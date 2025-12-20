@@ -167,6 +167,41 @@ image_exists() {
     $LXC_CMD image list | grep -q "$name"
 }
 
+#-------------------------------------------------------------------------------
+# Compute deterministic IP for sandbox using Feistel permutation
+# This ensures the same sandbox ID always gets the same IP
+#-------------------------------------------------------------------------------
+compute_sandbox_ip() {
+    local sandbox_id="$1"
+    local network_prefix="${2:-10.166.3}"
+    
+    # Use node.js for the Feistel computation (matches sandbox-proxy.js)
+    local ip
+    ip=$(node -e "
+const crypto = require('crypto');
+const KEY = process.env.IP_PERMUTATION_KEY || 'ginto-default-key-change-in-prod';
+function feistelPermute(input, key) {
+    let L = (input >>> 16) & 0xFFFF;
+    let R = input & 0xFFFF;
+    for (let i = 0; i < 4; i++) {
+        const rk = crypto.createHash('sha256').update(key + ':' + i + ':' + R).digest();
+        const F = (rk[0] << 8) | rk[1];
+        L = [R, L ^ F][0]; R = L ^ F; L = [R, L][0]; R = [R, L ^ F][1];
+        const nL = R; const nR = L ^ F; L = nL; R = nR;
+    }
+    return ((L << 16) | R) >>> 0;
+}
+const sandboxId = '$sandbox_id';
+const hash = crypto.createHash('sha256').update(sandboxId).digest();
+const input = ((hash[0] << 24) | (hash[1] << 16) | (hash[2] << 8) | hash[3]) >>> 0;
+const permuted = feistelPermute(input, KEY);
+const lastOctet = 2 + (permuted % 253);
+console.log('$network_prefix.' + lastOctet);
+" 2>/dev/null)
+    
+    echo "$ip"
+}
+
 get_container_ip() {
     local name="$1"
     local ip
@@ -476,6 +511,19 @@ setup_sandbox_proxy() {
     
     # Create systemd service
     log_info "Creating sandbox-proxy.service (user: $service_user, port: 1800)..."
+    
+    # Detect LXD bridge network prefix (typically 10.x.x for lxdbr0)
+    local network_prefix=""
+    local bridge_ip
+    bridge_ip=$(ip -4 addr show lxdbr0 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+' | head -1)
+    if [[ -n "$bridge_ip" ]]; then
+        network_prefix="$bridge_ip"
+        log_info "Detected LXD network prefix: $network_prefix"
+    else
+        log_warn "Could not detect LXD bridge, using default 10.166.3"
+        network_prefix="10.166.3"
+    fi
+    
     cat <<EOF | sudo tee /etc/systemd/system/sandbox-proxy.service > /dev/null
 [Unit]
 Description=Ginto Sandbox Proxy
@@ -487,6 +535,7 @@ Type=simple
 User=$service_user
 WorkingDirectory=$PROXY_DIR
 Environment=PORT=1800
+Environment=LXD_NETWORK_PREFIX=$network_prefix
 Environment=NODE_ENV=production
 ExecStart=/usr/bin/node sandbox-proxy.js
 Restart=always
@@ -1121,8 +1170,29 @@ cmd_create() {
             $LXC_CMD start "$name"
         fi
     else
+        # Extract sandbox ID from full name (remove prefix)
+        local sandbox_id="${name#${SANDBOX_PREFIX}}"
+        
+        # Detect LXD bridge network prefix
+        local network_prefix
+        network_prefix=$(ip -4 addr show lxdbr0 2>/dev/null | grep -oP '(?<=inet\s)\d+\.\d+\.\d+' | head -1)
+        [[ -z "$network_prefix" ]] && network_prefix="10.166.3"
+        
+        # Compute deterministic static IP
+        local static_ip
+        static_ip=$(compute_sandbox_ip "$sandbox_id" "$network_prefix")
+        
         log_info "Creating sandbox '$name' from $BASE_IMAGE (tier: $tier)..."
+        log_info "Assigning static IP: $static_ip"
+        
         $LXC_CMD launch "$BASE_IMAGE" "$name"
+        
+        # Assign static IP for deterministic routing
+        if [[ -n "$static_ip" ]]; then
+            $LXC_CMD config device override "$name" eth0 ipv4.address="$static_ip" 2>/dev/null || {
+                log_warn "Could not assign static IP, using DHCP"
+            }
+        fi
         
         # Apply security hardening with tier-based limits
         apply_security_config "$name" "$tier"

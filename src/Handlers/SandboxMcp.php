@@ -771,7 +771,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     host: '0.0.0.0',
-    port: 3000
+    port: 1800
   }
 })
 JS,
@@ -926,7 +926,7 @@ export default defineConfig({
   plugins: [vue()],
   server: {
     host: '0.0.0.0',
-    port: 3000
+    port: 1800
   }
 })
 JS,
@@ -1069,7 +1069,7 @@ require('dotenv').config();
 const apiRoutes = require('./routes/api');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 1800;
 
 // Middleware
 app.use(cors());
@@ -1120,7 +1120,7 @@ router.post('/items', (req, res) => {
 module.exports = router;
 JS,
             'node_env' => <<<ENV
-PORT=3000
+PORT=1800
 NODE_ENV=development
 ENV,
             // Python templates

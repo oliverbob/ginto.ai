@@ -411,7 +411,9 @@ install_utilities() {
     log_success "Utilities installed"
 }
 
-# Install Redis for sandbox IP routing and caching
+# Install Redis for agent communication and caching
+# NOTE: Redis is NOT used for IP routing (that's deterministic via Feistel permutation)
+#       Redis is used for: agent pub/sub, session state, message queues
 install_redis() {
     log_step "Checking Redis..."
     

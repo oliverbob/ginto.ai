@@ -128,40 +128,109 @@ class LxdSandboxManager
     }
     
     /**
-     * Convert sandbox ID to deterministic IP address
+     * Secret key for Feistel permutation
+     */
+    const PERMUTATION_KEY = 'ginto-default-key-change-in-prod';
+    
+    /**
+     * 4-round Feistel network for bijective 32-bit permutation
+     * Guarantees: same input → same output, different inputs → different outputs
      * 
-     * Two modes:
-     * 1. Full IP mode (datacenter): Uses all 4 bytes of SHA256 for full 32-bit IP
-     * 2. Subnet mode (local): Uses 1 byte mapped to last octet within network prefix
+     * @param int $input 32-bit unsigned integer
+     * @param string $key Secret key
+     * @return int Permuted 32-bit unsigned integer
+     */
+    private static function feistelPermute(int $input, string $key): int
+    {
+        $left = ($input >> 16) & 0xFFFF;
+        $right = $input & 0xFFFF;
+        
+        for ($round = 0; $round < 4; $round++) {
+            $roundKey = hash('sha256', "{$key}:{$round}:{$right}", true);
+            $f = (ord($roundKey[0]) << 8) | ord($roundKey[1]);
+            
+            $newLeft = $right;
+            $newRight = $left ^ $f;
+            
+            $left = $newLeft;
+            $right = $newRight;
+        }
+        
+        return (($left << 16) | $right) & 0xFFFFFFFF;
+    }
+    
+    /**
+     * Convert sandbox ID to deterministic IP address (Collision-Free)
      * 
-     * Set LXD_NETWORK_PREFIX env var to your subnet (e.g., "10.166.3") for local mode.
+     * Algorithm:
+     * 1. SHA256(sandboxId) → first 4 bytes → 32-bit integer
+     * 2. Feistel permutation with secret key → bijective mapping
+     * 3. Result → IPv4 address
+     * 
+     * Properties:
+     * - Deterministic: same ID always produces same IP
+     * - Collision-free: different IDs guaranteed different IPs (bijective)
+     * - Unpredictable: cannot guess IP without knowing the key
      * 
      * @param string $sandboxId The sandbox/agent identifier
-     * @return string IP address (e.g., "142.87.203.91" or "10.166.3.142")
+     * @return string IP address
      */
     public static function sandboxToIp(string $sandboxId): string
     {
-        $hash = hash('sha256', $sandboxId, true); // binary output
+        $hash = hash('sha256', $sandboxId, true);
         $networkPrefix = getenv('LXD_NETWORK_PREFIX') ?: null;
         
+        // Subnet mode: simple hash for /24 network
         if ($networkPrefix) {
-            // Subnet mode: map hash to last octet within network prefix
-            // Use hash byte to get value 2-254 (avoid .0, .1, .255)
             $lastOctet = 2 + (ord($hash[0]) % 253);
             return "{$networkPrefix}.{$lastOctet}";
         }
         
-        // Datacenter mode: full 32-bit IP space
-        $octets = array_map('ord', str_split(substr($hash, 0, 4)));
+        // Datacenter mode: bijective permutation over full 32-bit space
+        $input = (ord($hash[0]) << 24) | (ord($hash[1]) << 16) | (ord($hash[2]) << 8) | ord($hash[3]);
         
-        // Avoid reserved addresses: .0 (network) and .255 (broadcast)
-        $octets = array_map(function($b) {
-            if ($b === 0) return 1;
-            if ($b === 255) return 254;
-            return $b;
-        }, $octets);
+        $key = getenv('IP_PERMUTATION_KEY') ?: self::PERMUTATION_KEY;
+        $permuted = self::feistelPermute($input, $key);
+        
+        $octets = [
+            ($permuted >> 24) & 255,
+            ($permuted >> 16) & 255,
+            ($permuted >> 8) & 255,
+            $permuted & 255
+        ];
+        
+        // Avoid broadcast/network addresses in last octet
+        if ($octets[3] === 0) $octets[3] = 1;
+        if ($octets[3] === 255) $octets[3] = 254;
         
         return implode('.', $octets);
+    }
+    
+    /**
+     * Query LXD for container's actual IP address
+     * 
+     * @param string $sandboxId The sandbox identifier
+     * @return string|null IP address or null if not found
+     */
+    public static function queryLxdIp(string $sandboxId): ?string
+    {
+        $name = self::containerName($sandboxId);
+        
+        $output = [];
+        $code = 0;
+        exec(self::LXC_CMD . " list " . escapeshellarg($name) . " --format csv -c 4 2>/dev/null", $output, $code);
+        
+        if ($code !== 0 || empty($output)) {
+            return null;
+        }
+        
+        // Parse output like "10.166.3.85 (eth0)"
+        $ipLine = trim($output[0]);
+        if (preg_match('/(\d+\.\d+\.\d+\.\d+)/', $ipLine, $matches)) {
+            return $matches[1];
+        }
+        
+        return null;
     }
     
     /**

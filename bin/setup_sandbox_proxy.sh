@@ -79,7 +79,7 @@ ExecStart=/usr/bin/node sandbox-proxy.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
-Environment=PROXY_PORT=3000
+Environment=PROXY_PORT=1800
 Environment=AUTO_CREATE_SANDBOX=0
 
 # Logging
@@ -107,17 +107,17 @@ if [ -f "$CADDYFILE" ]; then
         echo "" >> "$CADDYFILE"
         cat >> "$CADDYFILE" << 'EOF'
 
-# Ginto Sandbox Proxy
+# Ginto Sandbox Proxy - listening directly on :1800
 :1800 {
-    reverse_proxy 127.0.0.1:3000
+    # Node.js proxy handles requests directly on this port
+    # No reverse proxy needed - proxy listens on 1800 itself
 }
 EOF
         echo "     Added sandbox proxy config to Caddyfile"
         systemctl reload caddy 2>/dev/null || echo "     (Caddy reload skipped)"
     fi
 else
-    echo "     Caddy not installed, skipping. Add manually:"
-    echo "     :1800 { reverse_proxy 127.0.0.1:3000 }"
+    echo "     Caddy not installed, skipping. Proxy listens directly on :1800"
 fi
 
 # 6. Verify installation
@@ -132,8 +132,8 @@ else
 fi
 
 # Check Node.js proxy
-if curl -s http://127.0.0.1:3000/health 2>/dev/null | grep -q '"status":"ok"'; then
-    echo "     ✓ Proxy: OK (port 3000)"
+if curl -s http://127.0.0.1:1800/health 2>/dev/null | grep -q '"status":"ok"'; then
+    echo "     ✓ Proxy: OK (port 1800)"
 else
     echo "     ✗ Proxy: Not responding yet (check: journalctl -u ginto-sandbox-proxy)"
 fi
@@ -157,5 +157,5 @@ echo ""
 echo "Management:"
 echo "  - Proxy logs:  journalctl -u ginto-sandbox-proxy -f"
 echo "  - Restart:     systemctl restart ginto-sandbox-proxy"
-echo "  - Status:      curl http://localhost:3000/status"
+echo "  - Status:      curl http://localhost:1800/status"
 echo ""

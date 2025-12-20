@@ -8,28 +8,26 @@ This document describes how to create and manage sandboxed containers for Ginto 
 ┌─────────────────────────────────────────────────────────────────┐
 │                         HOST MACHINE                            │
 │                                                                 │
-│  ┌─────────────┐    ┌──────────────┐    ┌──────────────────┐    │
-│  │   Caddy     │───▶│  Node.js     │───▶│     Redis        │    │
-│  │  :1800      │    │  Proxy :3000 │    │  user→IP mapping │    │
-│  └─────────────┘    └──────┬───────┘    └──────────────────┘    │
-│                            │                                    │
-│         ┌──────────────────┼──────────────────┐                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │ sandbox-u1  │    │ sandbox-u2  │    │ sandbox-u3  │  ...     │
-│  │ 10.0.0.2:80 │    │ 10.0.0.3:80 │    │ 10.0.0.4:80 │          │
-│  │ (PHP+Caddy) │    │ (PHP+Caddy) │    │ (PHP+Caddy) │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │   Node.js Sandbox Proxy :1800 (deterministic IP routing)│    │
+│  └────────────────────────┬────────────────────────────────┘    │
+│                           │                                     │
+│         ┌─────────────────┼─────────────────┐                   │
+│         ▼                 ▼                 ▼                   │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐            │
+│  │ sandbox-u1  │   │ sandbox-u2  │   │ sandbox-u3  │  ...       │
+│  │ 10.0.0.2:80 │   │ 10.0.0.3:80 │   │ 10.0.0.4:80 │            │
+│  │ (PHP+Caddy) │   │ (PHP+Caddy) │   │ (PHP+Caddy) │            │
+│  └─────────────┘   └─────────────┘   └─────────────┘            │
 │        LXD Containers (Alpine Linux)                            │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Flow:**
 1. User hits `http://host:1800/?sandbox=user123`
-2. Caddy proxies to Node.js proxy on port 3000
-3. Node.js looks up `user123` → `10.0.0.2` in Redis
-4. Node.js proxies request to container's internal IP
-5. Container's Caddy/PHP handles the request
+2. Node.js proxy computes IP via SHA256(sandboxId)
+3. Node.js proxies request to container's internal IP :80
+4. Container's Caddy/PHP handles the request
 
 ## System Requirements & Dependencies
 
@@ -872,7 +870,7 @@ http.createServer(async (req, res) => {
     }
 
     proxy.web(req, res, { target: `http://${ip}:80` });
-}).listen(3000, () => console.log('Sandbox proxy running on :3000'));
+}).listen(1800, () => console.log('Sandbox proxy running on :1800'));
 ```
 
 ### Option B: Caddy with Dynamic Backends
@@ -888,11 +886,12 @@ http.createServer(async (req, res) => {
 
 ### Host Caddy Configuration
 
-Add to `/etc/caddy/Caddyfile`:
+Note: The sandbox proxy now listens directly on port 1800, so Caddy reverse proxy is optional:
 
 ```
+# Only needed if using Caddy as a front proxy
 :1800 {
-    reverse_proxy 127.0.0.1:3000
+    # Node.js proxy listens directly on this port
 }
 ```
 
@@ -1886,7 +1885,7 @@ The sandbox proxy requires Node.js 18+ and npm packages:
 # Install and configure the sandbox proxy
 configure_sandbox_proxy() {
     local GINTO_PATH="${1:-/var/www/ginto}"
-    local PROXY_PORT="${2:-3000}"
+    local PROXY_PORT="${2:-1800}"
     
     echo "[*] Setting up sandbox proxy..."
     

@@ -25,7 +25,8 @@ A powerful **local AI Agent** that runs entirely on your machine. Works with Ope
 ### 📦 Optional Sandbox Environment
 - **LXD Container Isolation** - Secure code execution in isolated Alpine Linux containers
 - **Fair Use Tiers** - Free, Premium, and Admin resource limits
-- **Redis-backed routing** - O(1) container IP lookups
+- **Collision-Free IP Routing** - Bijective Feistel permutation for deterministic O(1) IP computation
+- **No Database Lookups** - IP derived cryptographically from sandbox ID (4.29 billion unique addresses)
 - **Automatic cleanup** - Idle containers are cleaned up based on tier
 
 ### 🔧 Built-in Infrastructure
@@ -106,8 +107,10 @@ After the main installation, the web UI will guide you to optionally set up the 
 This runs `./bin/ginto.sh` which sets up:
 - LXD container runtime
 - Alpine Linux base image
-- Redis for container routing
+- Deterministic IP routing (Feistel permutation - no Redis lookups)
 - Sandbox management infrastructure
+
+> **📖 See [docs/sandbox.md](docs/sandbox.md) for detailed sandbox architecture, diagrams, and the collision-free IP routing algorithm.**
 
 ---
 

@@ -8,28 +8,240 @@ This document describes how to create and manage sandboxed containers for Ginto 
 ┌─────────────────────────────────────────────────────────────────┐
 │                         HOST MACHINE                            │
 │                                                                 │
-│  ┌─────────────┐    ┌──────────────┐    ┌──────────────────┐    │
-│  │   Caddy     │───▶│  Node.js     │───▶│     Redis        │    │
-│  │  :1800      │    │  Proxy :3000 │    │  user→IP mapping │    │
-│  └─────────────┘    └──────┬───────┘    └──────────────────┘    │
-│                            │                                    │
-│         ┌──────────────────┼──────────────────┐                 │
-│         ▼                  ▼                  ▼                 │
-│  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
-│  │ sandbox-u1  │    │ sandbox-u2  │    │ sandbox-u3  │  ...     │
-│  │ 10.0.0.2:80 │    │ 10.0.0.3:80 │    │ 10.0.0.4:80 │          │
-│  │ (PHP+Caddy) │    │ (PHP+Caddy) │    │ (PHP+Caddy) │          │
-│  └─────────────┘    └─────────────┘    └─────────────┘          │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │   Node.js Sandbox Proxy :1800 (Bijective IP Routing)    │    │
+│  └────────────────────────┬────────────────────────────────┘    │
+│                           │                                     │
+│         ┌─────────────────┼─────────────────┐                   │
+│         ▼                 ▼                 ▼                   │
+│  ┌─────────────┐   ┌─────────────┐   ┌─────────────┐            │
+│  │ sandbox-u1  │   │ sandbox-u2  │   │ sandbox-u3  │  ...       │
+│  │ 142.87.3.91 │   │ 87.201.4.22 │   │ 15.166.8.77 │            │
+│  │ (PHP+Caddy) │   │ (PHP+Caddy) │   │ (PHP+Caddy) │            │
+│  └─────────────┘   └─────────────┘   └─────────────┘            │
 │        LXD Containers (Alpine Linux)                            │
+│        IPs computed via Feistel permutation                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 **Flow:**
 1. User hits `http://host:1800/?sandbox=user123`
-2. Caddy proxies to Node.js proxy on port 3000
-3. Node.js looks up `user123` → `10.0.0.2` in Redis
-4. Node.js proxies request to container's internal IP
-5. Container's Caddy/PHP handles the request
+2. Node.js proxy computes IP via SHA256 → Feistel permutation (no lookup!)
+3. Node.js proxies request to container's computed IP :80
+4. Container's Caddy/PHP handles the request
+
+## Deterministic IP Routing (Collision-Free)
+
+Ginto uses a **keyed bijective pseudorandom permutation** (Feistel network) over 32-bit integers to map sandbox IDs to IPv4 addresses. This eliminates the need for Redis lookups for routing.
+
+### Algorithm
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    BIJECTIVE IP COMPUTATION                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Step 1: HASH                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  SHA256("tzo422027oh6")                                             │    │
+│  │  → [232, 15, 87, 201, 44, 156, ...]  (32 bytes)                     │    │
+│  │  → Take first 4 bytes as 32-bit integer: 3893069769                 │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                              │
+│                              ▼                                              │
+│  Step 2: FEISTEL PERMUTATION (4 rounds)                                     │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  Input: 3893069769 (32-bit)                                         │    │
+│  │  Key: "ginto-secret-key" (secret)                                   │    │
+│  │                                                                     │    │
+│  │  Round 1: L=59437, R=6857 → L'=6857, R'=59437 ⊕ F(6857,key,1)       │    │
+│  │  Round 2: ...                                                       │    │
+│  │  Round 3: ...                                                       │    │
+│  │  Round 4: Final permutation                                         │    │
+│  │                                                                     │    │
+│  │  Output: 2392817491 (different 32-bit integer)                      │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                              │                                              │
+│                              ▼                                              │
+│  Step 3: CONVERT TO IP                                                      │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │  2392817491 → [142, 87, 203, 91] → "142.87.203.91"                  │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Properties
+
+| Property | Description |
+|----------|-------------|
+| **Deterministic** | Same sandbox ID always produces the same IP |
+| **Bijective (Collision-Free)** | Every different input maps to a different output. Guaranteed. |
+| **Unpredictable** | Cannot guess the IP without knowing the secret key |
+| **Fast** | ~1 microsecond per computation, pure math, no I/O |
+| **Scalable** | 4.29 billion unique addresses (full IPv4 space) |
+
+### Why Feistel Network?
+
+A Feistel network is a **symmetric structure** that is always **invertible** (bijective), regardless of the round function. This means:
+
+- **No collisions**: If `A ≠ B`, then `F(A) ≠ F(B)`. Always.
+- **Reversible**: Given the output and key, you can compute the input.
+- **Cryptographically secure**: With a strong round function (SHA256), the mapping is pseudorandom.
+
+### Configuration
+
+| Environment Variable | Description | Default |
+|---------------------|-------------|---------|
+| `IP_PERMUTATION_KEY` | Secret key for Feistel permutation | `ginto-default-key-change-in-prod` |
+| `LXD_NETWORK_PREFIX` | If set, uses subnet mode (e.g., "10.166.3") | `null` (full 32-bit mode) |
+
+**⚠️ Production Security:** Always set a unique `IP_PERMUTATION_KEY` in production to prevent IP guessing.
+
+### Redis Role
+
+With bijective IP routing, **Redis is NOT required for IP lookups**. However, Redis remains available for:
+
+- **Agent Communication**: Message queues, pub/sub between agents
+- **Metrics**: Request counts, last-access timestamps
+- **Shared State**: Cross-agent data sharing
+
+Redis prefix changed from `ginto:sandbox:` to `agent:` to reflect this new role.
+
+## Request Flow Diagram
+
+```
+                         USER REQUEST
+                              |
+                              v
++----------------------------------------------------------------+
+| Browser: http://host/clients/index.php?sandbox=e8lcyszcnpod    |
++----------------------------------------------------------------+
+                              |
+                              v
++----------------------------------------------------------------+
+| CADDY REVERSE PROXY                                            |
+| forwards to localhost:1800                                     |
++----------------------------------------------------------------+
+                              |
+                              v
++----------------------------------------------------------------+
+| SANDBOX-PROXY.JS (port 1800)                                   |
+|                                                                |
+| 1. Extract sandbox ID: "e8lcyszcnpod"                          |
+|                                                                |
+| 2. Compute IP (instant, no network calls):                     |
+|    sandboxId --> SHA256 --> 32-bit int --> FEISTEL --> IP      |
+|    "e8lcyszcnpod" -----------------------------> 10.166.3.170  |
+|                                                                |
+| 3. Proxy request to http://10.166.3.170:80/                    |
++----------------------------------------------------------------+
+                              |
+                              v
++----------------------------------------------------------------+
+| LXD CONTAINER                                                  |
+|                                                                |
+| Name: ginto-sandbox-e8lcyszcnpod                               |
+| Static IP: 10.166.3.170 (assigned at creation)                 |
+| Bridge: lxdbr0 (10.166.3.0/24)                                 |
++----------------------------------------------------------------+
+```
+
+### Feistel Permutation (4 rounds)
+
+```
+Input: 32-bit integer from SHA256(sandboxId)
+
++--------+--------+
+|   L0   |   R0   |  (16 bits each)
++--------+--------+
+     |       |
+     |   +---+-----+
+     |   | F(key,0)| ----> XOR
+     |   +---------+        |
+     +----------------------+
+     |       |
++--------+--------+
+|   L1   |   R1   |
++--------+--------+
+     ... (repeat 4 rounds)
+
+Output: Permuted 32-bit integer (bijective, collision-free)
+
+Subnet mode:  lastOctet = 2 + (permuted % 253)
+Result:       10.166.3.170
+```
+
+## Container Creation Flow
+
+```
+ginto.sh create mybox
+        |
+        v
++--------------------------------------+
+| sandbox_id = "mybox"                 |
+| name = "ginto-sandbox-mybox"         |
++--------------------------------------+
+        |
+        v
++--------------------------------------+
+| compute_sandbox_ip("mybox")          |
+| --> Same Feistel algorithm           |
+| --> Returns: 10.166.3.XXX            |
++--------------------------------------+
+        |
+        v
++--------------------------------------+
+| lxc launch ginto-sandbox             |
+|     ginto-sandbox-mybox              |
+|                                      |
+| lxc config device override           |
+|     eth0 ipv4.address=10.166.3.XXX   |
++--------------------------------------+
+        |
+        v
++--------------------------------------+
+| Container starts with                |
+| STATIC IP matching proxy computation |
++--------------------------------------+
+```
+
+## Installation Sequence
+
+The sandbox proxy systemd service is created during `ginto.sh init`, NOT during `gintoai.sh install`.
+
+```
+INSTALLATION SEQUENCE
+=====================
+
+Step 1: Install system dependencies
+------------------------------------
+$ bin/gintoai.sh install
+
+  [x] PHP, Node.js, Redis, Caddy, MariaDB, Composer
+  [ ] Does NOT create sandbox-proxy.service
+  [ ] Does NOT set up LXD
+
+Step 2: Initialize LXD and sandbox proxy
+-----------------------------------------
+$ bin/ginto.sh init
+
+  [x] Initializes LXD
+  [x] Creates ginto-sandbox base image
+  [x] Creates /etc/systemd/system/sandbox-proxy.service  <-- SERVICE CREATED HERE
+  [x] Sets LXD_NETWORK_PREFIX environment variable
+  [x] Starts sandbox-proxy on port 1800
+```
+
+### Files Involved
+
+| File | Purpose |
+|------|---------|
+| `tools/sandbox-proxy/sandbox-proxy.js` | Node.js proxy with `feistelPermute()`, `sandboxToIp()`, `getContainerIp()` |
+| `src/Helpers/LxdSandboxManager.php` | PHP version of `feistelPermute()`, `sandboxToIp()` |
+| `bin/ginto.sh` | `compute_sandbox_ip()`, `cmd_create()` with static IP, `setup_sandbox_proxy()` |
+| `bin/gintoai.sh` | System deps installer (Redis for agent communication, not IP routing) |
+| `/etc/systemd/system/sandbox-proxy.service` | Created by `ginto.sh init` with `LXD_NETWORK_PREFIX` |
 
 ## System Requirements & Dependencies
 
@@ -872,7 +1084,7 @@ http.createServer(async (req, res) => {
     }
 
     proxy.web(req, res, { target: `http://${ip}:80` });
-}).listen(3000, () => console.log('Sandbox proxy running on :3000'));
+}).listen(1800, () => console.log('Sandbox proxy running on :1800'));
 ```
 
 ### Option B: Caddy with Dynamic Backends
@@ -888,11 +1100,12 @@ http.createServer(async (req, res) => {
 
 ### Host Caddy Configuration
 
-Add to `/etc/caddy/Caddyfile`:
+Note: The sandbox proxy now listens directly on port 1800, so Caddy reverse proxy is optional:
 
 ```
+# Only needed if using Caddy as a front proxy
 :1800 {
-    reverse_proxy 127.0.0.1:3000
+    # Node.js proxy listens directly on this port
 }
 ```
 
@@ -1886,7 +2099,7 @@ The sandbox proxy requires Node.js 18+ and npm packages:
 # Install and configure the sandbox proxy
 configure_sandbox_proxy() {
     local GINTO_PATH="${1:-/var/www/ginto}"
-    local PROXY_PORT="${2:-3000}"
+    local PROXY_PORT="${2:-1800}"
     
     echo "[*] Setting up sandbox proxy..."
     

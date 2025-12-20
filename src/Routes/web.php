@@ -2725,15 +2725,11 @@ req($router, '/sandbox/install', function() use ($db) {
             exit;
         }
         
-        // Step 3: Get container name and cache IP in Redis
+        // Step 3: Get container name
         // Note: Container files live in /home/ inside the container (no host bind mounts)
         // The ginto-sandbox template already has starter files in /home/
+        // IP is computed deterministically via SHA256(sandboxId) - no Redis needed
         $containerName = \Ginto\Helpers\LxdSandboxManager::containerName($sandboxId);
-        
-        // Cache the container IP in Redis for fast proxy lookups
-        if (!empty($result['ip'])) {
-            \Ginto\Helpers\SandboxProxy::cacheIp($sandboxId, $result['ip']);
-        }
         
         // Record acceptance of terms in database
         if ($db) {
@@ -3081,19 +3077,23 @@ function handleClientProxy(string $path, $db): void
             exit;
         }
         
-        // Cache the IP in Redis after starting
-        $ip = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
-        if ($ip) {
-            \Ginto\Helpers\SandboxProxy::cacheIp($sandboxId, $ip);
-        }
-        
         // Wait a moment for container to fully initialize
+        // IP is computed deterministically via SHA256(sandboxId) - no Redis caching needed
         usleep(500000); // 0.5 seconds
     }
     
-    // Proxy via port 1800 (Node.js sandbox proxy)
-    // This is more efficient and handles WebSockets properly
-    $proxyUrl = 'http://127.0.0.1:1800' . $path . '?sandbox=' . urlencode($sandboxId);
+    // Get container IP directly from LXD (no Node proxy needed)
+    $containerIp = \Ginto\Helpers\LxdSandboxManager::sandboxToIp($sandboxId);
+    
+    if (!$containerIp) {
+        http_response_code(503);
+        header('Content-Type: application/json');
+        echo json_encode(['error' => 'Sandbox unavailable']);
+        exit;
+    }
+    
+    // Proxy directly to container
+    $proxyUrl = 'http://' . $containerIp . ':80' . $path;
     
     // Forward the request using cURL
     $ch = curl_init($proxyUrl);
@@ -3263,16 +3263,11 @@ function handleSandboxPreview(string $sandboxId, string $path, $db): void
             exit;
         }
         
-        // Cache the IP in Redis
-        $ip = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
-        if ($ip) {
-            \Ginto\Helpers\SandboxProxy::cacheIp($sandboxId, $ip);
-        }
-        
+        // IP is computed deterministically via SHA256(sandboxId) - no Redis caching needed
         usleep(500000); // Wait 0.5s for container to initialize
     }
     
-    // Proxy via port 1800. This can be removed and be replaced with direct call to port 3000 later.
+    // Proxy via port 1800 (Node.js sandbox proxy)
     $proxyUrl = 'http://127.0.0.1:1800' . $path . '?sandbox=' . urlencode($sandboxId);
     
     // Forward the request using cURL
