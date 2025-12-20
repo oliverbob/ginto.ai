@@ -550,8 +550,17 @@ install_nodejs() {
     
     case $OS in
         ubuntu|debian)
-            # Install Node.js 20 LTS
-            curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+            # Auto-detect current Node.js LTS version from nodesource
+            # Fetches the latest LTS major version dynamically
+            local NODE_LTS_VERSION
+            NODE_LTS_VERSION=$(curl -sL https://nodejs.org/dist/index.json | grep -oP '"version":"v\K[0-9]+' | head -1)
+            if [ -z "$NODE_LTS_VERSION" ]; then
+                NODE_LTS_VERSION="22"  # Fallback to known LTS
+                log_warn "Could not detect latest Node.js LTS, using v$NODE_LTS_VERSION"
+            else
+                log_info "Detected latest Node.js version: v$NODE_LTS_VERSION"
+            fi
+            curl -fsSL "https://deb.nodesource.com/setup_${NODE_LTS_VERSION}.x" | sudo -E bash -
             sudo apt-get install -y nodejs
             ;;
         fedora)
@@ -1322,7 +1331,7 @@ case "${1:-help}" in
         echo "  - MariaDB (database server)"
         echo "  - Caddy (web server/reverse proxy)"
         echo "  - Git, curl, unzip, ffmpeg"
-        echo "  - Node.js 20 LTS (optional)"
+        echo "  - Node.js LTS (auto-detected latest)"
         echo "  - llama.cpp (local LLM inference server)"
         echo "  - Build tools (gcc, cmake, etc.)"
         echo ""

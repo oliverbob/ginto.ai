@@ -848,9 +848,19 @@ create_base_image() {
     
     log_info "Creating ginto-sandbox base image..."
     
-    # Launch Alpine container
-    log_info "Launching Alpine 3.20 container..."
-    if ! $LXC_CMD launch images:alpine/3.20 "$container" 2>&1; then
+    # Auto-detect latest stable Alpine version from LXD images
+    local ALPINE_VERSION
+    ALPINE_VERSION=$($LXC_CMD image list images:alpine/ --format csv 2>/dev/null | grep -oP 'alpine/\K[0-9]+\.[0-9]+' | sort -V | tail -1)
+    if [ -z "$ALPINE_VERSION" ]; then
+        ALPINE_VERSION="3.21"  # Fallback to known stable
+        log_warn "Could not detect latest Alpine version, using $ALPINE_VERSION"
+    else
+        log_info "Detected latest Alpine version: $ALPINE_VERSION"
+    fi
+    
+    # Launch Alpine container with detected version
+    log_info "Launching Alpine $ALPINE_VERSION container..."
+    if ! $LXC_CMD launch "images:alpine/$ALPINE_VERSION" "$container" 2>&1; then
         echo ""
         log_error "Failed to launch container. If you see 'forkstart' error, nesting is not enabled."
         echo ""
