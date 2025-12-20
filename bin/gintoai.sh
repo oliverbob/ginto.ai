@@ -1283,8 +1283,20 @@ do_install() {
     
     # Run steps with checkpoint tracking
     local run_step
+    # Steps that should always run (idempotent, critical for correct state)
+    local ALWAYS_RUN_STEPS=("setup_permissions")
+    
     for step in "${INSTALL_STEPS[@]}"; do
-        if should_run_step "$step" "$last_checkpoint"; then
+        # Check if step should always run
+        local always_run=false
+        for always_step in "${ALWAYS_RUN_STEPS[@]}"; do
+            if [[ "$step" == "$always_step" ]]; then
+                always_run=true
+                break
+            fi
+        done
+        
+        if $always_run || should_run_step "$step" "$last_checkpoint"; then
             # Execute the step function
             $step
             # Save checkpoint after successful completion
