@@ -1,0 +1,115 @@
+{
+    "$id": "merged-raw.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "definitions": {},
+    "properties": {
+        "vars": {
+            "type": "object",
+            "patternProperties": {
+                "^([a-zA-Z\\._-]+)": {
+                    "type": "object",
+                    "required": ["name", "ids"],
+                    "properties": {
+                        "name": {
+                            "type": "string",
+                            "minLength": 2
+                        },
+                        "scope": {
+                            "type": "array",
+                            "additionalItems": false,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    "global",
+                                    "session",
+                                    "connection"
+                                ]
+                            }
+                        },
+                        "type": {
+                            "type": "string"
+                        },
+                        "ids": {
+                            "type": "array",
+                            "additionalItems": false,
+                            "items": {
+                                "type": "object",
+                                "additionalProperties": false,
+                                "required": ["anchor", "url"],
+                                "properties": {
+                                    "anchor": {
+                                        "type": ["string", "null"],
+                                        "minLength": 1
+                                    },
+                                    "url": {
+                                        "type": "string",
+                                        "format": "uri"
+                                    }
+                                }
+                            }
+                        },
+                        "cli": {
+                            "type": "string",
+                            "minLength": 2
+                        },
+                        "default": {
+                            "type": "string",
+                            "minLength": 0
+                        },
+                        "dynamic": {
+                            "type": "boolean"
+                        },
+                        "range": {
+                            "type": "object",
+                            "additionalProperties": false,
+                            "required": [],
+                            "properties": {
+                                "from": {
+                                    "type": "number"
+                                },
+                                "to": {
+                                    "oneOf": [
+                                        {
+                                            "type": "number"
+                                        },
+                                        {
+                                            "type": "string",
+                                            "enum": ["upwards"]
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        "validValues": {
+                            "type": "array",
+                            "additionalItems": false,
+                            "items": {
+                                "type": [ "string", "number"]
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "version": {
+            "$ref": "doc-version.json"
+        },
+        "urls": {
+            "type": "array",
+            "additionalItems": false,
+            "items": {
+                "$ref": "doc-url.json"
+            }
+        },
+        "types": {
+            "$ref": "url-types.json"
+        },
+        "varTypes": {
+            "$ref": "data-types.json"
+        }
+    },
+    "additionalProperties": false
+}

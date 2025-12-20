@@ -1,0 +1,33 @@
+{
+    "$schema": "https://ginto.ai/schemas/chat-config.json",
+    "comment": "Ginto AI Chat Configuration - Similar to VS Code settings",
+    
+    "streaming": {
+        "renderMarkdownOnServer": true,
+        "comment": "If true, markdown is rendered server-side with Parsedown. If false, raw markdown is sent to client."
+    },
+    
+    "rateLimit": {
+        "delayBetweenRequests": 500,
+        "comment": "Delay in milliseconds between consecutive model requests to avoid rate limiting"
+    },
+    
+    "agentPlan": {
+        "maxToolCallsPerPlan": 20,
+        "comment": "Maximum number of tool calls allowed in a single agentic plan execution"
+    },
+    
+    "visitor": {
+        "maxPromptsPerHour": 5,
+        "comment": "Maximum prompts per hour for non-logged-in visitors"
+    },
+    
+    "tools": {
+        "sandbox_exec": {
+            "requiresPremium": true,
+            "comment": "Require premium subscription to execute commands"
+        },
+        "autoApproveDefault": false,
+        "comment": "If true, tools execute without confirmation by default"
+    }
+}

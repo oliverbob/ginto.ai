@@ -1,0 +1,801 @@
+/* Editor Assistant (right-pane) — VS Code-style */
+:root {
+  --assistant-accent: #3aa0ff;
+  --assistant-border: var(--vscode-border, rgba(255,255,255,0.06));
+  --assistant-bg: var(--vscode-editor-bg, #0f1720);
+  /* prompt (textarea) background — match VS Code dark input/editor background */
+  /* Prompt background set to the color from the provided screenshot */
+  --assistant-prompt-bg: #2b2b2b; /* sampled dark VS Code-like prompt color */
+  --assistant-model-bg: #0f3a52; /* model select / changed background match */
+  --assistant-raptor-bg: #2b2b2b; /* Raptor mini select background (flat, non-rounded) */
+  --assistant-focus-ring: rgba(58,160,255,0.95);
+  --assistant-fg: var(--vscode-foreground, #ddd);
+  --assistant-muted: rgba(200,200,200,0.45);
+
+  /* Design tokens for VS Code-like composer */
+  --assistant-token-gap: 8px; /* base gutter */
+  --assistant-token-padding: 8px; /* composer padding */
+  --assistant-token-font-size: 13px;
+  --assistant-token-line-height: 1.35;
+  --assistant-token-minheight: 1.1em; /* one-line visible */
+  --assistant-token-maxheight: 400px;
+  --assistant-token-minheight-narrow: 140px;
+  --assistant-token-radius-top: 0px;
+  --assistant-token-radius-bottom: 3px; /* slight rounding like VS Code */
+  --assistant-token-border: 1px solid rgba(255,255,255,0.06);
+  --assistant-token-focus: rgba(0,122,204,0.08);
+  --assistant-token-chip-radius: 6px;
+  --assistant-token-chip-height: 28px;
+  --assistant-token-send-size: 48px;
+}
+
+/* Light mode overrides */
+html:not(.dark) {
+  --assistant-accent: #0078d4;
+  --assistant-border: rgba(0,0,0,0.12);
+  --assistant-bg: #f5f5f5;
+  --assistant-prompt-bg: #ffffff;
+  --assistant-model-bg: #e8f4fd;
+  --assistant-raptor-bg: #ffffff;
+  --assistant-focus-ring: rgba(0,120,212,0.3);
+  --assistant-fg: #1e1e1e;
+  --assistant-muted: rgba(60,60,60,0.6);
+}
+
+html:not(.dark) .assistant-pane {
+  background: #f5f5f5;
+  color: #1e1e1e;
+}
+
+html:not(.dark) .assistant-body {
+  background: #ffffff;
+}
+
+html:not(.dark) .assistant-input {
+  background: #ffffff !important;
+  color: #1e1e1e !important;
+  border-color: rgba(0,0,0,0.15) !important;
+}
+
+html:not(.dark) .assistant-input::placeholder {
+  color: rgba(0,0,0,0.45);
+}
+
+html:not(.dark) .assistant-message.bot .bubble {
+  background: rgba(0,0,0,0.04);
+  color: #1e1e1e;
+}
+
+html:not(.dark) .assistant-empty {
+  color: rgba(60,60,60,0.7);
+}
+
+html:not(.dark) .assistant-tab {
+  color: rgba(60,60,60,0.7);
+}
+
+html:not(.dark) .assistant-tab.active {
+  color: #1e1e1e;
+}
+
+html:not(.dark) .as-btn {
+  color: #555;
+}
+
+html:not(.dark) .as-btn:hover {
+  background: rgba(0,0,0,0.06);
+}
+
+html:not(.dark) .attached-file {
+  background: rgba(0,120,212,0.08);
+  border-color: rgba(0,120,212,0.15);
+}
+
+html:not(.dark) .mini-toggle .chev,
+html:not(.dark) .as-todos-toggle .chev {
+  color: #333;
+}
+
+.assistant-pane{
+  display:flex;
+  flex-direction:column;
+  height:100%;
+  min-height:0;
+  background:var(--assistant-bg);
+  color:var(--assistant-fg);
+  font-family:system-ui,-apple-system,'Segoe UI',Roboto,Arial;
+  overflow: auto;
+}
+
+/* Header */
+.assistant-header { flex:0 0 auto; display:flex; flex-direction:column; }
+.assistant-title-row { display:flex; align-items:center; justify-content:space-between; padding:8px 10px; gap:8px }
+.assistant-tabs { display:flex; align-items:center; gap:4px; overflow-x:auto; max-width:220px; }
+.assistant-tab { background:transparent; border:0; color:var(--assistant-muted); padding:5px 6px; border-radius:4px; font-weight:600; cursor:pointer; font-size:11px; white-space:nowrap; display:flex; align-items:center; gap:3px; position:relative; }
+.assistant-tab.active { color:var(--assistant-fg); border-bottom:2px solid var(--assistant-accent); padding-bottom:3px; background:rgba(255,255,255,0.05); }
+.assistant-tab:hover { background:rgba(255,255,255,0.08); }
+.assistant-tab .tab-label { pointer-events:none; }
+.assistant-tab .tab-close { font-size:13px; font-weight:400; line-height:1; opacity:0.4; padding:2px 4px; border-radius:3px; transition: all 0.15s; }
+.assistant-tab .tab-close:hover { opacity:1; background:rgba(239,68,68,0.2); color:#ef4444; }
+.assistant-tab:not(:hover) .tab-close { opacity:0.3; }
+.assistant-tab.active .tab-close { opacity:0.5; }
+.assistant-controls { display:flex; align-items:center; gap:6px }
+.as-btn { width:30px;height:30px;border-radius:6px;border:0;background:transparent;color:var(--assistant-fg);cursor:pointer;display:inline-flex;align-items:center;justify-content:center }
+.as-btn:hover { background: rgba(255,255,255,0.02) }
+
+/* Small inline editor header icons (used in playground editor header next to fullscreen) */
+.editor-mini-icons { display:flex; gap:6px; align-items:center }
+.editor-mini-icon { width:30px; height:30px; padding:4px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; border:0; background:transparent; color:var(--assistant-fg); cursor:pointer; }
+.editor-mini-icon:hover { background: rgba(255,255,255,0.02) }
+.as-divider { width:1px;height:22px;background:var(--assistant-border); margin:0 6px }
+.assistant-divider { height:1px; background:var(--assistant-border) }
+/* Body */
+.assistant-body { padding:12px; overflow-y:auto; overflow-x:hidden; flex:1; display:flex; flex-direction:column; gap:10px }
+  .assistant-todos-row { display:flex; align-items:center; gap:8px; padding:8px 10px; font-size:13px }
+  .as-todos-toggle { border:0; background:transparent; color:var(--assistant-muted); cursor:pointer; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center }
+  .todos-label { font-weight:600; color:var(--assistant-fg); }
+  .todos-count { color:var(--assistant-muted); font-weight:600; margin-left:6px }
+.assistant-empty { color:var(--assistant-muted); font-size:13px; padding:18px; border-radius:8px; text-align:center }
+.assistant-message { display:flex; gap:8px; align-items:flex-start }
+/* Make message bubbles span the full width of the conversation area. */
+.assistant-message.user { justify-content:flex-start }
+.assistant-message .bubble { width:100%; max-width:100%; padding:10px 14px; border-radius:10px; font-size:13px; line-height:1.35; box-sizing:border-box; overflow-x:hidden; word-break:break-word; }
+
+/* Ensure long code/pre blocks scroll horizontally within their own box instead
+   of causing the whole conversation to scroll horizontally. Also ensure code
+   blocks take full chat width but remain scrollable on overflow. */
+.assistant-message .bubble pre,
+.assistant-message .bubble pre code,
+.assistant-message .bubble code.pre,
+.sai-thinking pre,
+.sai-thinking pre code,
+.assistant-file-proposal pre,
+.assistant-file-proposal pre code,
+.assistant-file-proposal code {
+  white-space: pre; /* preserve whitespace */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  display: block;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+}
+
+/* Inline code that is likely to be long should wrap by default, but if you
+   want it to scroll instead, wrap it in a <pre> or use a .nowrap-code class. */
+.assistant-message .bubble code {
+  background: rgba(255,255,255,0.03);
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: pre-wrap; /* allow wrapping for inline code */
+  word-break: break-word;
+}
+.assistant-message.bot .bubble { background: rgba(255,255,255,0.02); color:var(--assistant-fg) }
+.assistant-message.user .bubble { background: linear-gradient(90deg,#3b82f6,#06b6d4); color:white }
+.assistant-meta { font-size:11px; color:var(--assistant-muted); margin-top:6px }
+
+/* Thinking indicator animation */
+.thinking-indicator {
+  display: inline-flex;
+  align-items: center;
+  color: var(--assistant-muted, rgba(255,255,255,0.6));
+  font-style: italic;
+}
+.thinking-indicator .dots {
+  display: inline-flex;
+  margin-left: 2px;
+}
+.thinking-indicator .dots span {
+  animation: thinking-bounce 1.4s infinite ease-in-out both;
+}
+.thinking-indicator .dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-indicator .dots span:nth-child(2) { animation-delay: 0.16s; }
+.thinking-indicator .dots span:nth-child(3) { animation-delay: 0.32s; }
+@keyframes thinking-bounce {
+  0%, 80%, 100% { opacity: 0.3; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* Footer + composer */
+/* Composer & Send button — make the composer look like VS Code dialog with an elevated, rounded send button */
+.assistant-footer { padding:8px 8px; display:flex; gap:8px; align-items:center; flex-direction:column }
+.assistant-composer--vscode {
+   display: flex;
+   flex-direction: column;
+   gap: var(--assistant-token-gap);
+   width: 100%;
+   align-items: stretch;
+  position: relative;
+  border-top-left-radius: var(--assistant-token-radius-top);
+  border-top-right-radius: var(--assistant-token-radius-top);
+  border-bottom-left-radius: var(--assistant-token-radius-bottom);
+  border-bottom-right-radius: var(--assistant-token-radius-bottom);
+  padding: var(--assistant-token-padding); /* compact padding for a neater, denser look */
+  overflow: hidden; /* clip inner elements to get clean rounded corners like VS Code */
+  border: var(--assistant-token-border);
+  background-clip: padding-box;
+}
+
+/* Focus outline similar to VS Code but more subtle and compact */
+.assistant-composer--vscode:focus-within {
+  outline: none;
+  border-top-left-radius: var(--assistant-token-radius-top);
+  border-top-right-radius: var(--assistant-token-radius-top);
+  border-bottom-left-radius: var(--assistant-token-radius-bottom);
+  border-bottom-right-radius: var(--assistant-token-radius-bottom);
+  box-shadow: 0 0 0 1px var(--assistant-token-focus); /* even subtler focus ring */
+}
+.assistant-composer--vscode .assistant-composer-header {
+  display:flex;
+  align-items:center;
+  justify-content:flex-start; /* left aligned header */
+  gap: var(--assistant-token-gap);
+  width:100%;
+  padding-bottom:6px;
+}
+
+.assistant-composer--vscode .assistant-composer-header-left { display:flex; align-items:center; gap:8px; }
+.assistant-composer--vscode .assistant-composer-header-right { display:flex; align-items:center; gap:8px; }
+.assistant-input {
+  flex: 1;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.04);
+  padding: 10px 12px;
+  background: var(--assistant-prompt-bg);
+  color: var(--assistant-fg);
+  min-height: var(--assistant-token-minheight);
+  resize: none !important;
+  font-size: var(--assistant-token-font-size);
+  line-height: var(--assistant-token-line-height);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+  box-sizing: border-box;
+  overflow-y: hidden;
+  transition: height 0.12s ease, box-shadow 0.12s ease;
+}
+
+/* Stronger specificity to ensure the textarea shows the VS Code-like prompt background
+   (some browsers or other CSS rules may override plain background). */
+.assistant-composer--vscode .assistant-input,
+.assistant-footer .assistant-input,
+.assistant-footer-overlay .assistant-input {
+  background: var(--assistant-prompt-bg) !important;
+  -webkit-appearance: none;
+  appearance: none;
+  background-clip: padding-box;
+}
+
+/* Override: make composer the unified background and textarea transparent
+   so focus only highlights the parent container and the textarea does not
+   change its own background on focus. */
+.editor-right-pane .assistant-composer--vscode {
+  background: var(--assistant-prompt-bg) !important;
+}
+.editor-right-pane .assistant-composer--vscode .assistant-input {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+}
+.editor-right-pane .assistant-composer--vscode .assistant-input:focus {
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.assistant-input.with-overlay { padding-top: calc(var(--assistant-token-chip-height) + var(--assistant-token-gap)) !important; padding-bottom:12px !important; padding-left:12px !important; }
+.assistant-input::placeholder { color: rgba(255,255,255,0.45) }
+.assistant-input:focus { outline: none; border-color: rgba(58,160,255,0.85); box-shadow: 0 4px 12px rgba(8,32,48,0.35), 0 0 0 3px rgba(58,160,255,0.10); }
+.assistant-send { background: linear-gradient(180deg, #4fb3ff 0%, #0b84ff 100%); color: white; border: 0; padding: 0; border-radius: 8px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: var(--assistant-token-send-size); height: var(--assistant-token-send-size); transition: transform .12s cubic-bezier(.2,.9,.2,1), box-shadow .12s ease, opacity .08s ease; box-shadow: 0 10px 26px rgba(9,25,40,0.6); }
+  .attached-file { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.03); padding: 6px 8px; border-radius: var(--assistant-token-chip-radius); display: inline-flex; gap: 8px; align-items: center; color: var(--assistant-fg); font-size: 13px }
+  .attached-file .file-tag { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: var(--assistant-token-chip-height); border-radius: 4px; background: rgba(255,255,255,0.03); font-weight: 700; color: var(--assistant-muted); font-size: 12px }
+  .attached-file .file-name { font-size:13px; color:var(--assistant-fg); padding-left:6px }
+.attached-overlay { position:absolute; left: var(--assistant-token-padding); top: var(--assistant-token-padding); display:flex; gap:6px; align-items:center; z-index:220; pointer-events:auto }
+  /* scope attached-overlay inside the composer so it flows and left-aligns */
+  .assistant-composer--vscode .attached-overlay { position: relative; display:flex; gap:6px; align-items:center; z-index:220; pointer-events:auto }
+.as-attach { width:28px; height:28px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; border:0; background: rgba(255,255,255,0.02); color:var(--assistant-fg); cursor:pointer }
+.as-attach:hover { background: rgba(255,255,255,0.03) }
+.assistant-send svg { display:block; width:18px; height:18px; fill:currentColor; stroke:none; }
+.assistant-send:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(8,32,48,0.6); }
+.assistant-send:focus { outline: 2px solid rgba(58,160,255,0.12); }
+.assistant-send:disabled { opacity:0.6; cursor:not-allowed }
+/* compact UI — removed extended toolbar and micro-info (kept for possible future re-use) */
+
+/* mini top rows (todos / changes) */
+.assistant-mini-top { width:100%; display:flex; flex-direction:column; gap:4px; padding:4px 2px }
+.assistant-mini-top .mini-row { display:flex; align-items:center; gap:6px; padding:4px 6px; border-radius:6px }
+.assistant-mini-top .todos-row { background: rgba(255,255,255,0.008); border:1px solid rgba(255,255,255,0.02) }
+.assistant-mini-top .changes-row { background: rgba(255,255,255,0.01); border:1px solid rgba(255,255,255,0.02) }
+.mini-toggle { background:transparent;border:0;color:var(--assistant-muted);cursor:pointer; display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px }
+
+/* Chevron rotation for expand/collapse indicators */
+.mini-toggle .chev, .as-todos-toggle .chev {
+  transition: transform 0.16s cubic-bezier(.2,.9,.2,1);
+  transform-origin: 50% 50%;
+  display:block;
+}
+
+/* Make the chevrons white for better visibility */
+.mini-toggle .chev, .as-todos-toggle .chev { color: #fff; }
+
+/* rotate right->down when expanded */
+.mini-toggle[aria-expanded="true"] .chev,
+.as-todos-toggle[aria-expanded="true"] .chev,
+.todos-open .as-todos-toggle .chev {
+  transform: rotate(90deg);
+}
+.mini-label { color:var(--assistant-fg); font-weight:600; display:block; flex:1; min-width:0; }
+.mini-row .plus { color:#22c55e; margin-left:6px }
+.mini-row .minus { color:#ef4444; margin-left:6px }
+.mini-row { position: relative; }
+
+/* Default layout for inline actions inside the mini-row */
+.assistant-mini-top .mini-row .mini-actions { margin-left: auto; display:flex; gap:8px; align-items:center; }
+
+/* On small screens make actions float as overlays over the label */
+@media (max-width:520px) {
+  .assistant-mini-top .mini-row.changes-row .mini-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    margin-left: 0;
+    z-index: 10;
+    pointer-events: auto;
+  }
+
+  /* make action buttons smaller/simpler when overlaying */
+  .assistant-mini-top .mini-row.changes-row .mini-actions .mini-keep,
+  .assistant-mini-top .mini-row.changes-row .mini-actions .mini-undo {
+    padding: 6px 8px;
+    font-size: 12px;
+    height: 32px;
+    border-radius: 6px;
+  }
+
+  /* reduce layout impact of label area when actions overlay; keep label single-line */
+  .assistant-mini-top .mini-row.changes-row .mini-label { padding-right: 110px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  /* Ensure the composer textarea is usable on very narrow views by enforcing
+     a larger minimum height (matches JS minSmall = 140) so the composer isn't
+     tiny when the UI compresses. Allow the textarea to grow above this min by
+     stretching the composer container and giving the textarea height:auto. */
+  .assistant-composer--vscode { align-items: stretch; }
+  .assistant-composer--vscode .assistant-input {
+    min-height: 140px !important;
+    height: auto !important;
+    overflow-y: auto; /* let autogrow / scrolling work seamlessly on narrow views */
+  }
+}
+
+/* When the panel is narrow (detected by JS) apply the same min-height so the
+   composer is usable even if the viewport itself is large. */
+.assistant-pane.composer-small .assistant-composer--vscode .assistant-input {
+  min-height: 140px !important;
+  height: auto !important;
+  overflow-y: auto;
+}
+
+/* When we're at the minimum height reduce the overlay padding so the text
+   doesn't sit behind visual chrome; keep slightly larger padding when there's
+   room so the overlay element still has space. */
+.assistant-pane.composer-small .assistant-composer--vscode .assistant-input.with-overlay {
+  padding-top: 60px !important;
+  padding-bottom: 12px !important;
+}
+
+@media (max-width:520px) {
+  .assistant-composer--vscode .assistant-input.with-overlay {
+    padding-top: 12px !important;
+    padding-bottom: 12px !important;
+    padding-left: 100px !important;
+  }
+}
+
+/* Very-narrow panels: keep the content vertically offset from overlay controls
+   so the placeholder / initial lines are visually clear. This overrides the
+   smaller 12px padding when the available width is extremely small. */
+@media (max-width:320px) {
+  .assistant-composer--vscode .assistant-input.with-overlay,
+  .assistant-pane.composer-small .assistant-composer--vscode .assistant-input.with-overlay {
+    padding-top: 80px !important;
+    padding-bottom: 12px !important;
+    padding-left: 12px !important; /* very narrow: overlay is likely stacked - reduce left padding */
+  }
+}
+
+/* Hide the verbose model label when the assistant pane is narrow so the select
+   remains usable but compact. Use two triggers: media query and JS-detected
+   .composer-small state so it works when the pane is narrow inside a wide
+   viewport. */
+@media (max-width:380px) {
+  .assistant-composer--vscode .custom-select__value,
+  .assistant-footer .custom-select__value,
+  .assistant-footer-overlay .custom-select__value {
+    display: none !important;
+  }
+
+  /* Make the trigger compact so only the arrow (and any small icon) remains */
+  .assistant-composer--vscode .custom-select__trigger,
+  .assistant-footer .custom-select__trigger,
+  .assistant-footer-overlay .custom-select__trigger {
+    padding: 6px !important;
+    min-width: 36px;
+    justify-content: center;
+  }
+
+  /* Shrink the wrapper itself when the model value is hidden so it doesn't
+     keep presenting as a full-width rounded control — this produces the
+     chevron-only trigger instead of the large rounded rectangle. */
+  .assistant-composer--vscode .custom-select,
+  .assistant-footer .custom-select,
+  .assistant-footer-overlay .custom-select {
+    min-width: 0 !important;
+    width: auto !important;
+  }
+
+  /* Reduce left padding so the textarea isn't overly indented when the
+     compact control is chevron-only. This keeps layout visually balanced. */
+  .assistant-composer--vscode .assistant-input.with-overlay {
+    padding-left: 56px !important;
+  }
+}
+
+/* When JS detects a very narrow assistant pane apply same compact styling */
+.assistant-pane.composer-small .custom-select__value,
+.assistant-pane.composer-small .assistant-footer .custom-select__value,
+.assistant-pane.composer-small .assistant-footer-overlay .custom-select__value {
+  display: none !important;
+}
+.assistant-pane.composer-small .custom-select__trigger,
+.assistant-pane.composer-small .assistant-footer .custom-select__trigger,
+.assistant-pane.composer-small .assistant-footer-overlay .custom-select__trigger {
+  padding: 6px !important;
+  min-width: 36px;
+  justify-content: center;
+}
+
+/* Tiny / chevron-only mode: hide badge and show only the chevron (square trigger)
+   Use when the pane is smaller than the 'composer-small' breakpoint and content
+   would otherwise overlap. */
+.assistant-pane.composer-tiny .custom-select__model-badge,
+.assistant-pane.composer-tiny .custom-select__value {
+  display: none !important;
+}
+.assistant-pane.composer-tiny .custom-select__trigger {
+  width: 38px !important;
+  min-width: 38px !important;
+  padding: 6px !important;
+  border-radius: 8px !important;
+  justify-content: center !important;
+}
+.assistant-pane.composer-tiny .custom-select__trigger .custom-select__arrow {
+  transform: none !important; /* keep arrow visually centered */
+}
+
+@media (max-width:340px) {
+  /* Mirror the tiny mode for very small viewports */
+  .custom-select__model-badge, .custom-select__value { display:none !important; }
+  .custom-select__trigger { width:38px !important; min-width:38px !important; padding:6px !important; justify-content:center !important; }
+}
+
+/* Fix: allow the custom-select wrapper to shrink when we are in tiny/chevron-only
+  mode — the parent .custom-select defaults to min-width:140px which creates a
+  visual full-width rounded rectangle even if the trigger is set small. Override
+  that here so we only show a small square chevron trigger. */
+.assistant-pane.composer-tiny .custom-select { min-width: 0 !important; width: auto !important; }
+
+/* Reduce the large left padding applied for composer-small to a small offset in
+  tiny mode — the single chevron trigger only needs a modest left gutter so the
+  input doesn't appear overly indented. */
+.assistant-pane.composer-tiny .assistant-composer--vscode .assistant-input.with-overlay { padding-left: 56px !important; }
+
+/* Compact model badge (shows when the select is compact) */
+.custom-select__model-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  color: var(--assistant-fg);
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.02);
+}
+
+/* File proposal visual improvements: ensure proposals are visible and
+   slightly elevated so the action buttons (Create / Dismiss) are obvious */
+.assistant-file-proposal {
+  position: relative;
+  z-index: 2;
+  box-shadow: 0 8px 30px rgba(2,6,23,0.55);
+  border-color: rgba(0,0,0,0.08) !important;
+  color: #111; /* dark text for file previews */
+}
+.assistant-file-proposal .proposal-content { background: #f7f9ff; color: #0a0a0a; }
+.assistant-file-proposal .as-prop-create { box-shadow: 0 6px 20px rgba(11,102,255,0.18); }
+}
+
+/* Only show the compact badge when we have hidden the verbose label */
+.assistant-pane.composer-small:not(.composer-tiny) .custom-select__model-badge { display:inline-flex !important; }
+.assistant-pane.composer-small .custom-select__value { display:none !important; }
+
+@media (max-width:380px) {
+  .custom-select__model-badge { display:inline-flex !important; }
+  .custom-select__value { display:none !important; }
+}
+.mini-keep { background:#0b84ff;color:white;border:0;padding:6px 10px;border-radius:6px;cursor:pointer }
+.mini-undo { background:transparent;color:var(--assistant-fg);border:1px solid rgba(255,255,255,0.06);padding:6px 10px;border-radius:6px;cursor:pointer }
+
+/* bottom toolbar */
+.assistant-bottom-toolbar { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 4px }
+.assistant-left-tools { display:flex; align-items:center; gap:12px }
+.assistant-right-tools { display:flex; align-items:center; gap:8px }
+.assistant-send.small { width:36px; height:36px; border-radius:8px; box-shadow:none; background:transparent; border:1px solid rgba(255,255,255,0.06); color:var(--assistant-fg) }
+.assistant-send.small svg { width:14px; height:14px }
+.assistant-model-select { display:flex; align-items:center; gap:8px }
+.assistant-model-select .agent-label { color:var(--assistant-muted); font-size:12px }
+/* model/agent select removed */
+.assistant-model-select .agent-label { color: var(--assistant-muted); }
+.mini-clip { background:transparent;border:0;color:var(--assistant-muted);cursor:pointer }
+
+/* Custom dropdown replacement for .agent-select (full visual control) */
+/* custom select markup/styles removed */
+
+
+/* Ensure native select remains hidden and does not interfere visually */
+.native-agent-select { display:none !important; visibility:hidden !important; height:0 !important; width:0 !important; margin:0 !important; padding:0 !important; border:0 !important; }
+
+/* composer footer overlay rules */
+/* model/custom-select visuals removed — controls are disabled */
+
+/* Hide the verbose model label when the assistant pane is narrow so the select
+   remains usable but compact. Use two triggers: media query and JS-detected
+   .composer-small state so it works when the pane is narrow inside a wide
+   viewport. */
+@media (max-width:380px) {
+  .assistant-composer--vscode .custom-select__value,
+  .assistant-footer .custom-select__value,
+  .assistant-footer-overlay .custom-select__value {
+    display: none !important;
+  }
+
+  /* Make the trigger compact so only the arrow (and any small icon) remains */
+  .assistant-composer--vscode .custom-select__trigger,
+  .assistant-footer .custom-select__trigger,
+  .assistant-footer-overlay .custom-select__trigger {
+    padding: 6px !important;
+    min-width: 36px;
+    justify-content: center;
+  }
+}
+
+/* When JS detects a very narrow assistant pane apply same compact styling */
+.assistant-pane.composer-small .custom-select__value,
+.assistant-pane.composer-small .assistant-footer .custom-select__value,
+.assistant-pane.composer-small .assistant-footer-overlay .custom-select__value {
+  display: none !important;
+}
+.assistant-pane.composer-small .custom-select__trigger,
+.assistant-pane.composer-small .assistant-footer .custom-select__trigger,
+.assistant-pane.composer-small .assistant-footer-overlay .custom-select__trigger {
+  padding: 6px !important;
+  min-width: 36px;
+  justify-content: center;
+}
+
+/* Tiny / chevron-only mode: hide badge and show only the chevron (square trigger)
+   Use when the pane is smaller than the 'composer-small' breakpoint and content
+   would otherwise overlap. */
+.assistant-pane.composer-tiny .custom-select__model-badge,
+.assistant-pane.composer-tiny .custom-select__value {
+  display: none !important;
+}
+.assistant-pane.composer-tiny .custom-select__trigger {
+  width: 38px !important;
+  min-width: 38px !important;
+  padding: 6px !important;
+  border-radius: 8px !important;
+  justify-content: center !important;
+}
+.assistant-pane.composer-tiny .custom-select__trigger .custom-select__arrow {
+  transform: none !important; /* keep arrow visually centered */
+}
+
+@media (max-width:340px) {
+  /* Mirror the tiny mode for very small viewports */
+  .custom-select__model-badge, .custom-select__value { display:none !important; }
+  .custom-select__trigger { width:38px !important; min-width:38px !important; padding:6px !important; justify-content:center !important; }
+}
+
+.custom-select__model-badge {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.02);
+  color: var(--assistant-fg);
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 6px;
+  box-shadow: inset 0 -1px 0 rgba(255,255,255,0.02);
+}
+
+/* Only show the compact badge when we have hidden the verbose label */
+.assistant-pane.composer-small .custom-select__model-badge { display:inline-flex !important; }
+.assistant-pane.composer-small .custom-select__value { display:none !important; }
+
+@media (max-width:380px) {
+  .custom-select__model-badge { display:inline-flex !important; }
+  .custom-select__value { display:none !important; }
+}
+.assistant-footer-overlay { position:absolute; left: var(--assistant-token-padding); right: var(--assistant-token-padding); bottom: calc(var(--assistant-token-padding) / 2); display:flex; align-items:center; justify-content:space-between; gap:var(--assistant-token-gap); z-index:4; pointer-events:auto }
+.assistant-footer-overlay .assistant-left-tools { gap:8px }
+.assistant-footer-overlay .assistant-right-tools { gap:6px }
+.assistant-footer-overlay .assistant-send.small { background: transparent; border:1px solid rgba(255,255,255,0.06); box-shadow:none }
+.assistant-footer-overlay .assistant-model-select .agent-label { display:none }
+.assistant-footer-overlay .agent-select { /* removed - agent select disabled */ padding:0; display:none; }
+
+/* Improve footer compression: transitions, safe truncation, and wrap behaviour to avoid overflow artifacts */
+.assistant-footer, .assistant-footer-overlay {
+  transition: padding .12s ease, gap .12s ease, transform .12s ease, opacity .12s ease;
+  -webkit-transition: padding .12s ease, gap .12s ease, transform .12s ease, opacity .12s ease;
+  overflow: visible;
+}
+.assistant-composer--vscode { overflow: hidden !important }
+
+/* Footer overlay flex behaviour: allow wrapping normally, but when narrow prefer single-line compact layout */
+.assistant-footer-overlay { display:flex; flex-wrap:wrap; align-items:center; gap:8px }
+.assistant-footer-overlay.narrow { flex-wrap:nowrap; align-items:center; gap:6px }
+
+/* Attached file chip: keep visible but truncate long names safely */
+.attached-file { flex: 0 0 auto; max-width: 220px; min-width: 0; display:inline-flex; align-items:center; gap:8px }
+
+/* Ensure composer-tiny always hides the full textual model badges/values
+  and enforces the compact chevron-only presentation even if other rules try
+  to re-show them (this sits at the end so it wins ordering and specificity). */
+.assistant-pane.composer-tiny .custom-select__model-badge,
+.assistant-pane.composer-tiny .custom-select__value { display: none !important; }
+
+.assistant-pane.composer-tiny .assistant-composer--vscode .assistant-input.with-overlay { padding-left: 56px !important; }
+.attached-file .file-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display:inline-block }
+.assistant-footer-overlay.narrow .attached-file { max-width: 120px }
+.assistant-footer-overlay.narrow .attached-file .file-name { max-width: 80px }
+
+/* Agent/model selector collapse: keep icon but truncate label, shrink to square in narrow mode */
+.assistant-footer .agent-select, .assistant-footer-overlay .agent-select { /* removed - agent select disabled */ display:none; }
+
+/* Audio status bar styling */
+.assistant-audio-status {
+  background: transparent;
+  border-bottom: 1px solid var(--assistant-border);
+  font-size: 11px;
+  color: var(--assistant-muted);
+}
+
+html:not(.dark) .assistant-audio-status {
+  background: transparent;
+  border-bottom-color: rgba(0,0,0,0.08);
+  color: #666;
+}
+
+.assistant-audio-status input[type="checkbox"] {
+  accent-color: var(--assistant-accent);
+}
+
+/* TTS/STT toggle buttons active states */
+#editor-tts-toggle.active,
+#editor-stt-toggle.active {
+  background: rgba(58, 160, 255, 0.2);
+  color: var(--assistant-accent);
+}
+
+#editor-stt-toggle[style*="color: #ef4444"] {
+  animation: pulse-recording 1s ease-in-out infinite;
+}
+
+@keyframes pulse-recording {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* Small send and icons get subtle transitions and won't cause layout jumps */
+.assistant-footer .assistant-send, .assistant-footer-overlay .assistant-send { transition: width .12s ease, height .12s ease, transform .12s ease, opacity .12s ease }
+
+/* Prevent body content from being clipped by overlay when composer grows */
+.assistant-body { padding-bottom: 120px }
+
+/* Playground editor views overlay styling (matches admin preview overlay visuals) */
+#editor-views-overlay {
+  position: absolute;
+  inset: 0;
+  display: none; /* created/shown by JS */
+  z-index: 60; /* above editor workspace but below UI modals */
+  background: #ffffff;
+  color: #000;
+  flex-direction: column;
+  overflow: auto;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+#editor-views-overlay iframe { width:100%; height:100%; border:0; display:block; }
+
+/* Make sure overlay content is visually separated when shown on top of editor */
+.editor-workspace > #editor-views-overlay { border-radius: 6px; overflow: hidden; }
+
+/* Strong composer radius enforcement — ensure the bottom radius renders and children don't visually square the corners.
+   This rule is intentionally specific and applied at the end of the file so it wins against less-specific overrides. */
+#assistant-pane .assistant-composer--vscode,
+.assistant-pane .assistant-composer--vscode {
+  border-bottom-left-radius: var(--assistant-token-radius-bottom) !important;
+  border-bottom-right-radius: var(--assistant-token-radius-bottom) !important;
+  overflow: hidden !important; /* ensure children are clipped to the container's rounded corners */
+  background-clip: padding-box !important;
+}
+
+/* Ensure overlay and footer visuals don't add square backgrounds that mask the parent's rounding. */
+#assistant-pane .assistant-composer--vscode .assistant-footer-overlay,
+#assistant-pane .assistant-composer--vscode .assistant-input {
+  background: transparent !important;
+  border-radius: 0 !important;
+}
+
+
+@media (max-width:800px) {
+  .assistant-pane { font-size:13px }
+  .assistant-title-row { padding:8px }
+  .assistant-send { width:36px; height:36px }
+}
+
+/* box sizing for nested elements */
+.assistant-pane, .assistant-pane * { box-sizing: border-box }
+
+/* Narrow footer mode: compress footer controls only (VS Code-like behavior) */
+.assistant-footer.narrow { padding:6px; display:flex; align-items:center; gap:6px }
+.assistant-footer-overlay.narrow { left:6px; right:6px; bottom:6px; display:flex; align-items:center; gap:6px }
+.assistant-footer.narrow .assistant-left-tools, .assistant-footer-overlay.narrow .assistant-left-tools { gap:6px }
+.assistant-footer.narrow .assistant-right-tools, .assistant-footer-overlay.narrow .assistant-right-tools { gap:6px }
+.assistant-footer.narrow .assistant-send, .assistant-footer-overlay.narrow .assistant-send { width:40px; height:40px; border-radius:8px; box-shadow:none }
+.assistant-footer.narrow .assistant-send.small, .assistant-footer-overlay.narrow .assistant-send.small { width:36px; height:36px }
+.assistant-footer.narrow .assistant-input, .assistant-footer-overlay.narrow .assistant-input { min-height:36px; padding:8px }
+.assistant-footer.narrow .assistant-footer-overlay .agent-select, .assistant-footer-overlay.narrow .agent-select { /* removed - agent select disabled */ display:none; }
+/* hide verbose labels in footer only */
+.assistant-footer.narrow .agent-label, .assistant-footer-overlay.narrow .agent-label, .assistant-footer.narrow .mini-label { display:none }
+/* Keep attachments visible when footer is narrow */
+.assistant-footer.narrow .attached-file, .assistant-footer-overlay.narrow .attached-file { display:inline-flex; }
+.assistant-footer.narrow .attached-file .file-name, .assistant-footer-overlay.narrow .attached-file .file-name { display:inline-block; }
+.assistant-footer.narrow .attached-overlay, .assistant-footer-overlay.narrow .attached-overlay { left:6px; top:6px }
+
+
+/* === SELECT REMOVAL OVERRIDES ===
+   The agent/model select and custom-select UI were removed from the composer.
+   Add an explicit, high-specificity override to ensure any leftover markup
+   is visually hidden while the feature is disabled. This avoids layout
+   regressions while keeping the code safe to re-introduce later. */
+.custom-select,
+.custom-select__trigger,
+.custom-select__value,
+.custom-select__arrow,
+.custom-select__options,
+.custom-option,
+.custom-select__overlay,
+.custom-select__options--overlay,
+.custom-select__model-badge,
+.native-agent-select,
+.agent-select {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+}
+
+

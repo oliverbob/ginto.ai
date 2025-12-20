@@ -1,0 +1,72 @@
+{
+    "$id": "merged-ultraslim.json",
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "type": "object",
+    "definitions": {},
+    "required": ["vars", "version", "urls", "types", "varTypes"],
+    "properties": {
+        "vars": {
+            "$id": "/properties/vars",
+            "type": "object",
+            "patternProperties": {
+                "^([a-zA-Z\\._-]+)": {
+                    "type": "object",
+                    "properties": {
+                        "t": {
+                            "description": "The variable type",
+                            "type": "integer"
+                        },
+                        "d": {
+                            "description": "The variable is dynamic or not",
+                            "type": "boolean"
+                        },
+                        "a": {
+                            "type": "array",
+                            "additionalItems": false,
+                            "items": {
+                                "type": "object",
+                                "required": ["u", "t"],
+                                "properties": {
+                                    "a": {
+                                        "description": "The link anchor",
+                                        "type": ["string", "null"]
+                                    },
+                                    "u": {
+                                        "description": "The URL id in the urls attribute",
+                                        "type": "integer"
+                                    },
+                                    "t": {
+                                        "description": "The link type",
+                                        "type": "integer",
+                                        "enum": [1, 2, 3]
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        }
+                    },
+                    "additionalProperties": false
+                }
+            },
+            "additionalProperties": false
+        },
+        "version": {
+            "$ref": "doc-version.json"
+        },
+        "urls": {
+            "description": "List of documentation URLs",
+            "type": "array",
+            "additionalItems": false,
+            "items": {
+                "$ref": "doc-url.json"
+            }
+        },
+        "types": {
+            "$ref": "url-types.json"
+        },
+        "varTypes": {
+            "$ref": "data-types.json"
+        }
+    },
+    "additionalProperties": false
+}

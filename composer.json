@@ -1,0 +1,61 @@
+{
+    "name": "my-cms/from-scratch",
+    "description": "A simple CMS built from scratch with Composer.",
+    "type": "project",
+    "config": {
+        "process-timeout": 0
+    },
+    "require": {
+        "php": ">=7.4",
+        "erusev/parsedown": "^1.7",
+        "opis/json-schema": "^2.6",
+        "php-mcp/server": "^3.3",
+        "vlucas/phpdotenv": "^5.6",
+        "catfan/medoo": "^2.1",
+        "pecee/simple-router": "^4.3",
+        "phpmyadmin/phpmyadmin": "^5.2",
+        "symfony/polyfill-php80": "^1",
+        "php-mcp/client": "^1.0",
+        "guzzlehttp/guzzle": "^7.10",
+        "erusev/parsedown-extra": "^0.8.1",
+        "cboden/ratchet": "^0.4.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "src/",
+            "Ginto\\": "src/",
+            "Core\\": "src/Core/",
+            "Playground\\": "src/Playground/"
+        }
+    },
+    "scripts": {
+        "serve": "php -S 0.0.0.0:8000 -t public 2>&1 | sed -E '/\\.well-known\\/appspecific\\/com\\.chrome\\.devtools\\.json/d'",
+        "start": "bash bin/ginto start --services && tail -n 200 -F /tmp/ginto-web.log",
+        "stop": "bash bin/stop_all.sh && bash bin/mcp_stop.sh",
+        "restart": [
+            "@stop",
+            "@start"
+        ],
+        "services": "bash bin/start_services.sh",
+        "services:stop": "bash bin/stop_services.sh",
+        "start:all": "bash bin/ginto start -- --services && tail -n 200 -F /tmp/ginto-web.log",
+        "stop:all": "bash bin/stop_all.sh",
+        "ratchet:start": "bash bin/composer_post.sh",
+        "mcp:start": "bash bin/mcp_start.sh",
+        "mcp:stop": "bash bin/mcp_stop.sh",
+        "mcp:status": "bash -c 'if [ -f /tmp/github-mcp.pid ]; then PID=$(cat /tmp/github-mcp.pid); if ps -p $PID > /dev/null; then echo \"github-mcp running (PID: $PID)\"; else echo \"github-mcp pid file exists but process not running\"; fi; else echo \"github-mcp not running\"; fi'",
+        "server:status": "bash -c 'PID=$(sudo lsof -t -i:8000 2>/dev/null); if [ ! -z \"$PID\" ]; then echo \"Server running on port 8000 (PID: $PID)\"; else echo \"No server running on port 8000\"; fi'",
+        "test:transcribe": "bash bin/test_transcribe.sh",
+        "post-install-cmd": [
+            "bash bin/composer_post.sh"
+        ],
+        "post-update-cmd": [
+            "bash bin/composer_post.sh"
+        ]
+    },
+    "config": {
+        "mcp": {
+            "default_server_url": "http://127.0.0.1:9010"
+        }
+    }
+}

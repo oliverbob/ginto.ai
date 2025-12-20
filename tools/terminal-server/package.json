@@ -1,0 +1,14 @@
+{
+  "name": "ginto-terminal-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "WS PTY server for Ginto playground (development only)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "node-pty": "^0.11.1",
+    "ws": "^8.13.0"
+  }
+}

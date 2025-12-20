@@ -1,0 +1,24 @@
+[Unit]
+Description=Ginto Sandbox Daemon Instance (%i)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/php /usr/local/bin/sandboxd.php
+User=root
+Group=root
+StandardInput=socket
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=full
+ProtectHome=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+CapabilityBoundingSet=
+Restart=on-failure
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

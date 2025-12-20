@@ -1,0 +1,52 @@
+{
+    "name": "php-mcp/client",
+    "description": "PHP Client for the Model Context Protocol (MCP)",
+    "type": "library",
+    "require": {
+        "psr/log": "^1.0 || ^2.0 || ^3.0",
+        "psr/simple-cache": "^1.0 || ^2.0 || ^3.0",
+        "psr/event-dispatcher": "^1.0",
+        "psr/container": "^1.0 || ^2.0",
+        "react/async": "^4.0",
+        "react/child-process": "^0.6.6",
+        "react/event-loop": "^1.5",
+        "react/http": "^1.11",
+        "react/promise": "^3.2",
+        "react/stream": "^1.4"
+    },
+    "require-dev": {
+        "pestphp/pest": "^2.3 || ^3.0",
+        "mockery/mockery": "^1.6",
+        "friendsofphp/php-cs-fixer": "^3.75",
+        "symfony/var-dumper": "^6.4 || ^7.1"
+    },
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "PhpMcp\\Client\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PhpMcp\\Client\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "test:coverage": "XDEBUG_MODE=coverage ./vendor/bin/pest --coverage",
+        "lint": "vendor/bin/php-cs-fixer fix --config=.php-cs-fixer.php"
+    },
+    "authors": [
+        {
+            "name": "Kyrian Obikwelu",
+            "email": "koshnawaza@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
+}

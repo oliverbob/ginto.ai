@@ -1,0 +1,32 @@
+{
+    "name": "php-mcp/openai-integration-example",
+    "description": "Example integrating php-mcp/client with openai-php",
+    "type": "project",
+    "require": {
+        "php": ">=8.1",
+        "nyholm/psr7": "^1.8",
+        "openai-php/client": "^0.10.0",
+        "php-mcp/client": "dev-one-client-one-server",
+        "symfony/http-client": "^7.2",
+        "vlucas/phpdotenv": "^5.6"
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Example\\": "src/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}
