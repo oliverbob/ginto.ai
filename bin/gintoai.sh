@@ -232,13 +232,21 @@ install_php() {
             sudo add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
             sudo apt-get update -qq
             
-            # Detect latest available PHP 8.x version
-            local PHP_VERSION=$(apt-cache search '^php8\.[0-9]+-cli$' 2>/dev/null | sort -V | tail -1 | grep -oP 'php\K8\.[0-9]+')
+            # Detect latest STABLE PHP 8.x version with all required extensions
+            # We check for opcache package to ensure it's a complete release
+            local PHP_VERSION=""
+            for ver in 8.4 8.3 8.2 8.1; do
+                if apt-cache show "php${ver}-opcache" &>/dev/null; then
+                    PHP_VERSION="$ver"
+                    break
+                fi
+            done
+            
             if [ -z "$PHP_VERSION" ]; then
                 PHP_VERSION="8.3"  # Fallback
-                log_warn "Could not detect latest PHP version, using $PHP_VERSION"
+                log_warn "Could not detect stable PHP version, using $PHP_VERSION"
             else
-                log_info "Detected latest PHP version: $PHP_VERSION"
+                log_info "Detected latest stable PHP version: $PHP_VERSION"
             fi
             
             # Install PHP and extensions with detected version
