@@ -988,6 +988,8 @@ setup_env() {
             touch "$env_file"
             log_info "Created new .env file"
         fi
+        # Make .env group-writable so web installer can update it
+        chmod 664 "$env_file"
     else
         log_info ".env already exists"
     fi
