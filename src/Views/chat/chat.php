@@ -1185,17 +1185,27 @@
           <p class="text-gray-500 dark:text-gray-400 mb-4 max-w-md">Type a message or upload files to get started. I can help you build, analyze, and create.</p>
 
           <!-- Promotional banner (styled like prompts) -->
-          <div class="mb-6 w-full max-w-md">
-            <div class="px-4 py-3 bg-gray-100 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-xl transition-colors">
-              <div class="flex items-start gap-3">
-                <div class="flex-shrink-0">
-                  <svg class="w-6 h-6 text-gray-700 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 1.343-3 3v3h6v-3c0-1.657-1.343-3-3-3z"/></svg>
+          <div class="mb-6 w-full max-w-lg">
+            <div class="px-4 py-3 bg-gradient-to-br from-indigo-50/30 via-white/50 to-purple-50/30 dark:from-indigo-950/20 dark:via-gray-900/50 dark:to-purple-950/20 border border-indigo-100/40 dark:border-indigo-800/30 rounded-xl transition-colors">
+              <div class="space-y-2 text-center">
+                <h4 class="flex items-center justify-center gap-2 text-sm font-semibold text-gray-800 dark:text-gray-100 tracking-tight">
+                  <svg class="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                  A Non-bloated, Flexible Agentic UI
+                </h4>
+                <div class="space-y-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                  <p>
+                    Compatible with <span class="font-medium text-gray-600 dark:text-gray-300">Ollama</span>, 
+                    <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-xs font-mono text-indigo-500 dark:text-indigo-400">llama.cpp</code>, 
+                    and OpenAI-compatible APIs.
+                  </p>
+                  <p>
+                    Supports <span class="font-medium text-gray-600 dark:text-gray-300">reasoning</span>, 
+                    <span class="font-medium text-gray-600 dark:text-gray-300">vision</span>, and 
+                    <span class="font-medium text-gray-600 dark:text-gray-300">tool-calling</span> with multi-tenant sandboxes. 
+                    Redis-backed to <span class="font-mono text-xs">4.29B</span> internal IPs.
+                  </p>
                 </div>
-                <div class="flex-1 text-sm leading-tight text-gray-700 dark:text-gray-300">
-                  <strong class="block">P50,000 (≈ $1,000) worth of premium is Free</strong>
-                  <span class="block">Available until December 18 for new registrants applying as <em>Platform Technolvangelists partner admin roles with their free accounts.</em>. <br /><br />
-                  Additionally, the entire code stack for Ginto Chat is also for sale to those interested. Register and chat with admin to claim.</span>
-                </div>
+                <p class="text-[10px] font-medium tracking-wider uppercase text-indigo-500 dark:text-indigo-400">Built to scale · Built to last</p>
               </div>
             </div>
           </div>
