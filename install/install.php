@@ -15,9 +15,14 @@ if (!isset($_POST['db_type']) && !isset($_POST['step'])) {
     ini_set('log_errors', 1);
 }
 
+// Ensure ROOT_PATH is defined (set by public/index.php, fallback for direct access)
+if (!defined('ROOT_PATH')) {
+    define('ROOT_PATH', dirname(__DIR__));
+}
+
 // Security check - prevent reinstallation only if installation is complete
-$envExists = file_exists('../.env');
-$installedMarkerExists = file_exists('../.installed') || file_exists('../../storage/.installed');
+$envExists = file_exists(ROOT_PATH . '/.env');
+$installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
 $forceInstall = isset($_GET['force']);
 
 // Allow installation if:
@@ -159,7 +164,7 @@ function handleInstallationStep($step, $data) {
 }
 
 function createConfigurationFiles($data) {
-    $envPath = '../.env';
+    $envPath = ROOT_PATH . '/.env';
 
     // Load existing .env into a map so we can preserve values and avoid overwriting
     // user-provided or sensitive values. We only add keys that are missing.
