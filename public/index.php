@@ -25,17 +25,20 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 
 // Handle /install routes directly
 if (strpos($path, '/install') === 0) {
-    // Serve installer files directly from the install directory
-    $installPath = $path === '/install' || $path === '/install/' ? '/install/index.html' : $path;
-    $filePath = ROOT_PATH . $installPath;
-    
     // Handle install.php
     if ($path === '/install.php' || $path === '/install/install.php') {
         require ROOT_PATH . '/install/install.php';
         exit;
     }
     
-    // Serve static files from install directory
+    // Serve installer index via index.php (handles guardrails and serves installer.html)
+    if ($path === '/install' || $path === '/install/') {
+        require ROOT_PATH . '/install/index.php';
+        exit;
+    }
+    
+    // Serve other static files from install directory
+    $filePath = ROOT_PATH . $path;
     if (file_exists($filePath)) {
         $ext = pathinfo($filePath, PATHINFO_EXTENSION);
         $mimeTypes = [
@@ -47,7 +50,12 @@ if (strpos($path, '/install') === 0) {
             'jpg' => 'image/jpeg',
             'gif' => 'image/gif',
             'svg' => 'image/svg+xml',
+            'php' => null, // Handle PHP files specially
         ];
+        if ($ext === 'php') {
+            require $filePath;
+            exit;
+        }
         if (isset($mimeTypes[$ext])) {
             header('Content-Type: ' . $mimeTypes[$ext]);
         }
