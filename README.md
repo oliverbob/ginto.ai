@@ -54,7 +54,19 @@ You are free to swap out the **Vision Model** and **Reasoning Model** with any H
 
 ---
 
-## 🚀 Quick Start
+## � Platform Compatibility
+
+| Platform | Core AI Agent | Sandbox (LXD) | Notes |
+|----------|---------------|---------------|-------|
+| **Ubuntu/Debian** | ✅ Full | ✅ Full | Recommended |
+| **Fedora/RHEL** | ✅ Full | ✅ Full | Tested |
+| **WSL2 (Ubuntu)** | ✅ Full | ⚠️ Limited | Enable systemd in `/etc/wsl.conf` |
+| **macOS** | 🔄 Partial | ❌ No LXD | Use Docker alternative |
+| **Docker** | 🔄 Planned | N/A | Official image coming soon |
+
+---
+
+## �🚀 Quick Start
 
 ### 1. Install Ginto AI
 
@@ -241,11 +253,21 @@ Application logs are located at:
 
 ## �️ Roadmap
 
-- [ ] **Ollama proxy support** - Use Ollama as a local inference backend
+### Deployment
+- [ ] **Official Docker image** - Run Ginto AI in a container
+- [ ] **Pre-built OS images** - Ready-to-use VM images for quick deployment
 - [ ] One-click web installer at `https://ginto.ai/install.sh`
+
+### Sandbox
+- [ ] **Multi-distro support** - Debian, Fedora, Arch, Rocky Linux base images
+- [ ] **Podman/Docker alternative** - For systems without LXD
 - [ ] Automatic SSL certificate provisioning per sandbox
-- [ ] Resource usage dashboard
 - [ ] Sandbox templates (Laravel, Next.js, Django, etc.)
+
+### Features
+- [ ] **Ollama proxy support** - Use Ollama as a local inference backend
+- [ ] Resource usage dashboard
+- [ ] Web-based model management
 
 ---
 
