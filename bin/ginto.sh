@@ -66,7 +66,7 @@ fi
 readonly BASE_IMAGE="ginto-sandbox"
 readonly BASE_CONTAINER="ginto-sandbox"
 readonly BACKUP_DIR="${GINTO_BACKUP_DIR:-/var/lib/ginto/backups}"
-readonly SANDBOX_PREFIX="sandbox-"
+readonly SANDBOX_PREFIX="ginto-sandbox-"
 
 # Optional: Web user for sudoers (can be set via --web-user or WEB_USER env)
 WEB_USER="${WEB_USER:-}"
@@ -1055,7 +1055,10 @@ EOF'
     $LXC_CMD exec "$container" -- mkdir -p /var/log/caddy
     
     log_info "Enabling services..."
-    $LXC_CMD exec "$container" -- rc-update add php-fpm82 default
+    # Auto-detect installed PHP-FPM service
+    local php_fpm_svc=$($LXC_CMD exec "$container" -- sh -c "rc-service --list | grep php-fpm | head -1" 2>/dev/null)
+    [ -z "$php_fpm_svc" ] && php_fpm_svc="php-fpm82"
+    $LXC_CMD exec "$container" -- rc-update add "$php_fpm_svc" default
     $LXC_CMD exec "$container" -- rc-update add caddy default
     
     log_info "Setting permissions..."
@@ -1483,7 +1486,10 @@ bootstrap_alpine() {
     fc-cache -f
     
     log_info "Enabling services..."
-    rc-update add php-fpm82 default
+    # Auto-detect installed PHP-FPM service
+    local php_fpm_svc=$(rc-service --list | grep php-fpm | head -1)
+    [ -z "$php_fpm_svc" ] && php_fpm_svc="php-fpm82"
+    rc-update add "$php_fpm_svc" default
     rc-update add caddy default
     
     log_success "Alpine packages installed successfully"
@@ -1501,11 +1507,17 @@ bootstrap_ubuntu() {
     apt-get install -y software-properties-common
     add-apt-repository -y ppa:ondrej/php
     apt-get update
+    
+    # Auto-detect latest available PHP 8.x version
+    local PHP_VERSION=$(apt-cache search '^php8\.[0-9]+-cli$' 2>/dev/null | sort -V | tail -1 | grep -oP 'php\K8\.[0-9]+')
+    [ -z "$PHP_VERSION" ] && PHP_VERSION="8.3"
+    log_info "Detected PHP version: $PHP_VERSION"
+    
     apt-get install -y \
-        php8.2 php8.2-fpm php8.2-cli php8.2-common \
-        php8.2-mbstring php8.2-xml php8.2-curl php8.2-zip \
-        php8.2-mysql php8.2-sqlite3 php8.2-gd php8.2-intl \
-        php8.2-bcmath php8.2-readline
+        "php${PHP_VERSION}" "php${PHP_VERSION}-fpm" "php${PHP_VERSION}-cli" "php${PHP_VERSION}-common" \
+        "php${PHP_VERSION}-mbstring" "php${PHP_VERSION}-xml" "php${PHP_VERSION}-curl" "php${PHP_VERSION}-zip" \
+        "php${PHP_VERSION}-mysql" "php${PHP_VERSION}-sqlite3" "php${PHP_VERSION}-gd" "php${PHP_VERSION}-intl" \
+        "php${PHP_VERSION}-bcmath" "php${PHP_VERSION}-readline" "php${PHP_VERSION}-redis"
     
     log_info "Installing Node.js 20..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
@@ -1732,7 +1744,13 @@ setup_caddy_config() {
     if [[ "$os_type" == "alpine" ]]; then
         php_fastcgi="127.0.0.1:9000"
     else
-        php_fastcgi="unix//run/php/php8.2-fpm.sock"
+        # Auto-detect PHP-FPM socket
+        local php_sock=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -1)
+        if [ -n "$php_sock" ]; then
+            php_fastcgi="unix/${php_sock}"
+        else
+            php_fastcgi="unix//run/php/php-fpm.sock"
+        fi
     fi
     
     mkdir -p /var/log/caddy

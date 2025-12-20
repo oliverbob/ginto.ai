@@ -3,7 +3,8 @@
  * LXD-based Sandbox Manager for Ginto
  * 
  * Manages user sandboxes using LXD containers (Alpine Linux).
- * Uses Redis to cache user->containerIP mappings for fast lookups.
+ * Uses DETERMINISTIC IP allocation via SHA256(sandboxId) for infinite scale.
+ * Redis is available for agent state (queues, metrics) but NOT for IP lookup.
  * 
  * IMPORTANT: This manager uses 'sudo lxc' for all commands. The web server user
  * (www-data or oliverbob) must have passwordless sudo access to lxc commands.
@@ -25,10 +26,10 @@ class LxdSandboxManager
     const BASE_IMAGE = 'ginto-sandbox';
     
     // Prefix for all sandbox container names
-    const CONTAINER_PREFIX = 'sandbox-';
+    const CONTAINER_PREFIX = 'ginto-sandbox-';
     
-    // Redis key prefix for user->IP mapping
-    const REDIS_PREFIX = 'sandbox:';
+    // Redis key prefix for agent state (NOT for IP lookup - that's deterministic)
+    const REDIS_PREFIX = 'agent:';
     
     // Additional packages to install (base image already has most tools)
     // Only used if specific extra packages are requested
@@ -127,7 +128,45 @@ class LxdSandboxManager
     }
     
     /**
+     * Convert sandbox ID to deterministic IP address
+     * 
+     * Two modes:
+     * 1. Full IP mode (datacenter): Uses all 4 bytes of SHA256 for full 32-bit IP
+     * 2. Subnet mode (local): Uses 1 byte mapped to last octet within network prefix
+     * 
+     * Set LXD_NETWORK_PREFIX env var to your subnet (e.g., "10.166.3") for local mode.
+     * 
+     * @param string $sandboxId The sandbox/agent identifier
+     * @return string IP address (e.g., "142.87.203.91" or "10.166.3.142")
+     */
+    public static function sandboxToIp(string $sandboxId): string
+    {
+        $hash = hash('sha256', $sandboxId, true); // binary output
+        $networkPrefix = getenv('LXD_NETWORK_PREFIX') ?: null;
+        
+        if ($networkPrefix) {
+            // Subnet mode: map hash to last octet within network prefix
+            // Use hash byte to get value 2-254 (avoid .0, .1, .255)
+            $lastOctet = 2 + (ord($hash[0]) % 253);
+            return "{$networkPrefix}.{$lastOctet}";
+        }
+        
+        // Datacenter mode: full 32-bit IP space
+        $octets = array_map('ord', str_split(substr($hash, 0, 4)));
+        
+        // Avoid reserved addresses: .0 (network) and .255 (broadcast)
+        $octets = array_map(function($b) {
+            if ($b === 0) return 1;
+            if ($b === 255) return 254;
+            return $b;
+        }, $octets);
+        
+        return implode('.', $octets);
+    }
+    
+    /**
      * Get a Redis connection (returns null if Redis unavailable)
+     * Redis is used for agent state (metrics, queues) NOT for IP routing
      */
     private static function getRedis(): ?\Redis
     {
@@ -182,45 +221,24 @@ class LxdSandboxManager
     }
     
     /**
-     * Get the IP address of a sandbox
+     * Get the IP address of a sandbox - DETERMINISTIC
+     * 
+     * IP is computed directly from sandboxId using SHA256.
+     * No Redis lookup, no LXD query - pure computation.
+     * 
+     * @param string $userId User/sandbox identifier
+     * @return string IP address (always returns a value)
      */
-    public static function getSandboxIp(string $userId): ?string
+    public static function getSandboxIp(string $userId): string
     {
-        // Try Redis cache first
-        $redis = self::getRedis();
-        if ($redis) {
-            $cached = $redis->get(self::REDIS_PREFIX . $userId);
-            if ($cached) {
-                return $cached;
-            }
-        }
-        
-        // Get from LXD
-        $name = self::containerName($userId);
-        $output = [];
-        $code = 0;
-        exec(self::LXC_CMD . " list $name -c 4 --format csv 2>/dev/null", $output, $code);
-        
-        if ($code !== 0 || empty($output)) {
-            return null;
-        }
-        
-        // Format is: "10.x.x.x (eth0)"
-        $ip = trim(explode(' ', $output[0])[0]);
-        
-        if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
-            // Cache in Redis
-            if ($redis) {
-                $redis->set(self::REDIS_PREFIX . $userId, $ip);
-            }
-            return $ip;
-        }
-        
-        return null;
+        // Deterministic: IP is computed, not looked up
+        return self::sandboxToIp($userId);
     }
     
     /**
-     * Create a new sandbox for a user
+     * Create a new sandbox for a user with static IP
+     * 
+     * IP is deterministic from userId via SHA256 - no DHCP needed.
      * 
      * @param string $userId User identifier
      * @param array $options Optional settings: packages, cpu, memory, disk
@@ -229,16 +247,16 @@ class LxdSandboxManager
     public static function createSandbox(string $userId, array $options = []): array
     {
         $name = self::containerName($userId);
+        $ip = self::sandboxToIp($userId);  // Deterministic IP
         
         // Check if already exists
         if (self::sandboxExists($userId)) {
             // Start if not running
             if (!self::sandboxRunning($userId)) {
                 exec(self::LXC_CMD . " start $name < /dev/null 2>&1", $output, $code);
-                sleep(2); // Wait for container to get IP
+                sleep(2);
             }
             
-            $ip = self::getSandboxIp($userId);
             return [
                 'success' => true,
                 'ip' => $ip,
@@ -264,8 +282,21 @@ class LxdSandboxManager
             ];
         }
         
-        // Wait for container to be ready
-        sleep(3);
+        // =======================================================================
+        // STATIC IP ASSIGNMENT - Deterministic from sandbox ID
+        // =======================================================================
+        
+        // Assign static IP via eth0 device override
+        exec(self::LXC_CMD . " config device override $name eth0 ipv4.address=$ip 2>&1", $ipOutput, $ipCode);
+        
+        if ($ipCode !== 0) {
+            // Fallback: try adding device if override failed
+            exec(self::LXC_CMD . " config device add $name eth0 nic nictype=bridged parent=lxdbr0 ipv4.address=$ip 2>&1");
+        }
+        
+        // Restart to apply static IP
+        exec(self::LXC_CMD . " restart $name < /dev/null 2>&1");
+        sleep(2);  // Brief wait for container to be ready
         
         // =======================================================================
         // SECURITY HARDENING - Proxmox-style with nesting enabled
@@ -313,8 +344,16 @@ class LxdSandboxManager
         exec(self::LXC_CMD . " exec $name -- rc-service php-fpm82 start 2>&1");
         exec(self::LXC_CMD . " exec $name -- rc-service caddy start 2>&1");
         
-        // Get IP
-        $ip = self::getSandboxIp($userId);
+        // Track agent creation in Redis (if available) - for metrics/monitoring
+        $redis = self::getRedis();
+        if ($redis) {
+            try {
+                $redis->set(self::REDIS_PREFIX . $userId . ':created', time());
+                $redis->set(self::REDIS_PREFIX . $userId . ':ip', $ip);
+            } catch (\Throwable $e) {
+                // Redis is optional for metrics
+            }
+        }
         
         return [
             'success' => true,

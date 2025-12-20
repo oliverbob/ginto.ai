@@ -30,7 +30,20 @@ $requestedAction = $_GET['action'] ?? '';
 if ($installedMarkerExists && !$forceInstall && $requestedAction !== 'get_env_values') {
     // Installation is marked as complete, block access
     http_response_code(403);
-    die(json_encode(['success' => false, 'message' => 'Ginto CMS installation is already complete. To reinstall, add ?force=1 to the URL or delete the .installed file.']));
+    
+    // Check if this is an AJAX/API request or a browser request
+    $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
+    $acceptsJson = isset($_SERVER['HTTP_ACCEPT']) && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false;
+    
+    if ($isAjax || $acceptsJson || !empty($requestedAction)) {
+        // API request - return JSON
+        header('Content-Type: application/json');
+        die(json_encode(['success' => false, 'message' => 'Ginto AI installation is already complete. To reinstall, add ?force=1 to the URL or delete the .installed file.']));
+    } else {
+        // Browser request - redirect to index.php which shows a nice page
+        header('Location: /install/');
+        exit;
+    }
 }
 
 // If .env exists but .installed doesn't, this is a partial/resumed installation - allow it to continue

@@ -2,18 +2,20 @@
  * Ginto Sandbox Proxy
  * 
  * Dynamic reverse proxy that routes requests to LXD sandbox containers.
- * Uses Redis to lookup user->containerIP mappings.
+ * Uses DETERMINISTIC IP allocation: SHA256(sandboxId) → IP address
  * 
  * Usage:
  *   http://host:3000/?sandbox=user123
  *   
- * The proxy looks up user123 in Redis (key: sandbox:user123) to get the
- * container IP, then forwards the request to http://<container_ip>:80
+ * The proxy computes the IP directly from the sandbox ID using SHA256.
+ * No Redis lookup needed for routing. Redis is available for agent
+ * communication (queues, pub/sub, shared state) but NOT for IP resolution.
  * 
  * @see docs/sandbox.md for full architecture
  */
 
 const http = require('http');
+const crypto = require('crypto');
 const httpProxy = require('http-proxy');
 const { createClient } = require('redis');
 const { exec } = require('child_process');
@@ -26,13 +28,18 @@ const CONFIG = {
     port: parseInt(process.env.PORT || '3000'),
     redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
     containerPort: parseInt(process.env.CONTAINER_PORT || '80'),
-    redisPrefix: 'sandbox:',
+    redisPrefix: 'agent:',  // For agent state, not IP lookup
     // If true, auto-create sandbox if it doesn't exist
     autoCreate: process.env.AUTO_CREATE_SANDBOX === '1',
     // Base image for new sandboxes
-    baseImage: process.env.LXD_BASE_IMAGE || 'ginto',
+    baseImage: process.env.LXD_BASE_IMAGE || 'ginto-sandbox',
     // Container name prefix
-    containerPrefix: 'sandbox-'
+    containerPrefix: 'ginto-sandbox-',
+    
+    // Network configuration for deterministic IP
+    // Set LXD_NETWORK_PREFIX to your LXD bridge subnet (e.g., "10.166.3")
+    // If not set, uses full 32-bit IP space (datacenter mode)
+    networkPrefix: process.env.LXD_NETWORK_PREFIX || null,
 };
 
 // Create proxy server
@@ -46,12 +53,13 @@ let redis = null;
 
 /**
  * Initialize Redis connection with timeout
- * Falls back to LXD direct lookups if Redis is unavailable
+ * Redis is available for agent communication (queues, pub/sub, state)
+ * but NOT used for IP routing (that's deterministic via SHA256)
  */
 async function initRedis() {
     return new Promise((resolve) => {
         const timeout = setTimeout(() => {
-            console.log('[Redis] Connection timeout (2s), falling back to LXD lookups');
+            console.log('[Redis] Connection timeout (2s), Redis unavailable for agent state');
             if (redis) {
                 redis.removeAllListeners();
                 redis.disconnect().catch(() => {});
@@ -79,118 +87,161 @@ async function initRedis() {
             
             redis.connect().then(() => {
                 clearTimeout(timeout);
-                console.log(`[Redis] Connected to ${CONFIG.redisUrl}`);
+                console.log(`[Redis] Connected - available for agent communication`);
                 resolve();
             }).catch((err) => {
                 clearTimeout(timeout);
                 console.log('[Redis] Failed to connect:', err.message);
-                console.log('[Redis] Falling back to LXD direct lookups');
+                console.log('[Redis] Agent state features unavailable (routing still works)');
                 redis = null;
                 resolve();
             });
         } catch (err) {
             clearTimeout(timeout);
             console.error('[Redis] Setup error:', err.message);
-            console.log('[Redis] Falling back to LXD direct lookups');
             redis = null;
             resolve();
         }
     });
 }
 
-/**
- * Get container IP from Redis cache
- */
-async function getCachedIp(userId) {
-    if (!redis || !redis.isReady) return null;
-    try {
-        return await redis.get(CONFIG.redisPrefix + userId);
-    } catch (err) {
-        console.error('[Redis] Get error:', err.message);
-        return null;
-    }
-}
+// ============================================================================
+// DETERMINISTIC IP ALLOCATION
+// Computes IP directly from sandbox ID using SHA256 - no lookup needed
+// ============================================================================
 
 /**
- * Cache container IP in Redis
+ * Convert sandbox ID to deterministic IP address
+ * 
+ * Two modes:
+ * 1. Full IP mode (datacenter): Uses all 4 bytes of SHA256 for full 32-bit IP
+ * 2. Subnet mode (local): Uses 1 byte mapped to last octet within network prefix
+ * 
+ * Set LXD_NETWORK_PREFIX env var to your subnet (e.g., "10.166.3") for local mode.
+ * 
+ * @param {string} sandboxId - The sandbox/agent identifier
+ * @returns {string} IP address (e.g., "142.87.203.91" or "10.166.3.142")
  */
-async function cacheIp(userId, ip) {
-    if (!redis || !redis.isReady) return;
-    try {
-        await redis.set(CONFIG.redisPrefix + userId, ip);
-    } catch (err) {
-        console.error('[Redis] Set error:', err.message);
-    }
-}
-
-/**
- * Get container IP directly from LXD
- */
-async function getLxdIp(userId) {
-    const containerName = CONFIG.containerPrefix + userId.replace(/[^a-zA-Z0-9_-]/g, '');
+function sandboxToIp(sandboxId) {
+    const hash = crypto.createHash('sha256').update(sandboxId).digest();
     
-    try {
-        const { stdout } = await execAsync(`sudo lxc list ${containerName} -c 4 --format csv 2>/dev/null`);
-        const ip = stdout.trim().split(' ')[0];
+    if (CONFIG.networkPrefix) {
+        // Subnet mode: map hash to last octet within network prefix
+        // Use hash byte to get value 2-254 (avoid .0, .1, .255)
+        let lastOctet = hash[0];
+        if (lastOctet < 2) lastOctet = 2;
+        if (lastOctet > 254) lastOctet = 254;
+        // Better distribution: ensure we use range 2-254
+        lastOctet = 2 + (hash[0] % 253);
         
-        if (ip && /^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
-            return ip;
-        }
-    } catch (err) {
-        // Container doesn't exist or other error
+        return `${CONFIG.networkPrefix}.${lastOctet}`;
     }
     
-    return null;
+    // Datacenter mode: full 32-bit IP space
+    let octets = [hash[0], hash[1], hash[2], hash[3]];
+    
+    // Avoid reserved addresses: .0 (network) and .255 (broadcast)
+    octets = octets.map(b => {
+        if (b === 0) return 1;
+        if (b === 255) return 254;
+        return b;
+    });
+    
+    return octets.join('.');
 }
 
 /**
- * Check if container exists
+ * Get container name from sandbox ID
  */
-async function containerExists(userId) {
-    const containerName = CONFIG.containerPrefix + userId.replace(/[^a-zA-Z0-9_-]/g, '');
+function containerName(sandboxId) {
+    const safe = sandboxId.replace(/[^a-zA-Z0-9_-]/g, '');
+    return CONFIG.containerPrefix + safe;
+}
+
+// ============================================================================
+// AGENT STATE (Redis) - Optional features, not required for routing
+// ============================================================================
+
+/**
+ * Update last access timestamp for agent (async, non-blocking)
+ */
+async function updateLastAccess(sandboxId) {
+    if (!redis?.isReady) return;
+    try {
+        await redis.set(`${CONFIG.redisPrefix}${sandboxId}:last`, Date.now().toString());
+    } catch {}
+}
+
+/**
+ * Track agent metrics (async, non-blocking)
+ */
+async function trackRequest(sandboxId) {
+    if (!redis?.isReady) return;
+    try {
+        await redis.incr(`${CONFIG.redisPrefix}${sandboxId}:requests`);
+    } catch {}
+}
+
+// ============================================================================
+// CONTAINER MANAGEMENT
+// ============================================================================
+
+/**
+ * Check if container exists in LXD
+ */
+async function containerExists(sandboxId) {
+    const name = containerName(sandboxId);
     
     try {
-        const { stdout } = await execAsync(`sudo lxc list --format csv -c n 2>/dev/null`);
+        const { stdout } = await execAsync(`lxc list --format csv -c n 2>/dev/null`);
         const containers = stdout.trim().split('\n');
-        return containers.includes(containerName);
+        return containers.includes(name);
     } catch (err) {
         return false;
     }
 }
 
 /**
- * Create a new sandbox container
+ * Create a new sandbox container with static IP
+ * IP is deterministic from sandboxId - no DHCP needed
  */
-async function createSandbox(userId) {
-    const containerName = CONFIG.containerPrefix + userId.replace(/[^a-zA-Z0-9_-]/g, '');
+async function createSandbox(sandboxId) {
+    const name = containerName(sandboxId);
+    const ip = sandboxToIp(sandboxId);
     
-    console.log(`[Sandbox] Creating new sandbox: ${containerName}`);
+    console.log(`[Sandbox] Creating ${name} with static IP ${ip}`);
     
     try {
         // Launch container
-        await execAsync(`sudo lxc launch ${CONFIG.baseImage} ${containerName}`);
+        await execAsync(`lxc launch ${CONFIG.baseImage} ${name}`);
         
-        // Wait for container to get IP
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // Assign static IP (override eth0 device)
+        await execAsync(`lxc config device override ${name} eth0 ipv4.address=${ip}`);
         
-        // Get IP
-        const ip = await getLxdIp(userId);
+        // Restart networking to apply static IP
+        await execAsync(`lxc restart ${name}`);
         
-        if (ip) {
-            await cacheIp(userId, ip);
-            console.log(`[Sandbox] Created ${containerName} with IP ${ip}`);
-            return ip;
+        // Brief wait for container to be ready
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        console.log(`[Sandbox] Created ${name} at ${ip}`);
+        
+        // Track agent creation in Redis (if available)
+        if (redis?.isReady) {
+            try {
+                await redis.set(`${CONFIG.redisPrefix}${sandboxId}:created`, Date.now().toString());
+            } catch {}
         }
         
-        return null;
+        return ip;
     } catch (err) {
-        console.error(`[Sandbox] Failed to create ${containerName}:`, err.message);
+        console.error(`[Sandbox] Failed to create ${name}:`, err.message);
         return null;
     }
 }
 
 /**
- * Check if IP is reachable (quick check)
+ * Check if IP is reachable (quick HTTP check)
  */
 async function isIpReachable(ip) {
     return new Promise((resolve) => {
@@ -213,44 +264,49 @@ async function isIpReachable(ip) {
 }
 
 /**
- * Get container IP (with optional auto-creation)
+ * Get container IP - DETERMINISTIC (no lookup needed!)
+ * 
+ * The IP is computed directly from the sandbox ID using SHA256.
+ * No Redis lookup, no LXD query - pure computation.
+ * 
+ * If autoCreate is enabled and container doesn't exist, creates it.
  */
-async function getContainerIp(userId) {
-    // 1. Try Redis cache
-    let ip = await getCachedIp(userId);
-    if (ip) {
-        // Verify cached IP is still valid by checking LXD
-        const lxdIp = await getLxdIp(userId);
-        if (lxdIp && lxdIp !== ip) {
-            // IP changed (container recreated), update cache
-            console.log(`[Lookup] ${userId} -> ${lxdIp} (cache stale, was ${ip})`);
-            await cacheIp(userId, lxdIp);
-            return lxdIp;
-        } else if (lxdIp) {
-            console.log(`[Lookup] ${userId} -> ${ip} (cached, verified)`);
-            return ip;
-        }
-        // Container no longer exists, clear cache and continue
-        console.log(`[Lookup] ${userId} -> cache invalid, container gone`);
-    }
+async function getContainerIp(sandboxId) {
+    // Compute IP deterministically - O(1), no I/O
+    const ip = sandboxToIp(sandboxId);
     
-    // 2. Try LXD direct
-    ip = await getLxdIp(userId);
-    if (ip) {
-        console.log(`[Lookup] ${userId} -> ${ip} (lxd)`);
-        await cacheIp(userId, ip);
+    // Quick reachability check
+    const reachable = await isIpReachable(ip);
+    
+    if (reachable) {
+        console.log(`[Route] ${sandboxId} -> ${ip} (computed, reachable)`);
+        // Fire-and-forget: track access in Redis
+        updateLastAccess(sandboxId);
+        trackRequest(sandboxId);
         return ip;
     }
     
-    // 3. Auto-create if enabled
+    // Not reachable - container may not exist yet
     if (CONFIG.autoCreate) {
-        ip = await createSandbox(userId);
-        if (ip) {
+        // Check if container exists but just isn't responding
+        const exists = await containerExists(sandboxId);
+        
+        if (!exists) {
+            // Create with the predetermined static IP
+            const createdIp = await createSandbox(sandboxId);
+            if (createdIp) {
+                return createdIp;
+            }
+        } else {
+            // Container exists but not responding - might be starting
+            console.log(`[Route] ${sandboxId} -> ${ip} (computed, container exists but not responding)`);
             return ip;
         }
     }
     
-    return null;
+    // Return computed IP even if not reachable (let proxy handle the error)
+    console.log(`[Route] ${sandboxId} -> ${ip} (computed, not reachable)`);
+    return ip;
 }
 
 /**
@@ -315,7 +371,7 @@ function sendError(res, code, message) {
 
 // Proxy error handler
 proxy.on('error', (err, req, res) => {
-    console.error('[Proxy Error]', err.message);
+    console.error('[Proxy Error]', err.code, err.message, `target=${req._proxyTarget || 'unknown'}`);
     if (res.writeHead) {
         sendError(res, 502, 'Sandbox unavailable');
     }
@@ -335,7 +391,7 @@ const server = http.createServer(async (req, res) => {
     // Status endpoint - list all sandboxes
     if (req.url === '/status' || req.url === '/_status') {
         try {
-            const { stdout } = await execAsync(`sudo lxc list --format csv -c ns4 2>/dev/null`);
+            const { stdout } = await execAsync(`lxc list --format csv -c ns4 2>/dev/null`);
             const sandboxes = stdout.trim().split('\n')
                 .filter(line => line.includes(CONFIG.containerPrefix))
                 .map(line => {
@@ -378,6 +434,9 @@ const server = http.createServer(async (req, res) => {
     const target = `http://${ip}:${CONFIG.containerPort}`;
     console.log(`[Proxy] ${userId} -> ${target}${forwardPath}`);
     
+    // Store target for error logging
+    req._proxyTarget = target;
+    
     // Rewrite the URL to the forward path
     req.url = forwardPath;
     
@@ -414,7 +473,7 @@ server.on('upgrade', async (req, socket, head) => {
 // Start server
 async function start() {
     console.log('=== Ginto Sandbox Proxy ===');
-    console.log(`Config: port=${CONFIG.port}, autoCreate=${CONFIG.autoCreate}`);
+    console.log(`Config: port=${CONFIG.port}, autoCreate=${CONFIG.autoCreate}, networkPrefix=${CONFIG.networkPrefix || 'FULL_IP_MODE'}`);
     
     await initRedis();
     

@@ -24,6 +24,7 @@ INSTALL_STEPS=(
     "update_packages"
     "install_git"
     "install_utilities"
+    "install_redis"
     "install_build_tools"
     "install_php"
     "install_mariadb"
@@ -213,6 +214,13 @@ install_php() {
         local php_version=$(php -v | head -1 | awk '{print $2}')
         if [[ "$php_version" =~ ^8\. ]]; then
             log_info "PHP already installed: $php_version"
+            # Ensure redis extension is installed for existing PHP
+            local php_major_minor=$(echo "$php_version" | cut -d. -f1,2)
+            if ! php -m | grep -qi redis; then
+                log_info "Installing missing php${php_major_minor}-redis..."
+                sudo apt-get install -y "php${php_major_minor}-redis" 2>/dev/null || true
+                sudo systemctl restart "php${php_major_minor}-fpm" 2>/dev/null || true
+            fi
             return 0
         fi
     fi
@@ -224,28 +232,41 @@ install_php() {
             sudo add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
             sudo apt-get update -qq
             
-            # Install PHP and extensions
+            # Detect latest available PHP 8.x version
+            local PHP_VERSION=$(apt-cache search '^php8\.[0-9]+-cli$' 2>/dev/null | sort -V | tail -1 | grep -oP 'php\K8\.[0-9]+')
+            if [ -z "$PHP_VERSION" ]; then
+                PHP_VERSION="8.3"  # Fallback
+                log_warn "Could not detect latest PHP version, using $PHP_VERSION"
+            else
+                log_info "Detected latest PHP version: $PHP_VERSION"
+            fi
+            
+            # Install PHP and extensions with detected version
             sudo apt-get install -y \
-                php8.3 \
-                php8.3-cli \
-                php8.3-fpm \
-                php8.3-mysql \
-                php8.3-sqlite3 \
-                php8.3-curl \
-                php8.3-xml \
-                php8.3-mbstring \
-                php8.3-zip \
-                php8.3-gd \
-                php8.3-bcmath \
-                php8.3-intl \
-                php8.3-readline \
-                php8.3-opcache
+                "php${PHP_VERSION}" \
+                "php${PHP_VERSION}-cli" \
+                "php${PHP_VERSION}-fpm" \
+                "php${PHP_VERSION}-mysql" \
+                "php${PHP_VERSION}-sqlite3" \
+                "php${PHP_VERSION}-curl" \
+                "php${PHP_VERSION}-xml" \
+                "php${PHP_VERSION}-mbstring" \
+                "php${PHP_VERSION}-zip" \
+                "php${PHP_VERSION}-gd" \
+                "php${PHP_VERSION}-bcmath" \
+                "php${PHP_VERSION}-intl" \
+                "php${PHP_VERSION}-readline" \
+                "php${PHP_VERSION}-opcache" \
+                "php${PHP_VERSION}-redis"
+            
+            # Ensure this version is the default
+            sudo update-alternatives --set php "/usr/bin/php${PHP_VERSION}" 2>/dev/null || true
             ;;
         fedora)
             sudo dnf install -y \
                 php php-cli php-fpm php-mysqlnd php-pdo \
                 php-curl php-xml php-mbstring php-zip php-gd \
-                php-bcmath php-intl php-opcache
+                php-bcmath php-intl php-opcache php-redis
             ;;
         *)
             log_error "Unsupported OS for PHP installation: $OS"
@@ -261,7 +282,7 @@ install_composer() {
     log_step "Installing Composer..."
     
     if command -v composer &>/dev/null; then
-        log_info "Composer already installed: $(composer --version)"
+        log_info "Composer already installed: $(composer --version --no-interaction)"
         return
     fi
     
@@ -270,7 +291,7 @@ install_composer() {
     sudo mv composer.phar /usr/local/bin/composer
     sudo chmod +x /usr/local/bin/composer
     
-    log_success "Composer installed: $(composer --version)"
+    log_success "Composer installed: $(composer --version --no-interaction)"
 }
 
 # Install MariaDB
@@ -285,8 +306,8 @@ install_mariadb() {
         sudo systemctl start mariadb 2>/dev/null || true
         
         # Skip database config if we detected existing installation
-        if [[ "${SKIP_CONFIGURED:-false}" == "true" ]]; then
-            log_info "Database already configured, skipping"
+        if [[ "${SKIP_DB_USER_SETUP:-false}" == "true" ]]; then
+            log_info "Database already configured, skipping user setup"
             return 0
         fi
         
@@ -388,6 +409,80 @@ install_utilities() {
     esac
     
     log_success "Utilities installed"
+}
+
+# Install Redis for sandbox IP routing and caching
+install_redis() {
+    log_step "Checking Redis..."
+    
+    local redis_installed=false
+    
+    # Check if Redis is already installed and running
+    if command -v redis-server &>/dev/null; then
+        if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
+            log_info "Redis already installed and running ($(redis-server --version | head -1 | awk '{print $3}'))"
+            redis_installed=true
+        fi
+    fi
+    
+    # Install Redis if not present
+    if ! $redis_installed; then
+        log_info "Installing Redis server..."
+        
+        case $OS in
+            ubuntu|debian)
+                sudo apt-get install -y redis-server
+                sudo systemctl enable --now redis-server
+                ;;
+            fedora)
+                sudo dnf install -y redis
+                sudo systemctl enable --now redis
+                ;;
+        esac
+        
+        # Verify Redis is running
+        if systemctl is-active --quiet redis-server 2>/dev/null || systemctl is-active --quiet redis 2>/dev/null; then
+            log_success "Redis installed and running"
+        else
+            log_warning "Redis installed but service may need manual start"
+            return 1
+        fi
+    fi
+    
+    # Sync existing LXD sandboxes to Redis (if LXD is available)
+    if command -v lxc &>/dev/null; then
+        log_info "Syncing existing sandboxes to Redis..."
+        local synced=0
+        
+        # Get all running sandbox containers and their IPs
+        while IFS=',' read -r name state ip_info; do
+            # Skip if not a sandbox container or not running
+            [[ "$name" != ginto-sandbox-* ]] && continue
+            [[ "$state" != "RUNNING" ]] && continue
+            
+            # Extract sandbox ID (remove "ginto-sandbox-" prefix)
+            local sandbox_id="${name#ginto-sandbox-}"
+            
+            # Extract IP address (format: "10.x.x.x (eth0)")
+            local ip=$(echo "$ip_info" | grep -oE '10\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+            
+            if [[ -n "$ip" ]]; then
+                # Check if already in Redis
+                local existing=$(redis-cli GET "ginto:sandbox:$sandbox_id" 2>/dev/null)
+                if [[ -z "$existing" || "$existing" == "(nil)" ]]; then
+                    redis-cli SET "ginto:sandbox:$sandbox_id" "$ip" >/dev/null 2>&1
+                    ((synced++))
+                    log_info "  Registered ginto:sandbox:$sandbox_id -> $ip"
+                fi
+            fi
+        done < <(lxc list --format csv -c n,s,4 2>/dev/null)
+        
+        if [[ $synced -gt 0 ]]; then
+            log_success "Synced $synced sandbox(es) to Redis"
+        else
+            log_info "No new sandboxes to sync"
+        fi
+    fi
 }
 
 # Install build tools for compiling llama.cpp and other native tools
@@ -826,7 +921,8 @@ install_dependencies() {
     cd "$PROJECT_DIR"
     
     if [ -f composer.json ]; then
-        composer install --no-interaction --prefer-dist
+        # Run composer as the install user, not root, so plugins can run
+        sudo -u "$INSTALL_USER" composer install --no-interaction --prefer-dist
         log_success "Composer dependencies installed"
     else
         log_warn "composer.json not found, skipping"
@@ -925,7 +1021,7 @@ print_summary() {
     echo ""
     echo "Installed components:"
     echo "  - PHP $(php -v 2>/dev/null | head -1 | awk '{print $2}' || echo 'N/A')"
-    echo "  - Composer $(composer --version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
+    echo "  - Composer $(composer --version --no-interaction 2>/dev/null | awk '{print $3}' || echo 'N/A')"
     echo "  - MariaDB $(mariadb --version 2>/dev/null | awk '{print $5}' | tr -d ',' || echo 'N/A')"
     echo "  - Caddy $(caddy version 2>/dev/null | awk '{print $1}' || echo 'N/A')"
     echo "  - Git $(git --version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
@@ -987,19 +1083,32 @@ prompt_configuration() {
         echo "  - PHP: $(php -v 2>/dev/null | head -1 | awk '{print $2}')"
         echo "  - MariaDB: $(mariadb --version 2>/dev/null | awk '{print $5}' | tr -d ',')"
         echo "  - Caddy: $(caddy version 2>/dev/null | awk '{print $1}')"
-        echo "  - Composer: $(composer --version 2>/dev/null | awk '{print $3}')"
+        echo "  - Composer: $(composer --version --no-interaction 2>/dev/null | awk '{print $3}')"
         echo "  - .env: configured"
         echo ""
         log_info "Skipping configuration prompts - will only install missing components"
         
-        # Set defaults to skip database creation
+        # Read existing database credentials from .env
+        if [ -f "$PROJECT_DIR/.env" ]; then
+            DB_NAME=$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "ginto")
+            DB_USER=$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "ginto")
+            DB_PASS=$(grep -E '^DB_PASS=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+            [ -z "$DB_NAME" ] && DB_NAME="ginto"
+            [ -z "$DB_USER" ] && DB_USER="ginto"
+        else
+            DB_NAME="ginto"
+            DB_USER="ginto"
+            DB_PASS=""
+        fi
         CADDY_LIVE_MODE="skip"
         CADDY_DOMAIN=""
         CADDY_TLS_EMAIL=""
-        DB_NAME="ginto"
-        DB_USER="ginto"
-        DB_PASS="skip"
         SKIP_CONFIGURED=true
+        SKIP_DB_USER_SETUP=true  # Don't touch existing database user
+        
+        # Skip to final steps - only run dependencies, env check, and summary
+        # This prevents re-running installation steps on existing systems
+        save_checkpoint "install_dependencies"
         return 0
     fi
     
@@ -1149,6 +1258,7 @@ do_install() {
     
     # Clear checkpoint on successful completion
     clear_checkpoint
+    
     log_success "Installation completed successfully!"
 }
 

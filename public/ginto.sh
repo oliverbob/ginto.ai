@@ -66,7 +66,7 @@ fi
 readonly BASE_IMAGE="ginto-sandbox"
 readonly BASE_CONTAINER="ginto-sandbox"
 readonly BACKUP_DIR="${GINTO_BACKUP_DIR:-/var/lib/ginto/backups}"
-readonly SANDBOX_PREFIX="sandbox-"
+readonly SANDBOX_PREFIX="ginto-sandbox-"
 
 # Optional: Web user for sudoers (can be set via --web-user or WEB_USER env)
 WEB_USER="${WEB_USER:-}"

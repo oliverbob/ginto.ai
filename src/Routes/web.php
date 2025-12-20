@@ -3034,9 +3034,9 @@ function handleClientProxy(string $path, $db): void
     
     // If no sandbox in session, check if user is logged in and get their sandbox
     if (empty($sandboxId) && !empty($_SESSION['user_id'])) {
-        // Try to get sandbox from database for this user
+        // Try to get sandbox from client_sandboxes table for this user
         try {
-            $stmt = $db->prepare('SELECT sandbox_id FROM users WHERE id = ?');
+            $stmt = $db->prepare('SELECT sandbox_id FROM client_sandboxes WHERE user_id = ? ORDER BY id DESC LIMIT 1');
             $stmt->execute([$_SESSION['user_id']]);
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
             if ($row && !empty($row['sandbox_id'])) {
@@ -3272,7 +3272,7 @@ function handleSandboxPreview(string $sandboxId, string $path, $db): void
         usleep(500000); // Wait 0.5s for container to initialize
     }
     
-    // Proxy via port 1800
+    // Proxy via port 1800. This can be removed and be replaced with direct call to port 3000 later.
     $proxyUrl = 'http://127.0.0.1:1800' . $path . '?sandbox=' . urlencode($sandboxId);
     
     // Forward the request using cURL

@@ -4,23 +4,22 @@
  * 
  * Proxies HTTP requests from /clients/ to the user's LXD container's web server.
  * The sandbox ID is determined from the user's session, not the URL.
- * Uses Redis for fast O(1) lookup of sandbox IP addresses.
+ * Uses DETERMINISTIC IP allocation via SHA256(sandboxId) for infinite scale.
+ * Redis is available for agent state (metrics, queues) but NOT for IP routing.
  * 
  * Architecture:
  *   Browser → /clients/path → (PHP gets sandbox from session) → http://{containerIp}:80/path
  *   
- * Redis Keys:
- *   sandbox:{sandboxId}      → container IP address
- *   sandbox:{sandboxId}:last → last access timestamp
+ * IP is computed: SHA256(sandboxId) → IP address (no lookup needed)
  */
 namespace Ginto\Helpers;
 
 class SandboxProxy
 {
     /**
-     * Redis key prefix for sandbox mappings
+     * Redis key prefix for agent state (NOT for IP lookup)
      */
-    const REDIS_PREFIX = 'sandbox:';
+    const REDIS_PREFIX = 'agent:';
     
     /**
      * Container port to proxy to
@@ -57,33 +56,29 @@ class SandboxProxy
     }
     
     /**
-     * Get container IP from Redis cache (O(1) lookup)
+     * Get sandbox IP - DETERMINISTIC
+     * 
+     * IP is computed directly from sandboxId using SHA256.
+     * No Redis lookup needed - pure computation, O(1).
+     * 
+     * @param string $sandboxId The sandbox identifier
+     * @return string IP address (always returns a value)
      */
-    public static function getCachedIp(string $sandboxId): ?string
+    public static function getSandboxIp(string $sandboxId): string
     {
-        $redis = self::getRedis();
-        if (!$redis) {
-            return null;
-        }
+        // Deterministic: use LxdSandboxManager's computation
+        $ip = LxdSandboxManager::sandboxToIp($sandboxId);
         
-        try {
-            $ip = $redis->get(self::REDIS_PREFIX . $sandboxId);
-            if ($ip && filter_var($ip, FILTER_VALIDATE_IP)) {
-                // Update last access time
-                $redis->set(self::REDIS_PREFIX . $sandboxId . ':last', time());
-                return $ip;
-            }
-        } catch (\Throwable $e) {
-            error_log('[SandboxProxy] Redis get error: ' . $e->getMessage());
-        }
+        // Track access in Redis (async, non-blocking for metrics)
+        self::trackAccess($sandboxId);
         
-        return null;
+        return $ip;
     }
     
     /**
-     * Cache container IP in Redis
+     * Track sandbox access for metrics (non-blocking)
      */
-    public static function cacheIp(string $sandboxId, string $ip): void
+    private static function trackAccess(string $sandboxId): void
     {
         $redis = self::getRedis();
         if (!$redis) {
@@ -91,33 +86,11 @@ class SandboxProxy
         }
         
         try {
-            $redis->set(self::REDIS_PREFIX . $sandboxId, $ip);
             $redis->set(self::REDIS_PREFIX . $sandboxId . ':last', time());
+            $redis->incr(self::REDIS_PREFIX . $sandboxId . ':requests');
         } catch (\Throwable $e) {
-            error_log('[SandboxProxy] Redis set error: ' . $e->getMessage());
+            // Metrics are optional - don't fail on errors
         }
-    }
-    
-    /**
-     * Get sandbox IP with Redis caching
-     * Falls back to LXD direct lookup if not in cache
-     */
-    public static function getSandboxIp(string $sandboxId): ?string
-    {
-        // Try Redis cache first (O(1))
-        $ip = self::getCachedIp($sandboxId);
-        if ($ip) {
-            return $ip;
-        }
-        
-        // Fall back to LXD lookup
-        $ip = LxdSandboxManager::getSandboxIp($sandboxId);
-        if ($ip) {
-            self::cacheIp($sandboxId, $ip);
-            return $ip;
-        }
-        
-        return null;
     }
     
     /**
