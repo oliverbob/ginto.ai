@@ -930,6 +930,25 @@ setup_permissions() {
     chmod +x "$PROJECT_DIR"/bin/*.sh 2>/dev/null || true
     chmod +x "$PROJECT_DIR"/run.sh 2>/dev/null || true
     
+    # Determine the PHP-FPM user (www-data on Debian/Ubuntu, nginx/caddy on others)
+    local PHP_FPM_USER="www-data"
+    if ! id "$PHP_FPM_USER" &>/dev/null; then
+        PHP_FPM_USER="caddy"
+    fi
+    
+    # Add PHP-FPM user to install user's group so it can write to project dir
+    if id "$PHP_FPM_USER" &>/dev/null; then
+        sudo usermod -aG "$INSTALL_USER" "$PHP_FPM_USER" 2>/dev/null || true
+        log_info "Added $PHP_FPM_USER to $INSTALL_USER group"
+    fi
+    
+    # Set group-writable permissions on project root for .env and .installed files
+    chmod g+w "$PROJECT_DIR" 2>/dev/null || true
+    
+    # Set group-writable permissions on storage directory
+    chown -R "$INSTALL_USER:$INSTALL_USER" "$STORAGE_DIR"
+    chmod -R g+w "$STORAGE_DIR"
+    
     log_success "Permissions configured"
 }
 
