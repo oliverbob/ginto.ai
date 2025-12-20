@@ -46,6 +46,12 @@ A powerful **local AI Agent** that runs entirely on your machine. Works with Ope
 | **Together AI** | OpenAI-compatible | Llama 3.1, Qwen 2.5 |
 | **Fireworks AI** | OpenAI-compatible | Llama 3.1, Mixtral |
 
+### 🧠 Local Models (llama.cpp)
+
+**Recommended Reasoning Model:** [GPT-OSS](https://huggingface.co/collections/mradermacher/gpt-oss-6839f5c1ffc2cb5bb2881c2e) - The most obedient and capable reasoning model tested so far.
+
+You are free to swap out the **Vision Model** and **Reasoning Model** with any Huggingface GGUF that is compatible with llama.cpp. Simply download your preferred model and configure it in your environment.
+
 ---
 
 ## 🚀 Quick Start
@@ -233,6 +239,16 @@ Application logs are located at:
 
 ---
 
-## 📄 License
+## �️ Roadmap
+
+- [ ] **Ollama proxy support** - Use Ollama as a local inference backend
+- [ ] One-click web installer at `https://ginto.ai/install.sh`
+- [ ] Automatic SSL certificate provisioning per sandbox
+- [ ] Resource usage dashboard
+- [ ] Sandbox templates (Laravel, Next.js, Django, etc.)
+
+---
+
+## �📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
