@@ -292,222 +292,39 @@ sudo /snap/bin/lxc version
 - Binary location: `/snap/bin/lxc` (NOT `/usr/bin/lxc`)
 - Default bridge network: `lxdbr0` (10.x.x.x range)
 
-#### 3. Redis (MANUAL INSTALLATION REQUIRED)
+#### 3. Redis (Optional - For Agent Communication)
 
-⚠️ **Redis is NOT auto-installed.** It must be manually set up.
+> **Note:** Redis is **NOT required for IP routing**. The Feistel permutation computes IPs deterministically without any database lookups.
 
-Redis stores sandbox-to-IP mappings for the reverse proxy, enabling O(1) lookups for container routing.
+Redis is optional and used only for:
+- **Agent Communication**: Message queues, pub/sub between agents
+- **Metrics**: Request counts, last-access timestamps  
+- **Shared State**: Cross-agent data sharing
 
 ```bash
-# Install Redis server
+# Install Redis server (optional)
 sudo apt update
 sudo apt install -y redis-server
 
-# Enable Redis to start on boot
+# Enable and start Redis
 sudo systemctl enable redis-server
-
-# Start Redis
 sudo systemctl start redis-server
 
 # Verify Redis is running
 redis-cli ping
 # Expected output: PONG
-
-# Check Redis version
-redis-cli INFO server | grep redis_version
 ```
 
-**Redis Configuration (Optional tuning):**
-
-Edit `/etc/redis/redis.conf` for production:
-
-```bash
-# Recommended settings for sandbox usage
-maxmemory 256mb              # Limit memory (1M keys ≈ 100MB)
-maxmemory-policy allkeys-lru # Evict old keys when full
-save ""                      # Disable persistence (optional)
+**Redis Data Format (Agent Communication):**
+```
+Key: agent:<sandboxId>:last      → Value: <unix_timestamp>  (last access time)
+Key: agent:<sandboxId>:requests  → Value: <counter>         (request count)
+Key: agent:<sandboxId>:state     → Value: <json>            (agent state)
 ```
 
-**Redis Data Format:**
-```
-Key: sandbox:<sandboxId>       → Value: <container_ip>
-Key: sandbox:<sandboxId>:last  → Value: <unix_timestamp>  (last access time)
+Note: The prefix changed from `sandbox:` to `agent:` to reflect the new role.
 
-Example:
-sandbox:cs668dfqjm8e           → 10.93.65.197
-sandbox:cs668dfqjm8e:last      → 1734432000
-```
-
-### Redis Implementation in Ginto
-
-Redis is used in two places:
-
-1. **PHP (`LxdSandboxManager` + `SandboxProxy`)** - For PHP-based lookups
-2. **Node.js (`sandbox-proxy.js`)** - For high-performance reverse proxy
-
-#### PHP Redis Integration
-
-The `LxdSandboxManager` class (`src/Helpers/LxdSandboxManager.php`) uses Redis:
-
-```php
-// Get Redis connection
-private static function getRedis(): ?\Redis
-{
-    if (!class_exists('Redis')) {
-        return null;
-    }
-    try {
-        $redis = new \Redis();
-        $redis->connect('127.0.0.1', 6379);
-        return $redis;
-    } catch (\Throwable $e) {
-        return null;
-    }
-}
-
-// Cache container IP
-public static function getSandboxIp(string $userId): ?string
-{
-    $redis = self::getRedis();
-    if ($redis) {
-        $cached = $redis->get('sandbox:' . $userId);
-        if ($cached) return $cached;
-    }
-    
-    // Fallback to LXD direct lookup
-    $ip = self::getLxdIp($userId);
-    if ($ip && $redis) {
-        $redis->set('sandbox:' . $userId, $ip);
-    }
-    return $ip;
-}
-```
-
-The `SandboxProxy` class (`src/Helpers/SandboxProxy.php`) extends this with last-access tracking:
-
-```php
-// Track last access time for cleanup
-$redis->set(self::REDIS_PREFIX . $sandboxId . ':last', time());
-```
-
-#### Node.js Redis Integration
-
-The sandbox proxy (`tools/sandbox-proxy/sandbox-proxy.js`) uses the `redis` npm package:
-
-```javascript
-const { createClient } = require('redis');
-
-const CONFIG = {
-    redisUrl: process.env.REDIS_URL || 'redis://127.0.0.1:6379',
-    redisPrefix: 'sandbox:',
-};
-
-// Initialize Redis
-let redis = createClient({ url: CONFIG.redisUrl });
-await redis.connect();
-
-// Get cached IP
-async function getCachedIp(userId) {
-    if (!redis?.isReady) return null;
-    return await redis.get(CONFIG.redisPrefix + userId);
-}
-
-// Cache IP
-async function cacheIp(userId, ip) {
-    if (!redis?.isReady) return;
-    await redis.set(CONFIG.redisPrefix + userId, ip);
-}
-```
-
-### Redis Scaling for High Traffic
-
-Redis handles sandbox routing with O(1) lookups, enabling horizontal scaling.
-
-#### Scaling Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    LOAD BALANCER (Nginx/HAProxy)                │
-│                              :1800                              │
-└──────────────────────────────┬──────────────────────────────────┘
-                               │
-         ┌─────────────────────┼─────────────────────┐
-         ▼                     ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   Web Server 1  │   │   Web Server 2  │   │   Web Server 3  │
-│  (Ginto PHP)    │   │  (Ginto PHP)    │   │  (Ginto PHP)    │
-└────────┬────────┘   └────────┬────────┘   └────────┬────────┘
-         │                     │                     │
-         └─────────────────────┼─────────────────────┘
-                               ▼
-                    ┌─────────────────────┐
-                    │     Redis Cluster   │
-                    │   (or single node)  │
-                    │   sandbox:* keys    │
-                    └──────────┬──────────┘
-                               │
-         ┌─────────────────────┼─────────────────────┐
-         ▼                     ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   LXD Host 1    │   │   LXD Host 2    │   │   LXD Host 3    │
-│ sandbox-user1   │   │ sandbox-user50  │   │ sandbox-user100 │
-│ sandbox-user2   │   │ sandbox-user51  │   │ sandbox-user101 │
-│     ...         │   │     ...         │   │     ...         │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
-```
-
-#### Redis Scaling Strategies
-
-| Users | Strategy | Configuration |
-|-------|----------|---------------|
-| < 10,000 | Single Redis | Default install, 256MB RAM |
-| 10,000 - 100,000 | Redis with persistence | Enable RDB snapshots |
-| 100,000 - 1M | Redis with replicas | Master-slave replication |
-| > 1M | Redis Cluster | Sharded across multiple nodes |
-
-#### Memory Estimation
-
-Each sandbox requires ~100 bytes in Redis:
-- Key: `sandbox:<sandboxId>` (~30 bytes)
-- Value: IP address (~15 bytes)
-- Last access key: ~40 bytes
-- Overhead: ~15 bytes
-
-**Formula:**
-```
-Redis Memory = Number of Sandboxes × 100 bytes
-10,000 sandboxes ≈ 1 MB
-100,000 sandboxes ≈ 10 MB
-1,000,000 sandboxes ≈ 100 MB
-```
-
-#### Redis Cluster Configuration (for > 100K users)
-
-```bash
-# Example redis-cluster.conf
-port 7000
-cluster-enabled yes
-cluster-config-file nodes.conf
-cluster-node-timeout 5000
-appendonly yes
-```
-
-#### 4. PHP Extensions for Redis
-
-The Ginto application needs PHP Redis support:
-
-```bash
-# Install PHP Redis extension
-sudo apt install -y php-redis
-
-# Verify it's loaded
-php -m | grep redis
-
-# Restart PHP-FPM (production)
-sudo systemctl restart php-fpm
-```
-
-#### 5. Node.js (for Sandbox Proxy)
+#### 4. Node.js (for Sandbox Proxy)
 
 Required for the dynamic reverse proxy:
 
@@ -1024,32 +841,32 @@ sudo /snap/bin/lxc image import /path/to/backup/ginto-sandbox-20251216.tar.gz --
 When a user clicks "My Files" for the first time:
 
 ```php
-// PHP triggers sandbox creation
-$sandboxId = "sandbox-" . $userId;
-exec("lxc launch ginto $sandboxId");
+// PHP triggers sandbox creation with deterministic static IP
+$sandboxId = $userId;  // e.g., "e8lcyszcnpod"
+$containerName = "ginto-sandbox-" . $sandboxId;
 
-// Wait for container, get IP
-$ip = trim(shell_exec("lxc list $sandboxId -c 4 --format csv | cut -d' ' -f1"));
+// Compute static IP using Feistel permutation (same algorithm as proxy)
+$ip = LxdSandboxManager::sandboxToIp($sandboxId);  // e.g., "10.166.3.170"
+
+// Create container and assign static IP
+exec("lxc launch ginto-sandbox $containerName");
+exec("lxc config device override $containerName eth0 ipv4.address=$ip");
 
 // Install packages inside container
-exec("lxc exec $sandboxId -- apk add php82 php82-fpm caddy mysql-client");
+exec("lxc exec $containerName -- apk add php82 php82-fpm caddy mysql-client");
 
-// Store mapping in Redis
-$redis->set("sandbox:$userId", $ip);
+// No Redis needed - IP is computed deterministically
 ```
 
 ### Subsequent Visits (Access Existing Sandbox)
 
 ```php
-$sandboxId = "sandbox-" . $userId;
-$ip = $redis->get("sandbox:$userId");
+$sandboxId = $userId;
 
-if (!$ip) {
-    // Sandbox might exist but not in cache - get IP from LXD
-    $ip = trim(shell_exec("lxc list $sandboxId -c 4 --format csv | cut -d' ' -f1"));
-    if ($ip) $redis->set("sandbox:$userId", $ip);
-}
+// Compute IP deterministically - no database lookup!
+$ip = LxdSandboxManager::sandboxToIp($sandboxId);
 
+// IP is guaranteed to be correct if container was created with static IP
 // Execute commands in sandbox
 exec("lxc exec $sandboxId -- /bin/sh -c 'cd /home && php script.php'");
 ```
@@ -1588,11 +1405,12 @@ function updateSandboxStatusIndicator(status) {
 │     ↓                                                                       │
 │  7. INSERT INTO client_sandboxes (user_id, public_id, sandbox_id, ...)      │
 │     ↓                                                                       │
-│  8. Create LXC container: lxc launch ginto-sandbox sandbox-{sandbox_id}     │
+│  8. Create LXC container with static IP from Feistel permutation:           │
+│     lxc launch ginto-sandbox sandbox-{sandbox_id}                           │
+│     lxc config device override sandbox-{sandbox_id} eth0 ipv4.address=X.X.X.X
 │     ↓                                                                       │
 │  9. Store in session: $_SESSION['sandbox_id'] = $sandboxId                  │
-│     ↓                                                                       │
-│  10. Cache IP in Redis: sandbox:{sandbox_id} → container_ip                 │
+│     (No Redis needed - IP computed deterministically)                       │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1614,8 +1432,7 @@ function updateSandboxStatusIndicator(status) {
 │     a. lxc stop sandbox-{id} --force                                        │
 │     b. lxc delete sandbox-{id}                                              │
 │     c. DELETE FROM client_sandboxes WHERE sandbox_id = ?                    │
-│     d. Redis: DEL sandbox:{id}                                              │
-│     e. rm -rf /clients/{id}/  (legacy directory if exists)                  │
+│     d. rm -rf /clients/{id}/  (legacy directory if exists)                  │
 │     ↓                                                                       │
 │  4. Clear session:                                                          │
 │     unset($_SESSION['sandbox_id'])                                          │
@@ -1783,8 +1600,8 @@ public function deleteSandbox($sandboxId) {
 - Alpine 3.19 no longer available; using 3.20
 - Containers start in ~1-2 seconds
 - Container IPs are in the `10.x.x.x` range (LXD default bridge)
-- Redis key format: `sandbox:<userId>` → `<container_ip>`
-- Redis must be installed manually (see [Redis installation](#3-redis-manual-installation-required))
+- IP routing uses deterministic Feistel permutation (no Redis lookup needed)
+- Redis is optional, used only for agent communication if needed
 
 ## LXD Permissions Setup (Required for Web Server)
 
@@ -1988,16 +1805,17 @@ configure_lxd_group() {
 }
 ```
 
-### 3. Redis Configuration (CRITICAL for Scaling)
+### 3. Redis Configuration (Optional - Agent Communication)
 
-Redis is essential for O(1) container IP lookups and must be automated.
+Redis is optional. IP routing uses deterministic Feistel permutation (no lookup needed).
+Redis may be used for optional agent communication, metrics, or shared state.
 
 ```bash
-# Full Redis installation and configuration
+# Full Redis installation and configuration (optional)
 configure_redis() {
     local MAX_MEMORY="${1:-256mb}"
     
-    echo "[*] Installing Redis server..."
+    echo "[*] Installing Redis server (optional for agent communication)..."
     apt update
     apt install -y redis-server
     
@@ -2007,10 +1825,11 @@ configure_redis() {
     # Backup original config
     cp /etc/redis/redis.conf /etc/redis/redis.conf.backup
     
-    # Configure for Ginto sandbox usage
+    # Configure for Ginto agent communication (optional)
     cat > /etc/redis/redis.conf.d/ginto.conf << EOF
-# Ginto Sandbox Redis Configuration
-# Auto-generated by ginto_container.sh
+# Ginto Redis Configuration (Optional)
+# Used for agent communication, not IP routing
+# IP routing is handled by deterministic Feistel permutation
 
 # Memory settings
 maxmemory $MAX_MEMORY
@@ -2329,9 +2148,9 @@ fi
 |---|------|--------------|------------------|
 | 1 | `/etc/sudoers.d/ginto-lxd` | PHP to manage containers | `configure_sudoers www-data` |
 | 2 | `lxd` group membership | Optional direct LXD access | `usermod -aG lxd www-data` |
-| 3 | Redis server + config | Container IP mapping (O(1) lookups) | `configure_redis 256mb` |
+| 3 | Redis server + config | Optional: agent communication | `configure_redis 256mb` |
 | 4 | Node.js proxy setup | High-performance reverse proxy | `configure_sandbox_proxy` |
-| 5 | PHP Redis extension | PHP to query Redis cache | `apt install php-redis` |
+| 5 | PHP Redis extension | Optional: agent communication | `apt install php-redis` |
 | 6 | `/storage/` ownership | PHP file writes | `chown www-data:www-data storage/` |
 | 7 | Firewall rules | Security | `configure_firewall` |
 | 8 | Sandbox proxy service | Auto-start reverse proxy | `configure_sandbox_proxy_service` |
@@ -2344,7 +2163,10 @@ fi
 # ginto_container.sh - Complete sandbox infrastructure setup
 
 # 1. Install system dependencies
-apt update && apt install -y snapd redis-server php-redis nodejs npm
+apt update && apt install -y snapd nodejs npm
+
+# Optional: Install Redis for agent communication
+# apt install -y redis-server php-redis
 
 # 2. Install and initialize LXD
 snap install lxd
@@ -2353,29 +2175,27 @@ lxd init --auto
 # 3. Configure sudoers
 configure_sudoers www-data $(whoami)
 
-# 4. Configure Redis
-configure_redis 256mb
-verify_redis
+# 4. (Optional) Configure Redis for agent communication
+# configure_redis 256mb
+# verify_redis
+# configure_php_redis
 
-# 5. Install PHP Redis extension
-configure_php_redis
-
-# 6. Create ginto-sandbox base image
+# 5. Create ginto-sandbox base image
 # Run: create_ginto_sandbox_image.sh
 
-# 7. Set up Node.js sandbox proxy
+# 6. Set up Node.js sandbox proxy (uses Feistel permutation for IP routing)
 configure_sandbox_proxy /var/www/ginto 3000
 
-# 8. Configure directories
+# 7. Configure directories
 configure_directories /var/www/ginto www-data
 
-# 9. Configure firewall
+# 8. Configure firewall
 configure_firewall
 
-# 10. Set up systemd services
+# 9. Set up systemd services
 configure_sandbox_proxy_service
 
-# 11. Verify everything
+# 10. Verify everything
 verify_sandbox_permissions.sh
 ```
 
