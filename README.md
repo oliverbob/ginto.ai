@@ -74,8 +74,8 @@ Clone the repository into your home directory and run the installer:
 
 ```bash
 cd ~
-git clone https://github.com/oliverbob/ginto.ai.git ginto
-cd ginto
+git clone https://github.com/oliverbob/ginto.ai.git
+cd ginto.ai
 sudo ./run.sh install
 ```
 
