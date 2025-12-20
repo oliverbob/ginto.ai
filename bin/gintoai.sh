@@ -945,6 +945,12 @@ setup_permissions() {
     # Set group-writable permissions on project root for .env and .installed files
     chmod g+w "$PROJECT_DIR" 2>/dev/null || true
     
+    # Ensure .env file is group-writable for web installer
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        chmod 664 "$PROJECT_DIR/.env"
+        log_info "Set .env group-writable"
+    fi
+    
     # Set group-writable permissions on storage directory
     chown -R "$INSTALL_USER:$INSTALL_USER" "$STORAGE_DIR"
     chmod -R g+w "$STORAGE_DIR"
