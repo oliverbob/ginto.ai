@@ -1,184 +1,188 @@
-# Minimal PHP 8.2 REST API (Tasks CRUD)
+# Ginto AI
 
-This repository demonstrates a **production‑ready** yet lightweight PHP API built with:
+A powerful **local AI Agent** that runs entirely on your machine. Works with OpenAI-compatible APIs and leverages the fastest inference engines on the planet: **Groq** and **Cerebras**.
 
-* **PHP 8.2** – typed properties, strict types, and modern syntax.
-* **PDO** – safe prepared statements, error handling, and a singleton connection.
-* **FastRoute** – a fast, PSR‑7‑compatible router (no heavy framework required).
-* **Composer autoload** – PSR‑4 class loading.
-* **JSON** request/response bodies.
-* **.htaccess** rewrite for Apache (works the same on Nginx with a simple location block).
-
----
-## Table of Contents
-
-- [Project Structure](#project-structure)
-- [Setup](#setup)
-- [API Endpoints](#api-endpoints)
-- [AI SDK Integration](#ai-sdk-integration)
-- [Sandbox Security](#sandbox-security-architecture)
-- [Configuration](#configuration)
-- [License](#license)
-
----
-## Project structure
-```
-├─ composer.json
-├─ README.md
-├─ sql/
-│   └─ create_tasks_table.sql
-├─ public/
-│   ├─ .htaccess
-│   └─ index.php          ← front‑controller (router entry point)
-└─ src/
-    ├─ Database.php       ← PDO singleton
-    └─ TaskController.php ← CRUD actions
-```
----
-
-## Logs
-
-Application logs are located at:
-```
-../storage/logs/ginto.log
-```
-(One level up from the project directory, at `/home/<user>/storage/logs/ginto.log`)
+![Ginto AI Success](public/assets/images/success.png)
 
 ---
 
-## Setup
-1. **Clone & install dependencies**
-   ```bash
-   git clone <repo‑url>
-   cd php-rest-api
-   composer install
-   ```
-2. **Create the database** (adjust credentials in `src/Database.php` or set env vars `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS`).
-   ```bash
-   mysql -u root -p < sql/create_tasks_table.sql
-   ```
-3. **Configure your web server**
-   *Apache* – point the document root to the `public/` folder. The provided `.htaccess` rewrites all requests to `index.php`.
-   *Nginx* – use a location block similar to:
-   ```nginx
-   location / {
-       try_files $uri /index.php?$query_string;
-   }
-   fastcgi_pass   php-fpm;
-   include        fastcgi_params;
-   fastcgi_param  SCRIPT_FILENAME $document_root/index.php;
-   ```
-4. **Run locally with PHP’s built‑in server** (great for quick testing):
-   ```bash
-   php -S localhost:8000 -t public
-   ```
-   The API will be reachable at `http://localhost:8000`.
----
+## ✨ Features
 
-## API endpoints
-| Method | URI | Description | Example response |
-|--------|-----|-------------|------------------|
-| `GET` | `/tasks` | List all tasks | `[{"id":1,"title":"Buy milk","completed":0}, …]` |
-| `GET` | `/tasks/{id}` | Get a single task | `{ "id":1, "title":"Buy milk", "completed":0 }` |
-| `POST` | `/tasks` | Create a task (JSON body) | `201 Created` → `{ "id":2, "title":"Read book", "completed":false }` |
-| `PUT` | `/tasks/{id}` | Update title/completed flag | `{ "message":"Task updated" }` |
-| `DELETE` | `/tasks/{id}` | Delete a task | `{ "message":"Task deleted" }` |
----
+### 🤖 AI Agent Capabilities
+- **44+ MCP Tools** for file operations, code analysis, database access, and more
+- **Multi-provider support** - OpenAI, Anthropic Claude, Groq, Together AI, Fireworks AI, Cerebras
+- **Streaming responses** with real-time tool execution
+- **Agentic workflows** - automated multi-step task execution
+- **Task persistence** - save and resume agent tasks across sessions
 
-## Security & best practices notes
-* **Prepared statements** prevent SQL injection.
-* **Strict typing** (`declare(strict_types=1)`) catches type errors early.
-* **Error handling** – the controller returns proper HTTP status codes (400, 404, 500, etc.).
-* **Environment variables** – keep DB credentials out of source control (use `.env` with `vlucas/phpdotenv` in a real project).
-* **CORS** – add appropriate headers if the API is consumed from a browser.
-* **Rate limiting / authentication** – not covered here but easy to plug in (e.g., JWT middleware).
----
+### 🛠️ Development Tools
+- **File Operations** - Read, write, edit, delete files with precision
+- **Code Analysis** - Analyze code structure, find usages, understand dependencies
+- **Project Scaffolding** - Generate code from templates
+- **Git Integration** - Repository operations and version control
+- **Database Access** - MySQL access with role-based access control
 
-## Testing the API (cURL examples)
-```bash
-# List tasks
-curl -s http://localhost:8000/tasks | jq
+### 📦 Optional Sandbox Environment
+- **LXD Container Isolation** - Secure code execution in isolated Alpine Linux containers
+- **Fair Use Tiers** - Free, Premium, and Admin resource limits
+- **Redis-backed routing** - O(1) container IP lookups
+- **Automatic cleanup** - Idle containers are cleaned up based on tier
 
-# Create a task
-curl -s -X POST http://localhost:8000/tasks \
-     -H "Content-Type: application/json" \
-     -d '{"title":"Write docs","completed":false}' | jq
+### 🔧 Built-in Infrastructure
+- **PHP 8.3** with modern typed syntax and strict types
+- **MariaDB** database with automatic setup
+- **Caddy** web server with automatic HTTPS
+- **WebSocket support** via Ratchet for real-time streaming
+- **Node.js** for sandbox proxy and additional tooling
+- **Composer** dependency management
 
-# Update a task (id=1)
-curl -s -X PUT http://localhost:8000/tasks/1 \
-     -H "Content-Type: application/json" \
-     -d '{"completed":true}' | jq
-
-# Delete a task (id=2)
-curl -s -X DELETE http://localhost:8000/tasks/2 | jq
-```
----
+### ⚡ LLM Providers
+| Provider | Type | Notable Models |
+|----------|------|----------------|
+| **Groq** | OpenAI-compatible | Llama 3.3 70B, DeepSeek R1, Llama 4 |
+| **Cerebras** | OpenAI-compatible | Ultra-fast inference |
+| **OpenAI** | Native | GPT-4o, o1-preview |
+| **Anthropic** | Native | Claude Sonnet 4, Claude Opus |
+| **Together AI** | OpenAI-compatible | Llama 3.1, Qwen 2.5 |
+| **Fireworks AI** | OpenAI-compatible | Llama 3.1, Mixtral |
 
 ---
 
-## AI SDK Integration
+## 🚀 Quick Start
 
-Ginto includes a modular integration with the [Vercel AI SDK](https://sdk.vercel.ai/) for structured tool calling and agent orchestration. This replaces custom tool-calling logic with a battle-tested, well-maintained library.
+### 1. Install Ginto AI
 
-### Quick Start
+Clone the repository into your home directory and run the installer:
 
 ```bash
-# Install dependencies
-cd public/assets/js/ai-sdk
-npm install
-
-# Build for production
-npm run build
+cd ~
+git clone https://github.com/oliverbob/ginto.ai.git ginto
+cd ginto
+sudo ./run.sh install
 ```
 
-### Basic Usage
+This runs `./bin/gintoai.sh` which handles:
+- Installing PHP 8.3, MariaDB, Caddy, Node.js, Composer
+- Setting up the database and environment
+- Configuring systemd services
+- Installing all dependencies
 
-```javascript
-import { GintoAgent } from './ai-sdk/index.js';
+The installer has **resume capability** - if interrupted, simply run it again to continue from where it left off.
 
-const agent = new GintoAgent();
+### 2. Start the Application
 
-await agent.stream({
-  prompt: 'List my files and create a hello.html',
-  onText: (text) => console.log(text),
-  onToolCall: (name, args) => console.log('Executing:', name),
-  onFinish: (response) => console.log('Done!'),
-});
+```bash
+./run.sh start
 ```
 
-### Features
+Access the web UI at `http://localhost:8000` (or your configured domain).
 
-| Feature | Description |
+### 3. (Optional) Install Sandbox Environment
+
+After the main installation, the web UI will guide you to optionally set up the sandbox environment for isolated code execution:
+
+```bash
+./bin/ginto.sh init
+```
+
+This runs `./bin/ginto.sh` which sets up:
+- LXD container runtime
+- Alpine Linux base image
+- Redis for container routing
+- Sandbox management infrastructure
+
+---
+
+## 📁 Project Structure
+
+```
+ginto/
+├── run.sh                 # Main entry point
+├── bin/
+│   ├── gintoai.sh         # Core installation script
+│   ├── ginto.sh           # Sandbox management script
+│   └── ...                # Other utilities
+├── src/
+│   ├── Controllers/       # API and admin controllers
+│   ├── Core/              # LLM providers and clients
+│   ├── Handlers/          # MCP tool handlers (AgentTools, DevTools, etc.)
+│   ├── Helpers/           # Utilities and sandbox management
+│   ├── Models/            # Data models
+│   └── Routes/            # FastRoute definitions
+├── public/                # Web root (front controller)
+├── tools/                 # MCP servers and utilities
+│   ├── groq-mcp/          # Groq MCP server
+│   ├── paypal-mcp/        # PayPal integration
+│   ├── sandbox-proxy/     # Node.js reverse proxy
+│   └── terminal-server/   # Terminal WebSocket server
+├── docs/                  # Documentation
+└── config/                # Configuration files
+```
+
+---
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Create a `.env` file with your API keys:
+
+```bash
+# LLM Provider (auto-detected if not set)
+LLM_PROVIDER=groq
+
+# API Keys (set the ones you need)
+GROQ_API_KEY=your_groq_api_key
+CEREBRAS_API_KEY=your_cerebras_api_key
+OPENAI_API_KEY=your_openai_api_key
+ANTHROPIC_API_KEY=your_anthropic_api_key
+
+# Database (auto-configured during install)
+DB_HOST=localhost
+DB_NAME=ginto
+DB_USER=ginto
+DB_PASS=your_db_password
+```
+
+### Provider Auto-Detection
+
+If `LLM_PROVIDER` is not set, the system detects based on available API keys in this order:
+1. Groq
+2. OpenAI
+3. Anthropic
+4. Together AI
+5. Fireworks AI
+
+---
+
+## 🔧 Commands
+
+| Command | Description |
 |---------|-------------|
-| **Automatic Tool Loop** | `maxSteps` handles multi-step execution automatically |
-| **Type-Safe Tools** | Zod schemas for all tool parameters |
-| **Streaming** | Native SSE streaming support |
-| **Provider Agnostic** | Works with OpenRouter, OpenAI, Anthropic, etc. |
-| **Bridge Mode** | Integrate with existing chat.js without rewriting |
-
-### Available Sandbox Tools
-
-| Tool | Description |
-|------|-------------|
-| `sandbox_list_files` | List files and directories |
-| `sandbox_read_file` | Read file contents |
-| `sandbox_write_file` | Create or update files |
-| `sandbox_delete_file` | Delete files/folders |
-| `sandbox_exec` | Execute shell commands |
-| `sandbox_create_project` | Create from template |
-
-### Documentation
-
-- [Full Integration Guide](docs/ai-sdk-integration.md)
-- [AI SDK README](public/assets/js/ai-sdk/README.md)
+| `./run.sh install` | Install all dependencies (requires sudo) |
+| `./run.sh start` | Start the web server and services |
+| `./run.sh stop` | Stop all running services |
+| `./run.sh status` | Show status of all services |
+| `./bin/ginto.sh init` | Initialize sandbox environment |
+| `./bin/ginto.sh create <name>` | Create a new sandbox |
+| `./bin/ginto.sh list` | List all sandboxes |
+| `./bin/ginto.sh shell <name>` | Open shell in sandbox |
 
 ---
 
-## Sandbox Security Architecture
+## 📖 Documentation
+
+- [MCP Tools Reference](docs/mcp-tools.md) - All 44+ agent tools
+- [LLM Providers](docs/llm-providers.md) - Provider configuration
+- [Sandbox Setup](docs/sandbox.md) - LXD container architecture
+
+---
+
+## 🔒 Sandbox Security Architecture
 
 Ginto uses LXD containers with **Proxmox-style security hardening** to safely allow nesting (Docker/LXC inside containers) while protecting the host.
 
-### Current Security Implementation (v1.0)
+### Current Security Implementation
 
 | Feature | Status | Implementation |
 |---------|--------|----------------|
@@ -187,103 +191,23 @@ Ginto uses LXD containers with **Proxmox-style security hardening** to safely al
 | **Nesting Enabled** | ✅ | `security.nesting=true` with interception |
 | **Mount Syscall Interception** | ✅ | Whitelist: `ext4,tmpfs,proc,sysfs,cgroup,overlay` |
 | **Device Node Interception** | ✅ | `security.syscalls.intercept.mknod=true` |
-| **Extended Attr Interception** | ✅ | `security.syscalls.intercept.setxattr=true` |
-| **BPF Interception** | ✅ | `security.syscalls.intercept.bpf=true` |
 | **Resource Limits** | ✅ | 2 CPU, 1GB RAM, 200 processes |
 | **Kernel Module Loading** | ✅ Blocked | `linux.kernel_modules=""` |
 | **Command Filtering** | ✅ | `SandboxSecurity.php` blocks dangerous commands |
 
-### Security Comparison: Ginto vs Proxmox
+---
 
-| Feature | Proxmox | Ginto | Status |
-|---------|---------|-------|--------|
-| User Namespace Mapping | UID 100000+ | `idmap.isolated=true` | ✅ Equivalent |
-| Unprivileged Default | ✅ | ✅ | ✅ Same |
-| Syscall Interception | AppArmor + seccomp | LXD intercept | ✅ Same result |
-| Mount Filtering | AppArmor whitelist | `mount.allowed=...` | ✅ Same |
-| **AppArmor Profile** | Custom strict | LXD default | ⚠️ **Gap** |
-| **Seccomp Profile** | Custom restrictive | LXD default | ⚠️ **Gap** |
-| **Network Egress Filtering** | veth + iptables | Just lxdbr0 | ⚠️ **Gap** |
-| Cgroup v2 Delegation | Controlled | LXD handles | ✅ Same |
+## 🔒 Security Best Practices
 
-**Current Security Rating: 85/100** (Production ready)
-
-### Future Security Enhancements (Community Contributions Welcome!)
-
-#### 1. Custom AppArmor Profile (Medium Priority)
-Add stricter AppArmor confinement matching Proxmox:
-```bash
-# Example: Add to ginto.sh apply_security_config()
-$LXC_CMD config set "$name" raw.apparmor="
-  deny mount options=(ro, remount) -> /,
-  deny /sys/firmware/** rwklx,
-  deny /sys/kernel/** rwklx,
-  deny /proc/sys/** wklx,
-"
-```
-
-#### 2. Custom Seccomp Profile (Low Priority)
-The syscall interception mostly covers this, but a custom profile adds defense-in-depth:
-```bash
-# Create /etc/lxd/seccomp/ginto.json with restricted syscalls
-$LXC_CMD config set "$name" raw.seccomp="..."
-```
-
-#### 3. Network Egress Filtering (Medium Priority)
-Restrict outbound connections to prevent abuse:
-```bash
-# Add to ginto.sh or as separate network hardening script
-sudo iptables -I FORWARD -i lxdbr0 -o eth0 -j DROP
-sudo iptables -I FORWARD -i lxdbr0 -o eth0 -p tcp --dport 80 -j ACCEPT
-sudo iptables -I FORWARD -i lxdbr0 -o eth0 -p tcp --dport 443 -j ACCEPT
-sudo iptables -I FORWARD -i lxdbr0 -o eth0 -p udp --dport 53 -j ACCEPT
-```
-
-#### 4. Per-Container Network Namespaces (Low Priority)
-Isolate container networks to prevent cross-container attacks.
-
-### Security Files Reference
-
-| File | Purpose |
-|------|---------|
-| `bin/ginto.sh` | Container creation with security config |
-| `src/Helpers/SandboxSecurity.php` | Command filtering and rate limiting |
-| `src/Helpers/LxdSandboxManager.php` | PHP sandbox management |
-| `/etc/sudoers.d/ginto-lxd` | Restricted sudo access for web server |
-
-### Reporting Security Issues
-
-If you discover a security vulnerability, please email **security@ginto.ai** instead of opening a public issue.
+- **Prepared statements** prevent SQL injection
+- **Strict typing** catches errors early
+- **Container isolation** for untrusted code execution
+- **Role-based access control** for database operations
+- **Fair use limits** prevent resource abuse
 
 ---
 
-## TODO
-
-### Sandbox Infrastructure
-
-- [ ] **Multi-Distro LXC Support** - Extend `ginto.sh` to support additional Linux distributions as sandbox base images:
-  - **Debian 12 (Bookworm)** - Stable, widely used, similar to Ubuntu
-  - **Fedora** - For users preferring RPM-based systems
-  - **Arch Linux** - Rolling release, latest packages
-  - **Rocky Linux / AlmaLinux** - RHEL-compatible for enterprise users
-  - **openSUSE Leap** - Enterprise-grade stability
-  - **Void Linux** - Lightweight alternative to Alpine with glibc
-
-- [ ] **Container Runtime Alternatives** - Support for other container technologies:
-  - **Podman** - Rootless containers, Docker-compatible
-  - **systemd-nspawn** - Lightweight, built into systemd
-  - **Incus** - LXD fork with community governance
-
-### Features
-
-- [ ] One-click web installer at `https://ginto.ai/install.sh`
-- [ ] Automatic SSL certificate provisioning per sandbox
-- [ ] Resource usage dashboard
-- [ ] Sandbox templates (Laravel, Next.js, Django, etc.)
-
----
-
-## Firewall (UFW) Configuration
+## 🌐 Firewall (UFW) Configuration
 
 If your server uses UFW, LXD bridge traffic must be allowed for containers to get IP addresses.
 
@@ -297,17 +221,18 @@ sudo ufw route allow in on lxdbr0
 sudo ufw route allow out on lxdbr0
 ```
 
-**Why is this needed?**
-- LXD creates a bridge network (`lxdbr0`) with a built-in DHCP server
-- UFW's default configuration blocks traffic on unknown interfaces
-- Without these rules, containers cannot get IPv4 addresses via DHCP
+---
 
-**Troubleshooting:**
-- If containers show only IPv6 (no IPv4), UFW is likely blocking DHCP
-- Run `sudo ufw status` to check if rules for `lxdbr0` exist
-- The bridge uses an internal subnet (e.g., `10.x.x.0/24`) not exposed to the internet
+## 📝 Logs
+
+Application logs are located at:
+```
+../storage/logs/ginto.log
+```
+(One level up from the project directory, at `/home/<user>/storage/logs/ginto.log`)
 
 ---
 
-## License
-MIT – feel free to copy, modify, and use in your own projects.
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) for details.
