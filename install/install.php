@@ -30,7 +30,6 @@ $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(d
 $requestedAction = $_GET['action'] ?? '';
 if ($installedMarkerExists && $requestedAction !== 'get_env_values') {
     // Installation is marked as complete, block access
-    http_response_code(403);
     
     // Check if this is an AJAX/API request or a browser request
     $isAjax = !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
@@ -38,12 +37,14 @@ if ($installedMarkerExists && $requestedAction !== 'get_env_values') {
     
     if ($isAjax || $acceptsJson || !empty($requestedAction)) {
         // API request - return JSON
+        http_response_code(403);
         header('Content-Type: application/json');
-        die(json_encode(['success' => false, 'message' => 'Ginto AI installation is already complete. The installer is disabled for security.']));
+        die(json_encode(['success' => false, 'message' => 'Installation disabled.']));
     } else {
-        // Browser request - redirect to index.php which shows a nice page
-        header('Location: /install/');
-        exit;
+        // Browser request - redirect directly to app
+        header('Location: /');
+        ob_end_clean();
+        die();
     }
 }
 
