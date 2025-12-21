@@ -173,19 +173,27 @@
   }
 
   function setBusy(b) {
-    sendBtn.disabled = b;
     if (b) {
-      // Spinning loader icon while streaming
-      sendBtn.innerHTML = `<svg class="w-5 h-5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      // Show stop button (square icon) when streaming - clicking aborts
+      sendBtn.disabled = false; // Keep enabled so user can click to stop
+      sendBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-500');
+      sendBtn.classList.add('bg-red-600', 'hover:bg-red-500');
+      sendBtn.title = 'Stop generating';
+      sendBtn.innerHTML = `<svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24">
+        <rect x="6" y="6" width="12" height="12" rx="1"/>
       </svg>`;
+      sendBtn._isStreaming = true;
     } else {
       // Paper plane icon (send)
+      sendBtn.disabled = false;
+      sendBtn.classList.remove('bg-red-600', 'hover:bg-red-500');
+      sendBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-500');
+      sendBtn.title = 'Send message';
       sendBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M22 2L11 13"/>
         <path d="M22 2L15 22L11 13L2 9L22 2Z"/>
       </svg>`;
+      sendBtn._isStreaming = false;
     }
   }
 
@@ -2921,9 +2929,15 @@
     if (attachFilename) attachFilename.textContent = '';
   }
 
-  // Wire send button click - triggers websearch-style streaming
+  // Wire send button click - triggers websearch-style streaming or stops generation
   sendBtn?.addEventListener('click', (e) => {
     try {
+      // If currently streaming, abort instead of sending
+      if (sendBtn._isStreaming && abortController) {
+        abortController.abort();
+        return;
+      }
+      
       const p = (promptEl.value || '').trim();
       if (!p) return;
       promptEl.value = '';
