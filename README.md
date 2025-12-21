@@ -336,11 +336,11 @@ export LXD_NETWORK_PREFIX=10.166.3
 - [ ] Web-based model management
 
 ---
-## 📋 Changelog
+## 📋 Release Notes
 
 See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
 
 ---
-## �📄 License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
