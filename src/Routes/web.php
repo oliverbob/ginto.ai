@@ -4382,13 +4382,14 @@ req($router, '/chat', function() use ($db) {
                 // Add current prompt
                 $messages[] = ['role' => 'user', 'content' => $prompt];
                 
-                // Stream response from Ollama
+                // Stream response from Ollama using chatStream method
                 $fullResponse = '';
-                $ollamaProvider->streamChat($messages, function($chunk) use (&$fullResponse) {
+                $onChunk = function($chunk) use (&$fullResponse) {
                     $fullResponse .= $chunk;
                     echo "data: " . json_encode(['text' => $chunk]) . "\n\n";
                     flush();
-                });
+                };
+                $ollamaProvider->chatStream($messages, [], [], $onChunk);
                 
                 // Final message with rendered HTML
                 $parsedown = null;
