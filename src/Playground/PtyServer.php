@@ -61,8 +61,16 @@ class PtyServer implements MessageComponentInterface
 
         // Start terminal in user's home directory to avoid accidental edits to repo
         $homeDir = getenv('HOME') ?: '/home/oliverbob';
+        // Set reasonable default terminal size via environment
+        $env = [
+            'TERM' => 'xterm-256color',
+            'COLUMNS' => '120',
+            'LINES' => '30',
+            'HOME' => $homeDir,
+            'PATH' => getenv('PATH') ?: '/usr/local/bin:/usr/bin:/bin',
+        ];
         $descriptors = [0 => ['pipe','r'], 1 => ['pipe','w'], 2 => ['pipe','w']];
-        $process = proc_open($cmd, $descriptors, $pipes, $homeDir, null);
+        $process = proc_open($cmd, $descriptors, $pipes, $homeDir, $env);
         if (!is_resource($process)) {
             $conn->send("Failed to spawn pty process\n");
             $conn->close();
@@ -71,6 +79,9 @@ class PtyServer implements MessageComponentInterface
 
         stream_set_blocking($pipes[1], false);
         stream_set_blocking($pipes[2], false);
+
+        // Set terminal size via stty (works better than env vars for interactive shells)
+        fwrite($pipes[0], "stty cols 120 rows 30 2>/dev/null\n");
 
         $state = $this->clients[$conn];
         $state['process'] = $process;
