@@ -6272,7 +6272,7 @@ req($router, '/api/models', function() {
 });
 
 // Admin API: Set active provider and model for the session
-reqP($router, '/api/models/set', function() {
+req($router, '/api/models/set', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     
