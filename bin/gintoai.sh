@@ -118,8 +118,11 @@ should_run_step() {
 # Auto-detect the current user (the one running the script, not root)
 if [ -n "${SUDO_USER:-}" ]; then
     INSTALL_USER="$SUDO_USER"
-else
+elif [ "$(whoami)" != "root" ]; then
     INSTALL_USER="$(whoami)"
+else
+    # Fallback: detect from project directory ownership
+    INSTALL_USER="$(stat -c '%U' "$PROJECT_DIR" 2>/dev/null || echo "root")"
 fi
 INSTALL_USER_HOME=$(getent passwd "$INSTALL_USER" | cut -d: -f6)
 
