@@ -4327,6 +4327,91 @@ req($router, '/chat', function() use ($db) {
     $hasImage = !empty($_POST['hasImage']) && $_POST['hasImage'] === '1';
     $imageDataUrl = $_POST['image'] ?? null;
 
+    // =====================================================================
+    // SESSION-SELECTED PROVIDER (e.g., Ollama from model dropdown)
+    // =====================================================================
+    // Check if user has selected a specific provider via the model dropdown.
+    // This takes priority over the default cloud provider selection.
+    // =====================================================================
+    $sessionProvider = $_SESSION['llm_provider_name'] ?? null;
+    $sessionModel = $_SESSION['llm_model'] ?? null;
+    $useSessionProvider = false;
+    
+    if ($sessionProvider && $sessionModel && $sessionProvider === 'ollama') {
+        // User selected Ollama - use it directly without cloud API logic
+        try {
+            $ollamaProvider = \App\Core\LLM\LLMProviderFactory::create('ollama', [
+                'model' => $sessionModel,
+            ]);
+            
+            if ($ollamaProvider->isConfigured()) {
+                $useSessionProvider = true;
+                
+                // Prepare streaming headers
+                @ini_set('output_buffering', 'off');
+                @ini_set('zlib.output_compression', false);
+                while (ob_get_level()) ob_end_flush();
+                ignore_user_abort(true);
+
+                if (!headers_sent()) header('Content-Type: text/event-stream; charset=utf-8');
+                if (!headers_sent()) header('Cache-Control: no-cache');
+                if (!headers_sent()) header('X-Accel-Buffering: no');
+                if (!headers_sent()) header('Connection: keep-alive');
+
+                echo str_repeat(' ', 1024);
+                flush();
+
+                // Build messages array
+                $messages = [];
+                $systemPrompt = 'You are Ginto, a helpful AI assistant created by Oliver Bob. Be concise and direct.';
+                $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+                
+                // Add history
+                $historyJson = $_POST['history'] ?? null;
+                if ($historyJson) {
+                    $h = json_decode($historyJson, true);
+                    if (is_array($h)) {
+                        foreach ($h as $hm) {
+                            if (!empty($hm['role']) && isset($hm['content']) && $hm['role'] !== 'system') {
+                                $messages[] = ['role' => $hm['role'], 'content' => (string)$hm['content']];
+                            }
+                        }
+                    }
+                }
+                
+                // Add current prompt
+                $messages[] = ['role' => 'user', 'content' => $prompt];
+                
+                // Stream response from Ollama
+                $fullResponse = '';
+                $ollamaProvider->streamChat($messages, function($chunk) use (&$fullResponse) {
+                    $fullResponse .= $chunk;
+                    echo "data: " . json_encode(['text' => $chunk]) . "\n\n";
+                    flush();
+                });
+                
+                // Final message with rendered HTML
+                $parsedown = null;
+                if (class_exists('\ParsedownExtra')) {
+                    try { $parsedown = new \ParsedownExtra(); } catch (\Throwable $_) {}
+                } elseif (class_exists('\Parsedown')) {
+                    try { $parsedown = new \Parsedown(); } catch (\Throwable $_) {}
+                }
+                if ($parsedown && method_exists($parsedown, 'setSafeMode')) {
+                    try { $parsedown->setSafeMode(true); } catch (\Throwable $_) {}
+                }
+                
+                $html = $parsedown ? $parsedown->text($fullResponse) : nl2br(htmlspecialchars($fullResponse));
+                echo "data: " . json_encode(['final' => true, 'html' => $html]) . "\n\n";
+                flush();
+                exit;
+            }
+        } catch (\Throwable $e) {
+            // Ollama failed, fall through to cloud providers
+            error_log("Ollama provider failed: " . $e->getMessage());
+        }
+    }
+
     // Use OpenAICompatibleProvider with rate-limit-aware provider selection
     try {
         // Initialize ProviderKeyManager for multi-key rotation
