@@ -71,7 +71,8 @@ class FixedPtyServer implements MessageComponentInterface
         stream_set_blocking($pipes[2], false);
 
         // Set terminal size via stty (works better than env vars for interactive shells)
-        fwrite($pipes[0], "stty cols 120 rows 30 2>/dev/null\n");
+        // clear hides the echoed command from the user
+        fwrite($pipes[0], "stty cols 120 rows 30 2>/dev/null; clear\n");
 
         $this->clients[$conn] = [
             'process' => $process,
