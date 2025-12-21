@@ -6,8 +6,13 @@
  * It blocks access if the .installed marker exists (unless ?force=1).
  */
 
+// Ensure ROOT_PATH is defined (set by public/index.php, fallback for direct access)
+if (!defined('ROOT_PATH')) {
+    define('ROOT_PATH', dirname(__DIR__));
+}
+
 // Check for .installed marker in both locations
-$installedMarkerExists = file_exists('../.installed') || file_exists('../../storage/.installed');
+$installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
 $forceInstall = isset($_GET['force']) && $_GET['force'] === '1';
 
 // Block access if installation is complete
