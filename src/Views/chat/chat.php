@@ -4522,7 +4522,10 @@
         const res = await fetch('/api/models/set', {
           method: 'POST',
           credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': window.GINTO_AUTH?.csrfToken || window.CSRF_TOKEN || ''
+          },
           body: JSON.stringify({ provider, model })
         });
         const data = await res.json();
