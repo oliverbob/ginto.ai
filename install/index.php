@@ -17,7 +17,8 @@ $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(d
 // Block access if installation is complete - redirect to application
 if ($installedMarkerExists) {
     header('Location: /');
-    exit;
+    ob_end_clean(); // Clear any output buffer
+    die(); // Ensure absolutely nothing is sent
 }
 
 // Installation not complete or force mode - serve the actual installer
