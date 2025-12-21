@@ -881,8 +881,8 @@
           <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
         </svg>
       </button>
-      <span class="w-2 h-2 bg-green-500 rounded-full hidden min-[350px]:block"></span>
-      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 hidden min-[350px]:block">Ginto AI</span>
+      <span class="w-2 h-2 bg-green-500 rounded-full hidden min-[350px]:block" id="mobile-model-status-dot"></span>
+      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 hidden min-[350px]:block" id="mobile-model-name">Ginto AI</span>
     </div>
     <?php if (empty($isLoggedIn)): ?>
     <div class="flex items-center gap-1">
@@ -1142,10 +1142,33 @@
       <div class="flex items-center justify-between px-4 h-14">
         <!-- Model selector -->
         <div class="flex items-center gap-2">
+          <?php if (!empty($isAdmin)): ?>
+          <!-- Admin model selector dropdown -->
+          <div class="relative" id="model-selector-wrapper">
+            <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer">
+              <div class="w-2 h-2 rounded-full bg-green-500" id="model-status-dot"></div>
+              <span class="text-sm text-gray-700 dark:text-gray-200" id="model-name">Ginto AI</span>
+              <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </button>
+            <!-- Dropdown menu -->
+            <div id="model-dropdown" class="hidden absolute left-0 mt-2 w-80 max-h-96 overflow-y-auto bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50">
+              <div class="p-3 border-b border-gray-200 dark:border-gray-700">
+                <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Select Model</span>
+              </div>
+              <div id="model-list" class="py-2">
+                <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
+              </div>
+            </div>
+          </div>
+          <?php else: ?>
+          <!-- Non-admin static display -->
           <div class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
             <div class="w-2 h-2 rounded-full bg-green-500"></div>
             <span class="text-sm text-gray-700 dark:text-gray-200" id="model-name">Ginto AI</span>
           </div>
+          <?php endif; ?>
         </div>
         
         <!-- Star on GitHub + Theme toggle -->
@@ -4385,6 +4408,179 @@
       });
     }
   </script>
+
+  <?php if (!empty($isAdmin)): ?>
+  <!-- Admin Model Selector Script -->
+  <script>
+  (function() {
+    const btn = document.getElementById('model-selector-btn');
+    const dropdown = document.getElementById('model-dropdown');
+    const modelList = document.getElementById('model-list');
+    const modelName = document.getElementById('model-name');
+    const statusDot = document.getElementById('model-status-dot');
+    const mobileModelName = document.getElementById('mobile-model-name');
+    const mobileStatusDot = document.getElementById('mobile-model-status-dot');
+    
+    if (!btn || !dropdown) return;
+    
+    // Helper to update both desktop and mobile displays
+    function updateModelDisplay(model, dotClass) {
+      if (modelName) modelName.textContent = model;
+      if (mobileModelName) mobileModelName.textContent = model;
+      if (statusDot) statusDot.className = dotClass;
+      if (mobileStatusDot) mobileStatusDot.className = dotClass.replace('w-2 h-2', 'w-2 h-2') + ' hidden min-[350px]:block';
+    }
+    
+    let modelsData = null;
+    let isOpen = false;
+    
+    // Toggle dropdown
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      isOpen = !isOpen;
+      dropdown.classList.toggle('hidden', !isOpen);
+      if (isOpen && !modelsData) {
+        loadModels();
+      }
+    });
+    
+    // Close on outside click
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target) && e.target !== btn) {
+        isOpen = false;
+        dropdown.classList.add('hidden');
+      }
+    });
+    
+    // Load models from API
+    async function loadModels() {
+      modelList.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading models...</div>';
+      
+      try {
+        const res = await fetch('/api/models', { credentials: 'same-origin' });
+        const data = await res.json();
+        
+        if (!data.success) {
+          modelList.innerHTML = '<div class="px-4 py-3 text-sm text-red-500">Error loading models</div>';
+          return;
+        }
+        
+        modelsData = data;
+        renderModels(data);
+        
+        // Update current model display (desktop + mobile)
+        if (data.current_model) {
+          updateModelDisplay(data.current_model, 'w-2 h-2 rounded-full bg-green-500');
+        }
+      } catch (err) {
+        modelList.innerHTML = '<div class="px-4 py-3 text-sm text-red-500">Failed to load models</div>';
+        console.error('Model load error:', err);
+      }
+    }
+    
+    // Render model list
+    function renderModels(data) {
+      let html = '';
+      const providers = Object.entries(data.providers || {});
+      
+      if (providers.length === 0) {
+        html = '<div class="px-4 py-3 text-sm text-gray-500">No providers configured</div>';
+      } else {
+        for (const [providerName, providerData] of providers) {
+          html += `<div class="px-4 py-2 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide bg-gray-50 dark:bg-gray-800/50">${escapeHtml(providerName)}</div>`;
+          
+          const models = providerData.models || [];
+          for (const model of models) {
+            const isActive = data.current_provider === providerName && data.current_model === model;
+            html += `
+              <button 
+                class="w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 dark:hover:bg-indigo-900/30 flex items-center gap-2 ${isActive ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}"
+                data-provider="${escapeHtml(providerName)}"
+                data-model="${escapeHtml(model)}"
+              >
+                ${isActive ? '<i class="fas fa-check text-xs text-indigo-500"></i>' : '<span class="w-3"></span>'}
+                <span class="truncate">${escapeHtml(model)}</span>
+              </button>
+            `;
+          }
+        }
+      }
+      
+      modelList.innerHTML = html;
+      
+      // Add click handlers
+      modelList.querySelectorAll('button[data-provider]').forEach(btn => {
+        btn.addEventListener('click', () => selectModel(btn.dataset.provider, btn.dataset.model));
+      });
+    }
+    
+    // Select a model
+    async function selectModel(provider, model) {
+      updateModelDisplay(model, 'w-2 h-2 rounded-full bg-yellow-500 animate-pulse');
+      
+      try {
+        const res = await fetch('/api/models/set', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, model })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          updateModelDisplay(model, 'w-2 h-2 rounded-full bg-green-500');
+          
+          // Update local state
+          if (modelsData) {
+            modelsData.current_provider = provider;
+            modelsData.current_model = model;
+            renderModels(modelsData);
+          }
+          
+          // Close dropdown
+          isOpen = false;
+          dropdown.classList.add('hidden');
+          
+          // Show toast notification
+          showToast(`Switched to ${provider} / ${model}`, 'success');
+        } else {
+          updateModelDisplay(modelName?.textContent || 'Ginto AI', 'w-2 h-2 rounded-full bg-red-500');
+          showToast(data.error || 'Failed to switch model', 'error');
+        }
+      } catch (err) {
+        updateModelDisplay(modelName?.textContent || 'Ginto AI', 'w-2 h-2 rounded-full bg-red-500');
+        showToast('Network error', 'error');
+        console.error('Model switch error:', err);
+      }
+    }
+    
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+    
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-4 right-4 px-4 py-2 rounded-lg shadow-lg z-50 text-sm font-medium transition-opacity ${
+        type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+        'bg-gray-800 text-white'
+      }`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+    
+    // Load current model on page load
+    loadModels();
+  })();
+  </script>
+  <?php endif; ?>
 
   <script src="/assets/js/chat.js"></script>
 </body>

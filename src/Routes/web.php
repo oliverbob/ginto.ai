@@ -6228,6 +6228,99 @@ req($router, '/debug/llm', function() {
     exit;
 });
 
+// Admin API: Get available models for all configured providers (including Ollama)
+req($router, '/api/models', function() {
+    header('Content-Type: application/json; charset=utf-8');
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    
+    // Admin check
+    $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin');
+    $tokenHeader = $_SERVER['HTTP_X_GINTO_ADMIN_TOKEN'] ?? $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? null;
+    $expected = getenv('GINTO_ADMIN_TOKEN') ?: getenv('ADMIN_TOKEN');
+    if (!$isAdmin && $expected && $tokenHeader && hash_equals((string)$expected, (string)$tokenHeader)) $isAdmin = true;
+    if (!$isAdmin) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Admin access required']);
+        exit;
+    }
+
+    $providers = \App\Core\LLM\LLMProviderFactory::getAvailableProviders();
+    $result = [
+        'success' => true,
+        'current_provider' => $_SESSION['llm_provider_name'] ?? (getenv('LLM_PROVIDER') ?: 'groq'),
+        'current_model' => $_SESSION['llm_model'] ?? (getenv('LLM_MODEL') ?: null),
+        'providers' => [],
+    ];
+
+    foreach ($providers as $providerName) {
+        try {
+            $provider = \App\Core\LLM\LLMProviderFactory::create($providerName);
+            if ($provider->isConfigured()) {
+                $result['providers'][$providerName] = [
+                    'configured' => true,
+                    'default_model' => $provider->getDefaultModel(),
+                    'models' => $provider->getModels(),
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Skip unconfigured providers
+        }
+    }
+
+    echo json_encode($result, JSON_PRETTY_PRINT);
+    exit;
+});
+
+// Admin API: Set active provider and model for the session
+reqP($router, '/api/models/set', function() {
+    header('Content-Type: application/json; charset=utf-8');
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    
+    // Admin check
+    $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin');
+    $tokenHeader = $_SERVER['HTTP_X_GINTO_ADMIN_TOKEN'] ?? $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? null;
+    $expected = getenv('GINTO_ADMIN_TOKEN') ?: getenv('ADMIN_TOKEN');
+    if (!$isAdmin && $expected && $tokenHeader && hash_equals((string)$expected, (string)$tokenHeader)) $isAdmin = true;
+    if (!$isAdmin) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Admin access required']);
+        exit;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $provider = $input['provider'] ?? null;
+    $model = $input['model'] ?? null;
+
+    if (!$provider || !$model) {
+        echo json_encode(['success' => false, 'error' => 'Missing provider or model']);
+        exit;
+    }
+
+    // Validate provider exists
+    try {
+        $providerInstance = \App\Core\LLM\LLMProviderFactory::create($provider);
+        if (!$providerInstance->isConfigured()) {
+            echo json_encode(['success' => false, 'error' => "Provider '$provider' is not configured"]);
+            exit;
+        }
+    } catch (\Throwable $e) {
+        echo json_encode(['success' => false, 'error' => "Invalid provider: " . $e->getMessage()]);
+        exit;
+    }
+
+    // Store in session
+    $_SESSION['llm_provider_name'] = $provider;
+    $_SESSION['llm_model'] = $model;
+
+    echo json_encode([
+        'success' => true,
+        'provider' => $provider,
+        'model' => $model,
+        'message' => "Switched to $provider / $model",
+    ]);
+    exit;
+});
+
 // Standard MCP chat endpoint: calls the local MCP server's `chat_completion` tool (admin only).
 // Returns JSON: { success: bool, reply: string, raw: mixed }
 req($router, '/mcp/chat', function() {
