@@ -261,11 +261,13 @@ class OllamaProvider extends AbstractLLMProvider
         try {
             $this->postStreamOllama('api/chat', $payload, function ($chunk) use (&$content, &$toolCalls, $onChunk) {
                 // Handle thinking content (qwen3 and other reasoning models)
+                // Send as a special reasoning event so frontend can display separately
                 if (isset($chunk['message']['thinking'])) {
                     $text = $chunk['message']['thinking'];
-                    $content .= $text;
+                    // Don't add thinking to main content - keep it separate
                     if ($onChunk) {
-                        $onChunk($text, null);
+                        // Pass thinking as a toolCall-like object with 'reasoning' flag
+                        $onChunk($text, ['reasoning' => true, 'text' => $text]);
                     }
                 }
                 

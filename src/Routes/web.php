@@ -4396,11 +4396,24 @@ req($router, '/chat', function() use ($db) {
                 
                 // Stream response from Ollama using chatStream method
                 $fullResponse = '';
+                $accumulatedReasoning = '';
                 $streamError = null;
-                $onChunk = function($chunk) use (&$fullResponse) {
-                    $fullResponse .= $chunk;
-                    echo "data: " . json_encode(['text' => $chunk]) . "\n\n";
-                    flush();
+                $onChunk = function($chunk, $toolCall = null) use (&$fullResponse, &$accumulatedReasoning) {
+                    // Handle reasoning/thinking events (qwen3 and other reasoning models)
+                    if ($toolCall !== null && isset($toolCall['reasoning'])) {
+                        $reasoningText = $toolCall['text'] ?? '';
+                        $accumulatedReasoning .= $reasoningText;
+                        echo "data: " . json_encode(['reasoning' => $reasoningText], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                        flush();
+                        return;
+                    }
+                    
+                    // Handle regular content
+                    if ($chunk !== '' && $chunk !== null) {
+                        $fullResponse .= $chunk;
+                        echo "data: " . json_encode(['text' => $chunk]) . "\n\n";
+                        flush();
+                    }
                 };
                 
                 try {
@@ -4438,7 +4451,46 @@ req($router, '/chat', function() use ($db) {
                 }
                 
                 $html = $parsedown ? $parsedown->text($fullResponse) : nl2br(htmlspecialchars($fullResponse));
-                echo "data: " . json_encode(['final' => true, 'html' => $html]) . "\n\n";
+                
+                // Format reasoning as Groq-style timeline HTML with dot + line per item
+                $reasoningHtml = '';
+                if ($accumulatedReasoning) {
+                    $createReasoningItem = fn($content) => '<div class="reasoning-item"><div class="reasoning-item-indicator"><div class="reasoning-item-dot"></div><div class="reasoning-item-line"></div></div><div class="reasoning-item-text"><p>' . htmlspecialchars(trim(preg_replace('/\n/', ' ', $content))) . '</p></div></div>';
+                    
+                    // Split by sentences or newlines
+                    $paragraphs = array_filter(preg_split('/\n\n+/', $accumulatedReasoning), fn($p) => trim($p));
+                    if (count($paragraphs) <= 1) {
+                        $paragraphs = array_filter(preg_split('/\n/', $accumulatedReasoning), fn($p) => trim($p));
+                    }
+                    if (count($paragraphs) <= 1 && strlen(trim($accumulatedReasoning)) > 100) {
+                        $text = preg_replace('/\s+/', ' ', trim($accumulatedReasoning));
+                        $parts = preg_split('/([.!?])\s+(?=[A-Z])/', $text, -1, PREG_SPLIT_DELIM_CAPTURE);
+                        $sentences = [];
+                        $current = '';
+                        foreach ($parts as $part) {
+                            if (preg_match('/^[.!?]$/', $part)) {
+                                $current .= $part;
+                            } else {
+                                if ($current) {
+                                    $sentences[] = trim($current);
+                                    $current = $part;
+                                } else {
+                                    $current = $part;
+                                }
+                            }
+                        }
+                        if (trim($current)) $sentences[] = trim($current);
+                        $paragraphs = array_filter($sentences);
+                    }
+                    $reasoningHtml = implode('', array_map($createReasoningItem, $paragraphs));
+                }
+                
+                echo "data: " . json_encode([
+                    'html' => $html,
+                    'reasoningHtml' => $reasoningHtml,
+                    'contentEmpty' => empty(trim($fullResponse)),
+                    'final' => true
+                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
                 flush();
                 exit;
             }
