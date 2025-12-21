@@ -1202,7 +1202,7 @@
                     Supports <span class="font-medium text-gray-600 dark:text-gray-300">reasoning</span>, 
                     <span class="font-medium text-gray-600 dark:text-gray-300">vision</span>, and 
                     <span class="font-medium text-gray-600 dark:text-gray-300">tool-calling</span> with multi-tenant sandboxes. 
-                    Redis-backed to <span class="font-mono text-xs">4.29B</span> internal IPs.
+                    Bijective routing to <span class="font-mono text-xs">4.29B</span> internal IPs.
                   </p>
                 </div>
                 <p class="text-[10px] font-medium tracking-wider uppercase text-indigo-500 dark:text-indigo-400">Built to scale · Built to last</p>
