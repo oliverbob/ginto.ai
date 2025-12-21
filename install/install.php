@@ -20,19 +20,15 @@ if (!defined('ROOT_PATH')) {
     define('ROOT_PATH', dirname(__DIR__));
 }
 
-// Security check - prevent reinstallation only if installation is complete
+// Security check - prevent reinstallation if installation is complete
 $envExists = file_exists(ROOT_PATH . '/.env');
 $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
-$forceInstall = isset($_GET['force']);
 
-// Allow installation if:
-// 1. No .installed marker exists (incomplete or fresh installation)
-// 2. Force install is requested via ?force=1
-// Block installation only if .installed marker exists (complete installation)
+// Block installation if .installed marker exists (complete installation)
 // Exception: allow the 'get_env_values' action even when installed so the installer UI
 // can prefill fields from an existing .env file for convenience.
 $requestedAction = $_GET['action'] ?? '';
-if ($installedMarkerExists && !$forceInstall && $requestedAction !== 'get_env_values') {
+if ($installedMarkerExists && $requestedAction !== 'get_env_values') {
     // Installation is marked as complete, block access
     http_response_code(403);
     
@@ -43,7 +39,7 @@ if ($installedMarkerExists && !$forceInstall && $requestedAction !== 'get_env_va
     if ($isAjax || $acceptsJson || !empty($requestedAction)) {
         // API request - return JSON
         header('Content-Type: application/json');
-        die(json_encode(['success' => false, 'message' => 'Ginto AI installation is already complete. To reinstall, add ?force=1 to the URL or delete the .installed file.']));
+        die(json_encode(['success' => false, 'message' => 'Ginto AI installation is already complete. The installer is disabled for security.']));
     } else {
         // Browser request - redirect to index.php which shows a nice page
         header('Location: /install/');

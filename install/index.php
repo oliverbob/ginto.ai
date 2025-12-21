@@ -13,10 +13,9 @@ if (!defined('ROOT_PATH')) {
 
 // Check for .installed marker in both locations
 $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
-$forceInstall = isset($_GET['force']) && $_GET['force'] === '1';
 
 // Block access if installation is complete
-if ($installedMarkerExists && !$forceInstall) {
+if ($installedMarkerExists) {
     http_response_code(403);
     ?>
 <!DOCTYPE html>
@@ -43,10 +42,6 @@ if ($installedMarkerExists && !$forceInstall) {
                 <a href="/" class="block w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-3 px-4 rounded-lg transition-colors">
                     Go to Application
                 </a>
-                <p class="text-xs text-gray-500 dark:text-gray-500">
-                    To reinstall, add <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">?force=1</code> to the URL<br>
-                    or delete the <code class="bg-gray-100 dark:bg-gray-700 px-1 rounded">.installed</code> file
-                </p>
             </div>
         </div>
     </div>
