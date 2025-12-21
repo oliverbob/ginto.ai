@@ -10,7 +10,7 @@ A powerful **local AI Agent** that runs entirely on your machine. Works with Ope
 
 ### 🤖 AI Agent Capabilities
 - **44+ MCP Tools** for file operations, code analysis, database access, and more
-- **Multi-provider support** - OpenAI, Anthropic Claude, Groq, Together AI, Fireworks AI, Cerebras
+- **Multi-provider support** - OpenAI, Anthropic Claude, Groq, Together AI, Fireworks AI, Cerebras, **Ollama** (local & cloud)
 - **Streaming responses** with real-time tool execution
 - **Agentic workflows** - automated multi-step task execution
 - **Task persistence** - save and resume agent tasks across sessions

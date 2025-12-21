@@ -6,6 +6,7 @@ namespace App\Core\LLM;
 
 use App\Core\LLM\Providers\OpenAICompatibleProvider;
 use App\Core\LLM\Providers\AnthropicProvider;
+use App\Core\LLM\Providers\OllamaProvider;
 
 /**
  * Factory for creating LLM provider instances.
@@ -26,6 +27,7 @@ class LLMProviderFactory
         'llama' => 'groq',
         'llama-3' => 'groq',
         'mixtral' => 'groq',
+        'ollama-cloud' => 'ollama',
     ];
 
     /**
@@ -48,6 +50,7 @@ class LLMProviderFactory
             'cerebras' => new OpenAICompatibleProvider('cerebras', $config),
             'together' => new OpenAICompatibleProvider('together', $config),
             'fireworks' => new OpenAICompatibleProvider('fireworks', $config),
+            'ollama' => new OllamaProvider($config),
             default => throw new \InvalidArgumentException("Unknown provider: $provider"),
         };
     }
@@ -115,7 +118,7 @@ class LLMProviderFactory
      */
     public static function getAvailableProviders(): array
     {
-        return ['openai', 'groq', 'cerebras', 'anthropic', 'together', 'fireworks'];
+        return ['openai', 'groq', 'cerebras', 'anthropic', 'together', 'fireworks', 'ollama'];
     }
 
     /**

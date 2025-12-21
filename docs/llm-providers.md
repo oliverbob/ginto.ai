@@ -6,8 +6,9 @@ This document describes the standardized LLM provider architecture that supports
 
 The system uses a provider-agnostic architecture that abstracts the differences between:
 
-- **OpenAI-compatible APIs**: OpenAI, Groq, Together AI, Fireworks AI
+- **OpenAI-compatible APIs**: OpenAI, Groq, Together AI, Fireworks AI, Cerebras
 - **Anthropic Claude API**: Uses different message format and tool calling conventions
+- **Ollama API**: Native Ollama format for local and Ollama Cloud
 
 ## Configuration
 
@@ -15,7 +16,7 @@ The system uses a provider-agnostic architecture that abstracts the differences 
 
 ```bash
 # Provider selection (auto-detected if not set)
-LLM_PROVIDER=groq          # Options: openai, groq, anthropic, together, fireworks
+LLM_PROVIDER=groq          # Options: openai, groq, anthropic, together, fireworks, ollama
 
 # Model selection (defaults based on provider)
 LLM_MODEL=llama-3.3-70b-versatile
@@ -26,6 +27,7 @@ OPENAI_API_KEY=your_openai_api_key
 ANTHROPIC_API_KEY=your_anthropic_api_key
 TOGETHER_API_KEY=your_together_api_key
 FIREWORKS_API_KEY=your_fireworks_api_key
+OLLAMA_API_KEY=your_ollama_cloud_key    # Only needed for Ollama Cloud
 ```
 
 ### Provider Detection Priority
@@ -77,6 +79,22 @@ If `LLM_PROVIDER` is not set, the system auto-detects based on available API key
 - `accounts/fireworks/models/llama-v3p1-70b-instruct` (default)
 - `accounts/fireworks/models/llama-v3p1-8b-instruct`
 - `accounts/fireworks/models/mixtral-8x7b-instruct`
+
+### Ollama (Local or Cloud)
+- `llama3.3` (cloud default)
+- `llama3.2` (local default)
+- `llama3.1`
+- `mistral`
+- `mixtral`
+- `phi3`
+- `gemma2`
+- `qwen2.5`
+- `deepseek-r1`
+- `codellama`
+
+> **Note**: Ollama models depend on what you've pulled locally or your cloud tier.
+> - Local: `ollama pull llama3.2` 
+> - Cloud: Uses models available on your Ollama Cloud plan
 
 ## Usage
 
