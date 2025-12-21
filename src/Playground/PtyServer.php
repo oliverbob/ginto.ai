@@ -101,16 +101,23 @@ class PtyServer implements MessageComponentInterface
 
     public function onMessage(ConnectionInterface $from, $msg)
     {
-        // support JSON control messages (resize)
+        // support JSON control messages (resize, ping)
         $state = $this->clients[$from] ?? null;
         $pipes = $state['pipes'] ?? null;
         if (!$pipes) return;
         try {
             if (is_string($msg) && strlen($msg) && $msg[0] === '{') {
                 $j = json_decode($msg, true);
-                if (is_array($j) && !empty($j['type']) && $j['type'] === 'resize' && !empty($j['cols']) && !empty($j['rows'])) {
-                    // we don't have a direct pty resize API here; ignore or implement via external tools
-                    return;
+                if (is_array($j) && !empty($j['type'])) {
+                    // Handle resize messages
+                    if ($j['type'] === 'resize' && !empty($j['cols']) && !empty($j['rows'])) {
+                        // we don't have a direct pty resize API here; ignore or implement via external tools
+                        return;
+                    }
+                    // Handle ping messages (keepalive) - silently ignore, don't write to PTY
+                    if ($j['type'] === 'ping') {
+                        return;
+                    }
                 }
             }
         } catch (\Throwable $_) {}
