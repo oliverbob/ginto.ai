@@ -4469,8 +4469,13 @@
         renderModels(data);
         
         // Update current model display (desktop + mobile)
+        // Check if current model is running (for Ollama) - green if running, red if not
         if (data.current_model) {
-          updateModelDisplay(data.current_model, 'w-2 h-2 rounded-full bg-green-500');
+          const isOllama = data.current_provider === 'ollama';
+          const runningModels = data.running_models || [];
+          const isModelRunning = !isOllama || runningModels.some(m => m === data.current_model || m.startsWith(data.current_model));
+          const dotClass = isModelRunning ? 'w-2 h-2 rounded-full bg-green-500' : 'w-2 h-2 rounded-full bg-red-500';
+          updateModelDisplay(data.current_model, dotClass);
         }
       } catch (err) {
         modelList.innerHTML = '<div class="px-4 py-3 text-sm text-red-500">Failed to load models</div>';

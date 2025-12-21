@@ -6336,7 +6336,36 @@ req($router, '/api/models', function() {
         'current_provider' => $_SESSION['llm_provider_name'] ?? (getenv('LLM_PROVIDER') ?: 'groq'),
         'current_model' => $_SESSION['llm_model'] ?? (getenv('LLM_MODEL') ?: null),
         'providers' => [],
+        'running_models' => [], // Ollama models currently loaded in memory
     ];
+
+    // Check Ollama running models via /api/ps
+    $runningModels = [];
+    try {
+        $ch = curl_init('http://localhost:11434/api/ps');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 2,
+            CURLOPT_CONNECTTIMEOUT => 1,
+        ]);
+        $psResponse = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode === 200 && $psResponse) {
+            $psData = json_decode($psResponse, true);
+            if (!empty($psData['models']) && is_array($psData['models'])) {
+                foreach ($psData['models'] as $m) {
+                    if (!empty($m['name'])) {
+                        $runningModels[] = $m['name'];
+                    }
+                }
+            }
+        }
+    } catch (\Throwable $e) {
+        // Ollama not reachable
+    }
+    $result['running_models'] = $runningModels;
 
     foreach ($providers as $providerName) {
         try {
