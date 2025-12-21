@@ -81,6 +81,10 @@ wss.on('connection', function connection(ws, req) {
           term.resize(msg.cols, msg.rows);
           return;
         }
+        // Handle ping messages (keepalive) - silently ignore, don't write to PTY
+        if (msg.type === 'ping') {
+          return;
+        }
       }
     } catch (e) {}
     try { term.write(message); } catch (e) {}

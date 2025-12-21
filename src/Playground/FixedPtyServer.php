@@ -99,8 +99,15 @@ class FixedPtyServer implements MessageComponentInterface
         try {
             if (is_string($msg) && strlen($msg) && $msg[0] === '{') {
                 $j = json_decode($msg, true);
-                if (is_array($j) && !empty($j['type']) && $j['type'] === 'resize' && !empty($j['cols']) && !empty($j['rows'])) {
-                    return;
+                if (is_array($j) && !empty($j['type'])) {
+                    // Handle resize messages
+                    if ($j['type'] === 'resize' && !empty($j['cols']) && !empty($j['rows'])) {
+                        return;
+                    }
+                    // Handle ping messages (keepalive) - silently ignore, don't write to PTY
+                    if ($j['type'] === 'ping') {
+                        return;
+                    }
                 }
             }
         } catch (\Throwable $_) {}
