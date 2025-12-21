@@ -6349,14 +6349,55 @@ req($router, '/api/models', function() {
         'running_models' => [], // Ollama models currently loaded in memory (cached)
     ];
 
-    // Read cached Ollama running models (updated by Ratchet background job)
-    // Cache file is written by bin/ollama_status_worker.php or updated on chat requests
-    $cacheFile = (defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2)) . '/storage/cache/ollama_ps.json';
+    // Read cached Ollama running models (updated by chat requests or background worker)
+    // Fallback to live check if cache is missing or stale (>60s)
+    $cacheDir = (defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2)) . '/storage/cache';
+    $cacheFile = $cacheDir . '/ollama_ps.json';
     $runningModels = [];
+    $cacheValid = false;
+    
     if (file_exists($cacheFile)) {
         $cacheData = @json_decode(file_get_contents($cacheFile), true);
-        if (!empty($cacheData['models']) && is_array($cacheData['models'])) {
-            $runningModels = $cacheData['models'];
+        if (!empty($cacheData['updated_at']) && (time() - $cacheData['updated_at']) < 60) {
+            // Cache is fresh (less than 60 seconds old)
+            $runningModels = $cacheData['models'] ?? [];
+            $cacheValid = true;
+        }
+    }
+    
+    // If cache is missing or stale, do a live check (but update cache for next time)
+    if (!$cacheValid) {
+        try {
+            $ch = curl_init('http://localhost:11434/api/ps');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 2,
+                CURLOPT_CONNECTTIMEOUT => 1,
+            ]);
+            $psResponse = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            if ($httpCode === 200 && $psResponse) {
+                $psData = json_decode($psResponse, true);
+                if (!empty($psData['models']) && is_array($psData['models'])) {
+                    foreach ($psData['models'] as $m) {
+                        if (!empty($m['name'])) {
+                            $runningModels[] = $m['name'];
+                        }
+                    }
+                }
+            }
+            
+            // Update cache for next request
+            if (!is_dir($cacheDir)) @mkdir($cacheDir, 0755, true);
+            @file_put_contents($cacheFile, json_encode([
+                'models' => $runningModels,
+                'updated_at' => time(),
+                'updated_at_iso' => date('c'),
+            ], JSON_PRETTY_PRINT));
+        } catch (\Throwable $e) {
+            // Ollama not reachable
         }
     }
     $result['running_models'] = $runningModels;
