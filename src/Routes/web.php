@@ -4340,6 +4340,18 @@ req($router, '/chat', function() use ($db) {
     if ($sessionProvider && $sessionModel && $sessionProvider === 'ollama') {
         // User selected Ollama - use it directly without cloud API logic
         try {
+            // First check if Ollama server is online
+            $ollamaHost = getenv('OLLAMA_HOST') ?: 'http://localhost:11434';
+            $checkCtx = stream_context_create(['http' => ['timeout' => 3, 'ignore_errors' => true]]);
+            $versionCheck = @file_get_contents($ollamaHost . '/api/version', false, $checkCtx);
+            
+            if ($versionCheck === false) {
+                // Ollama server is not running
+                @header('Content-Type: text/event-stream; charset=utf-8');
+                echo "data: " . json_encode(['error' => 'Ollama server is offline. Please start Ollama with: ollama serve']) . "\n\n";
+                exit;
+            }
+            
             $ollamaProvider = \App\Core\LLM\LLMProviderFactory::create('ollama', [
                 'model' => $sessionModel,
             ]);
@@ -4384,12 +4396,25 @@ req($router, '/chat', function() use ($db) {
                 
                 // Stream response from Ollama using chatStream method
                 $fullResponse = '';
+                $streamError = null;
                 $onChunk = function($chunk) use (&$fullResponse) {
                     $fullResponse .= $chunk;
                     echo "data: " . json_encode(['text' => $chunk]) . "\n\n";
                     flush();
                 };
-                $ollamaProvider->chatStream($messages, [], [], $onChunk);
+                
+                try {
+                    $ollamaProvider->chatStream($messages, [], [], $onChunk);
+                } catch (\Throwable $streamEx) {
+                    $streamError = $streamEx->getMessage();
+                }
+                
+                // If streaming failed and no response received, send error
+                if ($streamError && empty($fullResponse)) {
+                    echo "data: " . json_encode(['error' => 'Model not responding: ' . $streamError]) . "\n\n";
+                    flush();
+                    exit;
+                }
                 
                 // Update Ollama status cache (model is now loaded)
                 $cacheDir = (defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2)) . '/storage/cache';
@@ -4950,14 +4975,32 @@ req($router, '/chat', function() use ($db) {
         // Fallback error handling
         @ini_set('output_buffering', 'off');
         while (ob_get_level()) ob_end_flush();
-        header('Content-Type: text/plain; charset=utf-8');
-        header('Cache-Control: no-cache');
+        
+        // Determine user-friendly error message
+        $userError = 'An internal error occurred while processing your request.';
+        if (stripos($errorMessage, 'connection refused') !== false || 
+            stripos($errorMessage, 'could not connect') !== false ||
+            stripos($errorMessage, 'connection timed out') !== false ||
+            stripos($errorMessage, 'curl error') !== false) {
+            $userError = 'Unable to connect to the AI model. The service may be temporarily unavailable.';
+        } elseif (stripos($errorMessage, 'timeout') !== false) {
+            $userError = 'The AI model took too long to respond. Please try again.';
+        } elseif ($isRateLimitError) {
+            $userError = 'Rate limit exceeded. Please wait a moment and try again.';
+        }
+        
+        // Send error as SSE so frontend can display it properly
+        if (!headers_sent()) {
+            header('Content-Type: text/event-stream; charset=utf-8');
+            header('Cache-Control: no-cache');
+        }
         echo str_repeat(' ', 1024);
         flush();
 
         // Log full details for administrators, but don't expose provider/raw error text to clients
         \Ginto\Helpers\AdminErrorLogger::log($e->getMessage(), ['route' => '/chat', 'trace' => $e->getTraceAsString()]);
-        _chatSendSSE('An internal error occurred while processing your request. Administrators have been notified.', null);
+        echo "data: " . json_encode(['error' => $userError]) . "\n\n";
+        flush();
     }
 
     exit;
