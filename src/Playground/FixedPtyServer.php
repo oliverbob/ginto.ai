@@ -49,8 +49,10 @@ class FixedPtyServer implements MessageComponentInterface
             $cmd = ['script','-q','-c','/bin/bash','/dev/null'];
         }
 
+        // Start terminal in user's home directory to avoid accidental edits to repo
+        $homeDir = getenv('HOME') ?: '/home/oliverbob';
         $descriptors = [0 => ['pipe','r'], 1 => ['pipe','w'], 2 => ['pipe','w']];
-        $process = proc_open($cmd, $descriptors, $pipes, null, null);
+        $process = proc_open($cmd, $descriptors, $pipes, $homeDir, null);
         if (!is_resource($process)) {
             try { $conn->send("Failed to spawn pty process\n"); } catch (\Throwable $_) {}
             $conn->close();
