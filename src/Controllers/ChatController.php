@@ -340,4 +340,142 @@ class ChatController
             exit;
         }
     }
+
+    /**
+     * Delete a single conversation
+     */
+    public function deleteConversation(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+            exit;
+        }
+        
+        // Only for logged-in users
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+        
+        // CSRF validation
+        $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+        
+        $userId = (int)$_SESSION['user_id'];
+        $convoId = $_POST['convo_id'] ?? '';
+        
+        if (empty($convoId)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing convo_id']);
+            exit;
+        }
+        
+        try {
+            $this->db->delete('chat_conversations', [
+                'user_id' => $userId,
+                'convo_id' => $convoId
+            ]);
+            
+            echo json_encode(['success' => true]);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to delete conversation']);
+            exit;
+        }
+    }
+
+    /**
+     * Bulk sync all conversations from client
+     */
+    public function syncConversations(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+            exit;
+        }
+        
+        // Only for logged-in users
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            exit;
+        }
+        
+        // CSRF validation
+        $token = $_POST['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? '');
+        if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+        
+        $userId = (int)$_SESSION['user_id'];
+        $convosJson = $_POST['convos'] ?? '{}';
+        $activeId = $_POST['active_id'] ?? null;
+        
+        try {
+            $clientConvos = json_decode($convosJson, true);
+            if (!is_array($clientConvos)) {
+                $clientConvos = [];
+            }
+            
+            $now = date('Y-m-d H:i:s');
+            
+            foreach ($clientConvos as $convoId => $convo) {
+                if (empty($convoId) || !is_array($convo)) continue;
+                
+                $title = $convo['title'] ?? 'New chat';
+                $messages = $convo['messages'] ?? [];
+                
+                // Check if exists
+                $existing = $this->db->get('chat_conversations', 'id', [
+                    'user_id' => $userId,
+                    'convo_id' => $convoId
+                ]);
+                
+                if ($existing) {
+                    // Update (keep original expiration)
+                    $this->db->update('chat_conversations', [
+                        'title' => $title,
+                        'messages' => json_encode($messages),
+                        'updated_at' => $now
+                    ], [
+                        'user_id' => $userId,
+                        'convo_id' => $convoId
+                    ]);
+                } else {
+                    // Insert with 24-hour expiration
+                    $expiresAt = date('Y-m-d H:i:s', strtotime('+24 hours'));
+                    $this->db->insert('chat_conversations', [
+                        'user_id' => $userId,
+                        'convo_id' => $convoId,
+                        'title' => $title,
+                        'messages' => json_encode($messages),
+                        'created_at' => $now,
+                        'expires_at' => $expiresAt,
+                        'updated_at' => $now
+                    ]);
+                }
+            }
+            
+            echo json_encode(['success' => true]);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to sync conversations']);
+            exit;
+        }
+    }
 }
