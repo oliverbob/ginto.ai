@@ -2391,7 +2391,7 @@ $router->req('/chat/conversations', function() use ($db) {
 });
 
 // POST /chat/conversations/save - Save/update a single conversation
-req($router, '/chat/conversations/save', function() use ($db) {
+$router->req('/chat/conversations/save', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2476,7 +2476,7 @@ req($router, '/chat/conversations/save', function() use ($db) {
 });
 
 // POST /chat/conversations/delete - Delete a single conversation
-req($router, '/chat/conversations/delete', function() use ($db) {
+$router->req('/chat/conversations/delete', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2525,7 +2525,7 @@ req($router, '/chat/conversations/delete', function() use ($db) {
 });
 
 // POST /chat/conversations/sync - Bulk sync all conversations from client
-req($router, '/chat/conversations/sync', function() use ($db) {
+$router->req('/chat/conversations/sync', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2608,7 +2608,7 @@ req($router, '/chat/conversations/sync', function() use ($db) {
 });
 
 // Sandbox API: Check LXD installation progress (admin only)
-req($router, '/sandbox/image-install-status', function() use ($db) {
+$router->req('/sandbox/image-install-status', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Admin check
@@ -2694,7 +2694,7 @@ function getLxcBin(): ?string {
 }
 
 // Admin LXC Manager View (Proxmox-style datacenter interface)
-req($router, '/admin/lxc', function() use ($db) {
+$router->req('/admin/lxc', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     if (empty($_SESSION['is_admin'])) {
         if (!headers_sent()) header('Location: /login');
@@ -2705,7 +2705,7 @@ req($router, '/admin/lxc', function() use ($db) {
 });
 
 // Admin LXC API: List containers (GET) or Create container (POST)
-req($router, '/admin/api/lxc/containers', function() use ($db) {
+$router->req('/admin/api/lxc/containers', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -2875,7 +2875,7 @@ req($router, '/admin/api/lxc/containers', function() use ($db) {
 });
 
 // Admin LXC API: Container actions (start/stop/restart/delete) - MUST BE BEFORE {name} route
-req($router, '/admin/api/lxc/containers/{name}/{action}', function($name, $action) use ($db) {
+$router->req('/admin/api/lxc/containers/{name}/{action}', function($name, $action) use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -2946,7 +2946,7 @@ req($router, '/admin/api/lxc/containers/{name}/{action}', function($name, $actio
 });
 
 // Admin LXC API: Get single container details
-req($router, '/admin/api/lxc/containers/{name}', function($params) use ($db) {
+$router->req('/admin/api/lxc/containers/{name}', function($params) use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3008,7 +3008,7 @@ req($router, '/admin/api/lxc/containers/{name}', function($params) use ($db) {
 });
 
 // Admin LXC API: List images
-req($router, '/admin/api/lxc/images', function() use ($db) {
+$router->req('/admin/api/lxc/images', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3063,7 +3063,7 @@ req($router, '/admin/api/lxc/images', function() use ($db) {
 });
 
 // Admin LXC API: Delete image
-req($router, '/admin/api/lxc/images/{fingerprint}', function($fingerprint = '') use ($db) {
+$router->req('/admin/api/lxc/images/{fingerprint}', function($fingerprint = '') use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3110,7 +3110,7 @@ req($router, '/admin/api/lxc/images/{fingerprint}', function($fingerprint = '') 
 });
 
 // Admin LXC API: Pull image
-req($router, '/admin/api/lxc/images/pull', function() use ($db) {
+$router->req('/admin/api/lxc/images/pull', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3168,7 +3168,7 @@ req($router, '/admin/api/lxc/images/pull', function() use ($db) {
 });
 
 // Admin LXC API: List storage pools
-req($router, '/admin/api/lxc/storage', function() use ($db) {
+$router->req('/admin/api/lxc/storage', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3229,7 +3229,7 @@ req($router, '/admin/api/lxc/storage', function() use ($db) {
 });
 
 // Admin LXC API: List networks
-req($router, '/admin/api/lxc/networks', function() use ($db) {
+$router->req('/admin/api/lxc/networks', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3393,7 +3393,7 @@ $router->get('/admin/api/lxc/stats', function() use ($db) {
 });
 
 // Admin LXC API: Prune unused resources
-req($router, '/admin/api/lxc/prune', function() use ($db) {
+$router->req('/admin/api/lxc/prune', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3453,7 +3453,7 @@ req($router, '/admin/api/lxc/prune', function() use ($db) {
 });
 
 // Sandbox API: Get sandbox status (LXC container status)
-req($router, '/sandbox/status', function() use ($db) {
+$router->req('/sandbox/status', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Allow both logged-in users (user_id) and visitors (public_id)
@@ -3529,7 +3529,7 @@ req($router, '/sandbox/status', function() use ($db) {
 });
 
 // Sandbox API: Destroy sandbox completely (container + DB + Redis + session)
-req($router, '/sandbox/destroy', function() use ($db) {
+$router->req('/sandbox/destroy', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -3597,7 +3597,7 @@ req($router, '/sandbox/destroy', function() use ($db) {
 });
 
 // Sandbox API: Install/Create LXC sandbox container
-req($router, '/sandbox/install', function() use ($db) {
+$router->req('/sandbox/install', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -3743,7 +3743,7 @@ req($router, '/sandbox/install', function() use ($db) {
 }, ['POST']);
 
 // Sandbox API: Start an existing sandbox
-req($router, '/sandbox/start', function() use ($db) {
+$router->req('/sandbox/start', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -3809,7 +3809,7 @@ req($router, '/sandbox/start', function() use ($db) {
 // - Logged-in users only (no visitors)
 // - sandbox_exec requires premium subscription (or admin)
 // - Admin users have no restrictions
-req($router, '/sandbox/call', function() use ($db) {
+$router->req('/sandbox/call', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -4343,7 +4343,7 @@ function handleSandboxPreview(string $sandboxId, string $path, $db): void
 }
 
 // Standalone editor - tree endpoint
-req($router, '/editor/tree', function() use ($db) {
+$router->req('/editor/tree', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
