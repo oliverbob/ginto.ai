@@ -432,4 +432,152 @@ class SandboxController
             exit;
         }
     }
+
+    /**
+     * Call sandbox-scoped MCP tools
+     * This endpoint allows users with active sandboxes to call sandbox_* tools
+     * Tools are restricted to sandbox-prefixed tools for security
+     * Security restrictions:
+     * - Logged-in users only (no visitors)
+     * - sandbox_exec requires premium subscription (or admin)
+     * - Admin users have no restrictions
+     */
+    public function call(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+            exit;
+        }
+        
+        // Check if user is admin (admins bypass all restrictions)
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin($_SESSION);
+        
+        // SECURITY: Require logged-in user for all sandbox tools (unless admin)
+        if (!$isAdmin && empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode([
+                'success' => false, 
+                'error' => 'Please log in to use sandbox tools. Create a free account to get started!',
+                'action' => 'login'
+            ]);
+            exit;
+        }
+        
+        // Parse input early to check for special wizard tool
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid JSON body']);
+            exit;
+        }
+        
+        $tool = $input['tool'] ?? null;
+        $args = $input['args'] ?? [];
+        
+        // SPECIAL CASE: ginto_install runs the server-side installation script
+        if ($tool === 'ginto_install') {
+            echo json_encode([
+                'success' => true,
+                'action' => 'ginto_install',
+                'message' => 'Starting Ginto installation...',
+                'result' => [
+                    'action' => 'ginto_install',
+                    'command' => 'sudo bash ~/ginto.ai/bin/ginto.sh install',
+                    'message' => 'I\'ll start the Ginto installation for you. This will install LXC/LXD and set up the sandbox system. Please run this command in your server\'s SSH terminal: sudo bash ~/ginto.ai/bin/ginto.sh install'
+                ]
+            ]);
+            exit;
+        }
+        
+        // SPECIAL CASE: sandbox_install_wizard doesn't require existing sandbox
+        if ($tool === 'sandbox_install_wizard') {
+            echo json_encode([
+                'success' => true,
+                'action' => 'install_sandbox',
+                'message' => 'Opening sandbox installation wizard...',
+                'result' => [
+                    'action' => 'install_sandbox',
+                    'message' => 'I\'ll open the sandbox installation wizard for you now.'
+                ]
+            ]);
+            exit;
+        }
+        
+        // Get sandbox ID
+        $sandboxId = $_SESSION['sandbox_id'] ?? null;
+        if (empty($sandboxId)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'No active sandbox. Please create a sandbox first by clicking "My Files".']);
+            exit;
+        }
+        
+        // Verify sandbox exists
+        if (!\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Sandbox not found. It may have been destroyed. Please create a new one.']);
+            exit;
+        }
+        
+        if (empty($tool)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing tool parameter']);
+            exit;
+        }
+        
+        // Security: Only allow sandbox-prefixed tools
+        if (!str_starts_with($tool, 'sandbox_')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Access denied. Only sandbox tools are allowed for non-admin users.']);
+            exit;
+        }
+        
+        // SECURITY: sandbox_exec requires premium subscription (unless admin)
+        if (!$isAdmin && $tool === 'sandbox_exec') {
+            $userId = (int)($_SESSION['user_id'] ?? 0);
+            $isPremium = false;
+            
+            if ($userId > 0) {
+                // Check if user has active subscription
+                $activeSub = $this->db->get('user_subscriptions', ['id', 'plan_id'], [
+                    'user_id' => $userId,
+                    'status' => 'active',
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => date('Y-m-d H:i:s')
+                    ]
+                ]);
+                $isPremium = !empty($activeSub);
+            }
+            
+            if (!$isPremium) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false, 
+                    'error' => 'Command execution (sandbox_exec) requires a Premium subscription. Upgrade to unlock this powerful feature!',
+                    'action' => 'upgrade',
+                    'upgrade_url' => '/upgrade'
+                ]);
+                exit;
+            }
+        }
+        
+        // Ensure handlers are loaded
+        $root = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        foreach (glob($root . '/src/Handlers/*.php') as $f) {
+            require_once $f;
+        }
+        
+        try {
+            $result = \App\Core\McpInvoker::invoke($tool, $args);
+            echo json_encode(['success' => true, 'result' => $result]);
+        } catch (\Throwable $e) {
+            \Ginto\Helpers\AdminErrorLogger::log($e->getMessage(), ['route' => '/sandbox/call', 'tool' => $tool, 'sandbox_id' => $sandboxId]);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Tool execution failed: ' . $e->getMessage()]);
+        }
+        exit;
+    }
 }
