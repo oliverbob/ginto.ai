@@ -265,6 +265,130 @@ class UserController extends \Core\Controller
         $this->userModel = new User();
     }
 
+    /**
+     * User info endpoint - returns user data with CSRF token (GET /user)
+     */
+    public function user(): void
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method Not Allowed']);
+            exit;
+        }
+        $this->getUserInfoAction();
+    }
+
+    /**
+     * Dashboard page (GET /dashboard)
+     */
+    public function dashboard(): void
+    {
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+        $this->dashboardAction($_SESSION['user_id']);
+    }
+
+    /**
+     * User network tree view (GET /user/network-tree)
+     */
+    public function networkTree(): void
+    {
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+        $userId = $_SESSION['user_id'];
+        $user_data = $this->userModel->find($userId);
+        $stats = [
+            'direct_referrals' => $this->userModel->countDirectReferrals($userId),
+        ];
+        \Ginto\Core\View::view('user/network-tree', [
+            'title' => 'Network Tree',
+            'user_data' => $user_data,
+            'current_user_id' => $userId,
+            'stats' => $stats
+        ]);
+    }
+
+    /**
+     * Public profile route by numeric id, username, or public_id
+     */
+    public function profile($ident): void
+    {
+        // Resolve identifier: numeric id, public_id (alphanumeric), or username
+        $userId = null;
+        if (ctype_digit($ident)) {
+            $userId = intval($ident);
+        } else {
+            try {
+                $uid = $this->db->get('users', 'id', ['public_id' => $ident]);
+                if ($uid) $userId = intval($uid);
+                else {
+                    $uid2 = $this->db->get('users', 'id', ['username' => $ident]);
+                    if ($uid2) $userId = intval($uid2);
+                }
+            } catch (\Throwable $_) {
+                // ignore
+            }
+        }
+
+        if (!$userId) {
+            http_response_code(404);
+            echo '<h1>User not found</h1>';
+            exit;
+        }
+
+        // Render user profile view
+        try {
+            $user = $this->userModel->find($userId);
+            if ($user) {
+                \Ginto\Core\View::view('user/profile', ['user' => $user]);
+                exit;
+            }
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo '<h1>Error loading profile</h1>';
+            exit;
+        }
+    }
+
+    /**
+     * Compact network tree view (GET /user/network-tree/compact-view)
+     */
+    public function networkTreeCompact(): void
+    {
+        // Dev convenience: if no session user, try to auto-login user 'oliverbob'
+        if (empty($_SESSION['user_id'])) {
+            try {
+                $userId = $this->db->get('users', 'id', ['username' => 'oliverbob']);
+                if ($userId) {
+                    $_SESSION['user_id'] = (int)$userId;
+                }
+            } catch (\Throwable $_) {
+                // ignore - proceed without login if DB not available
+            }
+        }
+        
+        // Include the compact view file
+        $viewPath = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';
+        if (file_exists($viewPath)) {
+            include $viewPath;
+            exit;
+        }
+
+        // Fallback for older layout
+        $fallback = ROOT_PATH . '/src/Views/users/network-tree/compact-view.php';
+        if (file_exists($fallback)) {
+            include $fallback;
+            exit;
+        }
+
+        http_response_code(500);
+        echo "Compact view not found. Expected: $viewPath (or fallback: $fallback)";
+    }
+
 
     public function registerAction(array $postData): void
     {

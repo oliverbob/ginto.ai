@@ -528,24 +528,7 @@ HTML;
 $router->req('/', 'AuthController@index');
 
 // Full user network tree view
-$router->req('/user/network-tree', function() use ($db) {
-    if (empty($_SESSION['user_id'])) {
-        if (!headers_sent()) header('Location: /login');
-        exit;
-    }
-    $userId = $_SESSION['user_id'];
-    $userModel = new \Ginto\Models\User();
-    $user_data = $userModel->find($userId);
-    $stats = [
-        'direct_referrals' => $userModel->countDirectReferrals($userId),
-    ];
-    \Ginto\Core\View::view('user/network-tree', [
-        'title' => 'Network Tree',
-        'user_data' => $user_data,
-        'current_user_id' => $userId,
-        'stats' => $stats
-    ]);
-});
+$router->req('/user/network-tree', 'UserController@networkTree');
 
 // Downline view (legacy route)
 $router->req('/downline', 'AuthController@downline');
@@ -1798,124 +1781,17 @@ $router->req('/crypto-payments', function() use ($db, $countries) {
     }
 });
 
-$router->req('/dashboard', function() use ($db, $countries) {
-    // Only allow access if logged in
-    if (empty($_SESSION['user_id'])) {
-        if (!headers_sent()) header('Location: /login');
-        exit;
-    }
-
-    $controller = new \Ginto\Controllers\UserController($db, $countries);
-    $controller->dashboardAction($_SESSION['user_id']);
-});
+// Dashboard page
+$router->req('/dashboard', 'UserController@dashboard');
 
 // Public profile route by numeric id, username, or public_id
-$router->req('/user/profile/{ident}', function($ident) use ($db) {
-    // Resolve identifier: numeric id, public_id (alphanumeric), or username
-    $userId = null;
-    if (ctype_digit($ident)) {
-        $userId = intval($ident);
-    } else {
-        try {
-            $uid = $db->get('users', 'id', ['public_id' => $ident]);
-            if ($uid) $userId = intval($uid);
-            else {
-                $uid2 = $db->get('users', 'id', ['username' => $ident]);
-                if ($uid2) $userId = intval($uid2);
-            }
-        } catch (\Throwable $_) {
-            // ignore
-        }
-    }
+$router->req('/user/profile/{ident}', 'UserController@profile');
 
-    if (!$userId) {
-        http_response_code(404);
-        echo '<h1>User not found</h1>';
-        exit;
-    }
-
-    // Prefer controller/view rendering if available
-        try {
-            $userModel = new \Ginto\Models\User();
-            $user = $userModel->find($userId);
-            if ($user) {
-                // Render dedicated profile view to keep presentation separate
-                \Ginto\Core\View::view('user/profile', ['user' => $user]);
-                exit;
-            }
-        } catch (\Throwable $e) {
-            http_response_code(502);
-            // When the Python CLI produced no stdout, include stderr contents
-            // in the response to aid debugging (trim to avoid extremely large
-            // payloads). This improves visibility during dev.
-            $dbgErr = is_string($err) && $err !== '' ? substr($err,0,1200) : null;
-            $extra = [];
-            if ($dbgErr) $extra['detail'] = $dbgErr;
-            else $extra['exit_code'] = $code ?: null;
-            // Map common stderr cases to clearer error names
-            if ($dbgErr && stripos($dbgErr, 'Audio file is too short') !== false) {
-                echo json_encode(array_merge(['error' => 'audio_too_short'], $extra));
-            } else {
-                echo json_encode(array_merge(['error' => 'STT CLI produced no output'], $extra));
-            }
-            exit;
-        }
-});
-
-// User commissions page (renders `src/Views/user/commissions.php` via controller)
-$router->req('/user/commissions', function() use ($db) {
-    if (empty($_SESSION['user_id'])) {
-        if (!headers_sent()) header('Location: /login');
-        exit;
-    }
-
-    try {
-        $ctrl = new \Ginto\Controllers\CommissionsController();
-        return $ctrl->index();
-    } catch (\Throwable $e) {
-        // Fallback: attempt to include view directly if controller fails
-        $viewPath = ROOT_PATH . '/src/Views/user/commissions.php';
-        if (file_exists($viewPath)) {
-            include $viewPath;
-            exit;
-        }
-        http_response_code(500);
-        echo 'Commissions page not available: ' . $e->getMessage();
-        exit;
-    }
-});
+// User commissions page
+$router->req('/user/commissions', 'CommissionsController@index');
 
 // Compact-only user network view (dev route)
-$router->req('/user/network-tree/compact-view', function() use ($db) {
-    // Dev convenience: if no session user, try to auto-login user 'oliverbob'
-    if (empty($_SESSION['user_id'])) {
-        try {
-            $userId = $db->get('users', 'id', ['username' => 'oliverbob']);
-            if ($userId) {
-                $_SESSION['user_id'] = (int)$userId;
-            }
-        } catch (\Throwable $_) {
-            // ignore - proceed without login if DB not available
-        }
-    }
-    // Include the compact view file at `src/Views/user/network-tree/compact-view.php`
-    // (previously lived at `Views/...`)
-    $viewPath = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';
-    if (file_exists($viewPath)) {
-        include $viewPath;
-        exit;
-    }
-
-    // Fallback: check for `src/Views/users/...` (older layout) to be tolerant
-    $fallback = ROOT_PATH . '/src/Views/users/network-tree/compact-view.php';
-    if (file_exists($fallback)) {
-        include $fallback;
-        exit;
-    }
-
-    http_response_code(500);
-    echo "Compact view not found. Expected: $viewPath (or fallback: $fallback)";
-});
+$router->req('/user/network-tree/compact-view', 'UserController@networkTreeCompact');
 
 // Webhook endpoint (PayPal and status view)
 $router->req('/webhook', function() use ($db) {
@@ -1966,16 +1842,7 @@ $router->req('/webhook/status', function() use ($db) {
 
 // User info endpoint - returns user data with CSRF token
 // Usage: GET http://localhost/user
-$router->req('/user', function() use ($db) {
-    if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
-        http_response_code(405);
-        echo json_encode(['error' => 'Method Not Allowed']);
-        exit;
-    }
-    
-    $userController = new \Ginto\Controllers\UserController($db);
-    $userController->getUserInfoAction();
-});
+$router->req('/user', 'UserController@user');
 
 // Standalone Editor Object - Monaco editor with file management
 // Usage: GET http://localhost/editor
