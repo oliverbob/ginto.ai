@@ -951,6 +951,18 @@ install_dependencies() {
     else
         log_warn "composer.json not found, skipping"
     fi
+    
+    # Install phpMyAdmin nested dependencies
+    local PMA_DIR="$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin"
+    if [ -d "$PMA_DIR" ] && [ -f "$PMA_DIR/composer.json" ]; then
+        log_info "Installing phpMyAdmin dependencies..."
+        cd "$PMA_DIR"
+        sudo -u "$INSTALL_USER" composer install --no-interaction --prefer-dist
+        cd "$PROJECT_DIR"
+        log_success "phpMyAdmin dependencies installed"
+    else
+        log_info "phpMyAdmin not found in vendor, skipping nested install"
+    fi
 }
 
 # Create .env file if not exists
@@ -1057,6 +1069,7 @@ print_summary() {
     echo "  - Git $(git --version 2>/dev/null | awk '{print $3}' || echo 'N/A')"
     echo "  - Node.js $(node --version 2>/dev/null || echo 'N/A')"
     echo "  - llama.cpp $([ -f "$INSTALL_USER_HOME/llama.cpp/build/bin/llama-server" ] && echo 'Installed' || echo 'N/A')"
+    echo "  - phpMyAdmin $([ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ] && echo 'Installed' || echo 'N/A')"
     echo ""
     echo "Configuration:"
     echo "  - User: $INSTALL_USER"
@@ -1075,6 +1088,9 @@ print_summary() {
     echo "Access your site:"
     echo "  - Local: http://localhost"
     echo "  - Direct: http://localhost:8000"
+    if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
+        echo "  - phpMyAdmin: http://localhost/pma"
+    fi
     echo ""
     echo "Useful commands:"
     echo "  - Start:   sudo systemctl start ginto"
