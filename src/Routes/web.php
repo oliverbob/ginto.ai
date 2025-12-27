@@ -4454,7 +4454,7 @@ $router->req('/editor/tree', function() use ($db) {
 });
 
 // Standalone editor - create file/folder
-req($router, '/editor/create', function() use ($db) {
+$router->req('/editor/create', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
@@ -4537,7 +4537,7 @@ req($router, '/editor/create', function() use ($db) {
 }, ['POST']);
 
 // Standalone editor - rename file/folder
-req($router, '/editor/rename', function() use ($db) {
+$router->req('/editor/rename', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
@@ -4620,7 +4620,7 @@ req($router, '/editor/rename', function() use ($db) {
 }, ['POST']);
 
 // Standalone editor - delete file/folder
-req($router, '/editor/delete', function() use ($db) {
+$router->req('/editor/delete', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
@@ -4689,7 +4689,7 @@ req($router, '/editor/delete', function() use ($db) {
 }, ['POST']);
 
 // Standalone editor - paste (copy/move) file/folder
-req($router, '/editor/paste', function() use ($db) {
+$router->req('/editor/paste', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
@@ -4801,7 +4801,7 @@ req($router, '/editor/paste', function() use ($db) {
 }, ['POST']);
 
 // Standalone editor - save file
-req($router, '/editor/save', function() use ($db) {
+$router->req('/editor/save', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Only allow POST
@@ -4885,7 +4885,7 @@ req($router, '/editor/save', function() use ($db) {
 }, ['POST']);
 
 // Standalone editor - read file content
-req($router, '/editor/file', function() use ($db) {
+$router->req('/editor/file', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Get sandbox ID or root path
@@ -4957,7 +4957,7 @@ req($router, '/editor/file', function() use ($db) {
 
 // Rate limit status endpoint - shows current usage and limits
 // Usage: GET /rate-limits
-req($router, '/rate-limits', function() use ($db) {
+$router->req('/rate-limits', function() use ($db) {
     header('Content-Type: application/json');
     
     if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -5029,7 +5029,7 @@ req($router, '/rate-limits', function() use ($db) {
 // GET will render the test page; POST streams provider output.
 // Usage (GET): open http://localhost/chat
 // Usage (POST): curl -X POST -F 'prompt=Your prompt here' http://localhost/chat
-req($router, '/chat', function() use ($db) {
+$router->req('/chat', function() use ($db) {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         // Check if user is logged in
         $isLoggedIn = !empty($_SESSION['user_id']);
@@ -6254,7 +6254,7 @@ function _chatSendSSE(string $content, $parsedown): void
 // ============================================================================
 // Courses Route - Educational courses listing
 // ============================================================================
-req($router, '/courses', function() use ($db) {
+$router->req('/courses', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
@@ -6296,7 +6296,7 @@ req($router, '/courses', function() use ($db) {
 });
 
 // Pricing Page (must be before /courses/{slug} to avoid slug matching "pricing")
-req($router, '/courses/pricing', function() use ($db) {
+$router->req('/courses/pricing', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $userId = $_SESSION['user_id'] ?? 0;
     
@@ -6313,7 +6313,7 @@ req($router, '/courses/pricing', function() use ($db) {
 });
 
 // Upgrade Page (standalone upgrade/pricing page)
-req($router, '/upgrade', function() use ($db) {
+$router->req('/upgrade', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $userId = $_SESSION['user_id'] ?? 0;
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
@@ -6350,7 +6350,7 @@ req($router, '/upgrade', function() use ($db) {
 });
 
 // Subscribe Page - PayPal Checkout
-req($router, '/subscribe', function() use ($db) {
+$router->req('/subscribe', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $userId = $_SESSION['user_id'] ?? 0;
     
@@ -6408,7 +6408,7 @@ req($router, '/subscribe', function() use ($db) {
 });
 
 // Subscribe Success Page
-req($router, '/subscribe/success', function() use ($db) {
+$router->req('/subscribe/success', function() use ($db) {
     $subscriptionId = $_GET['subscription'] ?? null;
     $planName = 'Plus'; // Default
     
@@ -6429,7 +6429,7 @@ req($router, '/subscribe/success', function() use ($db) {
 });
 
 // API: Subscription Activation (called after PayPal approval)
-req($router, '/api/subscription/activate', function() use ($db) {
+$router->req('/api/subscription/activate', function() use ($db) {
     header('Content-Type: application/json');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -6574,7 +6574,7 @@ req($router, '/api/subscription/activate', function() use ($db) {
 });
 
 // PayPal Order Creation for Registration (one-time membership payment)
-req($router, '/api/register/paypal-order', function() use ($db) {
+$router->req('/api/register/paypal-order', function() use ($db) {
     header('Content-Type: application/json');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -6721,7 +6721,7 @@ req($router, '/api/register/paypal-order', function() use ($db) {
 });
 
 // PayPal Order Capture for Registration (one-time membership payment)
-req($router, '/api/register/paypal-capture', function() use ($db) {
+$router->req('/api/register/paypal-capture', function() use ($db) {
     header('Content-Type: application/json');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -6891,7 +6891,7 @@ req($router, '/api/register/paypal-capture', function() use ($db) {
 });
 
 // Course Detail Page
-req($router, '/courses/{slug}', function($slug) use ($db) {
+$router->req('/courses/{slug}', function($slug) use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
@@ -6930,7 +6930,7 @@ req($router, '/courses/{slug}', function($slug) use ($db) {
 });
 
 // Lesson Page
-req($router, '/courses/{courseSlug}/lesson/{lessonSlug}', function($courseSlug, $lessonSlug) use ($db) {
+$router->req('/courses/{courseSlug}/lesson/{lessonSlug}', function($courseSlug, $lessonSlug) use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
@@ -6997,7 +6997,7 @@ req($router, '/courses/{courseSlug}/lesson/{lessonSlug}', function($courseSlug, 
 });
 
 // Mark lesson complete API
-req($router, '/api/courses/complete-lesson', function() use ($db) {
+$router->req('/api/courses/complete-lesson', function() use ($db) {
     header('Content-Type: application/json');
     
     if (!isset($_SESSION['user_id'])) {
@@ -7020,7 +7020,7 @@ req($router, '/api/courses/complete-lesson', function() use ($db) {
 // ============================================================================
 
 // Masterclass Listing Page
-req($router, '/masterclass', function() use ($db) {
+$router->req('/masterclass', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
