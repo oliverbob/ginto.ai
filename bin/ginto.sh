@@ -809,6 +809,9 @@ EOF
     # Setup sandbox-proxy service
     setup_sandbox_proxy
     
+    # Write completion status for web notification (handles both fresh install and existing image)
+    update_install_status "complete" "ready" "LXD initialization complete. Sandbox system is ready." "true"
+    
     log_success "LXD initialization complete"
 }
 
