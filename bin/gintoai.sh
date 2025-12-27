@@ -710,6 +710,10 @@ install_caddy() {
     
     if command -v caddy &>/dev/null; then
         log_info "Caddy already installed: $(caddy version)"
+        # Still ensure data directories exist with proper ownership
+        sudo mkdir -p /var/lib/caddy/.local/share/caddy
+        sudo mkdir -p /var/lib/caddy/.config/caddy
+        sudo chown -R caddy:caddy /var/lib/caddy
         return
     fi
     
@@ -731,6 +735,12 @@ install_caddy() {
             return
             ;;
     esac
+    
+    # Create Caddy data directories for TLS certificates
+    sudo mkdir -p /var/lib/caddy/.local/share/caddy
+    sudo mkdir -p /var/lib/caddy/.config/caddy
+    sudo chown -R caddy:caddy /var/lib/caddy
+    log_info "Created Caddy data directories"
     
     log_success "Caddy installed: $(caddy version)"
 }
