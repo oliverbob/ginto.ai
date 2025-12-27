@@ -758,4 +758,243 @@ class PaymentController
             exit;
         }
     }
+
+    /**
+     * Get user's pending payment details
+     */
+    public function paymentDetails(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
+        
+        header('Content-Type: application/json');
+        
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Not authenticated']);
+            exit;
+        }
+        
+        $userId = (int)$_SESSION['user_id'];
+        
+        $payment = $this->db->get('subscription_payments', [
+            'id', 'transaction_id', 'plan_id', 'type', 'amount', 'currency',
+            'payment_method', 'payment_reference', 'status', 'receipt_filename',
+            'admin_review_requested', 'admin_review_requested_at', 'created_at',
+            'ip_address', 'user_agent', 'device_info', 'geo_country', 'geo_city', 'session_id'
+        ], [
+            'user_id' => $userId,
+            'ORDER' => ['created_at' => 'DESC'],
+            'LIMIT' => 1
+        ]);
+        
+        if ($payment) {
+            $totalPendingReviews = $this->db->count('subscription_payments', [
+                'status' => 'pending',
+                'admin_review_requested' => 1
+            ]);
+            
+            $queuePosition = null;
+            if ($payment['admin_review_requested']) {
+                $queuePosition = $this->db->count('subscription_payments', [
+                    'status' => 'pending',
+                    'admin_review_requested' => 1,
+                    'admin_review_requested_at[<=]' => $payment['admin_review_requested_at']
+                ]);
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'payment' => $payment,
+                'pending_reviews_count' => $totalPendingReviews,
+                'queue_position' => $queuePosition
+            ]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'No payment record found']);
+        }
+        exit;
+    }
+
+    /**
+     * Check/Sync Payment Status (for PayPal, checks API; for others, returns DB status)
+     */
+    public function checkStatus($paymentId): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
+        
+        header('Content-Type: application/json');
+        
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        
+        $userId = $_SESSION['user_id'];
+        
+        $payment = $this->db->get('subscription_payments', [
+            'id', 'user_id', 'payment_method', 'payment_reference', 'status', 'admin_review_requested'
+        ], ['id' => $paymentId]);
+        
+        if (!$payment || $payment['user_id'] != $userId) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Payment not found']);
+            exit;
+        }
+        
+        $currentStatus = $payment['status'];
+        $newStatus = $currentStatus;
+        $message = '';
+        $syncedFromPaypal = false;
+        
+        // For PayPal payments, check the API
+        if (in_array($payment['payment_method'], ['paypal', 'credit_card']) && $currentStatus === 'pending') {
+            $orderId = $payment['paypal_order_id'] ?? $payment['payment_reference'];
+            
+            if ($orderId) {
+                try {
+                    $paypalEnv = $_ENV['PAYPAL_ENVIRONMENT'] ?? getenv('PAYPAL_ENVIRONMENT') ?? 'sandbox';
+                    $clientId = $paypalEnv === 'sandbox' 
+                        ? ($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? getenv('PAYPAL_CLIENT_ID_SANDBOX'))
+                        : ($_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID'));
+                    $clientSecret = $paypalEnv === 'sandbox'
+                        ? ($_ENV['PAYPAL_SECRET_SANDBOX'] ?? getenv('PAYPAL_SECRET_SANDBOX'))
+                        : ($_ENV['PAYPAL_SECRET'] ?? getenv('PAYPAL_SECRET'));
+                    
+                    $baseUrl = $paypalEnv === 'sandbox' 
+                        ? 'https://api-m.sandbox.paypal.com'
+                        : 'https://api-m.paypal.com';
+                    
+                    $ch = curl_init();
+                    curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
+                    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                    curl_setopt($ch, CURLOPT_POST, true);
+                    curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+                    curl_setopt($ch, CURLOPT_USERPWD, $clientId . ':' . $clientSecret);
+                    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+                    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                    
+                    $tokenResponse = curl_exec($ch);
+                    $tokenData = json_decode($tokenResponse, true);
+                    curl_close($ch);
+                    
+                    if (isset($tokenData['access_token'])) {
+                        $ch = curl_init();
+                        curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v2/checkout/orders/' . $orderId);
+                        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                            'Content-Type: application/json',
+                            'Authorization: Bearer ' . $tokenData['access_token']
+                        ]);
+                        curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+                        
+                        $orderResponse = curl_exec($ch);
+                        $order = json_decode($orderResponse, true);
+                        curl_close($ch);
+                        
+                        if (isset($order['status'])) {
+                            $paypalStatus = $order['status'];
+                            $syncedFromPaypal = true;
+                            
+                            switch ($paypalStatus) {
+                                case 'COMPLETED':
+                                    $newStatus = 'completed';
+                                    $message = 'PayPal payment has been completed!';
+                                    break;
+                                case 'APPROVED':
+                                case 'PAYER_ACTION_REQUIRED':
+                                    $newStatus = 'pending';
+                                    $message = 'Payment requires additional action from PayPal.';
+                                    break;
+                                case 'VOIDED':
+                                    $newStatus = 'failed';
+                                    $message = 'Payment was voided.';
+                                    break;
+                                default:
+                                    $message = 'PayPal status: ' . $paypalStatus;
+                            }
+                            
+                            if ($newStatus !== $currentStatus) {
+                                $this->db->update('subscription_payments', ['status' => $newStatus], ['id' => $paymentId]);
+                                if ($newStatus === 'completed') {
+                                    $this->db->update('users', ['payment_status' => 'completed'], ['id' => $userId]);
+                                }
+                            }
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    error_log('PayPal status check error: ' . $e->getMessage());
+                    $message = 'Unable to check PayPal status.';
+                }
+            }
+        } else {
+            switch ($currentStatus) {
+                case 'completed': $message = 'Payment has been approved.'; break;
+                case 'pending': $message = 'Payment is pending admin verification.'; break;
+                case 'failed': $message = 'Payment was rejected.'; break;
+                default: $message = 'Status: ' . $currentStatus;
+            }
+        }
+        
+        echo json_encode([
+            'success' => true,
+            'payment_id' => $paymentId,
+            'previous_status' => $currentStatus,
+            'current_status' => $newStatus,
+            'new_status' => $newStatus,
+            'status_changed' => $newStatus !== $currentStatus,
+            'synced_from_paypal' => $syncedFromPaypal,
+            'admin_review_requested' => (bool)($payment['admin_review_requested'] ?? false),
+            'message' => $message
+        ]);
+        exit;
+    }
+
+    /**
+     * Request Admin Review for Payment
+     */
+    public function requestReview($paymentId): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
+        
+        header('Content-Type: application/json');
+        
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Unauthorized']);
+            exit;
+        }
+        
+        $userId = $_SESSION['user_id'];
+        
+        $payment = $this->db->get('subscription_payments', ['id', 'user_id', 'status', 'admin_review_requested'], ['id' => $paymentId]);
+        
+        if (!$payment || $payment['user_id'] != $userId) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'message' => 'Payment not found']);
+            exit;
+        }
+        
+        if ($payment['status'] === 'completed') {
+            echo json_encode(['success' => false, 'message' => 'Payment is already approved']);
+            exit;
+        }
+        
+        if ($payment['admin_review_requested']) {
+            echo json_encode(['success' => false, 'message' => 'Admin review already requested']);
+            exit;
+        }
+        
+        $this->db->update('subscription_payments', [
+            'admin_review_requested' => 1,
+            'admin_review_requested_at' => date('Y-m-d H:i:s')
+        ], ['id' => $paymentId]);
+        
+        error_log("Admin review requested for payment ID: $paymentId by user ID: $userId");
+        
+        echo json_encode([
+            'success' => true,
+            'message' => 'Admin review has been requested. You will be notified once reviewed.'
+        ]);
+        exit;
+    }
 }
