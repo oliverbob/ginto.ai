@@ -11,10 +11,7 @@
 $router->req('/test', 'TestController@test');
 
 // Serve role-based prompts for chat UI
-$router->req('/chat/prompts/', function() {
-    require_once __DIR__ . '/../Controllers/PromptsController.php';
-    \Controllers\PromptsController::getPrompts();
-});
+$router->req('/chat/prompts/', 'PromptsController@getPrompts');
 
 use Core\Router;
 use Ginto\Helpers\TransactionHelper;
@@ -54,7 +51,7 @@ function req($router, $path, $handler) {
 }
 
 // Debug endpoint to check IP detection (remove after testing)
-$router->get('/api/debug/ip-headers', function() {
+$router->req('/api/debug/ip-headers', function() {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     // Only allow admins
@@ -84,7 +81,7 @@ $router->get('/api/debug/ip-headers', function() {
 });
 
 // Login route
-req($router, '/login', function() use ($db, $countries) {
+$router->req('/login', function() use ($db, $countries) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $controller = new \Ginto\Controllers\UserController($db, $countries);
         $controller->loginAction($_POST);
@@ -98,7 +95,7 @@ req($router, '/login', function() use ($db, $countries) {
 // Lightweight transcribe endpoint for quick client testing.
 // Accepts a multipart file upload 'file' and returns a simplified JSON
 // { success: true, text: 'transcribed text' } to make client integration easier.
-req($router, '/transcribe', function() {
+$router->req('/transcribe', function() {
     // Provide a simple GET test page that lets you record audio client-side
     // and POST it back to this same endpoint for transcription. This helps
     // isolate listening behavior in the browser and exercise the POST
@@ -537,7 +534,7 @@ HTML;
 });
 
 // Custom root route: redirect based on session role
-req($router, '/', function() {
+$router->req('/', function() {
     if (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin') {
         if (!headers_sent()) header('Location: /admin');
         exit;
@@ -547,7 +544,7 @@ req($router, '/', function() {
 });
 
 // Full user network tree view
-req($router, '/user/network-tree', function() use ($db) {
+$router->req('/user/network-tree', function() use ($db) {
     if (empty($_SESSION['user_id'])) {
         if (!headers_sent()) header('Location: /login');
         exit;
@@ -567,7 +564,7 @@ req($router, '/user/network-tree', function() use ($db) {
 });
 
 // Downline view (legacy route)
-req($router, '/downline', function() use ($db, $countries) {
+$router->req('/downline', function() use ($db, $countries) {
     if (empty($_SESSION['user_id'])) {
         if (!headers_sent()) header('Location: /login');
         exit;
@@ -577,7 +574,7 @@ req($router, '/downline', function() use ($db, $countries) {
 });
 
 // Logout route: destroy session and redirect to login
-req($router, '/logout', function() {
+$router->req('/logout', function() {
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     // Unset all session variables
     $_SESSION = [];
@@ -598,7 +595,7 @@ req($router, '/logout', function() {
     exit;
 });
 
-req($router, '/register', function() use ($db, $countries) {
+$router->req('/register', function() use ($db, $countries) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $controller = new \Ginto\Controllers\UserController($db, $countries);
@@ -629,7 +626,7 @@ req($router, '/register', function() use ($db, $countries) {
 });
 
 // Bank Transfer Payment Registration
-req($router, '/bank-payments', function() use ($db, $countries) {
+$router->req('/bank-payments', function() use ($db, $countries) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     // Only accept POST requests via AJAX
@@ -890,7 +887,7 @@ req($router, '/bank-payments', function() use ($db, $countries) {
 });
 
 // GCash Payment Registration
-req($router, '/gcash-payments', function() use ($db, $countries) {
+$router->req('/gcash-payments', function() use ($db, $countries) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     // Only accept POST requests via AJAX
@@ -1152,7 +1149,7 @@ req($router, '/gcash-payments', function() use ($db, $countries) {
 
 // Crypto Payment Info API - serves USDT BEP20 wallet info dynamically via AJAX
 // The QR code is served with slight pixel variation to prevent direct hotlinking
-req($router, '/api/payments/crypto-info', function() {
+$router->req('/api/payments/crypto-info', function() {
     // Only accept AJAX requests
     if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] !== 'XMLHttpRequest') {
         header('Content-Type: application/json');
@@ -1233,7 +1230,7 @@ req($router, '/api/payments/crypto-info', function() {
 });
 
 // Get user's pending payment details (for transaction details modal)
-$router->get('/api/user/payment-details', function() use ($db) {
+$router->req('/api/user/payment-details', function() use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     header('Content-Type: application/json');
@@ -1307,7 +1304,7 @@ $router->get('/api/user/payment-details', function() use ($db) {
 });
 
 // Check/Sync Payment Status (for PayPal, checks API; for others, returns DB status)
-$router->post('/api/payment/check-status/{paymentId}', function($paymentId) use ($db) {
+$router->req('/api/payment/check-status/{paymentId}', function($paymentId) use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     header('Content-Type: application/json');
@@ -1462,7 +1459,7 @@ $router->post('/api/payment/check-status/{paymentId}', function($paymentId) use 
 });
 
 // Request Admin Review for Payment
-$router->post('/api/payment/request-review/{paymentId}', function($paymentId) use ($db) {
+$router->req('/api/payment/request-review/{paymentId}', function($paymentId) use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     header('Content-Type: application/json');
@@ -1511,7 +1508,7 @@ $router->post('/api/payment/request-review/{paymentId}', function($paymentId) us
 });
 
 // Serve receipt images securely (only for authenticated users viewing their own receipts or admins)
-req($router, '/receipt-image/{filename}', function($filename) use ($db) {
+$router->req('/receipt-image/{filename}', function($filename) use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     // Must be logged in
@@ -1591,7 +1588,7 @@ req($router, '/receipt-image/{filename}', function($filename) use ($db) {
 });
 
 // Crypto Payment Registration (USDT BEP20)
-req($router, '/crypto-payments', function() use ($db, $countries) {
+$router->req('/crypto-payments', function() use ($db, $countries) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     
     // Only accept POST requests via AJAX
@@ -1870,7 +1867,7 @@ req($router, '/crypto-payments', function() use ($db, $countries) {
     }
 });
 
-req($router, '/dashboard', function() use ($db, $countries) {
+$router->req('/dashboard', function() use ($db, $countries) {
     // Only allow access if logged in
     if (empty($_SESSION['user_id'])) {
         if (!headers_sent()) header('Location: /login');
@@ -1882,7 +1879,7 @@ req($router, '/dashboard', function() use ($db, $countries) {
 });
 
 // Public profile route by numeric id, username, or public_id
-req($router, '/user/profile/{ident}', function($ident) use ($db) {
+$router->req('/user/profile/{ident}', function($ident) use ($db) {
     // Resolve identifier: numeric id, public_id (alphanumeric), or username
     $userId = null;
     if (ctype_digit($ident)) {
@@ -1935,7 +1932,7 @@ req($router, '/user/profile/{ident}', function($ident) use ($db) {
 });
 
 // User commissions page (renders `src/Views/user/commissions.php` via controller)
-req($router, '/user/commissions', function() use ($db) {
+$router->req('/user/commissions', function() use ($db) {
     if (empty($_SESSION['user_id'])) {
         if (!headers_sent()) header('Location: /login');
         exit;

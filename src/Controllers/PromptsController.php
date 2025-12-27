@@ -1,6 +1,6 @@
 <?php
 // /src/Controllers/PromptsController.php
-namespace Controllers;
+namespace Ginto\Controllers;
 
 class PromptsController {
     /**
