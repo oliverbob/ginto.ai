@@ -3059,7 +3059,7 @@ req($router, '/admin/api/lxc/images', function() use ($db) {
 });
 
 // Admin LXC API: Delete image
-req($router, '/admin/api/lxc/images/{fingerprint}', function($params) use ($db) {
+req($router, '/admin/api/lxc/images/{fingerprint}', function($fingerprint = '') use ($db) {
     if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
     header('Content-Type: application/json; charset=utf-8');
     
@@ -3084,7 +3084,6 @@ req($router, '/admin/api/lxc/images/{fingerprint}', function($params) use ($db) 
         exit;
     }
     
-    $fingerprint = $params['fingerprint'] ?? '';
     if (!preg_match('/^[a-f0-9]+$/i', $fingerprint)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid fingerprint', 'received' => $fingerprint, 'length' => strlen($fingerprint)]);
