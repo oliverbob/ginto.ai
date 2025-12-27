@@ -2894,70 +2894,10 @@ $router->req('/api/courses/complete-lesson', function() use ($db) {
 // ============================================================================
 
 // Masterclass Listing Page
-$router->req('/masterclass', function() use ($db) {
-    $isLoggedIn = !empty($_SESSION['user_id']);
-    $isAdmin = \Ginto\Controllers\UserController::isAdmin();
-    $username = $_SESSION['username'] ?? null;
-    $userId = $_SESSION['user_id'] ?? null;
-    $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
-    
-    $masterclassController = new \Ginto\Controllers\MasterclassController($db);
-    $masterclasses = $masterclassController->getAllMasterclasses();
-    $categories = $masterclassController->getCategories();
-    $userPlan = $isLoggedIn ? $masterclassController->getUserPlanName($userId) : 'free';
-    
-    // Handle category filter
-    $categoryFilter = $_GET['category'] ?? null;
-    if ($categoryFilter) {
-        $masterclasses = $masterclassController->getMasterclassesByCategory($categoryFilter);
-    }
-    
-    // Handle user learning status filter
-    $statusFilter = $_GET['status'] ?? null;
-    $enrolledMasterclasses = [];
-    if ($isLoggedIn && $statusFilter) {
-        $enrolledMasterclasses = $masterclassController->getUserEnrolledMasterclasses($userId, $statusFilter);
-    }
-    
-    \Ginto\Core\View::view('masterclass/masterclass', [
-        'title' => 'Masterclasses | Ginto AI',
-        'isLoggedIn' => $isLoggedIn,
-        'isAdmin' => $isAdmin,
-        'username' => $username,
-        'userId' => $userId,
-        'userFullname' => $userFullname,
-        'masterclasses' => $masterclasses,
-        'categories' => $categories,
-        'userPlan' => $userPlan,
-        'categoryFilter' => $categoryFilter,
-        'statusFilter' => $statusFilter,
-        'enrolledMasterclasses' => $enrolledMasterclasses,
-    ]);
-});
+$router->req('/masterclass', 'MasterclassController@index');
 
 // Masterclass Pricing Page (must be before /masterclass/{slug} to avoid slug matching "pricing")
-$router->req('/masterclass/pricing', function() use ($db) {
-    $isLoggedIn = !empty($_SESSION['user_id']);
-    $userId = $_SESSION['user_id'] ?? 0;
-    $isAdmin = \Ginto\Controllers\UserController::isAdmin();
-    $username = $_SESSION['username'] ?? null;
-    $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
-    
-    $masterclassController = new \Ginto\Controllers\MasterclassController($db);
-    $plans = $masterclassController->getSubscriptionPlans();
-    $currentPlan = $isLoggedIn ? $masterclassController->getUserPlanName($userId) : 'free';
-    
-    \Ginto\Core\View::view('masterclass/pricing', [
-        'title' => 'Pricing | Ginto Masterclasses',
-        'isLoggedIn' => $isLoggedIn,
-        'isAdmin' => $isAdmin,
-        'username' => $username,
-        'userId' => $userId,
-        'userFullname' => $userFullname,
-        'plans' => $plans,
-        'currentPlan' => $currentPlan,
-    ]);
-});
+$router->req('/masterclass/pricing', 'MasterclassController@pricing');
 
 // Masterclass Detail Page
 $router->req('/masterclass/{slug}', function($slug) use ($db) {

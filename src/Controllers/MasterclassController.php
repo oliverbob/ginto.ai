@@ -407,4 +407,78 @@ class MasterclassController
         $stmt->execute([$limit]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
+
+    /**
+     * Masterclass listing page
+     */
+    public function index(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? null;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $masterclasses = $this->getAllMasterclasses();
+        $categories = $this->getCategories();
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        // Handle category filter
+        $categoryFilter = $_GET['category'] ?? null;
+        if ($categoryFilter) {
+            $masterclasses = $this->getMasterclassesByCategory($categoryFilter);
+        }
+        
+        // Handle user learning status filter
+        $statusFilter = $_GET['status'] ?? null;
+        $enrolledMasterclasses = [];
+        if ($isLoggedIn && $statusFilter) {
+            $enrolledMasterclasses = $this->getUserEnrolledMasterclasses($userId, $statusFilter);
+        }
+        
+        \Ginto\Core\View::view('masterclass/masterclass', [
+            'title' => 'Masterclasses | Ginto AI',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'masterclasses' => $masterclasses,
+            'categories' => $categories,
+            'userPlan' => $userPlan,
+            'categoryFilter' => $categoryFilter,
+            'statusFilter' => $statusFilter,
+            'enrolledMasterclasses' => $enrolledMasterclasses,
+        ]);
+    }
+
+    /**
+     * Masterclass pricing page
+     */
+    public function pricing(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $userId = $_SESSION['user_id'] ?? 0;
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $plans = $this->getSubscriptionPlans();
+        $currentPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        \Ginto\Core\View::view('masterclass/pricing', [
+            'title' => 'Pricing | Ginto Masterclasses',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'plans' => $plans,
+            'currentPlan' => $currentPlan,
+        ]);
+    }
 }
