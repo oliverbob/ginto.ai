@@ -8840,7 +8840,7 @@ $router->req('/playground/logs/create-sample', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - start working environment install (background)
-req($router, '/playground/editor/install_env', function() use ($db) {
+$router->req('/playground/editor/install_env', function() use ($db) {
     header('Content-Type: application/json');
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['success'=>false,'error'=>'Unauthorized']); exit; }
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'error'=>'Method not allowed']); exit; }
@@ -8867,7 +8867,7 @@ req($router, '/playground/editor/install_env', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - poll working environment install status
-req($router, '/playground/editor/install_status', function() use ($db) {
+$router->req('/playground/editor/install_status', function() use ($db) {
     header('Content-Type: application/json');
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['success'=>false,'error'=>'Unauthorized']); exit; }
     try {
@@ -8883,7 +8883,7 @@ req($router, '/playground/editor/install_status', function() use ($db) {
 }, ['GET']);
 
 // Playground sub-routes (catch-all for playground tools)
-req($router, '/playground/{tool}', function($tool = 'index') {
+$router->req('/playground/{tool}', function($tool = 'index') {
     // Require login
     if (empty($_SESSION['user_id'])) {
         header('Location: /login?redirect=/playground/' . urlencode($tool));
@@ -8904,7 +8904,7 @@ req($router, '/playground/{tool}', function($tool = 'index') {
     exit;
 });
 
-req($router, '/playground/logs/{id}', function($id = null) use ($db) {
+$router->req('/playground/logs/{id}', function($id = null) use ($db) {
     if (empty($_SESSION['user_id'])) { header('Location: /login?redirect=/playground/logs'); exit; }
     $user = null; try { $user = $db->get('users', ['role_id'], ['id' => $_SESSION['user_id']]); } catch (\Throwable $_) { $user = null; }
     if (!$user || !in_array($user['role_id'] ?? null, [1,2])) { header('Location: /playground'); exit; }
@@ -8939,7 +8939,7 @@ req($router, '/playground/logs/{id}', function($id = null) use ($db) {
 });
 
 // Playground editor save endpoint
-req($router, '/playground/editor/save', function() use ($db) {
+$router->req('/playground/editor/save', function() use ($db) {
     // Wrap handler in try/catch so we can log internal errors and avoid leaking details
     try {
     // Ensure a session sandbox exists for visitors (allow editing for visitor sandboxes)
@@ -9129,7 +9129,7 @@ req($router, '/playground/editor/save', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - toggle admin sandbox mode (admins can opt into per-user sandbox)
-req($router, '/playground/editor/toggle_sandbox', function() use ($db) {
+$router->req('/playground/editor/toggle_sandbox', function() use ($db) {
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['success'=>false,'error'=>'Unauthorized']); exit; }
     // Only admins can toggle sandbox mode
     $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin') || (!empty($_SESSION['is_admin']));
@@ -9200,7 +9200,7 @@ req($router, '/playground/editor/toggle_sandbox', function() use ($db) {
 }, ['POST']);
 
 // Dev endpoint: return a filtered view of the current session for debugging in the editor
-req($router, '/playground/editor/session_debug', function() use ($db) {
+$router->req('/playground/editor/session_debug', function() use ($db) {
     header('Content-Type: application/json');
     if (empty($_SESSION['user_id'])) {
         http_response_code(401);
@@ -9264,7 +9264,7 @@ req($router, '/playground/editor/session_debug', function() use ($db) {
 }, ['GET']);
 
 // Playground editor - refresh tree
-req($router, '/playground/editor/tree', function() use ($db) {
+$router->req('/playground/editor/tree', function() use ($db) {
     // Ensure visitor sessions have a sandbox so they can view/edit files.
     if (empty($_SESSION['user_id'])) {
         if (empty($_SESSION['sandbox_id'])) {
@@ -9327,7 +9327,7 @@ req($router, '/playground/editor/tree', function() use ($db) {
 });
 
 // Playground console - environment (safe read-only)
-req($router, '/playground/console/environment', function() use ($db) {
+$router->req('/playground/console/environment', function() use ($db) {
     header('Content-Type: application/json');
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['error'=>'Unauthorized']); exit; }
 
@@ -9382,7 +9382,7 @@ req($router, '/playground/console/environment', function() use ($db) {
 }, ['GET']);
 
 // Playground console - execute a command (CSRF-protected)
-req($router, '/playground/console/exec', function() use ($db) {
+$router->req('/playground/console/exec', function() use ($db) {
     header('Content-Type: application/json');
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['success'=>false,'error'=>'Unauthorized']); exit; }
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['success'=>false,'error'=>'Method not allowed']); exit; }
@@ -9506,7 +9506,7 @@ req($router, '/playground/console/exec', function() use ($db) {
 }, ['POST']);
 
 // Playground console - tail logs (safe read-only)
-req($router, '/playground/console/logs', function() use ($db) {
+$router->req('/playground/console/logs', function() use ($db) {
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo 'Unauthorized'; exit; }
     $lines = isset($_GET['lines']) ? (int)$_GET['lines'] : 200;
     if ($lines < 1) $lines = 200;
@@ -9547,7 +9547,7 @@ req($router, '/playground/console/logs', function() use ($db) {
 }, ['GET']);
 
 // Playground editor - create file/folder
-req($router, '/playground/editor/create', function() use ($db) {
+$router->req('/playground/editor/create', function() use ($db) {
     // Allow visitor sandboxes by ensuring a session sandbox exists.
     if (empty($_SESSION['user_id'])) {
         if (empty($_SESSION['sandbox_id'])) {
@@ -9649,7 +9649,7 @@ req($router, '/playground/editor/create', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - rename
-req($router, '/playground/editor/rename', function() use ($db) {
+$router->req('/playground/editor/rename', function() use ($db) {
     // Allow visitors with a session sandbox to rename within their sandbox
     if (empty($_SESSION['user_id'])) {
         if (empty($_SESSION['sandbox_id'])) {
@@ -9742,7 +9742,7 @@ req($router, '/playground/editor/rename', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - delete
-req($router, '/playground/editor/delete', function() use ($db) {
+$router->req('/playground/editor/delete', function() use ($db) {
     // Allow visitors with session sandboxes to delete within their sandbox
     if (empty($_SESSION['user_id'])) {
         if (empty($_SESSION['sandbox_id'])) {
@@ -9824,7 +9824,7 @@ req($router, '/playground/editor/delete', function() use ($db) {
 }, ['POST']);
 
 // Playground editor - paste (copy/move)
-req($router, '/playground/editor/paste', function() use ($db) {
+$router->req('/playground/editor/paste', function() use ($db) {
     // Allow visitors with session sandboxes to paste/copy within their sandbox
     if (empty($_SESSION['user_id'])) {
         if (empty($_SESSION['sandbox_id'])) {
@@ -9954,7 +9954,7 @@ req($router, '/playground/editor/paste', function() use ($db) {
 // =====================================================================
 // Provider API Keys Management (Admin Only)
 // =====================================================================
-req($router, '/api/provider-keys', function() use ($db) {
+$router->req('/api/provider-keys', function() use ($db) {
     header('Content-Type: application/json');
     
     // Require admin authentication
