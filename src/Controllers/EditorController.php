@@ -349,4 +349,429 @@ class EditorController
         ]);
         exit;
     }
+
+    /**
+     * Rename file or folder
+     */
+    public function rename(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Get sandbox ID or root path
+        $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        $sandboxId = null;
+        try {
+            putenv('GINTO_SKIP_SANDBOX_START=1');
+            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            putenv('GINTO_SKIP_SANDBOX_START');
+            
+            if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
+                $sandboxId = $result;
+            } else {
+                $editorRoot = $result ?: $editorRoot;
+            }
+        } catch (\Throwable $e) {}
+        
+        $oldPath = $_POST['oldPath'] ?? '';
+        $newPath = $_POST['newPath'] ?? '';
+        
+        if (empty($oldPath) || empty($newPath)) {
+            echo json_encode(['success' => false, 'error' => 'Both old and new paths required']);
+            exit;
+        }
+        
+        // Security: prevent path traversal
+        $oldPath = str_replace(['../', '..\\'], '', $oldPath);
+        $newPath = str_replace(['../', '..\\'], '', $newPath);
+        
+        // If we have a sandbox ID, use LXD to rename item
+        if ($sandboxId) {
+            if (\Ginto\Helpers\LxdSandboxManager::pathExists($sandboxId, $newPath)) {
+                echo json_encode(['success' => false, 'error' => 'Destination already exists']);
+                exit;
+            }
+            
+            $renameResult = \Ginto\Helpers\LxdSandboxManager::renameItem($sandboxId, $oldPath, $newPath);
+            if ($renameResult['success']) {
+                echo json_encode(['success' => true, 'path' => $newPath, 'encoded' => base64_encode($newPath)]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $renameResult['error'] ?? 'Failed to rename']);
+            }
+            exit;
+        }
+        
+        // Local filesystem (admin mode)
+        $oldFullPath = rtrim($editorRoot, '/') . '/' . ltrim($oldPath, '/');
+        $newFullPath = rtrim($editorRoot, '/') . '/' . ltrim($newPath, '/');
+        
+        if (!file_exists($oldFullPath)) {
+            echo json_encode(['success' => false, 'error' => 'Source does not exist']);
+            exit;
+        }
+        
+        if (file_exists($newFullPath)) {
+            echo json_encode(['success' => false, 'error' => 'Destination already exists']);
+            exit;
+        }
+        
+        $parentDir = dirname($newFullPath);
+        if (!is_dir($parentDir)) {
+            mkdir($parentDir, 0755, true);
+        }
+        
+        rename($oldFullPath, $newFullPath);
+        
+        echo json_encode(['success' => true, 'path' => $newPath, 'encoded' => base64_encode($newPath)]);
+        exit;
+    }
+
+    /**
+     * Delete file or folder
+     */
+    public function delete(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Get sandbox ID or root path
+        $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        $sandboxId = null;
+        try {
+            putenv('GINTO_SKIP_SANDBOX_START=1');
+            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            putenv('GINTO_SKIP_SANDBOX_START');
+            
+            if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
+                $sandboxId = $result;
+            } else {
+                $editorRoot = $result ?: $editorRoot;
+            }
+        } catch (\Throwable $e) {}
+        
+        $path = $_POST['path'] ?? '';
+        
+        if (empty($path)) {
+            echo json_encode(['success' => false, 'error' => 'Path is required']);
+            exit;
+        }
+        
+        // Security: prevent path traversal
+        $path = str_replace(['../', '..\\'], '', $path);
+        
+        // If we have a sandbox ID, use LXD to delete item
+        if ($sandboxId) {
+            $deleteResult = \Ginto\Helpers\LxdSandboxManager::deleteItem($sandboxId, $path);
+            if ($deleteResult['success']) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $deleteResult['error'] ?? 'Failed to delete']);
+            }
+            exit;
+        }
+        
+        // Local filesystem (admin mode)
+        $fullPath = rtrim($editorRoot, '/') . '/' . ltrim($path, '/');
+        
+        if (!file_exists($fullPath)) {
+            echo json_encode(['success' => false, 'error' => 'Path does not exist']);
+            exit;
+        }
+        
+        $this->deleteRecursive($fullPath);
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    /**
+     * Helper: Recursive delete for directories
+     */
+    private function deleteRecursive($path): void
+    {
+        if (is_dir($path)) {
+            $items = scandir($path);
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') continue;
+                $this->deleteRecursive($path . '/' . $item);
+            }
+            rmdir($path);
+        } else {
+            unlink($path);
+        }
+    }
+
+    /**
+     * Paste (copy/move) file or folder
+     */
+    public function paste(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Get sandbox ID or root path
+        $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        $sandboxId = null;
+        try {
+            putenv('GINTO_SKIP_SANDBOX_START=1');
+            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            putenv('GINTO_SKIP_SANDBOX_START');
+            
+            if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
+                $sandboxId = $result;
+            } else {
+                $editorRoot = $result ?: $editorRoot;
+            }
+        } catch (\Throwable $e) {}
+        
+        $source = $_POST['source'] ?? '';
+        $destination = $_POST['destination'] ?? '';
+        $action = $_POST['action'] ?? 'copy';
+        
+        if (empty($source)) {
+            echo json_encode(['success' => false, 'error' => 'Source path is required']);
+            exit;
+        }
+        
+        // Security: prevent path traversal
+        $source = str_replace(['../', '..\\'], '', $source);
+        $destination = str_replace(['../', '..\\'], '', $destination);
+        
+        // If we have a sandbox ID, use LXD operations
+        if ($sandboxId) {
+            $sourceName = basename($source);
+            $destPath = $destination ? rtrim($destination, '/') . '/' . $sourceName : $sourceName;
+            
+            // Handle naming conflicts
+            if (\Ginto\Helpers\LxdSandboxManager::pathExists($sandboxId, $destPath) && $source !== $destPath) {
+                $i = 1;
+                $ext = pathinfo($sourceName, PATHINFO_EXTENSION);
+                $base = pathinfo($sourceName, PATHINFO_FILENAME);
+                while (\Ginto\Helpers\LxdSandboxManager::pathExists($sandboxId, $destPath)) {
+                    $newName = $ext ? "$base ($i).$ext" : "$base ($i)";
+                    $destPath = $destination ? rtrim($destination, '/') . '/' . $newName : $newName;
+                    $i++;
+                }
+            }
+            
+            if ($action === 'cut') {
+                $result = \Ginto\Helpers\LxdSandboxManager::renameItem($sandboxId, $source, $destPath);
+            } else {
+                $result = \Ginto\Helpers\LxdSandboxManager::copyItem($sandboxId, $source, $destPath);
+            }
+            
+            echo json_encode($result['success'] ? ['success' => true] : ['success' => false, 'error' => $result['error'] ?? 'Operation failed']);
+            exit;
+        }
+        
+        // Local filesystem (admin mode)
+        $sourceFullPath = rtrim($editorRoot, '/') . '/' . ltrim($source, '/');
+        $sourceName = basename($source);
+        $destDir = $destination ? rtrim($editorRoot, '/') . '/' . ltrim($destination, '/') : $editorRoot;
+        $destFullPath = rtrim($destDir, '/') . '/' . $sourceName;
+        
+        if (!file_exists($sourceFullPath)) {
+            echo json_encode(['success' => false, 'error' => 'Source does not exist']);
+            exit;
+        }
+        
+        // Handle naming conflicts
+        if (file_exists($destFullPath) && $sourceFullPath !== $destFullPath) {
+            $i = 1;
+            $ext = pathinfo($sourceName, PATHINFO_EXTENSION);
+            $base = pathinfo($sourceName, PATHINFO_FILENAME);
+            while (file_exists($destFullPath)) {
+                $newName = $ext ? "$base ($i).$ext" : "$base ($i)";
+                $destFullPath = rtrim($destDir, '/') . '/' . $newName;
+                $i++;
+            }
+        }
+        
+        // Ensure destination directory exists
+        if (!is_dir($destDir)) {
+            mkdir($destDir, 0755, true);
+        }
+        
+        if ($action === 'cut') {
+            rename($sourceFullPath, $destFullPath);
+        } else {
+            $this->copyRecursive($sourceFullPath, $destFullPath);
+        }
+        
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+    /**
+     * Helper: Recursive copy for directories
+     */
+    private function copyRecursive($src, $dst): void
+    {
+        if (is_dir($src)) {
+            mkdir($dst, 0755, true);
+            $items = scandir($src);
+            foreach ($items as $item) {
+                if ($item === '.' || $item === '..') continue;
+                $this->copyRecursive($src . '/' . $item, $dst . '/' . $item);
+            }
+        } else {
+            copy($src, $dst);
+        }
+    }
+
+    /**
+     * Save file content
+     */
+    public function save(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Only allow POST
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+            exit;
+        }
+        
+        // CSRF validation
+        $token = $_POST['csrf_token'] ?? '';
+        if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+        
+        // Get sandbox ID or root path
+        $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        $sandboxId = null;
+        try {
+            putenv('GINTO_SKIP_SANDBOX_START=1');
+            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            putenv('GINTO_SKIP_SANDBOX_START');
+            
+            if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
+                $sandboxId = $result;
+            } else {
+                $editorRoot = $result ?: $editorRoot;
+            }
+        } catch (\Throwable $e) {}
+        
+        // Support both 'file' and 'encoded' param names for compatibility
+        $encoded = $_POST['file'] ?? $_POST['encoded'] ?? '';
+        $content = $_POST['content'] ?? '';
+        
+        if (empty($encoded)) {
+            echo json_encode(['success' => false, 'error' => 'File path is required']);
+            exit;
+        }
+        
+        $path = base64_decode($encoded);
+        if ($path === false) {
+            echo json_encode(['success' => false, 'error' => 'Invalid file encoding']);
+            exit;
+        }
+        
+        // Security: prevent path traversal
+        $path = str_replace(['../', '..\\'], '', $path);
+        
+        // If we have a sandbox ID, use LXD to write file
+        if ($sandboxId) {
+            $writeResult = \Ginto\Helpers\LxdSandboxManager::writeFile($sandboxId, $path, $content);
+            if ($writeResult['success']) {
+                echo json_encode(['success' => true, 'bytes' => $writeResult['bytes'] ?? strlen($content)]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $writeResult['error'] ?? 'Failed to write file']);
+            }
+            exit;
+        }
+        
+        // Local filesystem (admin mode)
+        $fullPath = rtrim($editorRoot, '/') . '/' . ltrim($path, '/');
+        
+        // Ensure parent directory exists
+        $parentDir = dirname($fullPath);
+        if (!is_dir($parentDir)) {
+            mkdir($parentDir, 0755, true);
+        }
+        
+        $result = file_put_contents($fullPath, $content);
+        
+        if ($result === false) {
+            echo json_encode(['success' => false, 'error' => 'Failed to write file']);
+            exit;
+        }
+        
+        echo json_encode(['success' => true, 'bytes' => $result]);
+        exit;
+    }
+
+    /**
+     * Read file content
+     */
+    public function file(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        // Get sandbox ID or root path
+        $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
+        $sandboxId = null;
+        try {
+            putenv('GINTO_SKIP_SANDBOX_START=1');
+            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            putenv('GINTO_SKIP_SANDBOX_START');
+            
+            if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
+                $sandboxId = $result;
+            } else {
+                $editorRoot = $result ?: $editorRoot;
+            }
+        } catch (\Throwable $e) {}
+        
+        $encoded = $_GET['file'] ?? $_POST['file'] ?? '';
+        
+        if (empty($encoded)) {
+            echo json_encode(['success' => false, 'error' => 'File path is required']);
+            exit;
+        }
+        
+        $path = base64_decode($encoded);
+        if ($path === false) {
+            echo json_encode(['success' => false, 'error' => 'Invalid file encoding']);
+            exit;
+        }
+        
+        // Security: prevent path traversal
+        $path = str_replace(['../', '..\\'], '', $path);
+        
+        // If we have a sandbox ID, use LXD to read file
+        if ($sandboxId) {
+            $readResult = \Ginto\Helpers\LxdSandboxManager::readFile($sandboxId, $path);
+            if ($readResult['success']) {
+                echo json_encode([
+                    'success' => true,
+                    'content' => $readResult['content'],
+                    'path' => $path,
+                    'encoded' => $encoded
+                ]);
+            } else {
+                echo json_encode(['success' => false, 'error' => $readResult['error'] ?? 'Failed to read file']);
+            }
+            exit;
+        }
+        
+        // Local filesystem (admin mode)
+        $fullPath = rtrim($editorRoot, '/') . '/' . ltrim($path, '/');
+        
+        if (!file_exists($fullPath) || !is_file($fullPath)) {
+            echo json_encode(['success' => false, 'error' => 'File not found']);
+            exit;
+        }
+        
+        $content = file_get_contents($fullPath);
+        
+        echo json_encode([
+            'success' => true,
+            'content' => $content,
+            'path' => $path,
+            'encoded' => $encoded
+        ]);
+        exit;
+    }
 }
