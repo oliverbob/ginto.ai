@@ -2371,4 +2371,197 @@ class ApiController
         echo json_encode($out);
         return;
     }
+
+    /**
+     * Rate limit status endpoint - shows current usage and limits
+     * GET /rate-limits
+     */
+    public function rateLimits(): void
+    {
+        header('Content-Type: application/json');
+        
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        
+        try {
+            $rateLimitService = new \App\Core\RateLimitService($this->db ?? null);
+            $userId = $_SESSION['user_id'] ?? ($_SESSION['sandbox_id'] ?? session_id());
+            $userRole = !empty($_SESSION['user_id']) ? ($_SESSION['is_admin'] ?? false ? 'admin' : 'user') : 'visitor';
+            
+            $provider = 'groq';
+            $model = 'openai/gpt-oss-120b';
+            
+            // Get user's current limits and usage
+            $canMakeRequest = $rateLimitService->canMakeRequest($userId, $userRole, $provider, $model);
+            $shouldFallback = $rateLimitService->shouldUseFallback($provider, $model);
+            $providerSelection = $rateLimitService->selectProvider($provider, $model);
+            
+            // Get org-level usage
+            $orgMinute = $rateLimitService->getOrgUsage($provider, $model, 'minute');
+            $orgDay = $rateLimitService->getOrgUsage($provider, $model, 'day');
+            
+            // Get rate limits from config
+            $limits = $rateLimitService->getRateLimits($provider, $model);
+            
+            // Calculate tier percentage
+            $tierPercentages = ['admin' => 50, 'user' => 10, 'visitor' => 5];
+            $tierPercent = $tierPercentages[strtolower($userRole)] ?? 5;
+            
+            echo json_encode([
+                'success' => true,
+                'user' => [
+                    'id' => $userId,
+                    'role' => $userRole,
+                    'tier_percent' => $tierPercent,
+                ],
+                'can_make_request' => $canMakeRequest['allowed'],
+                'limit_reason' => $canMakeRequest['reason'] ?? null,
+                'usage' => $canMakeRequest['usage'] ?? null,
+                'organization' => [
+                    'minute' => $orgMinute,
+                    'day' => $orgDay,
+                    'limits' => $limits,
+                ],
+                'fallback' => [
+                    'should_use' => $shouldFallback['use_fallback'],
+                    'reason' => $shouldFallback['reason'] ?? null,
+                    'provider' => $providerSelection['provider'],
+                    'is_fallback' => $providerSelection['is_fallback'],
+                ],
+                'providers' => [
+                    'primary' => $provider,
+                    'fallback' => getenv('RATE_LIMIT_FALLBACK_PROVIDER') ?: 'cerebras',
+                    'threshold' => (int)(getenv('RATE_LIMIT_FALLBACK_THRESHOLD') ?: 80),
+                ],
+            ], JSON_PRETTY_PRINT);
+        } catch (\Throwable $e) {
+            echo json_encode([
+                'success' => false,
+                'error' => 'Failed to retrieve rate limit status',
+                'message' => $e->getMessage(),
+            ]);
+        }
+        exit;
+    }
+
+    /**
+     * Provider API Keys Management (Admin Only)
+     * GET/POST /api/provider-keys
+     */
+    public function providerKeys(): void
+    {
+        header('Content-Type: application/json');
+        
+        // Require admin authentication
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        // Check if user is logged in
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Login required']);
+            exit;
+        }
+        
+        // CSRF validation for POST requests
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $csrfToken = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+            $sessionToken = $_SESSION['csrf_token'] ?? '';
+            if (empty($csrfToken) || empty($sessionToken) || !hash_equals($sessionToken, $csrfToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                exit;
+            }
+        }
+        
+        // Check admin status - first try session, then database
+        $isAdmin = UserController::isAdmin();
+        if (!$isAdmin && $this->db) {
+            // Fallback: check database directly
+            try {
+                $user = $this->db->get('users', ['role_id', 'is_admin'], ['id' => $_SESSION['user_id']]);
+                if ($user) {
+                    $isAdmin = !empty($user['is_admin']) || in_array((int)($user['role_id'] ?? 0), [1, 2], true);
+                }
+            } catch (\Throwable $_) {}
+        }
+        
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin access required']);
+            exit;
+        }
+        
+        $keyManager = new \App\Core\ProviderKeyManager($this->db);
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            // List all keys
+            $keys = $keyManager->getAllKeys();
+            // Mask API keys for security
+            foreach ($keys as &$key) {
+                $key['api_key_masked'] = \App\Core\ProviderKeyManager::maskKey($key['api_key']);
+                unset($key['api_key']); // Don't send full key to frontend
+            }
+            echo json_encode(['success' => true, 'keys' => $keys]);
+            exit;
+        }
+        
+        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            $action = $input['action'] ?? 'add';
+            
+            switch ($action) {
+                case 'add':
+                    if (empty($input['provider']) || empty($input['api_key'])) {
+                        echo json_encode(['success' => false, 'error' => 'Provider and API key are required']);
+                        exit;
+                    }
+                    $id = $keyManager->addKey([
+                        'provider' => $input['provider'],
+                        'api_key' => $input['api_key'],
+                        'key_name' => $input['key_name'] ?? null,
+                        'tier' => $input['tier'] ?? 'basic',
+                        'is_default' => !empty($input['is_default']),
+                        'priority' => $input['priority'] ?? null,
+                    ]);
+                    echo json_encode(['success' => true, 'id' => $id, 'message' => 'API key added successfully']);
+                    break;
+                    
+                case 'update':
+                    if (empty($input['id'])) {
+                        echo json_encode(['success' => false, 'error' => 'Key ID is required']);
+                        exit;
+                    }
+                    $success = $keyManager->updateKey((int)$input['id'], $input);
+                    echo json_encode(['success' => $success, 'message' => $success ? 'Key updated' : 'Update failed']);
+                    break;
+                    
+                case 'delete':
+                    if (empty($input['id'])) {
+                        echo json_encode(['success' => false, 'error' => 'Key ID is required']);
+                        exit;
+                    }
+                    $success = $keyManager->deleteKey((int)$input['id']);
+                    echo json_encode(['success' => $success, 'message' => $success ? 'Key deleted' : 'Delete failed']);
+                    break;
+                    
+                case 'clear_rate_limit':
+                    if (empty($input['id'])) {
+                        echo json_encode(['success' => false, 'error' => 'Key ID is required']);
+                        exit;
+                    }
+                    $keyManager->clearRateLimit((int)$input['id']);
+                    echo json_encode(['success' => true, 'message' => 'Rate limit cleared']);
+                    break;
+                    
+                default:
+                    echo json_encode(['success' => false, 'error' => 'Unknown action']);
+            }
+            exit;
+        }
+        
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        exit;
+    }
 }
