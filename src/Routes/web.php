@@ -11,7 +11,7 @@
 $router->req('/test', 'TestController@test');
 
 // Serve role-based prompts for chat UI
-req($router, '/chat/prompts/', function() {
+$router->req('/chat/prompts/', function() {
     require_once __DIR__ . '/../Controllers/PromptsController.php';
     \Controllers\PromptsController::getPrompts();
 });
