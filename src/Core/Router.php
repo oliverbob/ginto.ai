@@ -83,6 +83,25 @@ class Router
         $this->addRoute('PATCH', $uri, $callback);
     }
 
+    /**
+     * Unified request handler - registers route for ALL HTTP methods.
+     * CSRF is automatically applied via dispatch() for mutating methods.
+     * 
+     * Usage:
+     *   $router->req('/test', 'SomeController@test');
+     *   $router->req('/api/data', function() { ... });
+     * 
+     * @param string $uri The route URI
+     * @param callable|string $callback The handler (closure or Controller@method)
+     */
+    public function req($uri, $callback)
+    {
+        $methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+        foreach ($methods as $method) {
+            $this->addRoute($method, $uri, $callback);
+        }
+    }
+
     protected function addRoute($method, $uri, $callback)
     {
         // Get middleware from the current group, if any

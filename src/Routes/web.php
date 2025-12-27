@@ -2,6 +2,14 @@
 // src/Routes/web.php
 // Centralized route definitions for Ginto CMS
 
+// ============================================
+// TEST ROUTE - Using new simplified req() syntax
+// This demonstrates both syntaxes:
+//   1. $router->req() - direct method on router
+//   2. req($router, ...) - helper function
+// ============================================
+$router->req('/test', 'TestController@test');
+
 // Serve role-based prompts for chat UI
 req($router, '/chat/prompts/', function() {
     require_once __DIR__ . '/../Controllers/PromptsController.php';
@@ -34,16 +42,15 @@ if (!isset($db)) {
 }
 
 // Unified req() helper for all HTTP methods
+// Now delegates to $router->req() which handles GET, POST, PUT, PATCH, DELETE
 function req($router, $path, $handler) {
     global $ROUTE_REGISTRY;
     $ROUTE_REGISTRY[] = [
-        'methods' => ['GET', 'POST', 'DELETE'],
+        'methods' => ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
         'path' => $path,
         'handler' => $handler
     ];
-    $router->get($path, $handler);
-    $router->post($path, $handler);
-    $router->delete($path, $handler);
+    $router->req($path, $handler);
 }
 
 // Debug endpoint to check IP detection (remove after testing)
