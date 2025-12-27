@@ -81,16 +81,7 @@ $router->req('/api/debug/ip-headers', function() {
 });
 
 // Login route
-$router->req('/login', function() use ($db, $countries) {
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $controller = new \Ginto\Controllers\UserController($db, $countries);
-        $controller->loginAction($_POST);
-    } else {
-        \Ginto\Core\View::view('user/login', [
-            'title' => 'Login'
-        ]);
-    }
-});
+$router->req('/login', 'AuthController@login');
 
 // Lightweight transcribe endpoint for quick client testing.
 // Accepts a multipart file upload 'file' and returns a simplified JSON
@@ -534,14 +525,7 @@ HTML;
 });
 
 // Custom root route: redirect based on session role
-$router->req('/', function() {
-    if (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin') {
-        if (!headers_sent()) header('Location: /admin');
-        exit;
-    }
-    if (!headers_sent()) header('Location: /chat');
-    exit;
-});
+$router->req('/', 'AuthController@index');
 
 // Full user network tree view
 $router->req('/user/network-tree', function() use ($db) {
@@ -564,66 +548,13 @@ $router->req('/user/network-tree', function() use ($db) {
 });
 
 // Downline view (legacy route)
-$router->req('/downline', function() use ($db, $countries) {
-    if (empty($_SESSION['user_id'])) {
-        if (!headers_sent()) header('Location: /login');
-        exit;
-    }
-    $controller = new \Ginto\Controllers\UserController($db, $countries);
-    return $controller->downlineAction();
-});
+$router->req('/downline', 'AuthController@downline');
 
 // Logout route: destroy session and redirect to login
-$router->req('/logout', function() {
-    if (session_status() !== PHP_SESSION_ACTIVE) session_start();
-    // Unset all session variables
-    $_SESSION = [];
-    // Delete session cookie
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $params['path'] ?? '/',
-            $params['domain'] ?? '',
-            $params['secure'] ?? false,
-            $params['httponly'] ?? true
-        );
-    }
-    // Destroy the session
-    session_unset();
-    session_destroy();
-    if (!headers_sent()) header('Location: /');
-    exit;
-});
+$router->req('/logout', 'AuthController@logout');
 
-$router->req('/register', function() use ($db, $countries) {
-    if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $controller = new \Ginto\Controllers\UserController($db, $countries);
-        $controller->registerAction($_POST);
-    } else {
-        $refId = $_GET['ref'] ?? ($_SESSION['referral_code'] ?? null);
-        if (isset($_GET['ref'])) {
-            $_SESSION['referral_code'] = $_GET['ref'];
-        }
-        $detectedCountryCode = null;
-        $levels = [];
-        try {
-            $levels = $db->select('tier_plans', ['id','name','cost_amount','cost_currency','commission_rate_json'], ['ORDER' => ['id' => 'ASC']]);
-        } catch (Exception $e) {
-            error_log('Warning: Could not load levels for register view: ' . $e->getMessage());
-        }
-        \Ginto\Core\View::view('user/register/register', [
-            'title' => 'Register for Ginto',
-            'ref_id' => $refId,
-            'error' => null,
-            'old' => [],
-            'countries' => $countries,
-            'default_country_code' => $detectedCountryCode,
-            'levels' => $levels,
-            'csrf_token' => generateCsrfToken(true)
-        ]);
-    }
-});
+// Register route
+$router->req('/register', 'AuthController@register');
 
 // Bank Transfer Payment Registration
 $router->req('/bank-payments', function() use ($db, $countries) {
