@@ -1567,65 +1567,7 @@ $router->req('/sandbox/destroy', 'SandboxController@destroy', ['POST']);
 $router->req('/sandbox/install', 'SandboxController@install', ['POST']);
 
 // Sandbox API: Start an existing sandbox
-$router->req('/sandbox/start', function() use ($db) {
-    header('Content-Type: application/json; charset=utf-8');
-    
-    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-        http_response_code(405);
-        echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
-        exit;
-    }
-    
-    // Allow both logged-in users (user_id) and visitors (public_id)
-    if (empty($_SESSION['user_id']) && empty($_SESSION['public_id'])) {
-        http_response_code(401);
-        echo json_encode(['success' => false, 'error' => 'Unauthorized']);
-        exit;
-    }
-    
-    // CSRF validation
-    $token = $_POST['csrf_token'] ?? '';
-    if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
-        exit;
-    }
-    
-    try {
-        $sandboxRoot = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($db ?? null, $_SESSION ?? null, true);
-        if (empty($sandboxRoot)) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'No sandbox found. Your session may have expired.', 'needs_setup' => true]);
-            exit;
-        }
-        
-        $sandboxId = basename($sandboxRoot);
-        $started = \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($sandboxId, $sandboxRoot);
-        
-        if ($started) {
-            $ip = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
-            echo json_encode([
-                'success' => true,
-                'sandbox_id' => $sandboxId,
-                'container_ip' => $ip,
-                'status' => 'running',
-                'message' => 'Sandbox started successfully'
-            ]);
-        } else {
-            echo json_encode([
-                'success' => false,
-                'error' => 'Failed to start sandbox',
-                'sandbox_id' => $sandboxId
-            ]);
-        }
-        exit;
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'Error starting sandbox: ' . $e->getMessage()]);
-        exit;
-    }
-}, ['POST']);
-
+$router->req('/sandbox/start', 'SandboxController@start', ['POST']);
 // Sandbox API: Call sandbox-scoped MCP tools
 // This endpoint allows users with active sandboxes to call sandbox_* tools
 // Tools are restricted to sandbox-prefixed tools for security
