@@ -3863,61 +3863,11 @@ $router->req('/playground/editor/install_env', 'PlaygroundController@installEnv'
 $router->req('/playground/editor/install_status', 'PlaygroundController@installStatus', ['GET']);
 
 // Playground sub-routes (catch-all for playground tools)
-$router->req('/playground/{tool}', function($tool = 'index') {
-    // Require login
-    if (empty($_SESSION['user_id'])) {
-        header('Location: /login?redirect=/playground/' . urlencode($tool));
-        exit;
-    }
-    
-    $pageTitle = ucfirst($tool) . ' - Playground';
-    $toolView = ROOT_PATH . '/src/Views/playground/' . basename($tool) . '.php';
-    
-    // Check if specific tool view exists, otherwise show main playground
-    if (file_exists($toolView)) {
-        include $toolView;
-    } else {
-        // Show main playground with tool context
-        $currentTool = $tool;
-        include ROOT_PATH . '/src/Views/playground/index.php';
-    }
-    exit;
-});
+// Playground sub-routes (catch-all for playground tools)
+$router->req('/playground/{tool}', 'PlaygroundController@tool');
 
-$router->req('/playground/logs/{id}', function($id = null) use ($db) {
-    if (empty($_SESSION['user_id'])) { header('Location: /login?redirect=/playground/logs'); exit; }
-    $user = null; try { $user = $db->get('users', ['role_id'], ['id' => $_SESSION['user_id']]); } catch (\Throwable $_) { $user = null; }
-    if (!$user || !in_array($user['role_id'] ?? null, [1,2])) { header('Location: /playground'); exit; }
-
-    if (!$id) { http_response_code(404); echo 'Not found'; exit; }
-    // join to users so we can display username
-    $log = $db->get('activity_logs', [
-        '[>]users' => ['user_id' => 'id']
-    ], [
-        'activity_logs.id', 'activity_logs.user_id', 'users.username(user_name)', 'activity_logs.action', 'activity_logs.model_type', 'activity_logs.model_id', 'activity_logs.description', 'activity_logs.created_at'
-    ], ['activity_logs.id' => (int)$id]);
-
-    if ($log) {
-        $log['username'] = $log['user_name'] ?? ($log['user_id'] ? (string)$log['user_id'] : '(system)');
-
-        // Try to detect JSON descriptions for nicer display
-        $desc = (string)($log['description'] ?? '');
-        $trim = ltrim($desc);
-        if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
-            $json = json_decode($desc, true);
-            if (is_array($json)) {
-                // store pretty JSON for the view
-                $log['description_json'] = json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-            }
-        }
-    }
-    if (!$log) { http_response_code(404); echo 'Log not found'; exit; }
-
-    $pageTitle = 'Playground Log #' . $log['id'];
-    include ROOT_PATH . '/src/Views/playground/logs/show.php';
-    exit;
-});
-
+// Playground log detail view
+$router->req('/playground/logs/{id}', 'PlaygroundController@logDetail');
 // Playground editor save endpoint
 $router->req('/playground/editor/save', function() use ($db) {
     // Wrap handler in try/catch so we can log internal errors and avoid leaking details

@@ -307,29 +307,51 @@ class PlaygroundController
             exit;
         }
 
+        // Admin check using role_id
         $isAdmin = UserController::isAdmin();
         if (!$isAdmin) {
-            http_response_code(403);
-            echo '<h1>403 Forbidden</h1><p>Admin access required.</p>';
+            header('Location: /playground');
             exit;
         }
 
-        $logEntry = null;
-        if (!empty($id)) {
-            try {
-                $logEntry = $this->db->get('activity_logs', '*', ['id' => (int)$id]);
-                if ($logEntry && !empty($logEntry['user_id'])) {
-                    $u = $this->db->get('users', ['firstname','lastname','fullname','username'], ['id' => $logEntry['user_id']]);
-                    if ($u) {
-                        $logEntry['user_label'] = trim(($u['fullname'] ?? ($u['firstname'] . ' ' . $u['lastname'])) ?: ($u['username'] ?? $logEntry['user_id']));
-                    }
-                }
-            } catch (\Throwable $_) {}
+        if (!$id) {
+            http_response_code(404);
+            echo 'Not found';
+            exit;
         }
 
-        $pageTitle = 'Log Entry #' . ($id ?? '?');
+        // Join to users so we can display username
+        $log = $this->db->get('activity_logs', [
+            '[>]users' => ['user_id' => 'id']
+        ], [
+            'activity_logs.id', 'activity_logs.user_id', 'users.username(user_name)', 
+            'activity_logs.action', 'activity_logs.model_type', 'activity_logs.model_id', 
+            'activity_logs.description', 'activity_logs.created_at'
+        ], ['activity_logs.id' => (int)$id]);
+
+        if ($log) {
+            $log['username'] = $log['user_name'] ?? ($log['user_id'] ? (string)$log['user_id'] : '(system)');
+
+            // Try to detect JSON descriptions for nicer display
+            $desc = (string)($log['description'] ?? '');
+            $trim = ltrim($desc);
+            if ($trim !== '' && ($trim[0] === '{' || $trim[0] === '[')) {
+                $json = json_decode($desc, true);
+                if (is_array($json)) {
+                    $log['description_json'] = json_encode($json, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+                }
+            }
+        }
+        
+        if (!$log) {
+            http_response_code(404);
+            echo 'Log not found';
+            exit;
+        }
+
+        $pageTitle = 'Playground Log #' . $log['id'];
         $db = $this->db;
-        include ROOT_PATH . '/src/Views/playground/log_detail.php';
+        include ROOT_PATH . '/src/Views/playground/logs/show.php';
         exit;
     }
 }
