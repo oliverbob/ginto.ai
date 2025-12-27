@@ -481,4 +481,152 @@ class MasterclassController
             'currentPlan' => $currentPlan,
         ]);
     }
+
+    /**
+     * Masterclass detail page
+     * GET /masterclass/{slug}
+     */
+    public function detail(string $slug): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? (int)0;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $masterclass = $this->getMasterclassBySlug($slug);
+        
+        if (!$masterclass) {
+            http_response_code(404);
+            echo "Masterclass not found";
+            return;
+        }
+        
+        $lessons = $this->getAccessibleLessons($userId, $masterclass['id']);
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        $enrollment = $isLoggedIn ? $this->getUserEnrollment($userId, $masterclass['id']) : null;
+        $progressDetails = $isLoggedIn ? $this->getMasterclassProgressDetails($userId, $masterclass['id']) : [];
+        $stats = $this->getMasterclassStats($masterclass['id']);
+        
+        \Ginto\Core\View::view('masterclass/detail', [
+            'title' => $masterclass['title'] . ' | Ginto Masterclasses',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'masterclass' => $masterclass,
+            'lessons' => $lessons,
+            'userPlan' => $userPlan,
+            'enrollment' => $enrollment,
+            'progressDetails' => $progressDetails,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Masterclass lesson page
+     * GET /masterclass/{masterclassSlug}/lesson/{lessonSlug}
+     */
+    public function lesson(string $masterclassSlug, string $lessonSlug): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? (int)0;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $masterclass = $this->getMasterclassBySlug($masterclassSlug);
+        
+        if (!$masterclass) {
+            http_response_code(404);
+            echo "Masterclass not found";
+            return;
+        }
+        
+        $lesson = $this->getLessonBySlug($masterclass['id'], $lessonSlug);
+        if (!$lesson) {
+            http_response_code(404);
+            echo "Lesson not found";
+            return;
+        }
+        
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        // Check access
+        if (!$this->canAccessLesson($userId, $lesson, $userPlan)) {
+            // Redirect to upgrade page
+            \Ginto\Core\View::view('masterclass/upgrade', [
+                'title' => 'Upgrade Required | Ginto Masterclasses',
+                'isLoggedIn' => $isLoggedIn,
+                'masterclass' => $masterclass,
+                'lesson' => $lesson,
+                'userPlan' => $userPlan,
+            ]);
+            return;
+        }
+        
+        // Enroll user if logged in
+        if ($isLoggedIn) {
+            $this->enrollUser($userId, $masterclass['id']);
+            $this->updateLessonProgress($userId, $lesson['id'], $masterclass['id'], 'in_progress');
+        }
+        
+        $allLessons = $this->getAccessibleLessons($userId, $masterclass['id']);
+        $nextLesson = $this->getNextLesson($masterclass['id'], $lesson['lesson_order']);
+        $prevLesson = $this->getPreviousLesson($masterclass['id'], $lesson['lesson_order']);
+        
+        // Calculate current lesson index (0-based)
+        $currentIndex = 0;
+        foreach ($allLessons as $i => $l) {
+            if ($l['id'] == $lesson['id']) {
+                $currentIndex = $i;
+                break;
+            }
+        }
+        
+        \Ginto\Core\View::view('masterclass/lesson', [
+            'title' => $lesson['title'] . ' | ' . $masterclass['title'],
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'masterclass' => $masterclass,
+            'lesson' => $lesson,
+            'allLessons' => $allLessons,
+            'currentIndex' => $currentIndex,
+            'nextLesson' => $nextLesson,
+            'prevLesson' => $prevLesson,
+            'userPlan' => $userPlan,
+        ]);
+    }
+
+    /**
+     * Mark masterclass lesson as complete API
+     * POST /api/masterclass/complete-lesson
+     */
+    public function completeLesson(): void
+    {
+        header('Content-Type: application/json');
+        
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Not logged in']);
+            return;
+        }
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $lessonId = $data['lesson_id'] ?? 0;
+        $masterclassId = $data['masterclass_id'] ?? 0;
+        
+        $result = $this->updateLessonProgress($_SESSION['user_id'], $lessonId, $masterclassId, 'completed');
+        
+        echo json_encode(['success' => $result]);
+    }
 }

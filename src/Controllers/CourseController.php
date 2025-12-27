@@ -641,4 +641,144 @@ class CourseController
             'currentPlan' => $currentPlan,
         ]);
     }
+
+    /**
+     * Course detail page
+     * GET /courses/{slug}
+     */
+    public function detail(string $slug): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? (int)0;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $course = $this->getCourseBySlug($slug);
+        
+        if (!$course) {
+            http_response_code(404);
+            echo "Course not found";
+            return;
+        }
+        
+        $lessons = $this->getAccessibleLessons($userId, $course['id']);
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        $enrollment = $isLoggedIn ? $this->getUserEnrollment($userId, $course['id']) : null;
+        $progressDetails = $isLoggedIn ? $this->getCourseProgressDetails($userId, $course['id']) : [];
+        $stats = $this->getCourseStats($course['id']);
+        
+        \Ginto\Core\View::view('courses/detail', [
+            'title' => $course['title'] . ' | Ginto Courses',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'course' => $course,
+            'lessons' => $lessons,
+            'userPlan' => $userPlan,
+            'enrollment' => $enrollment,
+            'progressDetails' => $progressDetails,
+            'stats' => $stats,
+        ]);
+    }
+
+    /**
+     * Lesson page
+     * GET /courses/{courseSlug}/lesson/{lessonSlug}
+     */
+    public function lesson(string $courseSlug, string $lessonSlug): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? (int)0;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $course = $this->getCourseBySlug($courseSlug);
+        
+        if (!$course) {
+            http_response_code(404);
+            echo "Course not found";
+            return;
+        }
+        
+        $lesson = $this->getLessonBySlug($course['id'], $lessonSlug);
+        if (!$lesson) {
+            http_response_code(404);
+            echo "Lesson not found";
+            return;
+        }
+        
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        // Check access
+        if (!$this->canAccessLesson($userId, $lesson, $userPlan)) {
+            // Redirect to upgrade page or show access denied
+            \Ginto\Core\View::view('courses/upgrade', [
+                'title' => 'Upgrade Required | Ginto Courses',
+                'isLoggedIn' => $isLoggedIn,
+                'course' => $course,
+                'lesson' => $lesson,
+                'userPlan' => $userPlan,
+                'plans' => $this->getSubscriptionPlans('courses'),
+            ]);
+            return;
+        }
+        
+        // Enroll user if logged in
+        if ($isLoggedIn) {
+            $this->enrollUser($userId, $course['id']);
+            $this->updateLessonProgress($userId, $lesson['id'], $course['id'], 'in_progress');
+            $this->updateStudyStreak($userId);
+        }
+        
+        $allLessons = $this->getAccessibleLessons($userId, $course['id']);
+        $nextLesson = $this->getNextLesson($course['id'], $lesson['lesson_order']);
+        $prevLesson = $this->getPreviousLesson($course['id'], $lesson['lesson_order']);
+        
+        \Ginto\Core\View::view('courses/lesson', [
+            'title' => $lesson['title'] . ' | ' . $course['title'],
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'course' => $course,
+            'lesson' => $lesson,
+            'allLessons' => $allLessons,
+            'nextLesson' => $nextLesson,
+            'prevLesson' => $prevLesson,
+            'userPlan' => $userPlan,
+        ]);
+    }
+
+    /**
+     * Mark lesson as complete API
+     * POST /api/courses/complete-lesson
+     */
+    public function completeLesson(): void
+    {
+        header('Content-Type: application/json');
+        
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        if (!isset($_SESSION['user_id'])) {
+            echo json_encode(['success' => false, 'error' => 'Not logged in']);
+            return;
+        }
+        
+        $data = json_decode(file_get_contents('php://input'), true);
+        $lessonId = $data['lesson_id'] ?? 0;
+        $courseId = $data['course_id'] ?? 0;
+        
+        $result = $this->updateLessonProgress($_SESSION['user_id'], $lessonId, $courseId, 'completed');
+        
+        echo json_encode(['success' => $result]);
+    }
 }

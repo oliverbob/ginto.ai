@@ -997,4 +997,332 @@ class PaymentController
         ]);
         exit;
     }
+
+    /**
+     * Create PayPal order for registration
+     * POST /api/register/paypal-order
+     */
+    public function paypalOrder(): void
+    {
+        header('Content-Type: application/json');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit;
+        }
+        
+        // Origin validation for CSRF protection
+        $appUrl = $_ENV['APP_URL'] ?? 'https://ginto.app';
+        $allowedOrigins = [$appUrl, rtrim($appUrl, '/'), 'http://localhost', 'http://localhost:8000', 'http://127.0.0.1:8000'];
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $referer = parse_url($_SERVER['HTTP_REFERER'] ?? '', PHP_URL_HOST);
+        $appHost = parse_url($appUrl, PHP_URL_HOST);
+        
+        $originAllowed = in_array($origin, $allowedOrigins) || $origin === '';
+        $refererAllowed = $referer === $appHost || $referer === 'localhost' || $referer === '127.0.0.1' || empty($referer);
+        
+        if (!$originAllowed && !$refererAllowed) {
+            error_log("CSRF blocked: origin=$origin, referer=$referer, allowed_host=$appHost");
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden - invalid origin']);
+            exit;
+        }
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $levelId = $input['level_id'] ?? null;
+            $amount = $input['amount'] ?? null;
+            $currency = $input['currency'] ?? 'PHP';
+            
+            if (!$levelId || !$amount) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing level_id or amount']);
+                exit;
+            }
+            
+            // Validate level exists
+            $level = $this->db->get('tier_plans', '*', ['id' => $levelId]);
+            if (!$level) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid membership level']);
+                exit;
+            }
+            
+            // Validate amount matches level price
+            $expectedAmount = floatval($level['price']);
+            if (abs(floatval($amount) - $expectedAmount) > 0.01) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Amount mismatch']);
+                exit;
+            }
+            
+            // Get PayPal credentials based on environment
+            $paypalEnv = $_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox';
+            if ($paypalEnv === 'sandbox') {
+                $clientId = $_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? '';
+                $clientSecret = $_ENV['PAYPAL_CLIENT_SECRET_SANDBOX'] ?? '';
+                $baseUrl = 'https://api-m.sandbox.paypal.com';
+            } else {
+                $clientId = $_ENV['PAYPAL_CLIENT_ID'] ?? '';
+                $clientSecret = $_ENV['PAYPAL_CLIENT_SECRET'] ?? '';
+                $baseUrl = 'https://api-m.paypal.com';
+            }
+            
+            if (!$clientId || !$clientSecret) {
+                throw new \Exception('PayPal credentials not configured');
+            }
+            
+            // Get access token
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+            curl_setopt($ch, CURLOPT_USERPWD, $clientId . ':' . $clientSecret);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+            
+            $tokenResponse = curl_exec($ch);
+            $tokenData = json_decode($tokenResponse, true);
+            curl_close($ch);
+            
+            if (!isset($tokenData['access_token'])) {
+                throw new \Exception('Failed to get PayPal access token');
+            }
+            
+            $accessToken = $tokenData['access_token'];
+            
+            // Create PayPal order
+            $orderData = [
+                'intent' => 'CAPTURE',
+                'purchase_units' => [
+                    [
+                        'reference_id' => 'REG-' . $levelId . '-' . time(),
+                        'description' => $level['name'] . ' Membership',
+                        'amount' => [
+                            'currency_code' => $currency,
+                            'value' => number_format($amount, 2, '.', '')
+                        ]
+                    ]
+                ],
+                'application_context' => [
+                    'brand_name' => 'Ginto',
+                    'landing_page' => 'NO_PREFERENCE',
+                    'user_action' => 'PAY_NOW',
+                    'return_url' => ($_ENV['APP_URL'] ?? 'http://localhost') . '/register/paypal-success',
+                    'cancel_url' => ($_ENV['APP_URL'] ?? 'http://localhost') . '/register'
+                ]
+            ];
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v2/checkout/orders');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($orderData));
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $accessToken,
+                'PayPal-Request-Id: ' . uniqid('order-', true)
+            ]);
+            
+            $orderResponse = curl_exec($ch);
+            $order = json_decode($orderResponse, true);
+            curl_close($ch);
+            
+            if (!isset($order['id'])) {
+                error_log('PayPal order creation failed: ' . $orderResponse);
+                throw new \Exception('Failed to create PayPal order');
+            }
+            
+            error_log("PayPal order created: " . $order['id'] . " for level $levelId, amount $amount $currency");
+            
+            echo json_encode([
+                'id' => $order['id'],
+                'status' => $order['status']
+            ]);
+            
+        } catch (\Throwable $e) {
+            error_log('PayPal order creation error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to create order', 'details' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /**
+     * Capture PayPal payment for registration
+     * POST /api/register/paypal-capture
+     */
+    public function paypalCapture(): void
+    {
+        header('Content-Type: application/json');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit;
+        }
+        
+        // Origin validation for CSRF protection
+        $appUrl = $_ENV['APP_URL'] ?? 'https://ginto.app';
+        $prodUrl = $_ENV['PRODUCTION_URL'] ?? 'https://ginto.ai';
+        $allowedOrigins = [
+            $appUrl, 
+            rtrim($appUrl, '/'),
+            $prodUrl,
+            rtrim($prodUrl, '/'),
+            'https://ginto.ai',
+            'https://www.ginto.ai',
+            'http://localhost', 
+            'http://localhost:8000', 
+            'http://127.0.0.1:8000'
+        ];
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $referer = parse_url($_SERVER['HTTP_REFERER'] ?? '', PHP_URL_HOST);
+        $appHost = parse_url($appUrl, PHP_URL_HOST);
+        $prodHost = parse_url($prodUrl, PHP_URL_HOST);
+        
+        $originAllowed = in_array($origin, $allowedOrigins) || $origin === '';
+        $refererAllowed = $referer === $appHost || $referer === $prodHost || $referer === 'ginto.ai' || $referer === 'www.ginto.ai' || $referer === 'localhost' || $referer === '127.0.0.1' || empty($referer);
+        
+        if (!$originAllowed && !$refererAllowed) {
+            error_log("CSRF blocked: origin=$origin, referer=$referer, allowed_host=$appHost");
+            http_response_code(403);
+            echo json_encode(['error' => 'Forbidden - invalid origin']);
+            exit;
+        }
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $orderId = $input['order_id'] ?? null;
+            $levelId = $input['level_id'] ?? null;
+            $registrationData = $input['registration_data'] ?? null;
+            
+            if (!$orderId) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing order_id']);
+                exit;
+            }
+            
+            // Get PayPal credentials based on environment
+            $paypalEnv = $_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox';
+            if ($paypalEnv === 'sandbox') {
+                $clientId = $_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? '';
+                $clientSecret = $_ENV['PAYPAL_CLIENT_SECRET_SANDBOX'] ?? '';
+                $baseUrl = 'https://api-m.sandbox.paypal.com';
+            } else {
+                $clientId = $_ENV['PAYPAL_CLIENT_ID'] ?? '';
+                $clientSecret = $_ENV['PAYPAL_CLIENT_SECRET'] ?? '';
+                $baseUrl = 'https://api-m.paypal.com';
+            }
+            
+            if (!$clientId || !$clientSecret) {
+                throw new \Exception('PayPal credentials not configured');
+            }
+            
+            // Get access token
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+            curl_setopt($ch, CURLOPT_USERPWD, $clientId . ':' . $clientSecret);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
+            
+            $tokenResponse = curl_exec($ch);
+            $tokenData = json_decode($tokenResponse, true);
+            curl_close($ch);
+            
+            if (!isset($tokenData['access_token'])) {
+                throw new \Exception('Failed to get PayPal access token');
+            }
+            
+            $accessToken = $tokenData['access_token'];
+            
+            // Capture the order
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v2/checkout/orders/' . $orderId . '/capture');
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_POST, true);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, '{}');
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $accessToken
+            ]);
+            
+            $captureResponse = curl_exec($ch);
+            $capture = json_decode($captureResponse, true);
+            curl_close($ch);
+            
+            // Handle different PayPal statuses
+            $paypalStatus = $capture['status'] ?? 'UNKNOWN';
+            $captureDetails = $capture['purchase_units'][0]['payments']['captures'][0] ?? [];
+            $paymentId = $captureDetails['id'] ?? $orderId;
+            $amount = $captureDetails['amount']['value'] ?? '0.00';
+            $currency = $captureDetails['amount']['currency_code'] ?? 'PHP';
+            
+            // Map PayPal status to our internal status
+            $internalStatus = 'pending';
+            $statusMessage = '';
+            
+            switch ($paypalStatus) {
+                case 'COMPLETED':
+                    $internalStatus = 'completed';
+                    $statusMessage = 'Payment completed successfully';
+                    break;
+                case 'PENDING':
+                case 'APPROVED':
+                    $internalStatus = 'pending';
+                    $statusMessage = 'Payment is pending review by PayPal. This may take 24-48 hours.';
+                    break;
+                case 'VOIDED':
+                case 'DECLINED':
+                    $internalStatus = 'failed';
+                    $statusMessage = 'Payment was declined or voided';
+                    error_log('PayPal payment failed: ' . $captureResponse);
+                    throw new \Exception('Payment was declined: ' . ($capture['message'] ?? $paypalStatus));
+                default:
+                    if (!isset($capture['status'])) {
+                        error_log('PayPal capture failed - no status: ' . $captureResponse);
+                        throw new \Exception('Payment capture failed: ' . ($capture['message'] ?? 'Unknown error'));
+                    }
+                    $internalStatus = 'pending';
+                    $statusMessage = 'Payment status: ' . $paypalStatus;
+            }
+            
+            error_log("PayPal payment captured: $paymentId for $amount $currency - Status: $paypalStatus -> $internalStatus");
+            
+            // Store payment in session for registration completion
+            if (session_status() !== PHP_SESSION_ACTIVE) {
+                @session_start();
+            }
+            $_SESSION['paypal_payment'] = [
+                'order_id' => $orderId,
+                'payment_id' => $paymentId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'level_id' => $levelId,
+                'captured_at' => date('Y-m-d H:i:s'),
+                'status' => $internalStatus,
+                'paypal_status' => $paypalStatus
+            ];
+            
+            echo json_encode([
+                'success' => true,
+                'payment_id' => $paymentId,
+                'order_id' => $orderId,
+                'amount' => $amount,
+                'currency' => $currency,
+                'status' => $internalStatus,
+                'paypal_status' => $paypalStatus,
+                'message' => $statusMessage
+            ]);
+            
+        } catch (\Throwable $e) {
+            error_log('PayPal capture error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Failed to capture payment', 'details' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
