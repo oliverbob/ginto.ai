@@ -2430,63 +2430,10 @@ function _chatSendSSE(string $content, $parsedown): void
 // ============================================================================
 // Courses Route - Educational courses listing
 // ============================================================================
-$router->req('/courses', function() use ($db) {
-    $isLoggedIn = !empty($_SESSION['user_id']);
-    $isAdmin = \Ginto\Controllers\UserController::isAdmin();
-    $username = $_SESSION['username'] ?? null;
-    $userId = $_SESSION['user_id'] ?? null;
-    $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
-    
-    $courseController = new \Ginto\Controllers\CourseController($db);
-    $courses = $courseController->getAllCourses();
-    $categories = $courseController->getCategories();
-    $userPlan = $isLoggedIn ? $courseController->getUserPlanName($userId) : 'free';
-    
-    // Handle category filter
-    $categoryFilter = $_GET['category'] ?? null;
-    if ($categoryFilter) {
-        $courses = $courseController->getCoursesByCategory($categoryFilter);
-    }
-    
-    // Handle user learning status filter
-    $statusFilter = $_GET['status'] ?? null;
-    $enrolledCourses = [];
-    if ($isLoggedIn && $statusFilter) {
-        $enrolledCourses = $courseController->getUserEnrolledCourses($userId, $statusFilter);
-    }
-    
-    \Ginto\Core\View::view('courses/courses', [
-        'title' => 'Courses',
-        'isLoggedIn' => $isLoggedIn,
-        'isAdmin' => $isAdmin,
-        'username' => $username,
-        'userId' => $userId,
-        'userFullname' => $userFullname,
-        'courses' => $courses,
-        'categories' => $categories,
-        'userPlan' => $userPlan,
-        'categoryFilter' => $categoryFilter,
-        'statusFilter' => $statusFilter,
-        'enrolledCourses' => $enrolledCourses,
-    ]);
-});
+$router->req('/courses', 'CourseController@index');
 
 // Pricing Page (must be before /courses/{slug} to avoid slug matching "pricing")
-$router->req('/courses/pricing', function() use ($db) {
-    $isLoggedIn = !empty($_SESSION['user_id']);
-    $userId = $_SESSION['user_id'] ?? 0;
-    
-    $courseController = new \Ginto\Controllers\CourseController($db);
-    $plans = $courseController->getSubscriptionPlans('courses');
-    $currentPlan = $isLoggedIn ? $courseController->getUserPlanName($userId) : 'free';
-    
-    \Ginto\Core\View::view('courses/pricing', [
-        'title' => 'Pricing | Ginto Courses',
-        'isLoggedIn' => $isLoggedIn,
-        'plans' => $plans,
-        'currentPlan' => $currentPlan,
-    ]);
-});
+$router->req('/courses/pricing', 'CourseController@pricing');
 
 // Upgrade Page (standalone upgrade/pricing page)
 $router->req('/upgrade', function() use ($db) {

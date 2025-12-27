@@ -574,4 +574,71 @@ class CourseController
         ");
         $stmt->execute([$newStreak, $longestStreak, $today, $userId]);
     }
+
+    /**
+     * Courses listing page
+     */
+    public function index(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = \Ginto\Controllers\UserController::isAdmin();
+        $username = $_SESSION['username'] ?? null;
+        $userId = $_SESSION['user_id'] ?? null;
+        $userFullname = $_SESSION['fullname'] ?? $_SESSION['username'] ?? null;
+        
+        $courses = $this->getAllCourses();
+        $categories = $this->getCategories();
+        $userPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        // Handle category filter
+        $categoryFilter = $_GET['category'] ?? null;
+        if ($categoryFilter) {
+            $courses = $this->getCoursesByCategory($categoryFilter);
+        }
+        
+        // Handle user learning status filter
+        $statusFilter = $_GET['status'] ?? null;
+        $enrolledCourses = [];
+        if ($isLoggedIn && $statusFilter) {
+            $enrolledCourses = $this->getUserEnrolledCourses($userId, $statusFilter);
+        }
+        
+        \Ginto\Core\View::view('courses/courses', [
+            'title' => 'Courses',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'username' => $username,
+            'userId' => $userId,
+            'userFullname' => $userFullname,
+            'courses' => $courses,
+            'categories' => $categories,
+            'userPlan' => $userPlan,
+            'categoryFilter' => $categoryFilter,
+            'statusFilter' => $statusFilter,
+            'enrolledCourses' => $enrolledCourses,
+        ]);
+    }
+
+    /**
+     * Pricing page for courses
+     */
+    public function pricing(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $userId = $_SESSION['user_id'] ?? 0;
+        
+        $plans = $this->getSubscriptionPlans('courses');
+        $currentPlan = $isLoggedIn ? $this->getUserPlanName($userId) : 'free';
+        
+        \Ginto\Core\View::view('courses/pricing', [
+            'title' => 'Pricing | Ginto Courses',
+            'isLoggedIn' => $isLoggedIn,
+            'plans' => $plans,
+            'currentPlan' => $currentPlan,
+        ]);
+    }
 }
