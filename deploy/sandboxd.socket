@@ -1,0 +1,12 @@
+[Unit]
+Description=Ginto Sandbox Daemon Socket
+
+[Socket]
+ListenStream=/run/sandboxd.sock
+Accept=yes
+SocketMode=0660
+SocketUser=root
+SocketGroup=ginto
+
+[Install]
+WantedBy=sockets.target

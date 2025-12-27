@@ -1,0 +1,179 @@
+/* Editor left-sidebar extension point styles */
+:root { --editor-sidebar-bg: rgba(0,0,0,0.03); --editor-sidebar-border: rgba(0,0,0,0.06); }
+:root.dark { --editor-sidebar-bg: rgba(255,255,255,0.02); --editor-sidebar-border: rgba(255,255,255,0.04); }
+
+.editor-inner { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; }
+.editor-left-sidebar { flex: 0 0 220px; /* default width */ background: var(--editor-sidebar-bg); border-right: 1px solid var(--editor-sidebar-border); padding: 8px; box-sizing: border-box; overflow: auto; }
+.editor-left-sidebar .placeholder { display:flex; align-items:center; justify-content:center; height:100%; color:rgba(120,120,120,0.7); font-size:13px; }
+.editor-workspace { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; height:100%; position: relative; overflow: hidden; }
+
+/* Right-side pane / sidebar for editor workspace — empty by default */
+.editor-right-pane { flex: 0 0 320px; min-width: 220px; max-width: 40%; border-left: 1px solid var(--editor-sidebar-border); background: rgba(0,0,0,0.02); padding: 12px; box-sizing: border-box; overflow: auto; }
+@media (max-width: 980px) { .editor-right-pane { display: none; } }
+/* collapsed small state for right pane */
+.editor-right-pane.collapsed { width: 40px !important; min-width: 40px !important; max-width: 40px !important; flex: 0 0 40px !important; overflow: hidden; }
+
+/* Resizer handle between sidebar and workspace */
+.editor-resizer {
+  width: 1px; /* thin divider by default */
+  cursor: col-resize;
+  -webkit-user-select: none; -moz-user-select: none; user-select: none;
+  background: transparent; /* subtle indicator drawn via pseudo */
+  display: inline-block; position: relative; z-index: 30; flex: 0 0 1px; height: 100%;
+}
+/* Ensure the resizer stays above preview overlay so it remains draggable */
+.editor-resizer { z-index: 110000 !important; }
+.editor-resizer::before {
+  /* thin visual divider line centered on the resizer */
+  content: '';
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 1px; height: 100%; border-radius: 1px; background: var(--vscode-border); opacity: 0.6;
+}
+
+/* Invisible but larger hit area / hover surface so the user can easily hover and drag
+   while keeping the visual divider thin. On hover we reveal the fuller slider visuals. */
+.editor-resizer::after {
+  content: '';
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 28px; height: 100%; border-radius: 2px; background: transparent; pointer-events: auto; opacity: 0;
+}
+.editor-resizer:hover::after { opacity: 1; background: rgba(139,92,246,0.06); }
+.editor-resizer:hover::before { opacity: 0.95; width: 2px; height: 40px; background: #8b5cf6; }
+
+/* Small visual bar for easier vertical dragging on mobile and touch devices */
+.editor-resizer .grip { position: absolute; left: 50%; transform: translateX(-50%); top: 12px; width: 2px; height: calc(100% - 24px); background: transparent; }
+
+/* Right resizer specific styling */
+.editor-resizer-right { width: 1px; flex: 0 0 1px; }
+.editor-resizer-right::before { left: 50%; transform: translate(-50%,-50%); width: 1px; height: 100%; opacity: 0.6; background: var(--vscode-border); border-radius: 1px; }
+.editor-resizer-right::after { content: ''; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 28px; height: 100%; border-radius: 2px; background: transparent; pointer-events: auto; opacity: 0; }
+.editor-resizer-right:hover::after { opacity: 1; background: rgba(139,92,246,0.06); }
+.editor-resizer-right:hover::before, .editor-resizer-right.dragging::before { opacity: 0.95; width: 2px; height: 40px; background: #8b5cf6; }
+.editor-right-pane.resizing { transition: none !important; }
+
+/* Resizer drag state */
+.editor-left-sidebar.resizing { transition: none !important; }
+.editor-resizer.resizing::before { background: #8b5cf6; opacity: 0.75; }
+
+/* When collapsed, make sidebar small and show a slim visual */
+.editor-left-sidebar.collapsed { width: 40px !important; min-width: 40px !important; max-width: 40px !important; flex: 0 0 40px !important; overflow: visible; }
+.editor-left-sidebar.collapsed .placeholder { display: none; }
+
+/* Make sidebar + resizer remain inline in editor-inner */
+.editor-inner { display:flex; align-items:stretch; height:100%; }
+
+/* Small screens: hide sidebar (can be toggled by extension scripts) */
+@media (max-width: 900px) {
+  .editor-left-sidebar { display: none; position: absolute; z-index: 40; height: 100%; left: 0; top: 0; }
+  .editor-left-sidebar.open { display: block; box-shadow: 0 4px 16px rgba(0,0,0,0.12);} 
+}
+
+/* Provide a slim toggle handle for small widths when extension wants to expose it */
+.editor-left-sidebar-toggle { position: absolute; left: 220px; top: 12px; width: 28px; height: 28px; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; border-radius:4px; background:transparent; border:1px solid transparent; }
+.editor-left-sidebar-toggle:hover { background: rgba(0,0,0,0.03); }
+
+/* Repo tree styles */
+.repo-tree { font-size:13px; line-height:1.2; color:var(--vscode-foreground); }
+.repo-tree ul { list-style: none; margin: 0; padding-left: 8px; }
+.repo-tree li { padding: 0; display:block; position: relative; }
+.repo-tree .tree-node { display:flex; align-items:center; width:100%; }
+.repo-tree .dir-toggle { background:transparent;border:none;padding:0;margin:0 8px 0 0;cursor:pointer;color:var(--vscode-foreground); font-size:13px; opacity:0.8; width:18px; height:18px; display:inline-flex; align-items:center; justify-content:center }
+.repo-tree .dir-toggle:hover { opacity:1 }
+.repo-tree .dir-toggle .chev { display:inline-block; width:12px; height:12px; transform: rotate(0deg); transition: transform .14s ease; color: inherit; font-size:12px; }
+.repo-tree .dir-toggle .chev { display:inline-block; transform: rotate(0deg); transition: transform .14s ease; transform-origin: 50% 50%; color: var(--vscode-foreground); }
+.repo-tree .dir-toggle.open .chev { transform: rotate(90deg); }
+.repo-tree .dir-toggle[aria-expanded="true"] { opacity:0.95 }
+.repo-tree .dir-name { font-weight:500; color:inherit; display:flex; align-items:center; gap:8px; padding:2px 4px; border-radius:4px; min-height:22px; }
+.repo-tree .dir-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; flex:1 1 auto; min-width:0; }
+.repo-tree .dir-name:hover { background: rgba(0,0,0,0.02); }
+.repo-tree .dir-label { display:inline-block }
+.repo-tree .file-item { cursor:pointer; border-radius:4px; padding: 2px 6px; display:flex; align-items:center; gap:8px; width:100%; box-sizing:border-box; min-height:22px; }
+.repo-tree .file-label { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; flex:1 1 auto; min-width:0; }
+.repo-tree .file-item:hover { background: rgba(0,0,0,0.03); }
+.repo-tree .file-item .meta { font-size:11px; opacity:0.6 }
+.repo-tree .tree-children.hidden { display:none; }
+
+/* --- Hierarchy connectors (subtle lines like VS Code) --- */
+/* Draw a vertical spine for nested lists and a horizontal connector for each child */
+.repo-tree .tree-children {
+  position: relative;
+  margin-left: 6px; /* small indent */
+  padding-left: 12px; /* leave space for connectors */
+  border-left: 1px solid rgba(0,0,0,0.06); /* light vertical spine in light theme */
+}
+.dark .repo-tree .tree-children { border-left-color: rgba(255,255,255,0.06); }
+
+/* Horizontal connector from the spine to each node */
+.repo-tree .tree-children > li > .tree-node::before {
+  content: '';
+  position: absolute;
+  left: -12px; /* from node to spine */
+  top: 50%;
+  width: 10px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  transform: translateY(-50%);
+  opacity: 0.7;
+}
+.dark .repo-tree .tree-children > li > .tree-node::before { border-top-color: rgba(255,255,255,0.06); }
+
+/* If a node contains further children, make the connector a little bolder */
+.repo-tree .tree-node.has-children::before { opacity: 0.9; }
+
+/* Reduce vertical gaps between nested levels */
+.repo-tree ul { margin-top: 4px; margin-bottom: 4px; }
+
+.repo-preview { margin-top: 8px; padding: 8px; border-radius: 6px; background: rgba(0,0,0,0.02); color: var(--vscode-foreground); font-size:13px }
+
+/* When preview renders inside the editor workspace make sure it is
+   constrained to the available width and doesn't overflow into the file
+   panel. Use box-sizing + break-word to keep content inside the editor body. */
+.editor-workspace > .repo-preview {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere; /* allow long tokens/strings to wrap */
+  overflow: auto; /* avoid overflowing editor area */
+  margin: 8px 0; /* separate from header / editor */
+  color: var(--vscode-foreground);
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+  border: 1px solid rgba(0,0,0,0.06);
+  display: none; /* hide inline preview by default; JS will show it for non-editable files */
+}
+.repo-tree .file-item.selected { background: rgba(50,150,250,0.08); }
+.repo-tree .dir-name.selected { background: transparent; border-radius: 4px; }
+/* Underline style for selected directory labels (subtle, theme-aware) */
+.repo-tree .dir-name.selected .dir-label {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-decoration-color: rgba(65,150,255,0.18);
+  text-underline-offset: 4px;
+}
+.repo-tree .file-item .file-ico { width:18px; display:inline-flex; align-items:center; justify-content:center; margin-right:2px; opacity:0.85 }
+.repo-tree i.file-ico { font-size:14px; width:18px; display:inline-flex; align-items:center; justify-content:center; margin-right:8px; }
+
+/* File type colors (small set) */
+.repo-tree .ft-php { color: #6e5494; } /* purple-ish */
+.repo-tree .ft-js { color: #f0db4f; } /* JS yellow */
+.repo-tree .ft-sql { color: #DB5D16; } /* orange-ish */
+.repo-tree .ft-env { color: #9CA3AF; }
+.repo-tree .ft-installed { color: #3b82f6; }
+.repo-tree .ft-htaccess { color: #f97316; }
+.repo-tree .ft-yaml { color: #00a8f3; }
+.repo-tree .ft-lock { color: #9f7aea; }
+.repo-tree .ft-csv { color: #4caf50; }
+.repo-tree .ft-xml { color: #ffb86b; }
+.repo-tree .ft-py { color: #3572A5; }
+.repo-tree .ft-rb { color: #CC342D; }
+.repo-tree .ft-go { color: #00ADD8; }
+.repo-tree .ft-java { color: #b07219; }
+.repo-tree .ft-c { color: #555555; }
+.repo-tree .ft-sh { color: #8fbcbb; }
+.repo-tree .ft-json { color: #4DB6AC; }
+.repo-tree .ft-md { color: #6aa1f2; }
+.repo-tree .ft-css { color: #2965f1; }
+.repo-tree .ft-html { color: #e44d26; }
+.repo-tree .ft-image { color: #4caf50; }
+.repo-tree .ft-default { color: rgba(120,120,120,0.8); }
+.repo-preview .path { font-weight:600; font-size:12px; margin-bottom:6px }
+

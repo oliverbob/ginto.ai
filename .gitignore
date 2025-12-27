@@ -1,0 +1,21 @@
+# Ignore vendor dependencies — we keep these out of git and install with composer.
+vendor/
+
+# Common extras to ignore (optional)
+.idea/
+.vscode/
+node_modules/
+vendor/
+.DS_Store
+
+# Local environment files (do not commit secrets)
+.env
+.installed
+
+# Ignore nested git repos (MCP tools)
+tools/groq-mcp/
+
+# Storage directory (now at ../storage, but ignore any local storage/ just in case)
+storage/
+
+# Log files are stored outside repo at ../storage/logs
