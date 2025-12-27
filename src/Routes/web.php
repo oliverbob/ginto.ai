@@ -7062,7 +7062,7 @@ $router->req('/masterclass', function() use ($db) {
 });
 
 // Masterclass Pricing Page (must be before /masterclass/{slug} to avoid slug matching "pricing")
-req($router, '/masterclass/pricing', function() use ($db) {
+$router->req('/masterclass/pricing', function() use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $userId = $_SESSION['user_id'] ?? 0;
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
@@ -7086,7 +7086,7 @@ req($router, '/masterclass/pricing', function() use ($db) {
 });
 
 // Masterclass Detail Page
-req($router, '/masterclass/{slug}', function($slug) use ($db) {
+$router->req('/masterclass/{slug}', function($slug) use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
@@ -7125,7 +7125,7 @@ req($router, '/masterclass/{slug}', function($slug) use ($db) {
 });
 
 // Masterclass Lesson Page
-req($router, '/masterclass/{masterclassSlug}/lesson/{lessonSlug}', function($masterclassSlug, $lessonSlug) use ($db) {
+$router->req('/masterclass/{masterclassSlug}/lesson/{lessonSlug}', function($masterclassSlug, $lessonSlug) use ($db) {
     $isLoggedIn = !empty($_SESSION['user_id']);
     $isAdmin = \Ginto\Controllers\UserController::isAdmin();
     $username = $_SESSION['username'] ?? null;
@@ -7200,7 +7200,7 @@ req($router, '/masterclass/{masterclassSlug}/lesson/{lessonSlug}', function($mas
 });
 
 // Mark masterclass lesson complete API
-req($router, '/api/masterclass/complete-lesson', function() use ($db) {
+$router->req('/api/masterclass/complete-lesson', function() use ($db) {
     header('Content-Type: application/json');
     
     if (!isset($_SESSION['user_id'])) {
@@ -7221,7 +7221,7 @@ req($router, '/api/masterclass/complete-lesson', function() use ($db) {
 // ============================================================================
 // Web Search Test Route - Isolated test for GPT-OSS browser_search
 // ============================================================================
-req($router, '/websearch', function() {
+$router->req('/websearch', function() {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         \Ginto\Core\View::view('chat/websearch', ['title' => 'Web Search Test']);
         exit;
@@ -7437,7 +7437,7 @@ function _chatStreamResponse(string $content): void
 }
 
 // MCP tool call endpoint - lightweight session-based tool execution for chat UI (admin only)
-req($router, '/mcp/call', function() {
+$router->req('/mcp/call', function() {
     if (!headers_sent()) header('Content-Type: application/json; charset=utf-8');
     
     // Admin check - require login and admin role
@@ -7481,7 +7481,7 @@ req($router, '/mcp/call', function() {
 });
 
 // Lightweight MCP probe endpoint for client UI to check local MCP availability (admin only).
-req($router, '/mcp/probe', function() {
+$router->req('/mcp/probe', function() {
     header('Content-Type: application/json; charset=utf-8');
     
     // Admin check - require login and admin role
@@ -7527,7 +7527,7 @@ req($router, '/mcp/probe', function() {
 });
 
 // Debug endpoint to inspect LLM env visibility to PHP (admin-protected)
-req($router, '/debug/llm', function() {
+$router->req('/debug/llm', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin');
@@ -7597,7 +7597,7 @@ req($router, '/debug/llm', function() {
 });
 
 // Admin API: Get available models for all configured providers (including Ollama)
-req($router, '/api/models', function() {
+$router->req('/api/models', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     
@@ -7723,7 +7723,7 @@ req($router, '/api/models', function() {
 });
 
 // Admin API: Set active provider and model for the session
-req($router, '/api/models/set', function() {
+$router->req('/api/models/set', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     
@@ -7777,7 +7777,7 @@ req($router, '/api/models/set', function() {
 
 // Standard MCP chat endpoint: calls the local MCP server's `chat_completion` tool (admin only).
 // Returns JSON: { success: bool, reply: string, raw: mixed }
-req($router, '/mcp/chat', function() {
+$router->req('/mcp/chat', function() {
     header('Content-Type: application/json; charset=utf-8');
     
     // Admin check - require login and admin role
@@ -7887,7 +7887,7 @@ req($router, '/mcp/chat', function() {
 
 // Admin-protected in-process MCP invoke endpoint. Accepts JSON body:
 // { "tool": "namespace/name", "args": { ... } }
-req($router, '/mcp/invoke', function() {
+$router->req('/mcp/invoke', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin');
@@ -7929,7 +7929,7 @@ req($router, '/mcp/invoke', function() {
 });
 
 // Dev-friendly discovery endpoint: run local discovery script and return tool schemas (admin only).
-req($router, '/mcp/discover', function() {
+$router->req('/mcp/discover', function() {
     header('Content-Type: application/json; charset=utf-8');
     
     // Admin check - require login and admin role
@@ -8030,7 +8030,7 @@ req($router, '/mcp/discover', function() {
 });
 
 // Unified MCP discovery endpoint: returns normalized discovery across sources (admin only)
-req($router, '/mcp/unified', function() {
+$router->req('/mcp/unified', function() {
     header('Content-Type: application/json; charset=utf-8');
     if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
     
@@ -8072,7 +8072,7 @@ req($router, '/mcp/unified', function() {
 
 // Stream Groq TTS audio: POST 'text' or raw body. Streams audio/mpeg bytes.
 // Accessible to all users (including guests) for the chat experience
-req($router, '/audio/tts', function() {
+$router->req('/audio/tts', function() {
     if (session_status() !== PHP_SESSION_ACTIVE) session_start();
     
     @ini_set('zlib.output_compression', false);
@@ -8280,7 +8280,7 @@ req($router, '/audio/tts', function() {
 });
 
 // Speech-to-text: accept a multipart file upload 'file' and forward to Groq
-req($router, '/audio/stt', function() {
+$router->req('/audio/stt', function() {
     // CSRF and session protection
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (session_status() !== PHP_SESSION_ACTIVE) session_start();
@@ -8640,7 +8640,7 @@ req($router, '/audio/stt', function() {
 // =====================================================
 
 // Playground main route (accessible to both users and admins)
-req($router, '/playground', function() use ($db) {
+$router->req('/playground', function() use ($db) {
     // Require login
     if (empty($_SESSION['user_id'])) {
         header('Location: /login?redirect=/playground');
@@ -8700,7 +8700,7 @@ req($router, '/playground', function() use ($db) {
 // so it doesn't shadow those routes.
 
 // Playground admin-style logs (exposed under /playground/logs) — admin-only
-req($router, '/playground/logs', function() use ($db) {
+$router->req('/playground/logs', function() use ($db) {
     // require login
     if (empty($_SESSION['user_id'])) {
         header('Location: /login?redirect=/playground/logs');
@@ -8810,7 +8810,7 @@ req($router, '/playground/logs', function() use ($db) {
 });
 
 // Admin-only helper to create a sample playground log entry (POST)
-req($router, '/playground/logs/create-sample', function() use ($db) {
+$router->req('/playground/logs/create-sample', function() use ($db) {
     if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['error' => 'Unauthorized']); exit; }
     // admin only
     try { $user = $db->get('users', ['role_id'], ['id' => $_SESSION['user_id']]); } catch (\Throwable $_) { $user = null; }
