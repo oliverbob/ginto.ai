@@ -478,4 +478,84 @@ class ChatController
             exit;
         }
     }
+
+    /**
+     * Main chat page (GET /chat)
+     */
+    public function index(): void
+    {
+        // Check if user is logged in
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        
+        // Check if user is admin using the centralized helper
+        $isAdmin = UserController::isAdmin();
+        
+        // Determine a safe sandbox id (basename only) for the UI if available
+        $sandboxId = null;
+        try {
+            // First try lookup-only so we don't accidentally create a sandbox
+            // for users who already have one or for admin flows.
+            $editorRoot = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db ?? null, $_SESSION ?? null);
+            if (!empty($editorRoot)) {
+                $sandboxId = basename($editorRoot);
+            } else {
+                // If no sandbox exists and the user is not logged in, create
+                // a per-session sandbox so visitors see their sandbox id.
+                $sandboxId = $_SESSION['sandbox_id'] ?? null;
+                if (empty($sandboxId) && empty($_SESSION['user_id'])) {
+                    try {
+                        $createdPath = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db ?? null, $_SESSION ?? null);
+                        if (!empty($createdPath)) {
+                            $sandboxId = basename($createdPath);
+                            // Persist to session for subsequent requests
+                            $_SESSION['sandbox_id'] = $sandboxId;
+                        }
+                    } catch (\Throwable $_e) {
+                        // Fall back to whatever session value might exist
+                        $sandboxId = $_SESSION['sandbox_id'] ?? null;
+                    }
+                }
+            }
+        } catch (\Throwable $_) {
+            $sandboxId = $_SESSION['sandbox_id'] ?? null;
+        }
+
+        // Generate CSRF token for the view (use global helper if available)
+        if (function_exists('generateCsrfToken')) {
+            $csrf_token = generateCsrfToken();
+        } else {
+            if (empty($_SESSION['csrf_token'])) {
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            }
+            $csrf_token = $_SESSION['csrf_token'];
+        }
+
+        // Get payment status for logged in users - always check DB for current status
+        $paymentStatus = null;
+        if ($isLoggedIn) {
+            $paymentStatus = $this->db->get('users', 'payment_status', ['id' => $_SESSION['user_id']]);
+            // Update session to match DB
+            $_SESSION['payment_status'] = $paymentStatus;
+        }
+
+        \Ginto\Core\View::view('chat/chat', [
+            'title' => 'Ginto AI - agentic chat',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'userId' => $isLoggedIn ? $_SESSION['user_id'] : null,
+            'sandboxId' => $sandboxId,
+            'csrf_token' => $csrf_token,
+            'paymentStatus' => $paymentStatus
+        ]);
+        exit;
+    }
+
+    /**
+     * Handle streaming chat request (POST /chat)
+     */
+    public function stream(): void
+    {
+        $handler = new \Ginto\Handlers\ChatStreamHandler($this->db);
+        $handler->handle();
+    }
 }
