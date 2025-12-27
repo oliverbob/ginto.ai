@@ -3087,7 +3087,7 @@ req($router, '/admin/api/lxc/images/{fingerprint}', function($params) use ($db) 
     $fingerprint = $params['fingerprint'] ?? '';
     if (!preg_match('/^[a-f0-9]+$/i', $fingerprint)) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'Invalid fingerprint']);
+        echo json_encode(['success' => false, 'error' => 'Invalid fingerprint', 'received' => $fingerprint, 'length' => strlen($fingerprint)]);
         exit;
     }
     
