@@ -1,12 +1,14 @@
 <?php
-namespace App\Controllers;
+namespace Ginto\Controllers;
 
-use Core\Controller;
-use Dotenv\Dotenv;
+use Ginto\Core\Database;
 use Exception;
 
-class WebhookController extends Controller
+class WebhookController
 {
+    /** @var mixed Database instance */
+    protected $db;
+
     /** @var string PayPal Webhook ID from .env */
     private $paypal_webhook_id;
 
@@ -46,6 +48,10 @@ class WebhookController extends Controller
      */
     public function __construct($db = null)
     {
+        if ($db === null) {
+            $db = Database::getInstance();
+        }
+        $this->db = $db;
 
         // DEBUG: write resolved PayPal env sources for troubleshooting
         $dbg = "WEBHOOK CONSTRUCT: _ENV PAYPAL_CLIENT_ID=" . ($_ENV['PAYPAL_CLIENT_ID'] ?? 'NULL') . " | getenv PAYPAL_CLIENT_ID=" . (getenv('PAYPAL_CLIENT_ID') ?: 'NULL') . PHP_EOL;
@@ -57,9 +63,6 @@ class WebhookController extends Controller
         $this->paypal_client_id = $_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID');
         $this->paypal_client_secret = $_ENV['PAYPAL_CLIENT_SECRET'] ?? getenv('PAYPAL_CLIENT_SECRET');
         $this->paypal_environment = $_ENV['PAYPAL_ENVIRONMENT'] ?? getenv('PAYPAL_ENVIRONMENT');
-
-        // Optional DB injection for controllers that require DB access
-        $this->db = $db ?? null;
 
         // --- VALIDATION BLOCK ---
         // Check if any of the required variables failed to load.

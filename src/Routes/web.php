@@ -575,51 +575,11 @@ $router->req('/user/commissions', 'CommissionsController@index');
 $router->req('/user/network-tree/compact-view', 'UserController@networkTreeCompact');
 
 // Webhook endpoint (PayPal and status view)
-$router->req('/webhook', function() use ($db) {
-    try {
-        // Prefer the dedicated controller if available
-        if (class_exists('\\App\\Controllers\\WebhookController')) {
-            try {
-                $ctrl = new \App\Controllers\WebhookController($db);
-                return $ctrl->webhook();
-            } catch (\Throwable $e) {
-                error_log('WebhookController init failed: ' . $e->getMessage());
-                // If it's a POST (webhook delivery) return 500 so sender can retry.
-                if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-                    http_response_code(500);
-                    echo json_encode(['error' => 'Webhook controller not configured']);
-                    exit;
-                }
-                // For GET or OPTIONS, fall back to the static view to show status/info.
-            }
-        }
+// Webhook endpoint (PayPal)
+$router->req('/webhook', 'WebhookController@webhook');
 
-        // Fallback: include the view file directly
-        $viewPath = ROOT_PATH . '/src/Views/webhook/webhook.php';
-        if (file_exists($viewPath)) { include $viewPath; exit; }
-
-        http_response_code(500); echo 'Webhook handler not available'; exit;
-    } catch (\Throwable $e) {
-        http_response_code(500); error_log('Webhook route error: ' . $e->getMessage()); echo 'Webhook route error'; exit;
-    }
-});
-
-$router->req('/webhook/status', function() use ($db) {
-    try {
-        if (class_exists('\\App\\Controllers\\WebhookController')) {
-            try {
-                $ctrl = new \App\Controllers\WebhookController($db);
-                return $ctrl->saiCodeCheck();
-            } catch (\Throwable $e) {
-                error_log('WebhookController init failed (status): ' . $e->getMessage());
-                // Fall back to view below
-            }
-        }
-        // ...
-    } catch (\Throwable $e) {
-        http_response_code(500); error_log('Webhook status route error: ' . $e->getMessage()); echo 'Webhook status route error'; exit;
-    }
-});
+// Webhook status endpoint
+$router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // User info endpoint - returns user data with CSRF token
 // Usage: GET http://localhost/user
