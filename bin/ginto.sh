@@ -628,9 +628,16 @@ cmd_init() {
         log_success "LXD is already installed"
     fi
     
+    # Ensure LXD daemon is running before checking storage
+    if ! pgrep -x lxd &>/dev/null; then
+        log_info "Starting LXD daemon..."
+        sudo systemctl start lxd 2>/dev/null || sudo lxd --group lxd &>/dev/null &
+        sleep 2
+    fi
+    
     # Check if LXD storage pool exists (proper initialization check)
     local storage_exists=false
-    if $LXC_CMD storage list 2>/dev/null | grep -q "default\|ginto"; then
+    if timeout 5 $LXC_CMD storage list 2>/dev/null | grep -q "default\|ginto"; then
         storage_exists=true
     fi
     
