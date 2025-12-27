@@ -1955,7 +1955,7 @@ $router->req('/user/commissions', function() use ($db) {
 });
 
 // Compact-only user network view (dev route)
-req($router, '/user/network-tree/compact-view', function() use ($db) {
+$router->req('/user/network-tree/compact-view', function() use ($db) {
     // Dev convenience: if no session user, try to auto-login user 'oliverbob'
     if (empty($_SESSION['user_id'])) {
         try {
@@ -1987,7 +1987,7 @@ req($router, '/user/network-tree/compact-view', function() use ($db) {
 });
 
 // Webhook endpoint (PayPal and status view)
-req($router, '/webhook', function() use ($db) {
+$router->req('/webhook', function() use ($db) {
     try {
         // Prefer the dedicated controller if available
         if (class_exists('\\App\\Controllers\\WebhookController')) {
@@ -2016,7 +2016,7 @@ req($router, '/webhook', function() use ($db) {
     }
 });
 
-req($router, '/webhook/status', function() use ($db) {
+$router->req('/webhook/status', function() use ($db) {
     try {
         if (class_exists('\\App\\Controllers\\WebhookController')) {
             try {
@@ -2035,7 +2035,7 @@ req($router, '/webhook/status', function() use ($db) {
 
 // User info endpoint - returns user data with CSRF token
 // Usage: GET http://localhost/user
-req($router, '/user', function() use ($db) {
+$router->req('/user', function() use ($db) {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         http_response_code(405);
         echo json_encode(['error' => 'Method Not Allowed']);
@@ -2051,7 +2051,7 @@ req($router, '/user', function() use ($db) {
 // NOTE: This route intentionally uses the lookup-only helper
 // `getSandboxRootIfExists()` and MUST NOT call `getOrCreateSandboxRoot()`
 // so that a simple page render of `/editor` never creates a sandbox.
-req($router, '/editor', function() use ($db) {
+$router->req('/editor', function() use ($db) {
     if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
         http_response_code(405);
         exit;
@@ -2089,7 +2089,7 @@ req($router, '/editor', function() use ($db) {
 });
 
 // Standalone editor - toggle sandbox/repo mode
-req($router, '/editor/toggle_sandbox', function() use ($db) {
+$router->req('/editor/toggle_sandbox', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     if (empty($_SESSION['user_id'])) {
@@ -2168,7 +2168,7 @@ req($router, '/editor/toggle_sandbox', function() use ($db) {
 }, ['POST']);
 
 // Chat API: create a sandbox for the current session (POST only)
-req($router, '/chat/create_sandbox', function() use ($db) {
+$router->req('/chat/create_sandbox', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         http_response_code(405);
@@ -2209,7 +2209,7 @@ req($router, '/chat/create_sandbox', function() use ($db) {
 // ============ CHAT IMAGE UPLOAD API ============
 
 // POST /chat/upload-image - Upload an image for chat and return a URL
-req($router, '/chat/upload-image', function() {
+$router->req('/chat/upload-image', function() {
     header('Content-Type: application/json; charset=utf-8');
     
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -2297,7 +2297,7 @@ req($router, '/chat/upload-image', function() {
 }, ['POST']);
 
 // Serve chat images from storage
-req($router, '/storage/chat_images/{userId}/{filename}', function($userId, $filename) {
+$router->req('/storage/chat_images/{userId}/{filename}', function($userId, $filename) {
     // Security: Only allow alphanumeric and basic filename chars
     if (!preg_match('/^\d+$/', $userId) || !preg_match('/^[a-zA-Z0-9_\-\.]+\.(jpg|jpeg|png|gif|webp)$/i', $filename)) {
         http_response_code(404);
@@ -2334,7 +2334,7 @@ req($router, '/storage/chat_images/{userId}/{filename}', function($userId, $file
 
 // GET /chat/conversations - Load all conversations for logged-in user
 // Also cleans up expired conversations (24 hours after creation)
-req($router, '/chat/conversations', function() use ($db) {
+$router->req('/chat/conversations', function() use ($db) {
     header('Content-Type: application/json; charset=utf-8');
     
     // Only for logged-in users
