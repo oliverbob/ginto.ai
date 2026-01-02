@@ -1,0 +1,82 @@
+# Ginto AI Docker Ignore
+# Excludes files from Docker build context
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Dependencies (rebuilt in container)
+vendor/
+node_modules/
+tools/sandbox-proxy/node_modules/
+tools/terminal-server/node_modules/
+
+# Environment files (use docker env)
+.env
+.env.local
+.env.*.local
+.install_checkpoint
+.install_config
+
+# IDE and editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.log
+*.pid
+
+# Storage (mounted separately)
+storage/
+../storage/
+
+# Documentation (not needed in container)
+docs/
+*.md
+!docker/README.md
+
+# Test files
+tests/
+*.test.php
+*.spec.js
+
+# Docker files (already used)
+docker-compose*.yml
+Dockerfile*
+
+# Temporary files
+tmp/
+temp/
+cache/
+
+# Cookies and sensitive data
+cookies.txt
+*.pem
+*.key
+*.crt
+
+# Database files
+*.sql
+database/migrations/*.sql
+!database/migrations/001_*.sql
+
+# PhpMyAdmin installed via Composer
+pma/
+public/pma/
+
+# Deployment scripts (not needed in container)
+deploy/
+install/
+
+# Backup files
+*.bak
+*.backup
+*.old

@@ -1,0 +1,74 @@
+# Ginto AI Docker Compose - Sandbox Mode
+# Extends docker-compose.yml with Docker-based sandbox support
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+#
+# This file enables Docker-in-Docker sandbox mode by mounting the Docker socket
+# and adding necessary permissions for the PHP container to spawn sibling containers.
+
+version: "3.8"
+
+services:
+  # ==========================================================================
+  # PHP-FPM with Docker Socket Access (for sibling containers)
+  # ==========================================================================
+  php:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    group_add:
+      - "999"  # docker group (adjust if your docker GID is different)
+    environment:
+      - DOCKER_SANDBOXES=true
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SANDBOX_NETWORK=ginto-sandbox
+    depends_on:
+      - mariadb
+      - redis
+
+  # ==========================================================================
+  # Sandbox Manager Service
+  # Manages Docker-based sandbox containers
+  # ==========================================================================
+  sandbox-manager:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ginto-sandbox-manager
+    restart: unless-stopped
+    command: ["php", "bin/sandbox_manager.php", "--daemon"]
+    volumes:
+      - .:/var/www/html
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - storage_data:/var/www/storage
+    group_add:
+      - "999"  # docker group
+    environment:
+      - DOCKER_SANDBOXES=true
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - SANDBOX_NETWORK=ginto-sandbox
+      - DB_HOST=mariadb
+      - DB_PORT=3306
+      - DB_NAME=${DB_NAME:-ginto}
+      - DB_USER=${DB_USER:-ginto}
+      - DB_PASS=${DB_PASS:-secret}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SKIP_DB_WAIT=true
+      - RUN_MIGRATIONS=false
+    depends_on:
+      - php
+      - redis
+    networks:
+      - ginto-network
+      - ginto-sandbox
+
+# ==========================================================================
+# Additional Networks for Sandboxes
+# ==========================================================================
+networks:
+  ginto-sandbox:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.29.0.0/16
