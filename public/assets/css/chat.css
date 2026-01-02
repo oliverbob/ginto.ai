@@ -673,3 +673,160 @@
   gap: 0 !important;
   padding: 16px 0 !important;
 }
+
+/* ============ LIGHT MODE STYLES (INVERSE OF DARK) ============ */
+
+/* Light mode: Convo card body - light gradient background */
+html:not(.dark) .convo-card-body {
+  background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.08), rgba(248, 250, 252, 0.95), rgba(168, 85, 247, 0.08)) !important;
+  border: 1px solid rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Light mode: User message bubble */
+html:not(.dark) .messenger-bubble-user {
+  background: rgb(79 70 229 / 90%) !important;
+  color: #ffffff !important;
+}
+
+/* Light mode: Reasoning section */
+html:not(.dark) .messenger-reasoning {
+  border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .messenger-reasoning-toggle {
+  color: #374151 !important;
+}
+
+html:not(.dark) .messenger-reasoning-toggle:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Reasoning content */
+html:not(.dark) .messenger-reasoning-content {
+  color: #4b5563 !important;
+}
+
+/* Light mode: Reasoning dots */
+html:not(.dark) .reasoning-item-dot {
+  background: #9ca3af !important;
+}
+
+html:not(.dark) .reasoning-item-dot-green {
+  background: #3b82f6 !important;
+}
+
+/* Light mode: Reasoning lines */
+html:not(.dark) .reasoning-item::before {
+  background: #d1d5db !important;
+}
+
+/* Light mode: Reasoning text */
+html:not(.dark) .reasoning-item-text {
+  color: #4b5563 !important;
+}
+
+/* Light mode: Response prose */
+html:not(.dark) .messenger-response.prose {
+  color: #111827 !important;
+}
+
+html:not(.dark) .messenger-response.prose h1,
+html:not(.dark) .messenger-response.prose h2,
+html:not(.dark) .messenger-response.prose h3 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .messenger-response.prose strong {
+  color: #000000 !important;
+}
+
+html:not(.dark) .messenger-response.prose code {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #9333ea !important;
+}
+
+html:not(.dark) .messenger-response.prose pre {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+html:not(.dark) .messenger-response.prose pre code {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+}
+
+/* Light mode: Citations */
+html:not(.dark) .messenger-citations {
+  border-top-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .messenger-citation {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .messenger-citation:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Action buttons */
+html:not(.dark) .messenger-action-btn {
+  color: #6b7280 !important;
+}
+
+html:not(.dark) .messenger-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Tables */
+html:not(.dark) .markdown-table thead,
+html:not(.dark) .prose table thead {
+  background: rgba(243, 244, 246, 0.8) !important;
+}
+
+html:not(.dark) .markdown-table th,
+html:not(.dark) .markdown-table td,
+html:not(.dark) .prose table th,
+html:not(.dark) .prose table td {
+  border-color: #e5e7eb !important;
+}
+
+html:not(.dark) .markdown-table th,
+html:not(.dark) .prose table th {
+  color: #111827 !important;
+}
+
+html:not(.dark) .markdown-table td,
+html:not(.dark) .prose table td {
+  color: #374151 !important;
+}
+
+html:not(.dark) .markdown-table tbody tr:hover,
+html:not(.dark) .prose table tbody tr:hover {
+  background: rgba(243, 244, 246, 0.5) !important;
+}
+
+/* Light mode: Citations in cards */
+html:not(.dark) .citation,
+html:not(.dark) .citation-chip {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .citation:hover,
+html:not(.dark) .citation-chip:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Version navigation */
+html:not(.dark) .version-nav {
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+html:not(.dark) .version-indicator {
+  color: #6366f1 !important;
+}
