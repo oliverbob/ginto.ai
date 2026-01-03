@@ -2400,11 +2400,12 @@
       const userCopyBtn = userRow.querySelector('.user-copy-btn');
       const userEditBtn = userRow.querySelector('.user-edit-btn');
       const userRegenBtn = userRow.querySelector('.user-regen-btn');
-      const userMsgContent = userRow.querySelector('.user-message-content');
-      const editArea = userRow.querySelector('.user-message-edit-area');
-      const editTextarea = userRow.querySelector('.user-edit-textarea');
-      const editCancelBtn = userRow.querySelector('.user-edit-cancel-btn');
-      const editSaveBtn = userRow.querySelector('.user-edit-save-btn');
+      const userBubble = userRow.querySelector('.messenger-bubble-user');
+      const userMsgContent = userBubble?.querySelector('.user-message-content');
+      const editArea = userBubble?.querySelector('.user-message-edit-area');
+      const editTextarea = userBubble?.querySelector('.user-edit-textarea');
+      const editCancelBtn = userBubble?.querySelector('.user-edit-cancel-btn');
+      const editSaveBtn = userBubble?.querySelector('.user-edit-save-btn');
       
       // Copy user prompt
       userCopyBtn?.addEventListener('click', async (e) => {
