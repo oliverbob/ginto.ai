@@ -2,10 +2,14 @@
 namespace Ginto\Controllers;
 
 use Ginto\Core\View;
+use Ginto\Helpers\UnifiedSandbox;
 
 /**
  * Sandbox Controller
  * Handles sandbox-related routes: status, destroy, install, start, call
+ * 
+ * Supports both LXD and Docker backends via UnifiedSandbox abstraction.
+ * Docker mode has limited features (no VNC/Console).
  */
 class SandboxController
 {
@@ -123,15 +127,17 @@ class SandboxController
                     'status' => 'not_created',
                     'sandbox_id' => null,
                     'container_status' => null,
+                    'backend' => UnifiedSandbox::getBackend(),
                     'message' => 'No sandbox has been created for your account.'
                 ]);
                 exit;
             }
             
-            // Check LXC container status
-            $containerExists = \Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId);
-            $containerRunning = $containerExists ? \Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId) : false;
-            $containerIp = $containerRunning ? \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId) : null;
+            // Check container status using unified sandbox abstraction (works with both LXD and Docker)
+            $backend = UnifiedSandbox::getBackend();
+            $containerExists = UnifiedSandbox::exists($sandboxId);
+            $containerRunning = $containerExists ? UnifiedSandbox::isRunning($sandboxId) : false;
+            $containerIp = $containerRunning ? UnifiedSandbox::getIp($sandboxId) : null;
             
             // Double-check: if container doesn't exist, clean up stale data and return not_created
             if (!$containerExists) {
@@ -150,6 +156,7 @@ class SandboxController
                     'status' => 'not_created',
                     'sandbox_id' => null,
                     'container_status' => null,
+                    'backend' => $backend,
                     'message' => 'Your sandbox session expired. Click "My Files" to create a new one.'
                 ]);
                 exit;
@@ -168,10 +175,11 @@ class SandboxController
                 'sandbox_id' => $sandboxId,
                 'container_status' => $containerStatus,
                 'container_ip' => $containerIp,
+                'backend' => $backend,
                 'sandbox_path' => $sandboxId,
                 'message' => $containerStatus === 'running' 
                     ? 'Your sandbox is running and ready to use.'
-                    : ($containerExists ? 'Your sandbox is installed but not running.' : 'Sandbox directory exists but LXC container not installed.')
+                    : ($containerExists ? 'Your sandbox is installed but not running.' : 'Sandbox container not installed.')
             ]);
             exit;
         } catch (\Throwable $e) {
@@ -226,8 +234,8 @@ class SandboxController
                 exit;
             }
             
-            // Delete sandbox completely (container + DB + Redis + directory)
-            $result = \Ginto\Helpers\LxdSandboxManager::deleteSandboxCompletely($sandboxId, $this->db);
+            // Delete sandbox completely using unified interface (works with both LXD and Docker)
+            $result = UnifiedSandbox::deleteCompletely($sandboxId, $this->db);
             
             // Clear session data
             unset($_SESSION['sandbox_id']);
@@ -238,12 +246,13 @@ class SandboxController
                 unset($_SESSION['session_created_at']);
             }
             
-            error_log("[/sandbox/destroy] Destroyed sandbox: {$sandboxId}");
+            error_log("[/sandbox/destroy] Destroyed sandbox: {$sandboxId} (backend: " . ($result['backend'] ?? 'unknown') . ")");
             
             echo json_encode([
                 'success' => true,
                 'message' => 'Sandbox destroyed completely',
-                'sandbox_id' => $sandboxId
+                'sandbox_id' => $sandboxId,
+                'backend' => $result['backend'] ?? UnifiedSandbox::getBackend()
             ]);
             exit;
         } catch (\Throwable $e) {
@@ -329,23 +338,24 @@ class SandboxController
             
             if (!empty($existingSandbox['sandbox_id'])) {
                 $sandboxId = $existingSandbox['sandbox_id'];
-                // Check if container still exists
-                if (\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+                // Check if container still exists (works with both LXD and Docker)
+                if (UnifiedSandbox::exists($sandboxId)) {
                     // Return existing sandbox - users can only have one
                     $_SESSION['sandbox_id'] = $sandboxId;
                     
                     // Check if running, start if not
-                    $isRunning = \Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId);
+                    $isRunning = UnifiedSandbox::isRunning($sandboxId);
                     if (!$isRunning) {
-                        \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
+                        UnifiedSandbox::start($sandboxId);
                         $isRunning = true;
                     }
                     
                     echo json_encode([
                         'success' => true,
                         'sandbox_id' => $sandboxId,
-                        'container_name' => \Ginto\Helpers\LxdSandboxManager::containerName($sandboxId),
+                        'container_name' => UnifiedSandbox::containerName($sandboxId),
                         'status' => $isRunning ? 'running' : 'stopped',
+                        'backend' => UnifiedSandbox::getBackend(),
                         'message' => 'Using your existing sandbox.',
                         'reused' => true
                     ]);
@@ -367,23 +377,24 @@ class SandboxController
             
             if (!empty($existingSandbox['sandbox_id'])) {
                 $sandboxId = $existingSandbox['sandbox_id'];
-                // Check if container still exists
-                if (\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+                // Check if container still exists (works with both LXD and Docker)
+                if (UnifiedSandbox::exists($sandboxId)) {
                     // Return existing shared visitor sandbox
                     $_SESSION['sandbox_id'] = $sandboxId;
                     
                     // Check if running, start if not
-                    $isRunning = \Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId);
+                    $isRunning = UnifiedSandbox::isRunning($sandboxId);
                     if (!$isRunning) {
-                        \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
+                        UnifiedSandbox::start($sandboxId);
                         $isRunning = true;
                     }
                     
                     echo json_encode([
                         'success' => true,
                         'sandbox_id' => $sandboxId,
-                        'container_name' => \Ginto\Helpers\LxdSandboxManager::containerName($sandboxId),
+                        'container_name' => UnifiedSandbox::containerName($sandboxId),
                         'status' => $isRunning ? 'running' : 'stopped',
+                        'backend' => UnifiedSandbox::getBackend(),
                         'message' => 'Using shared visitor sandbox.',
                         'reused' => true
                     ]);
@@ -395,16 +406,18 @@ class SandboxController
         }
         
         try {
-            // PRE-FLIGHT CHECK: Is LXC/LXD installed and configured?
-            $lxcStatus = \Ginto\Helpers\LxdSandboxManager::checkLxcAvailability();
-            if (!$lxcStatus['available']) {
+            // PRE-FLIGHT CHECK: Is sandbox system (LXD or Docker) available?
+            $backend = UnifiedSandbox::getBackend();
+            $availabilityCheck = UnifiedSandbox::checkAvailability();
+            if (!$availabilityCheck['available']) {
                 echo json_encode([
                     'success' => false,
-                    'error' => $lxcStatus['message'],
-                    'error_code' => $lxcStatus['error'],
+                    'error' => $availabilityCheck['message'] ?? 'No sandbox backend available',
+                    'error_code' => $availabilityCheck['error'] ?? 'no_backend',
                     'install_required' => true,
-                    'install_command' => $lxcStatus['install_command'],
-                    'step' => 'lxc_check'
+                    'install_command' => $availabilityCheck['install_command'] ?? null,
+                    'backend' => $backend,
+                    'step' => 'backend_check'
                 ]);
                 exit;
             }
@@ -439,18 +452,18 @@ class SandboxController
             if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
             $_SESSION['sandbox_id'] = $sandboxId;
             
-            // Step 2: Create LXC container
-            $result = \Ginto\Helpers\LxdSandboxManager::createSandbox($sandboxId, [
+            // Step 2: Create container using unified sandbox interface (works with both LXD and Docker)
+            $result = UnifiedSandbox::create($sandboxId, [
                 'cpu' => '1',
                 'memory' => '256MB',
                 'packages' => ['php82', 'php82-fpm', 'caddy', 'mysql-client', 'git', 'nodejs', 'npm']
             ]);
             
             if (!$result['success']) {
-                $errorMessage = $result['error'] ?? 'Failed to create LXC container';
+                $errorMessage = $result['error'] ?? 'Failed to create sandbox container';
                 
-                // Add nesting hint if it looks like a nesting/forkstart error
-                if (stripos($errorMessage, 'forkstart') !== false || stripos($errorMessage, 'failed to run') !== false) {
+                // Add nesting hint if it looks like a nesting/forkstart error (LXD-specific)
+                if ($backend === 'lxd' && (stripos($errorMessage, 'forkstart') !== false || stripos($errorMessage, 'failed to run') !== false)) {
                     $errorMessage .= ' (Nesting may not be enabled. Run on HOST: lxc profile set default security.nesting=true OR lxc config set <container-name> security.nesting=true)';
                 }
                 
@@ -458,13 +471,15 @@ class SandboxController
                     'success' => false,
                     'error' => $errorMessage,
                     'sandbox_id' => $sandboxId,
+                    'backend' => $backend,
                     'step' => 'container_creation'
                 ]);
                 exit;
             }
             
             // Step 3: Get container name
-            $containerName = \Ginto\Helpers\LxdSandboxManager::containerName($sandboxId);
+            $containerName = UnifiedSandbox::containerName($sandboxId);
+            $containerIp = $result['ip'] ?? $result['ip_address'] ?? UnifiedSandbox::getIp($sandboxId);
             
             // Record acceptance of terms in database
             if ($this->db) {
@@ -474,6 +489,7 @@ class SandboxController
                         'container_created_at' => date('Y-m-d H:i:s'),
                         'container_name' => $containerName,
                         'container_status' => 'running',
+                        'backend_type' => $backend,
                         'last_accessed_at' => date('Y-m-d H:i:s')
                     ], ['sandbox_id' => $sandboxId]);
                     
@@ -487,9 +503,10 @@ class SandboxController
             echo json_encode([
                 'success' => true,
                 'sandbox_id' => $sandboxId,
-                'container_name' => $result['sandboxId'],
-                'container_ip' => $result['ip'],
+                'container_name' => $containerName,
+                'container_ip' => $containerIp,
                 'status' => 'running',
+                'backend' => $backend,
                 'message' => 'Your sandbox has been created and is now running!'
             ]);
             exit;
@@ -498,7 +515,8 @@ class SandboxController
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error' => 'Failed to install sandbox: ' . $e->getMessage()
+                'error' => 'Failed to install sandbox: ' . $e->getMessage(),
+                'backend' => $backend ?? UnifiedSandbox::getBackend()
             ]);
             exit;
         }

@@ -4615,8 +4615,9 @@
         progressBar.style.width = '100%';
         statusText.textContent = 'Complete!';
         
-        // Store sandbox ID (use window scope for cleanup access)
+        // Store sandbox ID and backend type (use window scope for cleanup access)
         window.installedSandboxId = data.sandbox_id;
+        window.installedSandboxBackend = data.backend || 'lxd';
         
         // Update display
         if (sandboxIdDisplay) {
@@ -4625,6 +4626,12 @@
         
         // Update status indicator to running
         updateSandboxStatusIndicator('running');
+        
+        // Update tab visibility based on sandbox backend (Docker vs LXD)
+        // Docker mode: only My Files available; LXD mode: all tabs available
+        if (typeof updateTabsForBackend === 'function') {
+          updateTabsForBackend(data.backend || 'lxd');
+        }
         
         await new Promise(r => setTimeout(r, 500));
         
@@ -5005,6 +5012,12 @@
           sandboxIdDisplay.textContent = statusData.sandbox_id.substring(0, 8);
         }
         
+        // Update tab visibility based on sandbox backend (Docker vs LXD)
+        // Docker mode: only My Files available; LXD mode: all tabs available
+        if (typeof updateTabsForBackend === 'function') {
+          updateTabsForBackend(statusData.backend || 'lxd');
+        }
+        
         // Open editor with sandbox context
         // This displays the Monaco editor with the sandbox files in the explorer
         let editorUrl = '/editor?sandbox=' + encodeURIComponent(statusData.sandbox_id);
@@ -5076,6 +5089,7 @@
     let vncIframeUser = null;
     let vncConnected = false;
     let currentEditorTab = 'files'; // 'files', 'computer', or 'console'
+    let currentSandboxBackend = 'lxd'; // 'lxd' or 'docker' - affects available tabs
     
     // Console tab terminal management
     let consoleTabTerminalTabs = [];
@@ -5083,6 +5097,34 @@
     let consoleTabCounter = 0;
     const CONSOLE_PING_INTERVAL_MS = 25000;
     
+    /**
+     * Update tab visibility based on sandbox backend
+     * Docker mode: Only "My Files" tab is available
+     * LXD mode: All tabs (My Files, My Computer, Console) are available
+     */
+    function updateTabsForBackend(backend) {
+      currentSandboxBackend = backend || 'lxd';
+      
+      if (backend === 'docker') {
+        // Docker mode: Hide My Computer and Console tabs
+        if (tabMyComputer) tabMyComputer.classList.add('hidden');
+        if (tabConsole) tabConsole.classList.add('hidden');
+        
+        // Ensure we're on My Files tab
+        if (currentEditorTab !== 'files') {
+          switchToFilesTab();
+        }
+        
+        console.log('[Sandbox] Docker mode: VNC and Console tabs hidden');
+      } else {
+        // LXD mode: Show all tabs
+        if (tabMyComputer) tabMyComputer.classList.remove('hidden');
+        if (tabConsole) tabConsole.classList.remove('hidden');
+        
+        console.log('[Sandbox] LXD mode: All tabs available');
+      }
+    }
+
     function updateVncStatus(status, colorClass) {
       if (vncUserStatus) {
         vncUserStatus.textContent = status;

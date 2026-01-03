@@ -415,4 +415,104 @@ class UnifiedSandbox
             'details' => self::checkAvailability()
         ];
     }
+    
+    /**
+     * Delete sandbox completely (container + DB + Redis + directory)
+     * Unified interface for complete sandbox cleanup
+     * 
+     * @param string $sandboxId The sandbox ID
+     * @param \Medoo\Medoo|null $db Database connection (optional, will create if needed)
+     * @return array ['success' => bool, 'deleted' => [...], 'errors' => [...], 'backend' => string]
+     */
+    public static function deleteCompletely(string $sandboxId, $db = null): array
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            // Docker sandbox cleanup
+            $result = [
+                'success' => true,
+                'deleted' => [],
+                'errors' => [],
+                'backend' => 'docker'
+            ];
+            
+            // 1. Delete Docker container
+            $deleteResult = DockerSandboxManager::deleteSandbox($sandboxId);
+            if ($deleteResult['success']) {
+                $result['deleted'][] = 'container';
+            } else {
+                $result['errors'][] = $deleteResult['error'] ?? 'Failed to delete container';
+                $result['success'] = false;
+            }
+            
+            // 2. Delete database entry
+            if ($db === null) {
+                try {
+                    if (class_exists('\\Ginto\\Core\\Database')) {
+                        $db = \Ginto\Core\Database::getConnection();
+                    }
+                } catch (\Throwable $e) {}
+            }
+            
+            if ($db) {
+                try {
+                    $db->delete('client_sandboxes', ['sandbox_id' => $sandboxId]);
+                    $result['deleted'][] = 'database';
+                } catch (\Throwable $e) {
+                    $result['errors'][] = 'Failed to delete database entry: ' . $e->getMessage();
+                }
+            }
+            
+            // 3. Delete clients directory if exists
+            $clientsDir = defined('ROOT_PATH') ? ROOT_PATH . '/clients/' . $sandboxId : null;
+            if (!$clientsDir) {
+                $clientsDir = dirname(dirname(__DIR__)) . '/clients/' . $sandboxId;
+            }
+            
+            if (is_dir($clientsDir)) {
+                self::deleteDirectoryRecursive($clientsDir);
+                if (!is_dir($clientsDir)) {
+                    $result['deleted'][] = 'directory';
+                } else {
+                    $result['errors'][] = 'Failed to delete directory: ' . $clientsDir;
+                }
+            } else {
+                $result['deleted'][] = 'directory';
+            }
+            
+            return $result;
+        }
+        
+        // LXD sandbox cleanup - use existing method
+        $result = LxdSandboxManager::deleteSandboxCompletely($sandboxId, $db);
+        $result['backend'] = 'lxd';
+        return $result;
+    }
+    
+    /**
+     * Recursively delete a directory
+     */
+    private static function deleteDirectoryRecursive(string $path): bool
+    {
+        if (!is_dir($path)) {
+            return true;
+        }
+        
+        $items = scandir($path);
+        foreach ($items as $item) {
+            if ($item === '.' || $item === '..') {
+                continue;
+            }
+            
+            $itemPath = $path . '/' . $item;
+            if (is_dir($itemPath)) {
+                self::deleteDirectoryRecursive($itemPath);
+            } else {
+                @unlink($itemPath);
+            }
+        }
+        
+        return @rmdir($path);
+    }
 }
