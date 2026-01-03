@@ -3239,7 +3239,7 @@ html, body {
                 destroyBtn.innerHTML = '⏳ Destroying...';
                 
                 try {
-                    const res = await fetch('/sandbox/destroy', {
+                    const res = await fetch('/api/sandbox/destroy', {
                         method: 'POST',
                         credentials: 'same-origin',
                         headers: { 'Content-Type': 'application/json' },

@@ -83,14 +83,14 @@ $router->get('/imagegen', 'ChatController@imageGenInfo');
 $router->post('/imagegen', 'ChatController@imageGen');
 $router->req('/storage/imagegen/{filename}', 'ChatController@serveImageGenFile');
 
-// Sandbox routes
-$router->req('/sandbox/image-install-status', 'SandboxController@imageInstallStatus');
-$router->req('/sandbox/status', 'SandboxController@status');
-$router->req('/sandbox/install', 'SandboxController@install', ['POST']);
-$router->req('/sandbox/start', 'SandboxController@start', ['POST']);
-$router->req('/sandbox/call', 'SandboxController@call', ['POST']);
-$router->req('/sandbox/vnc', 'SandboxController@vnc', ['POST']);
-$router->req('/sandbox/destroy', 'SandboxController@destroy', ['POST']);
+// Sandbox API routes (using /api/sandbox to avoid conflict with sandbox-proxy at /sandbox/*)
+$router->req('/api/sandbox/image-install-status', 'SandboxController@imageInstallStatus');
+$router->req('/api/sandbox/status', 'SandboxController@status');
+$router->req('/api/sandbox/install', 'SandboxController@install', ['POST']);
+$router->req('/api/sandbox/start', 'SandboxController@start', ['POST']);
+$router->req('/api/sandbox/call', 'SandboxController@call', ['POST']);
+$router->req('/api/sandbox/vnc', 'SandboxController@vnc', ['POST']);
+$router->req('/api/sandbox/destroy', 'SandboxController@destroy', ['POST']);
 
 // LXC binary path helper
 function getLxcBin(): ?string {

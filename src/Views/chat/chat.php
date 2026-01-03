@@ -4443,7 +4443,7 @@
     (async function prefetchSandboxStatus() {
       try {
         await window.GINTO_AUTH_PROMISE;
-        const res = await fetch('/sandbox/status', { credentials: 'same-origin' });
+        const res = await fetch('/api/sandbox/status', { credentials: 'same-origin' });
         const data = await res.json().catch(() => null);
         if (data && data.status) {
           updateSandboxStatusIndicator(data.container_status || data.status);
@@ -4531,7 +4531,7 @@
         body.append('csrf_token', window.GINTO_AUTH?.csrfToken || '');
         body.append('accept_terms', '1');
         
-        const res = await fetch('/sandbox/install', {
+        const res = await fetch('/api/sandbox/install', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -4729,7 +4729,7 @@
       
       try {
         // Call the exec endpoint to run the install script
-        const res = await fetch('/sandbox/exec', {
+        const res = await fetch('/api/sandbox/exec', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
@@ -4780,7 +4780,7 @@
       
       installPollInterval = setInterval(async () => {
         try {
-          const res = await fetch('/sandbox/image-install-status', { credentials: 'same-origin' });
+          const res = await fetch('/api/sandbox/image-install-status', { credentials: 'same-origin' });
           const data = await res.json();
           
           if (data.success && data.status === 'complete' && data.ready_for_sandbox) {
@@ -4834,7 +4834,7 @@
       
       globalInstallPollInterval = setInterval(async () => {
         try {
-          const res = await fetch('/sandbox/image-install-status', { credentials: 'same-origin' });
+          const res = await fetch('/api/sandbox/image-install-status', { credentials: 'same-origin' });
           const data = await res.json();
           
           if (data.success && data.status === 'complete' && data.ready_for_sandbox) {
@@ -4957,7 +4957,7 @@
         await window.GINTO_AUTH_PROMISE;
         
         // Check sandbox status first
-        const statusRes = await fetch('/sandbox/status', { credentials: 'same-origin' });
+        const statusRes = await fetch('/api/sandbox/status', { credentials: 'same-origin' });
         const statusData = await statusRes.json().catch(() => null);
         
         if (!statusRes.ok || !statusData) {
@@ -4988,7 +4988,7 @@
           try {
             const startBody = new URLSearchParams();
             startBody.append('csrf_token', window.GINTO_AUTH?.csrfToken || '');
-            const startRes = await fetch('/sandbox/start', {
+            const startRes = await fetch('/api/sandbox/start', {
               method: 'POST',
               credentials: 'same-origin',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -5217,7 +5217,7 @@
       
       try {
         const csrfToken = window.GINTO_AUTH?.csrfToken || '';
-        const response = await fetch('/sandbox/vnc', {
+        const response = await fetch('/api/sandbox/vnc', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'same-origin',
