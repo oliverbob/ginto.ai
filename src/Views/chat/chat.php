@@ -2262,7 +2262,7 @@
                 </svg>
                 <div>
                   <div class="font-medium text-gray-900 dark:text-white">Isolated Environment</div>
-                  <div class="text-sm text-gray-600 dark:text-gray-400">Your files are stored in a secure LXC container</div>
+                  <div class="text-sm text-gray-600 dark:text-gray-400">Your files are stored in a secure container</div>
                 </div>
               </div>
               
@@ -2412,7 +2412,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z"/>
                   </svg>
                 </div>
-                <span class="text-sm text-gray-600 dark:text-gray-400">Launching LXC container...</span>
+                <span class="text-sm text-gray-600 dark:text-gray-400">Launching container...</span>
               </div>
               
               <div id="install-step-3" class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 transition-all">
@@ -4552,7 +4552,7 @@
         updateInstallStep(1, 'done');
         updateInstallStep(2, 'active');
         progressBar.style.width = '30%';
-        statusText.textContent = 'Launching LXC container...';
+        statusText.textContent = 'Launching container...';
         
         // Make API call to install sandbox
         let { res, data } = await doInstallRequest();
@@ -4563,7 +4563,7 @@
           statusText.textContent = 'Refreshing session...';
           const refreshed = await refreshCsrfToken();
           if (refreshed) {
-            statusText.textContent = 'Launching LXC container...';
+            statusText.textContent = 'Launching container...';
             ({ res, data } = await doInstallRequest());
           }
         }
