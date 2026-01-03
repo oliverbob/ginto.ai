@@ -56,8 +56,8 @@ services:
       # Bind mount to host's storage dir outside repo (persists across restarts)
       # Same location as non-docker LXC: ~/ginto.ai/../storage
       - ../storage:/var/www/storage
-      # Mount Docker socket for Docker-based sandboxes (optional)
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount Docker socket for Docker-based sandboxes (requires write access)
+      - /var/run/docker.sock:/var/run/docker.sock
     environment:
       - DB_HOST=mariadb
       - DB_PORT=3306

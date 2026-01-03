@@ -140,6 +140,53 @@ setup_lightpanda() {
     fi
 }
 
+# Setup Docker sandbox environment (image + network)
+setup_docker_sandbox() {
+    # Only run if SANDBOX_MODE is docker and we have access to Docker socket
+    if [ "${SANDBOX_MODE:-auto}" != "docker" ] && [ "${SANDBOX_MODE:-auto}" != "auto" ]; then
+        echo "✅ Sandbox mode is not Docker, skipping Docker sandbox setup"
+        return 0
+    fi
+    
+    if ! command -v docker &> /dev/null; then
+        echo "⚠️ Docker CLI not available, skipping Docker sandbox setup"
+        return 0
+    fi
+    
+    if ! docker info &> /dev/null 2>&1; then
+        echo "⚠️ Cannot connect to Docker daemon, skipping Docker sandbox setup"
+        return 0
+    fi
+    
+    echo "🐳 Setting up Docker sandbox environment..."
+    
+    # Build ginto/sandbox image if it doesn't exist
+    if ! docker image inspect ginto/sandbox:latest &> /dev/null 2>&1; then
+        echo "   Building ginto/sandbox:latest image (this may take a few minutes)..."
+        if [ -f "/var/www/html/docker/sandbox/Dockerfile" ]; then
+            docker build -t ginto/sandbox:latest -f /var/www/html/docker/sandbox/Dockerfile /var/www/html/docker/sandbox/ 2>&1 | tail -5
+            echo "✅ Sandbox image built successfully"
+        else
+            echo "⚠️ Sandbox Dockerfile not found at /var/www/html/docker/sandbox/Dockerfile"
+        fi
+    else
+        echo "✅ Sandbox image already exists"
+    fi
+    
+    # Create sandbox network if it doesn't exist
+    SUBNET="${DOCKER_SANDBOX_SUBNET:-172.30.0.0/16}"
+    if ! docker network inspect ginto-sandbox &> /dev/null 2>&1; then
+        echo "   Creating sandbox network (subnet: $SUBNET)..."
+        docker network create \
+            --driver bridge \
+            --subnet="$SUBNET" \
+            ginto-sandbox 2>&1 || echo "   ⚠️ Network creation failed (may already exist with different name)"
+        echo "✅ Sandbox network created"
+    else
+        echo "✅ Sandbox network already exists"
+    fi
+}
+
 # Generate .env if not exists
 setup_env() {
     if [ ! -f "/var/www/html/.env" ]; then
@@ -186,6 +233,7 @@ main() {
     fi
     
     setup_lightpanda
+    setup_docker_sandbox
     
     echo ""
     echo "🚀 Ginto AI PHP Container Ready!"
