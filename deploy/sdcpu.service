@@ -1,0 +1,16 @@
+[Unit]
+Description=FastSD CPU Image Generation Server
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=test
+WorkingDirectory=/home/test/ginto.ai/tools/sdcpu
+ExecStart=/bin/bash -c 'source venv/bin/activate && python src/api_server.py --port 8888'
+Restart=always
+RestartSec=5
+StandardOutput=append:/tmp/sdcpu.log
+StandardError=append:/tmp/sdcpu.log
+
+[Install]
+WantedBy=multi-user.target

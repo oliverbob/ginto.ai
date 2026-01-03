@@ -557,11 +557,20 @@
   background: transparent !important;
   border: none !important;
   cursor: pointer !important;
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: rgba(107, 114, 128, 0.7) !important;
   transition: all 0.15s !important;
 }
 
+.dark .user-action-btn {
+  color: rgba(255, 255, 255, 0.5) !important;
+}
+
 .user-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #111827 !important;
+}
+
+.dark .user-action-btn:hover {
   background: rgba(255, 255, 255, 0.1) !important;
   color: #ffffff !important;
 }

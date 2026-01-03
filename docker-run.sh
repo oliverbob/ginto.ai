@@ -193,6 +193,10 @@ cmd_restart() {
     
     info "Restarting Ginto AI services..."
     $compose restart
+    
+    # Start SDCPU after docker restart (in case it was stopped or never started)
+    start_sdcpu
+    
     success "All services restarted."
 }
 

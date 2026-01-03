@@ -3944,22 +3944,22 @@
               let progressContainer = currentCard.response.querySelector('.image-gen-progress');
               if (!progressContainer) {
                 progressContainer = document.createElement('div');
-                progressContainer.className = 'image-gen-progress mt-2 p-3 bg-purple-900/20 border border-purple-500/30 rounded-lg';
+                progressContainer.className = 'image-gen-progress mt-2 p-3 bg-purple-100 dark:bg-purple-900/20 border border-purple-300 dark:border-purple-500/30 rounded-lg';
                 progressContainer.innerHTML = `
-                  <div class="flex items-center gap-2 text-purple-300 mb-2">
+                  <div class="flex items-center gap-2 text-purple-700 dark:text-purple-300 mb-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <span class="text-sm font-medium">Generating Image</span>
-                    <span class="image-gen-step text-xs text-purple-400/70 ml-auto"></span>
+                    <span class="image-gen-step text-xs text-purple-500 dark:text-purple-400/70 ml-auto"></span>
                   </div>
                   <div class="flex items-center gap-2">
-                    <div class="flex-1 bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
                       <div class="image-gen-bar bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-150" style="width: 0%"></div>
                     </div>
-                    <span class="image-gen-percent text-xs text-purple-300/70 min-w-[3rem] text-right"></span>
+                    <span class="image-gen-percent text-xs text-purple-600 dark:text-purple-300/70 min-w-[3rem] text-right"></span>
                   </div>
-                  <div class="image-gen-status text-xs text-purple-300/70 mt-1"></div>
+                  <div class="image-gen-status text-xs text-purple-600 dark:text-purple-300/70 mt-1"></div>
                 `;
                 currentCard.response.appendChild(progressContainer);
               }
@@ -4595,7 +4595,7 @@
       
       if (!success) {
         const errorMsg = data?.error || 'Search failed';
-        return `<div class="p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300">
+        return `<div class="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg text-red-700 dark:text-red-300">
           <div class="flex items-center gap-2">
             <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -4619,8 +4619,8 @@
       const sourcesCount = data?.sourcesCount || sources.length;
       
       // Show a compact summary with expandable full content
-      return `<div class="p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-        <div class="flex items-center gap-2 text-blue-300 mb-2">
+      return `<div class="p-3 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-500/30 rounded-lg">
+        <div class="flex items-center gap-2 text-blue-700 dark:text-blue-300 mb-2">
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
@@ -4644,7 +4644,7 @@
     
     if (result?.error || data?.error) {
       const errorMsg = result?.error || data?.error;
-      return `<div class="p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300">
+      return `<div class="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg text-red-700 dark:text-red-300">
         <div class="flex items-center gap-2">
           <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -4717,14 +4717,14 @@
       const path = data.path || 'file';
       const bytes = data.bytes_written || 0;
       const url = data.url || '/clients/' + path.replace(/^\//, '');
-      return `<div class="flex items-center justify-between gap-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300">
+      return `<div class="flex items-center justify-between gap-2 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300">
         <div class="flex items-center gap-2">
           <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
           </svg>
-          <span>Created <code class="bg-gray-700 px-1 rounded">${escapeHtml(path)}</code>${bytes > 0 ? ` (${bytes} bytes)` : ''}</span>
+          <span>Created <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code>${bytes > 0 ? ` (${bytes} bytes)` : ''}</span>
         </div>
-        <a href="${escapeHtml(url)}" target="_blank" class="flex items-center gap-1 px-2 py-1 bg-green-600/30 hover:bg-green-600/50 rounded text-sm transition-colors">
+        <a href="${escapeHtml(url)}" target="_blank" class="flex items-center gap-1 px-2 py-1 bg-green-200 hover:bg-green-300 dark:bg-green-600/30 dark:hover:bg-green-600/50 rounded text-sm transition-colors">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
           </svg>
@@ -4744,13 +4744,13 @@
       
       // Format-specific icon and color - including PDF and DOCX
       const formatStyles = {
-        pdf: { icon: '📕', bg: 'bg-red-900/20', border: 'border-red-500/30', text: 'text-red-300', btn: 'bg-red-600/30 hover:bg-red-600/50' },
-        docx: { icon: '📘', bg: 'bg-blue-900/20', border: 'border-blue-500/30', text: 'text-blue-300', btn: 'bg-blue-600/30 hover:bg-blue-600/50' },
-        odt: { icon: '📙', bg: 'bg-orange-900/20', border: 'border-orange-500/30', text: 'text-orange-300', btn: 'bg-orange-600/30 hover:bg-orange-600/50' },
-        html: { icon: '🌐', bg: 'bg-cyan-900/20', border: 'border-cyan-500/30', text: 'text-cyan-300', btn: 'bg-cyan-600/30 hover:bg-cyan-600/50' },
-        rtf: { icon: '📄', bg: 'bg-purple-900/20', border: 'border-purple-500/30', text: 'text-purple-300', btn: 'bg-purple-600/30 hover:bg-purple-600/50' },
-        md: { icon: '📝', bg: 'bg-gray-800/50', border: 'border-gray-500/30', text: 'text-gray-300', btn: 'bg-gray-600/30 hover:bg-gray-600/50' },
-        txt: { icon: '📃', bg: 'bg-gray-800/50', border: 'border-gray-500/30', text: 'text-gray-300', btn: 'bg-gray-600/30 hover:bg-gray-600/50' }
+        pdf: { icon: '📕', bg: 'bg-red-100 dark:bg-red-900/20', border: 'border-red-300 dark:border-red-500/30', text: 'text-red-700 dark:text-red-300', btn: 'bg-red-200 hover:bg-red-300 dark:bg-red-600/30 dark:hover:bg-red-600/50' },
+        docx: { icon: '📘', bg: 'bg-blue-100 dark:bg-blue-900/20', border: 'border-blue-300 dark:border-blue-500/30', text: 'text-blue-700 dark:text-blue-300', btn: 'bg-blue-200 hover:bg-blue-300 dark:bg-blue-600/30 dark:hover:bg-blue-600/50' },
+        odt: { icon: '📙', bg: 'bg-orange-100 dark:bg-orange-900/20', border: 'border-orange-300 dark:border-orange-500/30', text: 'text-orange-700 dark:text-orange-300', btn: 'bg-orange-200 hover:bg-orange-300 dark:bg-orange-600/30 dark:hover:bg-orange-600/50' },
+        html: { icon: '🌐', bg: 'bg-cyan-100 dark:bg-cyan-900/20', border: 'border-cyan-300 dark:border-cyan-500/30', text: 'text-cyan-700 dark:text-cyan-300', btn: 'bg-cyan-200 hover:bg-cyan-300 dark:bg-cyan-600/30 dark:hover:bg-cyan-600/50' },
+        rtf: { icon: '📄', bg: 'bg-purple-100 dark:bg-purple-900/20', border: 'border-purple-300 dark:border-purple-500/30', text: 'text-purple-700 dark:text-purple-300', btn: 'bg-purple-200 hover:bg-purple-300 dark:bg-purple-600/30 dark:hover:bg-purple-600/50' },
+        md: { icon: '📝', bg: 'bg-gray-100 dark:bg-gray-800/50', border: 'border-gray-300 dark:border-gray-500/30', text: 'text-gray-700 dark:text-gray-300', btn: 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-600/30 dark:hover:bg-gray-600/50' },
+        txt: { icon: '📃', bg: 'bg-gray-100 dark:bg-gray-800/50', border: 'border-gray-300 dark:border-gray-500/30', text: 'text-gray-700 dark:text-gray-300', btn: 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-600/30 dark:hover:bg-gray-600/50' }
       };
       const style = formatStyles[formatKey] || formatStyles.txt;
       
@@ -4864,7 +4864,7 @@
       } else {
         // Error case
         const errorMsg = data?.error || 'Image generation failed';
-        return `<div class="p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300">
+        return `<div class="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg text-red-700 dark:text-red-300">
           <div class="flex items-center gap-2">
             <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -4879,7 +4879,7 @@
     if (toolName === 'image_gen_status') {
       const available = data?.available || false;
       const message = data?.message || (available ? 'Image generation is available' : 'Image generation not configured');
-      return `<div class="p-3 ${available ? 'bg-green-900/20 border-green-500/30 text-green-300' : 'bg-yellow-900/20 border-yellow-500/30 text-yellow-300'} border rounded-lg">
+      return `<div class="p-3 ${available ? 'bg-green-100 dark:bg-green-900/20 border-green-300 dark:border-green-500/30 text-green-700 dark:text-green-300' : 'bg-yellow-100 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-500/30 text-yellow-700 dark:text-yellow-300'} border rounded-lg">
         <div class="flex items-center gap-2">
           <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${available ? 'M5 13l4 4L19 7' : 'M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z'}"/>
@@ -4893,11 +4893,11 @@
     if (toolName === 'sandbox_create_file' && data?.success) {
       const path = data.path || 'item';
       const type = data.type || 'file';
-      return `<div class="flex items-center gap-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300">
+      return `<div class="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
-        <span>Created ${type} <code class="bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></span>
+        <span>Created ${type} <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></span>
       </div>`;
     }
     
@@ -4908,33 +4908,33 @@
         const projectName = data.project_name || 'project';
         const projectType = data.template_name || data.project_type || 'Project';
         const runHint = data.run_hint || '';
-        return `<div class="p-4 bg-green-900/20 border border-green-500/30 rounded-lg">
-          <div class="flex items-center gap-2 text-green-300 mb-3">
+        return `<div class="p-4 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg">
+          <div class="flex items-center gap-2 text-green-700 dark:text-green-300 mb-3">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <span class="font-semibold text-lg">${escapeHtml(projectType)} Created!</span>
           </div>
-          <div class="mb-3 text-gray-300">
-            <span class="text-gray-400">Project:</span> <code class="bg-gray-700 px-2 py-0.5 rounded text-green-300">${escapeHtml(projectName)}</code>
+          <div class="mb-3 text-gray-700 dark:text-gray-300">
+            <span class="text-gray-500 dark:text-gray-400">Project:</span> <code class="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded text-green-700 dark:text-green-300">${escapeHtml(projectName)}</code>
           </div>
           <details class="mb-3">
-            <summary class="cursor-pointer text-gray-400 text-sm hover:text-gray-300">${files.length} files created</summary>
-            <ul class="mt-2 text-sm text-gray-400 space-y-1 ml-4">
+            <summary class="cursor-pointer text-gray-500 dark:text-gray-400 text-sm hover:text-gray-600 dark:hover:text-gray-300">${files.length} files created</summary>
+            <ul class="mt-2 text-sm text-gray-500 dark:text-gray-400 space-y-1 ml-4">
               ${files.map(f => `<li class="flex items-center gap-1"><svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg> ${escapeHtml(f)}</li>`).join('')}
             </ul>
           </details>
-          ${runHint ? `<div class="p-2 bg-gray-800/50 rounded text-sm text-gray-300"><span class="text-gray-500">To run:</span> <code class="text-blue-300">${escapeHtml(runHint)}</code></div>` : ''}
+          ${runHint ? `<div class="p-2 bg-gray-100 dark:bg-gray-800/50 rounded text-sm text-gray-700 dark:text-gray-300"><span class="text-gray-500">To run:</span> <code class="text-blue-600 dark:text-blue-300">${escapeHtml(runHint)}</code></div>` : ''}
         </div>`;
       } else {
-        return `<div class="p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300">
+        return `<div class="p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg text-red-700 dark:text-red-300">
           <div class="flex items-center gap-2">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
             <span>Failed to create project: ${escapeHtml(data?.error || 'Unknown error')}</span>
           </div>
-          ${data?.available_types ? `<div class="mt-2 text-sm text-gray-400">Available types: ${data.available_types.join(', ')}</div>` : ''}
+          ${data?.available_types ? `<div class="mt-2 text-sm text-gray-500 dark:text-gray-400">Available types: ${data.available_types.join(', ')}</div>` : ''}
         </div>`;
       }
     }
@@ -4965,7 +4965,7 @@
     // Default: show success message or raw data
     if (data?.success) {
       const msg = data.message || 'Done!';
-      return `<div class="flex items-center gap-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300">
+      return `<div class="flex items-center gap-2 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
         </svg>
@@ -5156,7 +5156,7 @@
       // Model confirmed completion
       console.log('[continueAgentPlanWithPrompt] Model confirmed complete');
       const doneNote = document.createElement('div');
-      doneNote.className = 'mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300';
+      doneNote.className = 'mt-3 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300';
       doneNote.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>All steps completed!</span></div>';
       if (card?.response) card.response.appendChild(doneNote);
     }
@@ -5172,7 +5172,7 @@
     if (depth >= MAX_DEPTH) {
       console.log('[continueAgentPlan] Max depth reached, stopping');
       const summaryNote = document.createElement('div');
-      summaryNote.className = 'mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg text-blue-300';
+      summaryNote.className = 'mt-3 p-3 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-500/30 rounded-lg text-blue-700 dark:text-blue-300';
       summaryNote.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Plan execution complete (max steps reached)</span></div>';
       if (card?.response) card.response.appendChild(summaryNote);
       return;
@@ -5351,7 +5351,7 @@ Have you finished the ORIGINAL REQUEST above?
         if (alreadyExecuted) {
           console.log('[continueAgentPlan] Exact same tool call already executed, stopping to prevent loop:', toolSignature);
           const doneNote = document.createElement('div');
-          doneNote.className = 'mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300';
+          doneNote.className = 'mt-3 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300';
           doneNote.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>Plan complete!</span></div>';
           if (card?.response) card.response.appendChild(doneNote);
           return;
@@ -5389,7 +5389,7 @@ Have you finished the ORIGINAL REQUEST above?
           }
         } catch (e) {
           console.error('[continueAgentPlan] Tool execution failed:', e);
-          execNote.className = 'mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300';
+          execNote.className = 'mt-3 p-3 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg text-red-700 dark:text-red-300';
           execNote.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg><span>Tool failed: ' + escapeHtml(e.message) + '</span></div>';
         }
       } else {
@@ -5425,7 +5425,7 @@ Is the ORIGINAL REQUEST complete? If not, output the next sandbox_delete. If don
           console.log('[continueAgentPlan] No more tool calls detected, plan complete');
           if (formattedContent && formattedContent.length > 20) {
             const doneNote = document.createElement('div');
-            doneNote.className = 'mt-3 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-300';
+            doneNote.className = 'mt-3 p-3 bg-green-100 dark:bg-green-900/20 border border-green-300 dark:border-green-500/30 rounded-lg text-green-700 dark:text-green-300';
             doneNote.innerHTML = '<div class="flex items-center gap-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg><span>All steps completed!</span></div>';
             if (card?.response) card.response.appendChild(doneNote);
           }
