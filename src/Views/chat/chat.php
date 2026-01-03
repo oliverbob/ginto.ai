@@ -517,14 +517,19 @@
     .action-btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 1.75rem; height: 1.75rem; border-radius: 50%;
-      color: #000000; transition: all 0.15s; background: transparent; border: none; cursor: pointer;
+      color: #1a1a1a; transition: all 0.15s; background: transparent; border: none; cursor: pointer;
     }
+    .action-btn svg { width: 1rem; height: 1rem; stroke: #1a1a1a; }
     .dark .action-btn { color: #ffffff; }
-    .action-btn:hover { background: rgba(0,0,0,0.1); color: #000000; }
+    .dark .action-btn svg { stroke: #ffffff; }
+    .action-btn:hover { background: rgba(0,0,0,0.15); color: #000000; }
+    .action-btn:hover svg { stroke: #000000; }
     .dark .action-btn:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
+    .dark .action-btn:hover svg { stroke: #ffffff; }
     .action-btn.active { color: #0084ff; }
+    .action-btn.active svg { stroke: #0084ff; }
     .dark .action-btn.active { color: #0084ff; }
-    .action-btn svg { width: 1rem; height: 1rem; }
+    .dark .action-btn.active svg { stroke: #0084ff; }
     
     /* Action group with dropdown - messenger style */
     .action-group { position: relative; }

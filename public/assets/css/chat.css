@@ -557,17 +557,31 @@
   background: transparent !important;
   border: none !important;
   cursor: pointer !important;
-  color: #000000 !important;
+  color: #1a1a1a !important;
   transition: all 0.15s !important;
+}
+
+.user-action-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke: #1a1a1a !important;
 }
 
 .dark .user-action-btn {
   color: #ffffff !important;
 }
 
+.dark .user-action-btn svg {
+  stroke: #ffffff !important;
+}
+
 .user-action-btn:hover {
-  background: rgba(0, 0, 0, 0.1) !important;
+  background: rgba(0, 0, 0, 0.15) !important;
   color: #000000 !important;
+}
+
+.user-action-btn:hover svg {
+  stroke: #000000 !important;
 }
 
 .dark .user-action-btn:hover {
@@ -575,9 +589,8 @@
   color: #ffffff !important;
 }
 
-.user-action-btn svg {
-  width: 14px !important;
-  height: 14px !important;
+.dark .user-action-btn:hover svg {
+  stroke: #ffffff !important;
 }
 
 /* ============ EDIT IN PLACE ============ */
