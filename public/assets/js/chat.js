@@ -3286,12 +3286,47 @@
     }
     
     if (elements.userEditBtn) {
+      const userMsgContent = elements.userBubble?.querySelector('.user-message-content');
+      const editArea = elements.userBubble?.querySelector('.user-message-edit-area');
+      const editTextarea = elements.userBubble?.querySelector('.user-edit-textarea');
+      const editCancelBtn = elements.userBubble?.querySelector('.user-edit-cancel-btn');
+      const editSaveBtn = elements.userBubble?.querySelector('.user-edit-save-btn');
+      
       elements.userEditBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (promptEl) {
-          promptEl.value = query;
-          promptEl.focus();
-          promptEl.setSelectionRange(0, promptEl.value.length);
+        if (userMsgContent && editArea && editTextarea) {
+          editTextarea.value = query;
+          userMsgContent.classList.add('hidden');
+          editArea.classList.remove('hidden');
+          editTextarea.focus();
+          editTextarea.setSelectionRange(editTextarea.value.length, editTextarea.value.length);
+        }
+      });
+      
+      // Cancel edit
+      editCancelBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (userMsgContent && editArea) {
+          editArea.classList.add('hidden');
+          userMsgContent.classList.remove('hidden');
+        }
+      });
+      
+      // Save & Send edited message
+      editSaveBtn?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const newQuery = editTextarea?.value?.trim();
+        if (newQuery && promptEl && sendBtn) {
+          editArea.classList.add('hidden');
+          userMsgContent.classList.remove('hidden');
+          // Update the displayed message
+          userMsgContent.textContent = newQuery;
+          // Mark as regeneration to store alternative
+          const lastUserMsg = history.filter(m => m.role === 'user' && m.content === query).pop();
+          window._regeneratingPromptId = lastUserMsg?.id || lastUserMsg?.ts || Date.now();
+          window._editedPromptText = newQuery;
+          promptEl.value = newQuery;
+          sendBtn.click();
         }
       });
     }
@@ -4835,22 +4870,22 @@
         const model = data.model || 'Imagen';
         const text = data.text || '';
         
-        return `<div class="p-4 bg-purple-100 dark:bg-purple-900/20 border border-purple-300 dark:border-purple-500/30 rounded-lg">
-          <div class="flex items-center gap-2 text-purple-700 dark:text-purple-300 mb-3">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        return `<div class="p-4 bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-800/50 dark:to-gray-900/50 border border-slate-200 dark:border-slate-600/30 rounded-xl shadow-sm">
+          <div class="flex items-center gap-2 text-slate-700 dark:text-slate-200 mb-3">
+            <svg class="w-5 h-5 text-indigo-500 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
             <span class="font-semibold">Image Generated</span>
-            <span class="text-xs text-purple-500 dark:text-purple-400/70 ml-auto">${escapeHtml(model)}</span>
+            <span class="text-xs text-slate-500 dark:text-slate-400 ml-auto">${escapeHtml(model)}</span>
           </div>
-          ${text ? `<p class="text-gray-700 dark:text-gray-300 text-sm mb-3">${escapeHtml(text)}</p>` : ''}
+          ${text ? `<p class="text-slate-600 dark:text-slate-300 text-sm mb-3">${escapeHtml(text)}</p>` : ''}
           <div class="flex flex-wrap gap-3">
             ${images.map((img, idx) => `
               <div class="relative group">
                 <img 
                   src="${escapeHtml(img.dataUrl || img.url)}" 
                   alt="${escapeHtml(prompt)}"
-                  class="max-w-[200px] max-h-[200px] rounded-lg shadow-lg cursor-pointer hover:opacity-90 hover:scale-105 transition-all border border-purple-300 dark:border-purple-500/30"
+                  class="max-w-[200px] max-h-[200px] rounded-xl shadow-md cursor-pointer hover:shadow-lg hover:scale-105 transition-all border border-slate-200 dark:border-slate-600/50"
                   onclick="window.showImageModal && window.showImageModal('${escapeHtml(img.url || img.dataUrl)}')"
                   loading="lazy"
                   title="Click to view full size"
@@ -4858,8 +4893,7 @@
               </div>
             `).join('')}
           </div>
-          <p class="text-xs text-gray-600 dark:text-gray-500 mt-3 italic">"${escapeHtml(prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt)}"</p>
-          <p class="text-xs text-purple-500 dark:text-purple-400/60 mt-1">Click image to view full size</p>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-3 italic">"${escapeHtml(prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt)}"</p>
         </div>`;
       } else {
         // Error case

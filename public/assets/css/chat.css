@@ -499,22 +499,22 @@
   background: transparent !important;
   border: none !important;
   cursor: pointer !important;
-  color: #65676b !important;
+  color: #000000 !important;
   transition: all 0.15s !important;
 }
 
 .dark .messenger-action-btn {
-  color: #9ca3af !important;
+  color: #ffffff !important;
 }
 
 .messenger-action-btn:hover {
-  background: rgba(0, 0, 0, 0.08) !important;
-  color: #050505 !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
 }
 
 .dark .messenger-action-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
-  color: #e4e6eb !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
 }
 
 .messenger-action-btn.active {
@@ -557,21 +557,21 @@
   background: transparent !important;
   border: none !important;
   cursor: pointer !important;
-  color: rgba(107, 114, 128, 0.7) !important;
+  color: #000000 !important;
   transition: all 0.15s !important;
 }
 
 .dark .user-action-btn {
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: #ffffff !important;
 }
 
 .user-action-btn:hover {
-  background: rgba(0, 0, 0, 0.08) !important;
-  color: #111827 !important;
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
 }
 
 .dark .user-action-btn:hover {
-  background: rgba(255, 255, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
   color: #ffffff !important;
 }
 

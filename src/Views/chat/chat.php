@@ -517,11 +517,11 @@
     .action-btn {
       display: inline-flex; align-items: center; justify-content: center;
       width: 1.75rem; height: 1.75rem; border-radius: 50%;
-      color: #65676b; transition: all 0.15s; background: transparent; border: none; cursor: pointer;
+      color: #000000; transition: all 0.15s; background: transparent; border: none; cursor: pointer;
     }
-    .dark .action-btn { color: #b0b3b8; }
-    .action-btn:hover { background: rgba(0,0,0,0.05); color: #050505; }
-    .dark .action-btn:hover { background: rgba(255,255,255,0.1); color: #e4e6eb; }
+    .dark .action-btn { color: #ffffff; }
+    .action-btn:hover { background: rgba(0,0,0,0.1); color: #000000; }
+    .dark .action-btn:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
     .action-btn.active { color: #0084ff; }
     .dark .action-btn.active { color: #0084ff; }
     .action-btn svg { width: 1rem; height: 1rem; }
