@@ -3186,7 +3186,7 @@
         <!-- Response Section -->
         <div class="card-response-label response-label hidden">Response</div>
         <div class="card-response prose">
-          <p class="text-gray-400 thinking-indicator-wrapper" style="display:flex;align-items:center;"><span class="dancing-dots"><span>•</span><span>•</span><span>•</span></span></p>
+          <p class="text-gray-500 dark:text-gray-400 thinking-indicator-wrapper" style="display:flex;align-items:center;"><span class="dancing-dots"><span>•</span><span>•</span><span>•</span></span></p>
         </div>
         
         <!-- Footer Actions -->
@@ -3925,13 +3925,13 @@
               // Mark that we have tool results - don't overwrite with text
               currentCard.hasToolResults = true;
               const toolNote = document.createElement('div');
-              toolNote.className = 'mt-3 p-3 bg-gray-800/50 border border-gray-700 rounded-lg tool-exec-' + (data.tool_name || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
-              toolNote.innerHTML = `<div class="flex items-center gap-2 text-gray-300">
+              toolNote.className = 'mt-3 p-3 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg tool-exec-' + (data.tool_name || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
+              toolNote.innerHTML = `<div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
                 <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                   <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                <span>Executing <code class="bg-gray-700 px-1 rounded">${escapeHtml(data.tool_name || 'tool')}</code>...</span>
+                <span>Executing <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(data.tool_name || 'tool')}</code>...</span>
               </div>`;
               currentCard.response.appendChild(toolNote);
               smartScrollToElement(toolNote, { behavior: 'smooth', block: 'end' });
@@ -4129,7 +4129,7 @@
                 setTimeout(() => initStickyCodeButtons(), 100);
               } else if (data.contentEmpty && data.reasoningHtml) {
                 // Content was empty, show informative message
-                currentCard.response.innerHTML = '<p class="text-gray-400 italic">The model\'s analysis is shown in the reasoning section above.</p>';
+                currentCard.response.innerHTML = '<p class="text-gray-500 dark:text-gray-400 italic">The model\'s analysis is shown in the reasoning section above.</p>';
               }
               
               if (data.reasoningHtml) {
@@ -4669,12 +4669,12 @@
       }
       
       let html = '<div class="space-y-2">';
-      html += '<p class="text-gray-300">Here are your files:</p>';
-      html += '<div class="bg-gray-800/50 rounded-lg p-3 font-mono text-sm">';
+      html += '<p class="text-gray-700 dark:text-gray-300">Here are your files:</p>';
+      html += '<div class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 font-mono text-sm">';
       
       // Show folders first
       for (const folder of folders.sort()) {
-        html += `<div class="flex items-center gap-2 text-blue-400 py-0.5">
+        html += `<div class="flex items-center gap-2 text-blue-600 dark:text-blue-400 py-0.5">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"/>
           </svg>
@@ -4684,7 +4684,7 @@
       
       // Then files
       for (const file of files.sort()) {
-        html += `<div class="flex items-center gap-2 text-gray-300 py-0.5">
+        html += `<div class="flex items-center gap-2 text-gray-700 dark:text-gray-300 py-0.5">
           <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
           </svg>
@@ -4707,8 +4707,8 @@
       const ext = path.split('.').pop()?.toLowerCase() || '';
       
       return `<div class="space-y-2">
-        <p class="text-gray-300">Contents of <code class="bg-gray-700 px-1 rounded">${escapeHtml(path)}</code>:</p>
-        <pre class="bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-96"><code>${escapeHtml(content)}</code></pre>
+        <p class="text-gray-700 dark:text-gray-300">Contents of <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code>:</p>
+        <pre class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-96 text-gray-800 dark:text-gray-200"><code>${escapeHtml(content)}</code></pre>
       </div>`;
     }
     
@@ -4784,29 +4784,29 @@
     // sandbox_list_document_formats - show available formats
     if (toolName === 'sandbox_list_document_formats' && data?.formats) {
       const formats = data.formats || [];
-      return `<div class="p-4 bg-gray-800/50 rounded-lg">
-        <div class="font-medium text-gray-200 mb-3">📄 Available Document Formats</div>
+      return `<div class="p-4 bg-gray-100 dark:bg-gray-800/50 rounded-lg">
+        <div class="font-medium text-gray-800 dark:text-gray-200 mb-3">📄 Available Document Formats</div>
         <div class="grid gap-2">
           ${formats.map(f => `
-            <div class="flex items-center gap-3 p-2 bg-gray-700/30 rounded">
-              <code class="bg-gray-600 px-2 py-0.5 rounded text-sm text-blue-300">${escapeHtml(f.format)}</code>
-              <span class="text-gray-300">${escapeHtml(f.name)}</span>
+            <div class="flex items-center gap-3 p-2 bg-gray-200/50 dark:bg-gray-700/30 rounded">
+              <code class="bg-gray-300 dark:bg-gray-600 px-2 py-0.5 rounded text-sm text-blue-600 dark:text-blue-300">${escapeHtml(f.format)}</code>
+              <span class="text-gray-700 dark:text-gray-300">${escapeHtml(f.name)}</span>
               <span class="text-gray-500 text-sm">${escapeHtml(f.extension)}</span>
             </div>
           `).join('')}
         </div>
-        ${data.tip ? `<div class="text-xs text-gray-400 mt-3">💡 ${escapeHtml(data.tip)}</div>` : ''}
+        ${data.tip ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-3">💡 ${escapeHtml(data.tip)}</div>` : ''}
       </div>`;
     }
     
     // sandbox_delete - confirm file was deleted
     if (toolName === 'sandbox_delete' && data?.success) {
       const path = data.path || 'file';
-      return `<div class="flex items-center gap-2 p-3 bg-amber-900/20 border border-amber-500/30 rounded-lg text-amber-300">
+      return `<div class="flex items-center gap-2 p-3 bg-amber-100 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-500/30 rounded-lg text-amber-700 dark:text-amber-300">
         <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
         </svg>
-        <span>Deleted <code class="bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></span>
+        <span>Deleted <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></span>
       </div>`;
     }
     
@@ -4817,13 +4817,13 @@
       const isError = exitCode !== 0;
       
       return `<div class="space-y-2">
-        <div class="flex items-center gap-2 ${isError ? 'text-red-300' : 'text-green-300'}">
+        <div class="flex items-center gap-2 ${isError ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
           </svg>
           <span>Command ${isError ? 'failed' : 'completed'}</span>
         </div>
-        ${output ? `<pre class="bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-64 text-gray-300"><code>${escapeHtml(output)}</code></pre>` : ''}
+        ${output ? `<pre class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-64 text-gray-800 dark:text-gray-300"><code>${escapeHtml(output)}</code></pre>` : ''}
       </div>`;
     }
     
@@ -4835,22 +4835,22 @@
         const model = data.model || 'Imagen';
         const text = data.text || '';
         
-        return `<div class="p-4 bg-purple-900/20 border border-purple-500/30 rounded-lg">
-          <div class="flex items-center gap-2 text-purple-300 mb-3">
+        return `<div class="p-4 bg-purple-100 dark:bg-purple-900/20 border border-purple-300 dark:border-purple-500/30 rounded-lg">
+          <div class="flex items-center gap-2 text-purple-700 dark:text-purple-300 mb-3">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
             </svg>
             <span class="font-semibold">Image Generated</span>
-            <span class="text-xs text-purple-400/70 ml-auto">${escapeHtml(model)}</span>
+            <span class="text-xs text-purple-500 dark:text-purple-400/70 ml-auto">${escapeHtml(model)}</span>
           </div>
-          ${text ? `<p class="text-gray-300 text-sm mb-3">${escapeHtml(text)}</p>` : ''}
+          ${text ? `<p class="text-gray-700 dark:text-gray-300 text-sm mb-3">${escapeHtml(text)}</p>` : ''}
           <div class="flex flex-wrap gap-3">
             ${images.map((img, idx) => `
               <div class="relative group">
                 <img 
                   src="${escapeHtml(img.dataUrl || img.url)}" 
                   alt="${escapeHtml(prompt)}"
-                  class="max-w-[200px] max-h-[200px] rounded-lg shadow-lg cursor-pointer hover:opacity-90 hover:scale-105 transition-all border border-purple-500/30"
+                  class="max-w-[200px] max-h-[200px] rounded-lg shadow-lg cursor-pointer hover:opacity-90 hover:scale-105 transition-all border border-purple-300 dark:border-purple-500/30"
                   onclick="window.showImageModal && window.showImageModal('${escapeHtml(img.url || img.dataUrl)}')"
                   loading="lazy"
                   title="Click to view full size"
@@ -4858,8 +4858,8 @@
               </div>
             `).join('')}
           </div>
-          <p class="text-xs text-gray-500 mt-3 italic">"${escapeHtml(prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt)}"</p>
-          <p class="text-xs text-purple-400/60 mt-1">Click image to view full size</p>
+          <p class="text-xs text-gray-600 dark:text-gray-500 mt-3 italic">"${escapeHtml(prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt)}"</p>
+          <p class="text-xs text-purple-500 dark:text-purple-400/60 mt-1">Click image to view full size</p>
         </div>`;
       } else {
         // Error case
@@ -4942,23 +4942,23 @@
     // sandbox_list_project_types - show available templates
     if (toolName === 'sandbox_list_project_types' && data?.success) {
       const types = data.project_types || [];
-      return `<div class="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-        <div class="flex items-center gap-2 text-gray-200 mb-3">
-          <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      return `<div class="p-4 bg-gray-100 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-700 rounded-lg">
+        <div class="flex items-center gap-2 text-gray-800 dark:text-gray-200 mb-3">
+          <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
           </svg>
           <span class="font-semibold">Available Project Templates</span>
         </div>
         <div class="grid gap-2">
-          ${types.map(t => `<div class="p-2 bg-gray-900/50 rounded flex items-center justify-between">
+          ${types.map(t => `<div class="p-2 bg-gray-200/50 dark:bg-gray-900/50 rounded flex items-center justify-between">
             <div>
-              <code class="text-blue-300 font-mono">${escapeHtml(t.type)}</code>
-              <span class="text-gray-400 ml-2">${escapeHtml(t.name)}</span>
+              <code class="text-blue-600 dark:text-blue-300 font-mono">${escapeHtml(t.type)}</code>
+              <span class="text-gray-600 dark:text-gray-400 ml-2">${escapeHtml(t.name)}</span>
             </div>
             <span class="text-xs text-gray-500">${escapeHtml(t.description)}</span>
           </div>`).join('')}
         </div>
-        <div class="mt-3 text-sm text-gray-400">Use: "Create a [type] project called [name]"</div>
+        <div class="mt-3 text-sm text-gray-600 dark:text-gray-400">Use: "Create a [type] project called [name]"</div>
       </div>`;
     }
     
