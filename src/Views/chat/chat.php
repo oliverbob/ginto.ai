@@ -890,19 +890,20 @@
     }
     .convo-card-chevron { display: none !important; }
     
-    /* Assistant response - left aligned, dark background like welcome card */
+    /* Assistant response - LIGHT MODE (default) */
     .convo-card-body {
       border-top: none !important; 
       margin-left: 0 !important; 
       margin-top: 8px !important;
       position: relative !important;
-      background: linear-gradient(to bottom right, rgba(67, 56, 202, 0.06), rgba(17, 24, 39, 0.4), rgba(88, 28, 135, 0.06)) !important;
-      border: 1px solid rgba(99, 102, 241, 0.12) !important;
+      background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.08), rgba(248, 250, 252, 0.95), rgba(168, 85, 247, 0.08)) !important;
+      border: 1px solid rgba(99, 102, 241, 0.2) !important;
       border-radius: 18px 18px 18px 4px !important;
       padding: 10px !important;
       overflow: visible !important;
       z-index: 1 !important;
     }
+    /* Assistant response - DARK MODE */
     .dark .convo-card-body { 
       border-top-color: transparent !important; 
       background: linear-gradient(to bottom right, rgba(67, 56, 202, 0.06), rgba(17, 24, 39, 0.4), rgba(88, 28, 135, 0.06)) !important;
@@ -916,16 +917,17 @@
       content: none !important;
     }
     
-    /* Response content - transparent, inherits gradient from parent */
+    /* Response content - LIGHT MODE (default) */
     .card-response {
       background: transparent !important;
-      color: #e4e6eb !important;
+      color: #1f2937 !important;
       padding: 12px 16px !important;
       border-radius: 0 !important;
       display: block !important; 
       max-width: none !important;
       width: 100% !important;
     }
+    /* Response content - DARK MODE */
     .dark .card-response { 
       background: transparent !important; 
       color: #e4e6eb !important;
