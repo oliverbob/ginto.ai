@@ -731,6 +731,47 @@ EOF
 }
 
 #-------------------------------------------------------------------------------
+# Setup lightpanda-mcp for web search (Panda Search)
+# This provides AI-powered web search using Lightpanda headless browser
+#-------------------------------------------------------------------------------
+setup_lightpanda_mcp() {
+    local GINTO_DIR
+    GINTO_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
+    local LIGHTPANDA_DIR="$GINTO_DIR/tools/lightpanda-mcp"
+    
+    if [[ ! -d "$LIGHTPANDA_DIR" ]]; then
+        log_warn "Lightpanda MCP directory not found: $LIGHTPANDA_DIR"
+        log_info "Skipping lightpanda-mcp setup"
+        return 0
+    fi
+    
+    # Check if node is available
+    if ! command -v node &>/dev/null; then
+        log_warn "Node.js not found, skipping lightpanda-mcp setup"
+        return 0
+    fi
+    
+    log_info "Setting up lightpanda-mcp (Panda Search)..."
+    
+    # Install npm dependencies if needed
+    if [[ ! -d "$LIGHTPANDA_DIR/node_modules" ]]; then
+        log_info "Installing lightpanda-mcp dependencies..."
+        (cd "$LIGHTPANDA_DIR" && npm install) || {
+            log_error "Failed to install lightpanda-mcp dependencies"
+            return 1
+        }
+    fi
+    
+    # Download/upgrade Lightpanda browser binary
+    log_info "Downloading Lightpanda browser binary..."
+    (cd "$LIGHTPANDA_DIR" && npx @lightpanda/browser upgrade 2>/dev/null) || {
+        log_warn "Lightpanda browser download failed (may retry on next run)"
+    }
+    
+    log_success "lightpanda-mcp (Panda Search) setup complete"
+}
+
+#-------------------------------------------------------------------------------
 # Command: init
 #-------------------------------------------------------------------------------
 cmd_init() {
@@ -945,6 +986,9 @@ EOF
     
     # Setup sandbox-proxy service
     setup_sandbox_proxy
+    
+    # Setup lightpanda-mcp for web search
+    setup_lightpanda_mcp
     
     # Upgrade existing sandboxes with latest packages (e.g., VNC support)
     local running_sandboxes
