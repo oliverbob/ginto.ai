@@ -4462,7 +4462,14 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
         const res = await fetch('/api/sandbox/status', { credentials: 'same-origin' });
         const data = await res.json().catch(() => null);
         if (data && data.status) {
-          updateSandboxStatusIndicator(data.container_status || data.status);
+          // Only show indicator if sandbox actually exists
+          if (data.status === 'not_created' || data.status === 'not_installed') {
+            // Hide indicator when no sandbox exists
+            const indicator = document.getElementById('sandbox-status-indicator');
+            if (indicator) indicator.classList.add('hidden');
+          } else {
+            updateSandboxStatusIndicator(data.container_status || data.status);
+          }
         }
       } catch (e) {
         // ignore
