@@ -4428,25 +4428,26 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
       const dot = indicator.querySelector('span');
       if (!dot) return;
       
-      indicator.classList.remove('hidden');
-      
       switch (status) {
         case 'running':
         case 'ready':
+          indicator.classList.remove('hidden');
           dot.className = 'w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse';
           dot.title = 'Sandbox running';
           break;
         case 'stopped':
         case 'installed':
+          indicator.classList.remove('hidden');
           dot.className = 'w-2 h-2 rounded-full bg-amber-500 inline-block';
           dot.title = 'Sandbox stopped';
           break;
         case 'not_created':
         case 'not_installed':
-          dot.className = 'w-2 h-2 rounded-full bg-gray-400 inline-block';
-          dot.title = 'Sandbox not installed';
+          // Hide indicator when no sandbox exists
+          indicator.classList.add('hidden');
           break;
         case 'error':
+          indicator.classList.remove('hidden');
           dot.className = 'w-2 h-2 rounded-full bg-red-500 inline-block';
           dot.title = 'Sandbox error';
           break;
