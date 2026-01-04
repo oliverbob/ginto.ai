@@ -605,53 +605,50 @@ class DockerSandboxManager
      */
     public static function listFiles(string $sandboxId, string $path = '/home/sandbox', int $maxDepth = 5): array
     {
-        // Use find command to list files recursively
-        $cmd = 'find ' . escapeshellarg($path) . ' -maxdepth ' . $maxDepth . ' -printf "%y %p\n" 2>/dev/null | head -500';
+        // Use ls -la which works on all systems including BusyBox
+        $cmd = 'ls -la ' . escapeshellarg($path) . ' 2>/dev/null';
         [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
         
-        if ($code !== 0 || empty($stdout)) {
-            // Fallback to ls
-            $cmd = 'ls -la ' . escapeshellarg($path) . ' 2>/dev/null';
-            [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
-            
-            if ($code !== 0) {
-                return [
-                    'success' => false,
-                    'error' => $stderr ?: 'Failed to list files',
-                    'tree' => []
-                ];
-            }
+        if ($code !== 0) {
+            return [
+                'success' => false,
+                'error' => $stderr ?: 'Failed to list files',
+                'tree' => []
+            ];
         }
         
-        // Build tree structure from find output
+        // Parse ls -la output
         $tree = [];
         $lines = explode("\n", trim($stdout));
         
         foreach ($lines as $line) {
             $line = trim($line);
             if (empty($line)) continue;
+            if (strpos($line, 'total ') === 0) continue; // Skip total line
             
-            // Parse find output: "d /home/sandbox/Documents" or "f /home/sandbox/index.php"
-            if (preg_match('/^([df])\s+(.+)$/', $line, $matches)) {
-                $type = $matches[1];
-                $fullPath = $matches[2];
-                $name = basename($fullPath);
-                $relativePath = str_replace($path . '/', '', $fullPath);
-                
-                // Skip hidden files at root level except specific ones
-                if ($fullPath === $path) continue;
-                if (strpos($name, '.') === 0 && !in_array($name, ['.config', '.local', '.pki'])) continue;
-                
-                // Only include first-level items for the tree
-                if (substr_count($relativePath, '/') === 0) {
-                    $tree[] = [
-                        'name' => $name,
-                        'path' => $fullPath,
-                        'type' => ($type === 'd') ? 'directory' : 'file',
-                        'children' => ($type === 'd') ? [] : null
-                    ];
-                }
-            }
+            // Parse ls -la output: drwxr-xr-x  2 sandbox sandbox  4096 Jan  4 14:13 Desktop
+            // First character: d=directory, -=file, l=link
+            $type = substr($line, 0, 1);
+            if ($type !== 'd' && $type !== '-' && $type !== 'l') continue;
+            
+            // Get filename (last column, may contain spaces)
+            $parts = preg_split('/\s+/', $line, 9);
+            if (count($parts) < 9) continue;
+            
+            $name = $parts[8];
+            if ($name === '.' || $name === '..') continue;
+            
+            // Skip hidden files except specific ones
+            if (strpos($name, '.') === 0 && !in_array($name, ['.config', '.local', '.pki'])) continue;
+            
+            $fullPath = rtrim($path, '/') . '/' . $name;
+            
+            $tree[] = [
+                'name' => $name,
+                'path' => $fullPath,
+                'type' => ($type === 'd') ? 'directory' : 'file',
+                'children' => ($type === 'd') ? [] : null
+            ];
         }
         
         // Sort: directories first, then files, alphabetically
