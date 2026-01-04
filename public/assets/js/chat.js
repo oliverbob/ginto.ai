@@ -234,6 +234,14 @@
     // Preprocess: fix PHP code blocks
     markdown = fixPhpCodeBlocks(markdown);
     
+    // Preprocess: fix malformed markdown from LLM output
+    // Fix broken bold/italic markers with spaces: "* *" -> "**", "* " at end -> "*"
+    markdown = markdown.replace(/\*\s+\*/g, '**');  // "* *" -> "**"
+    markdown = markdown.replace(/\*\*\s+\*\*/g, '****');  // "** **" -> "****" (will be fixed next)
+    markdown = markdown.replace(/\*{4,}/g, '**');  // "****+" -> "**"
+    markdown = markdown.replace(/\*\s+(?=[a-zA-Z0-9])/g, '*');  // "* word" -> "*word" (fix opening)
+    markdown = markdown.replace(/([a-zA-Z0-9])\s+\*/g, '$1*');  // "word *" -> "word*" (fix closing)
+    
     // Preprocess: fix headings without space after # (LLM often outputs ###1. instead of ### 1.)
     markdown = markdown.replace(/^(#{1,6})([^\s#])/gm, '$1 $2');
     
