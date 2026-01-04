@@ -948,7 +948,8 @@ Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
             }
             ksort($folders, SORT_NATURAL | SORT_FLAG_CASE);
             ksort($files, SORT_NATURAL | SORT_FLAG_CASE);
-            $tree = array_merge($folders, $files);
+            // Use array replace instead of merge to preserve string keys and reference
+            $tree = $folders + $files;
         };
         
         $sortTree($tree);

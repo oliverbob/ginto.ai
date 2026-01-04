@@ -1500,7 +1500,8 @@ class LxdSandboxManager
             }
             ksort($folders, SORT_NATURAL | SORT_FLAG_CASE);
             ksort($files, SORT_NATURAL | SORT_FLAG_CASE);
-            $tree = array_merge($folders, $files);
+            // Use + operator instead of array_merge to preserve string keys
+            $tree = $folders + $files;
         };
         $sortTree($tree);
         

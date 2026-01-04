@@ -79,7 +79,7 @@ The "My Files" interface follows the familiar [Microsoft Windows](https://www.mi
 - **Memory** - context retention for smarter, personalized responses
 - **Groq TTS** - Text-to-speech adopted from the original [Groq MCP Server](https://github.com/groq/groq-mcp-server/)
 
-### � Panda Search
+### 🐼 Panda Search
 - **AI-powered web search** - Real-time web search integrated into chat conversations
 - **LightPanda browser engine** - Fast, headless browser for web content extraction
 - **Activity timeline** - Collapsible view showing search queries and sources
