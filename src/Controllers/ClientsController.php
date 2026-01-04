@@ -133,27 +133,32 @@ class ClientsController
             exit;
         }
         
-        // Ensure container is running, network is migrated if needed, routes and services ready
-        if (!\Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId)) {
-            // Try starting if it doesn't exist yet
-            $started = \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($sandboxId);
+        // Use UnifiedSandbox to support both Docker and LXD backends
+        $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+        
+        // Ensure container is running
+        if (!\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
+            // Try starting it
+            $startResult = \Ginto\Helpers\UnifiedSandbox::ensureRunning($sandboxId);
             
-            if (!$started) {
+            if (!$startResult['success']) {
                 http_response_code(503);
                 header('Content-Type: text/html; charset=utf-8');
                 echo '<h1>503 - Sandbox Unavailable</h1><p>Your sandbox could not be started. Please try again.</p>';
                 exit;
             }
             
-            // Try again after starting
-            \Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId);
-            
             // Wait a moment for container to fully initialize
             usleep(500000); // 0.5 seconds
         }
         
-        // Get container IP - queries LXD for actual IP in bridge/nat mode
-        $containerIp = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
+        // For LXD, also ensure network routes are set up
+        if ($backend === 'lxd') {
+            \Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId);
+        }
+        
+        // Get container IP - uses UnifiedSandbox which auto-selects backend
+        $containerIp = \Ginto\Helpers\UnifiedSandbox::getIp($sandboxId);
         
         if (!$containerIp) {
             http_response_code(503);
@@ -284,9 +289,9 @@ class ClientsController
                  ($_SERVER['HTTP_HOST'] ?? '') === 'localhost';
         
         if (!$isOwner && $isDev) {
-            // Check if the sandbox actually exists in the system
+            // Check if the sandbox actually exists in the system (works for both Docker and LXD)
             try {
-                if (\Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId)) {
+                if (\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
                     $isOwner = true; // Allow access in dev mode if container exists
                 }
             } catch (\Throwable $e) {
@@ -309,27 +314,32 @@ class ClientsController
             exit;
         }
         
-        // Ensure container is running, routes are set up, and services are ready
-        if (!\Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId)) {
-            // Try harder - maybe it just needs to be started
-            $started = \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($sandboxId);
+        // Use UnifiedSandbox to support both Docker and LXD backends
+        $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+        
+        // Ensure container is running
+        if (!\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
+            // Try starting it
+            $startResult = \Ginto\Helpers\UnifiedSandbox::ensureRunning($sandboxId);
             
-            if (!$started) {
+            if (!$startResult['success']) {
                 http_response_code(503);
                 header('Content-Type: text/html; charset=utf-8');
                 echo '<h1>503 - Sandbox Unavailable</h1><p>Could not start sandbox. Please try again.</p>';
                 exit;
             }
             
-            // Try again to ensure accessibility (routes, caddy)
-            \Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId);
-            
             // Wait for container to initialize
             usleep(500000); // 0.5 seconds
         }
         
-        // Get container IP - queries LXD for actual IP in bridge/nat mode
-        $containerIp = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
+        // For LXD, also ensure network routes are set up
+        if ($backend === 'lxd') {
+            \Ginto\Helpers\LxdSandboxManager::ensureSandboxAccessible($sandboxId);
+        }
+        
+        // Get container IP - uses UnifiedSandbox which auto-selects backend
+        $containerIp = \Ginto\Helpers\UnifiedSandbox::getIp($sandboxId);
         
         if (!$containerIp) {
             http_response_code(503);
