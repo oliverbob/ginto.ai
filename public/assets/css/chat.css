@@ -547,6 +547,7 @@
   opacity: 1 !important;
 }
 
+/* User action buttons - force black in light mode, white in dark mode */
 .user-action-btn {
   display: inline-flex !important;
   align-items: center !important;
@@ -561,17 +562,27 @@
   transition: all 0.15s !important;
 }
 
+html:not(.dark) .user-action-btn {
+  color: #1a1a1a !important;
+}
+
+html:not(.dark) .user-action-btn svg {
+  stroke: #1a1a1a !important;
+}
+
 .user-action-btn svg {
   width: 14px !important;
   height: 14px !important;
   stroke: #1a1a1a !important;
 }
 
-.dark .user-action-btn {
+.dark .user-action-btn,
+html.dark .user-action-btn {
   color: #ffffff !important;
 }
 
-.dark .user-action-btn svg {
+.dark .user-action-btn svg,
+html.dark .user-action-btn svg {
   stroke: #ffffff !important;
 }
 

@@ -520,8 +520,10 @@
       color: #1a1a1a; transition: all 0.15s; background: transparent; border: none; cursor: pointer;
     }
     .action-btn svg { width: 1rem; height: 1rem; stroke: #1a1a1a; }
-    .dark .action-btn { color: #ffffff; }
-    .dark .action-btn svg { stroke: #ffffff; }
+    html:not(.dark) .action-btn { color: #1a1a1a; }
+    html:not(.dark) .action-btn svg { stroke: #1a1a1a; }
+    .dark .action-btn, html.dark .action-btn { color: #ffffff; }
+    .dark .action-btn svg, html.dark .action-btn svg { stroke: #ffffff; }
     .action-btn:hover { background: rgba(0,0,0,0.15); color: #000000; }
     .action-btn:hover svg { stroke: #000000; }
     .dark .action-btn:hover { background: rgba(255,255,255,0.15); color: #ffffff; }
