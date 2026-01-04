@@ -103,6 +103,16 @@
         </button>
       </div>
     </div>
+    
+    <!-- Sandbox Controls (only shown if user has sandbox) -->
+    <div id="sandbox-controls-section" class="hidden">
+      <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Sandbox</h4>
+      <div class="space-y-2">
+        <button id="destroy_sandbox_btn" class="w-full px-3 py-2 text-sm bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg transition-colors text-left">
+          🛑 Destroy Sandbox
+        </button>
+      </div>
+    </div>
   </div>
   
   <!-- Tab Content: MCP (admin only) -->

@@ -178,7 +178,7 @@
         // Only admins have access to the console - open it with install command
         // Use detected path from PHP
         if (typeof window.openConsoleWithCommand === 'function') {
-          window.openConsoleWithCommand('sudo bash <?= addslashes(dirname(__DIR__, 3)) ?>/bin/ginto.sh install');
+          window.openConsoleWithCommand('sudo bash <?= addslashes(dirname(__DIR__, 4)) ?>/bin/ginto.sh install');
           
           // Start polling for install completion in background
           startInstallStatusPollingGlobal();

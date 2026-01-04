@@ -18,7 +18,7 @@
   <title><?= htmlspecialchars($title ?? 'Ginto Chat') ?></title>
   <script>
     // Ginto installation path (detected from PHP)
-    window.GINTO_PATH = <?= json_encode(dirname(__DIR__, 3)) ?>;
+    window.GINTO_PATH = <?= json_encode(dirname(__DIR__, 4)) ?>;
     
     // Sandbox backend type (docker or lxd)
     window.SANDBOX_BACKEND = <?= json_encode($sandboxBackend) ?>;
