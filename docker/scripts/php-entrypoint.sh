@@ -153,6 +153,19 @@ setup_docker_sandbox() {
         return 0
     fi
     
+    # Grant www-data access to Docker socket by matching the socket's group
+    if [ -S /var/run/docker.sock ]; then
+        DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+        if ! getent group docker > /dev/null 2>&1; then
+            groupadd -g "$DOCKER_GID" docker
+            echo "   Created docker group with GID $DOCKER_GID"
+        fi
+        if ! id -nG www-data | grep -qw docker; then
+            usermod -aG docker www-data
+            echo "   Added www-data to docker group"
+        fi
+    fi
+    
     if ! docker info &> /dev/null 2>&1; then
         echo "⚠️ Cannot connect to Docker daemon, skipping Docker sandbox setup"
         return 0
