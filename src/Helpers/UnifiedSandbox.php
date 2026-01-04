@@ -347,6 +347,8 @@ class UnifiedSandbox
     
     /**
      * Get the home directory path for sandboxes
+     * Docker: /home/sandbox (user home)
+     * LXD: /root (root user home directory)
      */
     public static function getHomePath(): string
     {

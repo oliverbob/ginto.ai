@@ -426,10 +426,10 @@ Each sandbox container is created from the `ginto-sandbox` base image. The base 
 
 ### Sandbox Home Directory Structure
 
-The `ginto-sandbox` base template includes a pre-configured `/home/` directory that serves as the root for user files in the `/editor` route (accessed via "My Files" in `/chat`):
+The `ginto-sandbox` base template includes a pre-configured `/root/` directory that serves as the root user home for all user files in the `/editor` route (accessed via "My Files" in `/chat`):
 
 ```
-/home/
+/root/
 ├── index.php      # Welcome page with dev tools info (served at /)
 ├── README.md      # Getting started guide for users
 ├── Desktop/       # Desktop files
@@ -443,12 +443,12 @@ The `ginto-sandbox` base template includes a pre-configured `/home/` directory t
 
 #### Default Files in Template
 
-**`/home/README.md`** - A welcome guide displayed in the editor:
+**`/root/README.md`** - A welcome guide displayed in the editor:
 - Lists available tools (PHP, Node.js, Python, Git, etc.)
 - Quick start examples for PHP, Node.js, and Python projects
 - Web server information (Caddy on port 80)
 
-**`/home/index.php`** - Default landing page that:
+**`/root/index.php`** - Default landing page that:
 - Displays installed tool versions dynamically
 - Shows the Ginto Sandbox welcome interface
 - Includes quick start instructions and links
@@ -459,16 +459,16 @@ These files are automatically available when a user clicks "My Files" in the `/c
 
 The `/editor` route (and `/chat` → "My Files" button) reads files from within the LXC container:
 
-1. **File Tree**: Uses `LxdSandboxManager::execInSandbox()` to run `find /home -type f` inside the container
+1. **File Tree**: Uses `LxdSandboxManager::execInSandbox()` to run `find /root -type f` inside the container
 2. **File Read**: Uses `lxc file pull` to retrieve file contents
 3. **File Write**: Uses `lxc file push` to save edited files
 4. **File Create**: Uses `lxc exec` to create new files/directories
 
-The web root inside each container is `/home/`, configured in Caddy's configuration at `/etc/caddy/Caddyfile`:
+The web root inside each container is `/root/`, configured in Caddy's configuration at `/etc/caddy/Caddyfile`:
 
 ```caddy
 :80 {
-    root * /home
+    root * /root
     php_fastcgi unix//run/php-fpm82.sock
     file_server
     file_server browse
@@ -960,13 +960,13 @@ Note: The sandbox proxy now listens directly on port 1800, so Caddy reverse prox
 Each sandbox container runs:
 - **Caddy**: Web server on port 80
 - **PHP-FPM**: PHP processing
-- **User files**: Mounted at `/home/sandbox`
+- **User files**: Located at `/root/`
 
 Container Caddyfile (`/etc/caddy/Caddyfile`):
 
 ```
 :80 {
-    root * /home/sandbox
+    root * /root
     php_fastcgi unix//run/php-fpm.sock
     file_server
 }
@@ -996,16 +996,16 @@ sudo systemctl enable redis-server
 lxc launch ginto sandbox-user123
 
 # Execute commands
-lxc exec sandbox-user123 -- /bin/sh -c "php /home/sandbox/index.php"
+lxc exec sandbox-user123 -- /bin/sh -c "php /root/index.php"
 
 # Get container IP
 lxc list sandbox-user123 -c 4 --format csv | cut -d' ' -f1
 
 # Copy files in
-lxc file push /local/file.php sandbox-user123/home/sandbox/file.php
+lxc file push /local/file.php sandbox-user123/root/file.php
 
 # Copy files out
-lxc file pull sandbox-user123/home/sandbox/output.txt ./output.txt
+lxc file pull sandbox-user123/root/output.txt ./output.txt
 
 # Stop and delete
 lxc stop sandbox-user123

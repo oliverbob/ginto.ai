@@ -900,6 +900,18 @@ class LxdSandboxManager
         // PHP-FPM service name varies by version (php-fpm82, php-fpm83, php-fpm85, etc.)
         exec(self::LXC_CMD . " exec $name -- sh -c 'rc-service php-fpm* start 2>/dev/null || true' 2>&1");
         
+        // =======================================================================
+        // HOME DIRECTORY SETUP - Ensure /root/ has the proper structure
+        // =======================================================================
+        // Copy user files from /home/ to /root/ if they exist there (legacy templates)
+        exec(self::LXC_CMD . " exec $name -- sh -c 'if [ -d /home/Desktop ] || [ -f /home/index.php ]; then cp -rn /home/* /root/ 2>/dev/null || true; fi' 2>&1");
+        
+        // Ensure /root/ has the standard directories
+        exec(self::LXC_CMD . " exec $name -- sh -c 'mkdir -p /root/Desktop /root/Documents /root/Downloads /root/Music /root/Pictures /root/Videos /root/Websites' 2>&1");
+        
+        // Update Caddyfile to serve from /root/ (in case template has old /home/ config)
+        exec(self::LXC_CMD . " exec $name -- sh -c 'sed -i \"s|root \\* /home|root * /root|g\" /etc/caddy/Caddyfile 2>/dev/null || true' 2>&1");
+        
         // Start Caddy directly (more reliable than rc-service)
         exec(self::LXC_CMD . " exec $name -- sh -c 'caddy start --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1 &' 2>&1");
         
