@@ -5020,12 +5020,39 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
         }
         
         if (statusData.status === 'not_created' || statusData.status === 'not_installed') {
-          // No sandbox - show wizard
+          // No sandbox - show wizard ONLY for LXD mode
+          // For Docker mode, auto-create sandbox by opening editor directly
+          if (statusData.backend === 'docker') {
+            console.log('[Sandbox] Docker mode: auto-creating sandbox via editor');
+            let editorUrl = '/editor';
+            editorIframe.src = editorUrl;
+            editorModal.classList.remove('hidden');
+            editorModal.classList.add('flex');
+            return;
+          }
           showSandboxWizard();
           return;
         }
         
-        if (statusData.status === 'installed' || statusData.container_status === 'stopped') {
+        // Sandbox exists (ready, installed, or stopped) - open editor directly
+        if (statusData.status === 'ready' || statusData.status === 'installed' || statusData.container_status === 'running') {
+          // Sandbox is running - open editor
+          if (statusData.sandbox_id && sandboxIdDisplay) {
+            sandboxIdDisplay.textContent = statusData.sandbox_id.substring(0, 8);
+          }
+          
+          if (typeof updateTabsForBackend === 'function') {
+            updateTabsForBackend(statusData.backend || 'lxd');
+          }
+          
+          let editorUrl = '/editor?sandbox=' + encodeURIComponent(statusData.sandbox_id);
+          editorIframe.src = editorUrl;
+          editorModal.classList.remove('hidden');
+          editorModal.classList.add('flex');
+          return;
+        }
+        
+        if (statusData.container_status === 'stopped') {
           // Sandbox exists but not running - try to start it
           try {
             const startBody = new URLSearchParams();
