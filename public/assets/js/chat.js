@@ -250,9 +250,10 @@
     // Preprocess: ensure double newlines before headers for proper paragraph breaks
     markdown = markdown.replace(/([^\n])\n(#{1,6}\s)/g, '$1\n\n$2');
     
-    // Preprocess: fix markdown tables - ensure proper newlines around table rows
-    // Tables need blank lines before and after, and each row on its own line
-    markdown = markdown.replace(/([^\n])\s*(\|[^|\n]+\|)/g, '$1\n$2');
+    // Preprocess: fix markdown tables - ensure proper blank lines before tables
+    // Tables need a blank line before the header row for marked.js to parse them
+    // Match pipe at start of line (table row) that follows non-blank content
+    markdown = markdown.replace(/([^\n])\n(\|)/g, '$1\n\n$2');
     
     // Preprocess: protect and normalize LaTeX delimiters
     markdown = fixLatexDelimiters(markdown);
@@ -3592,9 +3593,11 @@
     cleaned = cleaned.replace(/!\[[^\]]*\]\([^)]+\)/g, '');
     
     // Clean up leftover whitespace and punctuation artifacts
+    // BUT preserve newlines for tables and markdown formatting
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
     cleaned = cleaned.replace(/\.{2,}/g, '.');
-    cleaned = cleaned.replace(/\s{2,}/g, ' ');
+    // Only collapse multiple spaces on the same line, not newlines
+    cleaned = cleaned.replace(/[^\S\n]{2,}/g, ' ');
     cleaned = cleaned.replace(/\s+\./g, '.');
     return cleaned.trim();
   }
