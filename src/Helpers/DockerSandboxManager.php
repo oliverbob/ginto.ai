@@ -350,18 +350,39 @@ class DockerSandboxManager
             ];
         }
         
-        // Wait a moment for container to fully start
-        usleep(500000); // 500ms
+        // Wait for container to be fully ready (up to 5 seconds)
+        $ready = false;
+        for ($i = 0; $i < 10; $i++) {
+            usleep(500000); // 500ms
+            if (self::sandboxRunning($sandboxId)) {
+                // Verify container can accept exec commands
+                [$testCode, , ] = self::execInSandbox($sandboxId, 'echo ready', '/tmp', 5);
+                if ($testCode === 0) {
+                    $ready = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!$ready) {
+            return [
+                'success' => false,
+                'error' => 'Container created but not responding to commands',
+                'container_name' => $name,
+                'ip_address' => $ip
+            ];
+        }
         
         // Create default directory structure and files
-        self::createDefaultFiles($sandboxId);
+        $filesResult = self::createDefaultFiles($sandboxId);
         
         return [
             'success' => true,
             'message' => 'Sandbox created successfully',
             'container_name' => $name,
             'container_id' => trim($output[0] ?? ''),
-            'ip_address' => $ip
+            'ip_address' => $ip,
+            'files_created' => $filesResult['success'] ?? false
         ];
     }
     
@@ -394,6 +415,10 @@ class DockerSandboxManager
                 'error' => 'Failed to start sandbox: ' . implode("\n", $output)
             ];
         }
+        
+        // Wait for container to be ready, then ensure default files exist
+        usleep(500000); // 500ms
+        self::ensureDefaultFiles($sandboxId);
         
         return [
             'success' => true,
@@ -608,15 +633,36 @@ class DockerSandboxManager
     
     /**
      * Create default directory structure and files in a new sandbox
+     * 
+     * Creates:
+     * - Desktop/, Documents/, Downloads/, Music/, Pictures/, Videos/, Websites/ directories
+     * - README.md with welcome content
+     * - index.php with starter PHP code
+     * 
+     * This method is idempotent - safe to call multiple times.
      */
     public static function createDefaultFiles(string $sandboxId): array
     {
         $homePath = '/home/sandbox';
+        $errors = [];
+        $created = [];
         
-        // Create standard directories
+        // Ensure home directory exists with correct ownership
+        [$code, , $stderr] = self::execInSandbox($sandboxId, "mkdir -p $homePath && chown sandbox:sandbox $homePath 2>/dev/null || true");
+        if ($code !== 0) {
+            $errors[] = "Failed to ensure home directory: $stderr";
+        }
+        
+        // Create standard directories with proper ownership
         $dirs = ['Desktop', 'Documents', 'Downloads', 'Music', 'Pictures', 'Videos', 'Websites'];
         foreach ($dirs as $dir) {
-            self::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg("$homePath/$dir"));
+            $dirPath = "$homePath/$dir";
+            [$code, , $stderr] = self::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg($dirPath) . ' && chown sandbox:sandbox ' . escapeshellarg($dirPath) . ' 2>/dev/null || true');
+            if ($code === 0) {
+                $created[] = $dir;
+            } else {
+                $errors[] = "Failed to create $dir: $stderr";
+            }
         }
         
         // Create index.php
@@ -712,12 +758,79 @@ Welcome to your personal development environment!
 Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
 ';
         
-        self::writeFile($sandboxId, "$homePath/README.md", $readme);
+        // Write index.php with ownership fix
+        $indexResult = self::writeFile($sandboxId, "$homePath/index.php", $indexPhp);
+        if ($indexResult['success']) {
+            $created[] = 'index.php';
+            self::execInSandbox($sandboxId, "chown sandbox:sandbox $homePath/index.php 2>/dev/null || true");
+        } else {
+            $errors[] = 'Failed to create index.php: ' . ($indexResult['error'] ?? 'unknown');
+        }
+        
+        // Write README.md with ownership fix
+        $readmeResult = self::writeFile($sandboxId, "$homePath/README.md", $readme);
+        if ($readmeResult['success']) {
+            $created[] = 'README.md';
+            self::execInSandbox($sandboxId, "chown sandbox:sandbox $homePath/README.md 2>/dev/null || true");
+        } else {
+            $errors[] = 'Failed to create README.md: ' . ($readmeResult['error'] ?? 'unknown');
+        }
+        
+        // Return success if we created at least the directories
+        $success = count($created) >= count($dirs);
         
         return [
-            'success' => true,
-            'message' => 'Default files created successfully'
+            'success' => $success,
+            'message' => $success ? 'Default files created successfully' : 'Some files could not be created',
+            'created' => $created,
+            'errors' => $errors
         ];
+    }
+    
+    /**
+     * Ensure default files exist in a sandbox (idempotent)
+     * 
+     * Checks if default structure exists and creates missing items.
+     * Safe to call on existing sandboxes.
+     */
+    public static function ensureDefaultFiles(string $sandboxId): array
+    {
+        $homePath = '/home/sandbox';
+        $missing = [];
+        
+        // Check which directories are missing
+        $dirs = ['Desktop', 'Documents', 'Downloads', 'Music', 'Pictures', 'Videos', 'Websites'];
+        foreach ($dirs as $dir) {
+            [$code, , ] = self::execInSandbox($sandboxId, "test -d " . escapeshellarg("$homePath/$dir"));
+            if ($code !== 0) {
+                $missing[] = $dir;
+            }
+        }
+        
+        // Check if files are missing
+        [$code, , ] = self::execInSandbox($sandboxId, "test -f $homePath/index.php");
+        $indexMissing = ($code !== 0);
+        
+        [$code, , ] = self::execInSandbox($sandboxId, "test -f $homePath/README.md");
+        $readmeMissing = ($code !== 0);
+        
+        // If nothing is missing, we're done
+        if (empty($missing) && !$indexMissing && !$readmeMissing) {
+            return [
+                'success' => true,
+                'message' => 'Default files already exist',
+                'action' => 'none'
+            ];
+        }
+        
+        // Create missing items by calling createDefaultFiles
+        $result = self::createDefaultFiles($sandboxId);
+        $result['action'] = 'created';
+        $result['was_missing'] = $missing;
+        if ($indexMissing) $result['was_missing'][] = 'index.php';
+        if ($readmeMissing) $result['was_missing'][] = 'README.md';
+        
+        return $result;
     }
     
     /**
