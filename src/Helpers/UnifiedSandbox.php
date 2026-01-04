@@ -122,17 +122,22 @@ class UnifiedSandbox
     }
     
     /**
-     * Convert sandbox ID to IP address
+     * Get sandbox IP address
+     * 
+     * Queries the actual container IP from LXD/Docker (not deterministic).
+     * Returns null if container not found or not running.
      */
-    public static function getIp(string $sandboxId): string
+    public static function getIp(string $sandboxId): ?string
     {
         $backend = self::getBackend();
         
         if ($backend === self::BACKEND_DOCKER) {
+            // Docker uses deterministic IPs that are actually configured
             return DockerSandboxManager::sandboxToIp($sandboxId);
         }
         
-        return LxdSandboxManager::sandboxToIp($sandboxId);
+        // LXD: query actual container IP (survives DHCP/mode changes)
+        return LxdSandboxManager::getSandboxIp($sandboxId);
     }
     
     /**
