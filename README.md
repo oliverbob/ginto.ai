@@ -6,7 +6,9 @@ A powerful **local AI Agent** that runs entirely on your machine. Works with Ope
 
 <p align="center">
   <a href="https://ginto.ai/public/assets/videos/superman.mp4">
-    <img src="https://github.com/oliverbob/ginto.ai/raw/main/public/assets/images/superman-preview.png" alt="Watch Ginto AI Demo" width="100%">
+    <video src="https://ginto.ai/public/assets/videos/superman.mp4" width="100%" autoplay loop muted playsinline>
+      <img src="https://github.com/oliverbob/ginto.ai/raw/main/public/assets/images/superman-preview.png" alt="Watch Ginto AI Demo" width="100%">
+    </video>
   </a>
   <br>
   <em>▶️ Click to watch demo video</em>
