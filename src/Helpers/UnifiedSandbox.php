@@ -174,9 +174,9 @@ class UnifiedSandbox
             return DockerSandboxManager::createSandbox($sandboxId, $options);
         }
         
-        // LXD create is typically done via ensureSandbox
+        // LXD create is typically done via ensureSandboxRunning
         try {
-            LxdSandboxManager::ensureSandbox($sandboxId);
+            LxdSandboxManager::ensureSandboxRunning($sandboxId);
             return [
                 'success' => true,
                 'message' => 'Sandbox created',
@@ -206,7 +206,7 @@ class UnifiedSandbox
         
         // LXD start
         try {
-            LxdSandboxManager::ensureSandbox($sandboxId);
+            LxdSandboxManager::ensureSandboxRunning($sandboxId);
             return [
                 'success' => true,
                 'message' => 'Sandbox started',
