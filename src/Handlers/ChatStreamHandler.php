@@ -887,8 +887,13 @@ class ChatStreamHandler
                         }
 
                         if ($chunk !== '' && $chunk !== null) {
-                            $chunk = self::stripMarkers($chunk);
-                            if (trim($chunk) === '') return;
+                            // Only strip markers if the chunk has actual content, not just whitespace
+                            // Important: preserve space-only chunks as they separate words
+                            if (preg_match('/[^\s]/', $chunk)) {
+                                $chunk = self::stripMarkers($chunk);
+                            }
+                            // Skip truly empty chunks but keep whitespace-only chunks
+                            if ($chunk === '') return;
                             $accumulatedContent .= $chunk;
                             error_log("[ChatStream] Streaming text chunk: " . strlen($chunk) . " chars");
                             echo "data: " . json_encode(['text' => $chunk], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
@@ -1402,11 +1407,13 @@ class ChatStreamHandler
         
         // Clean up leftover punctuation and whitespace
         $content = preg_replace('/\.{2,}/', '.', $content);
-        $content = preg_replace('/\s{2,}/', ' ', $content);
+        // Only collapse multiple internal spaces, preserve single spaces
+        $content = preg_replace('/  +/', ' ', $content);
         $content = preg_replace('/\s+\./', '.', $content);
         $content = preg_replace('/\n{3,}/', "\n\n", $content);
         
-        return trim($content);
+        // Don't trim - preserve leading/trailing spaces for word boundaries
+        return $content;
     }
 
     /**
