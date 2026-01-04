@@ -259,7 +259,8 @@ class EditorController
                 }
             }
             
-            $listResult = \Ginto\Helpers\LxdSandboxManager::listFiles($sandboxId, '/root', 5);
+            // Use UnifiedSandbox to handle both Docker and LXD backends
+            $listResult = \Ginto\Helpers\UnifiedSandbox::listFiles($sandboxId, null, 5);
             if ($listResult['success']) {
                 echo json_encode(['success' => true, 'tree' => $listResult['tree'], 'sandbox_id' => $sandboxId]);
             } else {
@@ -735,9 +736,9 @@ class EditorController
         // Security: prevent path traversal
         $path = str_replace(['../', '..\\'], '', $path);
         
-        // If we have a sandbox ID, use LXD to write file
+        // If we have a sandbox ID, use UnifiedSandbox to write file (supports Docker & LXD)
         if ($sandboxId) {
-            $writeResult = \Ginto\Helpers\LxdSandboxManager::writeFile($sandboxId, $path, $content);
+            $writeResult = \Ginto\Helpers\UnifiedSandbox::writeFile($sandboxId, $path, $content);
             if ($writeResult['success']) {
                 echo json_encode(['success' => true, 'bytes' => $writeResult['bytes'] ?? strlen($content)]);
             } else {
@@ -804,9 +805,9 @@ class EditorController
         // Security: prevent path traversal
         $path = str_replace(['../', '..\\'], '', $path);
         
-        // If we have a sandbox ID, use LXD to read file
+        // If we have a sandbox ID, use UnifiedSandbox to read file (supports Docker & LXD)
         if ($sandboxId) {
-            $readResult = \Ginto\Helpers\LxdSandboxManager::readFile($sandboxId, $path);
+            $readResult = \Ginto\Helpers\UnifiedSandbox::readFile($sandboxId, $path);
             if ($readResult['success']) {
                 echo json_encode([
                     'success' => true,

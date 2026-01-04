@@ -346,6 +346,31 @@ class UnifiedSandbox
     }
     
     /**
+     * Get the home directory path for sandboxes
+     */
+    public static function getHomePath(): string
+    {
+        $backend = self::getBackend();
+        return ($backend === self::BACKEND_DOCKER) ? '/home/sandbox' : '/root';
+    }
+    
+    /**
+     * List files in a sandbox directory
+     */
+    public static function listFiles(string $sandboxId, ?string $path = null, int $maxDepth = 5): array
+    {
+        $backend = self::getBackend();
+        $homePath = self::getHomePath();
+        $targetPath = $path ?? $homePath;
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            return DockerSandboxManager::listFiles($sandboxId, $targetPath, $maxDepth);
+        }
+        
+        return LxdSandboxManager::listFiles($sandboxId, $targetPath, $maxDepth);
+    }
+    
+    /**
      * List all sandboxes
      */
     public static function listSandboxes(): array

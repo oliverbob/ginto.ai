@@ -601,6 +601,74 @@ class DockerSandboxManager
     }
     
     /**
+     * List files in sandbox directory
+     */
+    public static function listFiles(string $sandboxId, string $path = '/home/sandbox', int $maxDepth = 5): array
+    {
+        // Use find command to list files recursively
+        $cmd = 'find ' . escapeshellarg($path) . ' -maxdepth ' . $maxDepth . ' -printf "%y %p\n" 2>/dev/null | head -500';
+        [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
+        
+        if ($code !== 0 || empty($stdout)) {
+            // Fallback to ls
+            $cmd = 'ls -la ' . escapeshellarg($path) . ' 2>/dev/null';
+            [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
+            
+            if ($code !== 0) {
+                return [
+                    'success' => false,
+                    'error' => $stderr ?: 'Failed to list files',
+                    'tree' => []
+                ];
+            }
+        }
+        
+        // Build tree structure from find output
+        $tree = [];
+        $lines = explode("\n", trim($stdout));
+        
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if (empty($line)) continue;
+            
+            // Parse find output: "d /home/sandbox/Documents" or "f /home/sandbox/index.php"
+            if (preg_match('/^([df])\s+(.+)$/', $line, $matches)) {
+                $type = $matches[1];
+                $fullPath = $matches[2];
+                $name = basename($fullPath);
+                $relativePath = str_replace($path . '/', '', $fullPath);
+                
+                // Skip hidden files at root level except specific ones
+                if ($fullPath === $path) continue;
+                if (strpos($name, '.') === 0 && !in_array($name, ['.config', '.local', '.pki'])) continue;
+                
+                // Only include first-level items for the tree
+                if (substr_count($relativePath, '/') === 0) {
+                    $tree[] = [
+                        'name' => $name,
+                        'path' => $fullPath,
+                        'type' => ($type === 'd') ? 'directory' : 'file',
+                        'children' => ($type === 'd') ? [] : null
+                    ];
+                }
+            }
+        }
+        
+        // Sort: directories first, then files, alphabetically
+        usort($tree, function($a, $b) {
+            if ($a['type'] !== $b['type']) {
+                return $a['type'] === 'directory' ? -1 : 1;
+            }
+            return strcasecmp($a['name'], $b['name']);
+        });
+        
+        return [
+            'success' => true,
+            'tree' => $tree
+        ];
+    }
+    
+    /**
      * List all sandbox containers
      */
     public static function listSandboxes(): array
