@@ -1,3 +1,7 @@
+<?php
+// Detect sandbox backend (docker or lxd)
+$sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+?>
 <!doctype html>
 <html lang="en" class="dark">
 <head>
@@ -8,6 +12,9 @@
   <script>
     // Ginto installation path (detected from PHP)
     window.GINTO_PATH = <?= json_encode(dirname(__DIR__, 2)) ?>;
+    
+    // Sandbox backend type (docker or lxd)
+    window.SANDBOX_BACKEND = <?= json_encode($sandboxBackend) ?>;
     
     // Auth status - will be populated by fetching /user endpoint
     window.GINTO_AUTH = {
@@ -2349,8 +2356,8 @@
               </span>
             </label>
             
-            <?php if (!empty($isAdmin)): ?>
-            <!-- LXD Nesting Warning (Admin only) -->
+            <?php if (!empty($isAdmin) && $sandboxBackend === 'lxd'): ?>
+            <!-- LXD Nesting Warning (Admin only, LXD backend only) -->
             <div class="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
               <div class="flex items-start gap-2">
                 <svg class="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4587,6 +4594,25 @@
             
             // Start polling for install completion in background
             startInstallStatusPollingGlobal();
+          }
+          return;
+        }
+        
+        // Check if Docker sandbox backend has issues
+        if (data?.error_code?.startsWith('docker_')) {
+          // Show Docker-specific error
+          showWizardStep('error'); // Error step
+          const errorMsg = document.getElementById('wizard-error-message');
+          if (errorMsg) {
+            let message = data.error || 'Docker sandbox error';
+            if (data.error_code === 'docker_not_running') {
+              message = 'Docker daemon is not running. Please start Docker and try again.';
+            } else if (data.error_code === 'docker_permission') {
+              message = 'Docker permission denied. Add user to docker group: sudo usermod -aG docker $USER';
+            } else if (data.error_code === 'docker_not_installed') {
+              message = 'Docker is not installed. Install Docker: curl -fsSL https://get.docker.com | sh';
+            }
+            errorMsg.textContent = message;
           }
           return;
         }
