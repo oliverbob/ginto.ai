@@ -4582,8 +4582,34 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
           }
         }
         
-        // Check if LXC installation is required
-        if (data?.install_required || data?.error_code?.startsWith('lxc_') || data?.error_code === 'base_image_missing' || data?.error_code === 'lxd_not_initialized') {
+        // Determine the sandbox backend from response or global config
+        const backend = data?.backend || window.SANDBOX_BACKEND || 'lxd';
+        
+        // Check if Docker sandbox backend has issues (check BEFORE LXC logic)
+        if (backend === 'docker') {
+          if (data?.install_required || data?.error_code?.startsWith('docker_') || !data?.success) {
+            // Show Docker-specific error
+            showWizardStep('error');
+            const errorMsg = document.getElementById('wizard-error-message');
+            if (errorMsg) {
+              let message = data?.error || 'Docker sandbox error';
+              if (data?.error_code === 'docker_not_running') {
+                message = 'Docker daemon is not running. Please start Docker and try again.';
+              } else if (data?.error_code === 'docker_permission') {
+                message = 'Docker permission denied. Add user to docker group: sudo usermod -aG docker $USER';
+              } else if (data?.error_code === 'docker_not_installed') {
+                message = 'Docker is not installed. Install Docker: curl -fsSL https://get.docker.com | sh';
+              } else if (data?.error_code === 'no_backend' || data?.install_required) {
+                message = 'Docker sandbox image not found. The admin needs to build the sandbox image: docker compose build sandbox-image';
+              }
+              errorMsg.textContent = message;
+            }
+            return;
+          }
+        }
+        
+        // Check if LXC installation is required (only for LXD backend)
+        if (backend === 'lxd' && (data?.install_required || data?.error_code?.startsWith('lxc_') || data?.error_code === 'base_image_missing' || data?.error_code === 'lxd_not_initialized')) {
           // Close the wizard and open web terminal with auto-install command (admin only)
           closeSandboxWizard();
           
@@ -4594,25 +4620,6 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             
             // Start polling for install completion in background
             startInstallStatusPollingGlobal();
-          }
-          return;
-        }
-        
-        // Check if Docker sandbox backend has issues
-        if (data?.error_code?.startsWith('docker_')) {
-          // Show Docker-specific error
-          showWizardStep('error'); // Error step
-          const errorMsg = document.getElementById('wizard-error-message');
-          if (errorMsg) {
-            let message = data.error || 'Docker sandbox error';
-            if (data.error_code === 'docker_not_running') {
-              message = 'Docker daemon is not running. Please start Docker and try again.';
-            } else if (data.error_code === 'docker_permission') {
-              message = 'Docker permission denied. Add user to docker group: sudo usermod -aG docker $USER';
-            } else if (data.error_code === 'docker_not_installed') {
-              message = 'Docker is not installed. Install Docker: curl -fsSL https://get.docker.com | sh';
-            }
-            errorMsg.textContent = message;
           }
           return;
         }
