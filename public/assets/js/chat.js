@@ -250,10 +250,16 @@
     // Preprocess: ensure double newlines before headers for proper paragraph breaks
     markdown = markdown.replace(/([^\n])\n(#{1,6}\s)/g, '$1\n\n$2');
     
-    // Preprocess: fix markdown tables - ensure proper blank lines before tables
-    // Tables need a blank line before the header row for marked.js to parse them
-    // Match pipe at start of line (table row) that follows non-blank content
-    markdown = markdown.replace(/([^\n])\n(\|)/g, '$1\n\n$2');
+    // Preprocess: fix markdown tables that have rows concatenated without proper newlines
+    // Pattern: | ... | followed immediately by | (another row start) - inject newline
+    // e.g., "| Header |Word || Data1 | Data2 |" -> "| Header |Word |\n| Data1 | Data2 |"
+    markdown = markdown.replace(/(\|[^|\n]*\|)(\s*)(\|)/g, function(match, row1, space, pipe2) {
+      // If there's no newline between the end of one row and start of next, add one
+      if (!space.includes('\n')) {
+        return row1 + '\n' + pipe2;
+      }
+      return match;
+    });
     
     // Preprocess: protect and normalize LaTeX delimiters
     markdown = fixLatexDelimiters(markdown);
