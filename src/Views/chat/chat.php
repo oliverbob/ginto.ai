@@ -27,17 +27,13 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
 
 <?php include __DIR__ . '/includes/head.php'; ?>
 
-<body class="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+<body class="bg-gray-50 dark:bg-gray-950 text-gray-900 dark:text-gray-100 min-h-screen transition-colors duration-200">
 
   <?php include __DIR__ . '/includes/mobile-header.php'; ?>
 
-  <div class="flex flex-1 overflow-hidden">
-    
-    <?php include __DIR__ . '/includes/sidebar.php'; ?>
+  <?php include __DIR__ . '/includes/sidebar.php'; ?>
 
-    <?php include __DIR__ . '/includes/main-content.php'; ?>
-
-  </div>
+  <?php include __DIR__ . '/includes/main-content.php'; ?>
 
   <!-- Modals -->
   <?php include __DIR__ . '/includes/modals.php'; ?>
