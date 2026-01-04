@@ -1109,7 +1109,19 @@ class ChatStreamHandler
             $sandboxAvailable = \Ginto\Helpers\UnifiedSandbox::isAvailable();
             $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
 
+            // Get sandbox ID from session OR look up from database
             $sandboxId = $_SESSION['sandbox_id'] ?? null;
+            if (!$sandboxId && $this->db && !empty($_SESSION['user_id'])) {
+                // Try to load sandbox_id from client_sandboxes table
+                try {
+                    $row = $this->db->get('client_sandboxes', ['sandbox_id'], ['user_id' => $_SESSION['user_id']]);
+                    if (!empty($row['sandbox_id'])) {
+                        $sandboxId = $row['sandbox_id'];
+                        $_SESSION['sandbox_id'] = $sandboxId; // Cache in session
+                    }
+                } catch (\Throwable $_) {}
+            }
+            
             $hasSandbox = $sandboxAvailable && !empty($sandboxId) && \Ginto\Helpers\UnifiedSandbox::exists($sandboxId);
 
             if (!$sandboxAvailable) {
