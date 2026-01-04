@@ -694,6 +694,42 @@
             return createReasoningItem(normalized);
         }
 
+        // Helper function to copy text to clipboard with fallback for non-HTTPS
+        async function copyToClipboard(text) {
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(text);
+                    return true;
+                }
+            } catch (err) {
+                console.log('Clipboard API failed, using fallback:', err.message);
+            }
+            
+            // Fallback for older browsers or non-HTTPS contexts
+            try {
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                textArea.style.position = 'fixed';
+                textArea.style.left = '-9999px';
+                textArea.style.top = '0';
+                textArea.setAttribute('readonly', '');
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                
+                const success = document.execCommand('copy');
+                document.body.removeChild(textArea);
+                
+                if (success) {
+                    return true;
+                }
+            } catch (fallbackErr) {
+                console.error('Fallback copy also failed:', fallbackErr);
+            }
+            
+            return false;
+        }
+
         // Detect programming language from code content or class
         function detectLanguage(code, className) {
             if (className) {
@@ -832,14 +868,12 @@
                 
                 copyBtn.addEventListener('click', async (e) => {
                     e.stopPropagation();
-                    try {
-                        await navigator.clipboard.writeText(codeText);
+                    const success = await copyToClipboard(codeText);
+                    if (success) {
                         copyBtn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>Copied!`;
                         setTimeout(() => {
                             copyBtn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy`;
                         }, 2000);
-                    } catch (err) {
-                        console.error('Copy failed:', err);
                     }
                 });
                 buttonsDiv.appendChild(copyBtn);
@@ -1020,13 +1054,13 @@
             // Copy button
             elements.copyBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                try {
-                    await navigator.clipboard.writeText(elements.response.innerText);
+                const success = await copyToClipboard(elements.response.innerText);
+                if (success) {
                     elements.copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
                     setTimeout(() => {
                         elements.copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
                     }, 2000);
-                } catch (err) {}
+                }
             });
             
             // Like/Dislike with visual feedback
@@ -1063,11 +1097,13 @@
                     } catch (err) {}
                 } else {
                     // Fallback: copy to clipboard
-                    await navigator.clipboard.writeText(shareText);
-                    elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-                    setTimeout(() => {
-                        elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>';
-                    }, 2000);
+                    const success = await copyToClipboard(shareText);
+                    if (success) {
+                        elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+                        setTimeout(() => {
+                            elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>';
+                        }, 2000);
+                    }
                 }
             });
             

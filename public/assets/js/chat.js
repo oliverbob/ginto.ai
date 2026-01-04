@@ -115,6 +115,43 @@
     }
   }
   
+  // Helper function to copy text to clipboard with fallback for non-HTTPS
+  async function copyToClipboard(text) {
+    try {
+      // Try modern clipboard API first
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (err) {
+      console.log('Clipboard API failed, using fallback:', err.message);
+    }
+    
+    // Fallback for older browsers or non-HTTPS contexts
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '0';
+      textArea.setAttribute('readonly', '');
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      
+      const success = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      
+      if (success) {
+        return true;
+      }
+    } catch (fallbackErr) {
+      console.error('Fallback copy also failed:', fallbackErr);
+    }
+    
+    return false;
+  }
+  
   // Track when user scrolls during streaming
   let isStreaming = false;
   let scrollCheckTimeout = null;
@@ -128,11 +165,12 @@
   }, { passive: true });
 
   // Global function to copy code blocks
-  window.copyCodeBlock = function(id) {
+  window.copyCodeBlock = async function(id) {
     const el = document.getElementById(id);
     if (!el) return;
     const text = el.textContent || el.innerText;
-    navigator.clipboard.writeText(text).then(() => {
+    const success = await copyToClipboard(text);
+    if (success) {
       // Find the button and update it temporarily
       const btn = el.parentElement?.querySelector('.copy-code-btn');
       if (btn) {
@@ -140,9 +178,7 @@
         btn.textContent = '✓ Copied!';
         setTimeout(() => { btn.textContent = original; }, 2000);
       }
-    }).catch(err => {
-      console.error('Copy failed:', err);
-    });
+    }
   };
 
   // ============ MARKDOWN RENDERER MODULE ============
@@ -2253,8 +2289,9 @@
 
               try {
                 const btn = document.getElementById('mcp-copy-json');
-                if (btn) btn.addEventListener('click', () => {
-                  try { navigator.clipboard.writeText(JSON.stringify(j, null, 2)); btn.textContent = 'Copied'; setTimeout(()=>btn.textContent='Copy discovery JSON',1200); } catch (e) { alert('Copy failed: ' + (e?.message||e)); }
+                if (btn) btn.addEventListener('click', async () => {
+                  const success = await copyToClipboard(JSON.stringify(j, null, 2));
+                  if (success) { btn.textContent = 'Copied'; setTimeout(()=>btn.textContent='Copy discovery JSON',1200); }
                 });
               } catch (e) {}
             } catch (e) {}
@@ -2410,13 +2447,13 @@
       // Copy user prompt
       userCopyBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(query);
+        const success = await copyToClipboard(query);
+        if (success) {
           userCopyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
           setTimeout(() => {
             userCopyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
           }, 2000);
-        } catch (err) {}
+        }
       });
       
       // Edit user prompt - show edit in place
@@ -2663,13 +2700,13 @@
       const responseEl = assistantRow.querySelector('.card-response');
       copyBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(responseEl?.innerText || '');
+        const success = await copyToClipboard(responseEl?.innerText || '');
+        if (success) {
           copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
           setTimeout(() => {
             copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
           }, 2000);
-        } catch (err) {}
+        }
       });
       
       // Like button
@@ -2693,12 +2730,12 @@
       
       // Share button
       const shareBtn = assistantRow.querySelector('.card-share-btn');
-      shareBtn?.addEventListener('click', (e) => {
+      shareBtn?.addEventListener('click', async (e) => {
         e.stopPropagation();
         if (navigator.share) {
           navigator.share({ text: responseEl?.innerText || '' }).catch(() => {});
         } else {
-          navigator.clipboard.writeText(responseEl?.innerText || '').catch(() => {});
+          await copyToClipboard(responseEl?.innerText || '');
         }
       });
       
@@ -3276,13 +3313,13 @@
     if (elements.userCopyBtn) {
       elements.userCopyBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        try {
-          await navigator.clipboard.writeText(query);
+        const success = await copyToClipboard(query);
+        if (success) {
           elements.userCopyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
           setTimeout(() => {
             elements.userCopyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
           }, 2000);
-        } catch (err) {}
+        }
       });
     }
     
@@ -3355,13 +3392,13 @@
     // Copy button
     elements.copyBtn?.addEventListener('click', async (e) => {
       e.stopPropagation();
-      try {
-        await navigator.clipboard.writeText(elements.response.innerText);
+      const success = await copyToClipboard(elements.response.innerText);
+      if (success) {
         elements.copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
         setTimeout(() => {
           elements.copyBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>';
         }, 2000);
-      } catch (err) {}
+      }
     });
     
     // Like/Dislike
@@ -3396,11 +3433,13 @@
           await navigator.share(shareData);
         } catch (err) {}
       } else {
-        await navigator.clipboard.writeText(window.location.href);
-        elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
-        setTimeout(() => {
-          elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>';
-        }, 2000);
+        const success = await copyToClipboard(window.location.href);
+        if (success) {
+          elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+          setTimeout(() => {
+            elements.shareBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>';
+          }, 2000);
+        }
       }
     });
     
