@@ -10,28 +10,24 @@
   
   // Render YouTube video embed for non-logged-in users
   function renderYouTubeEmbed() {
-    const container = document.getElementById('welcome-prompts');
-    if (!container) return;
-    
-    container.innerHTML = `
-      <div class="col-span-full w-full max-w-2xl mx-auto">
-        <div class="relative w-full" style="padding-bottom: 56.25%;">
-          <iframe 
-            class="absolute top-0 left-0 w-full h-full rounded-xl shadow-lg"
-            src="https://www.youtube.com/embed/DDBa56EJ7a0?rel=0&modestbranding=1" 
-            title="Ginto AI Demo"
-            frameborder="0" 
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
-            allowfullscreen>
-          </iframe>
+    // Hide the welcome hint area and show full-width video
+    const hintArea = document.querySelector('.bg-hint');
+    if (hintArea) {
+      hintArea.innerHTML = `
+        <div class="w-full max-w-4xl mx-auto">
+          <div class="relative w-full" style="padding-bottom: 56.25%;">
+            <iframe 
+              class="absolute top-0 left-0 w-full h-full rounded-xl shadow-2xl"
+              src="https://www.youtube.com/embed/DDBa56EJ7a0?rel=0&modestbranding=1&autoplay=1&mute=1" 
+              title="Ginto AI Demo"
+              frameborder="0" 
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" 
+              allowfullscreen>
+            </iframe>
+          </div>
         </div>
-        <p class="text-center text-sm text-gray-500 dark:text-gray-400 mt-3">
-          <a href="/login" class="text-indigo-500 hover:text-indigo-400 font-medium">Login</a> or 
-          <a href="/register" class="text-green-500 hover:text-green-400 font-medium">Register</a> 
-          to start chatting
-        </p>
-      </div>
-    `;
+      `;
+    }
   }
   
   // Example prompts: fetch role-based prompts from server and render
