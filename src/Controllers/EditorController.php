@@ -224,14 +224,16 @@ class EditorController
         
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            // Use getSandboxRootIfExists instead of getOrCreateSandboxRoot
+            // This prevents auto-creation - user must go through wizard first
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             // Check if result is a sandbox ID (short alphanumeric) or a filesystem path
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -240,23 +242,19 @@ class EditorController
             $sandboxValid = \Ginto\Helpers\ClientSandboxHelper::validateSandboxExists($sandboxId, $this->db);
             
             if (!$sandboxValid) {
-                // Sandbox is stale - clean up and create a new one
+                // Sandbox is stale - clean up but DON'T auto-create
+                // User must go through wizard to create a new sandbox
                 \Ginto\Helpers\UnifiedSandbox::deleteCompletely($sandboxId, $this->db);
                 unset($_SESSION['sandbox_id']);
                 
-                // Create fresh sandbox
-                $newSandboxId = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxId($this->db, $_SESSION);
-                if ($newSandboxId) {
-                    $createResult = \Ginto\Helpers\UnifiedSandbox::create($newSandboxId);
-                    if ($createResult['success']) {
-                        \Ginto\Helpers\UnifiedSandbox::ensureRunning($newSandboxId);
-                        $_SESSION['sandbox_id'] = $newSandboxId;
-                        $sandboxId = $newSandboxId;
-                    } else {
-                        echo json_encode(['success' => false, 'error' => 'Failed to create sandbox', 'tree' => []]);
-                        exit;
-                    }
-                }
+                // Return error indicating sandbox needs to be created via wizard
+                echo json_encode([
+                    'success' => false, 
+                    'error' => 'Sandbox not found. Please use the installation wizard to create one.',
+                    'status' => 'not_created',
+                    'tree' => []
+                ]);
+                exit;
             }
             
             // Use UnifiedSandbox to handle both Docker and LXD backends
@@ -269,9 +267,22 @@ class EditorController
             exit;
         }
         
-        // Build tree recursively for local filesystem (admin mode)
-        $tree = $this->buildEditorTree($editorRoot);
-        echo json_encode(['success' => true, 'tree' => $tree]);
+        // No sandbox exists - check if user is admin with direct filesystem access
+        $isAdmin = (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin') || (!empty($_SESSION['is_admin']));
+        if ($isAdmin && $editorRoot && is_dir($editorRoot)) {
+            // Admin can access filesystem directly
+            $tree = $this->buildEditorTree($editorRoot);
+            echo json_encode(['success' => true, 'tree' => $tree]);
+            exit;
+        }
+        
+        // Non-admin without sandbox - return error, user must use wizard
+        echo json_encode([
+            'success' => false, 
+            'error' => 'No sandbox found. Please use the installation wizard to create one.',
+            'status' => 'not_created',
+            'tree' => []
+        ]);
         exit;
     }
 
@@ -336,19 +347,19 @@ class EditorController
     {
         header('Content-Type: application/json; charset=utf-8');
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             // Check if result is a sandbox ID or a filesystem path
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -422,18 +433,18 @@ class EditorController
     {
         header('Content-Type: application/json; charset=utf-8');
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -497,18 +508,18 @@ class EditorController
     {
         header('Content-Type: application/json; charset=utf-8');
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -571,18 +582,18 @@ class EditorController
     {
         header('Content-Type: application/json; charset=utf-8');
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -703,18 +714,18 @@ class EditorController
             exit;
         }
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         
@@ -774,18 +785,18 @@ class EditorController
     {
         header('Content-Type: application/json; charset=utf-8');
         
-        // Get sandbox ID or root path
+        // Get sandbox ID or root path - use getSandboxRootIfExists to prevent auto-creation
         $editorRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(__DIR__, 2);
         $sandboxId = null;
         try {
             putenv('GINTO_SKIP_SANDBOX_START=1');
-            $result = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxRoot($this->db, $_SESSION ?? null);
+            $result = \Ginto\Helpers\ClientSandboxHelper::getSandboxRootIfExists($this->db, $_SESSION ?? null, true);
             putenv('GINTO_SKIP_SANDBOX_START');
             
             if ($result && !is_dir($result) && preg_match('/^[a-z0-9]{8,20}$/i', $result)) {
                 $sandboxId = $result;
-            } else {
-                $editorRoot = $result ?: $editorRoot;
+            } else if ($result) {
+                $editorRoot = $result;
             }
         } catch (\Throwable $e) {}
         

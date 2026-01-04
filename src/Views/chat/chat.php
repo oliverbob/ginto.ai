@@ -5028,16 +5028,8 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
         }
         
         if (statusData.status === 'not_created' || statusData.status === 'not_installed') {
-          // No sandbox - show wizard ONLY for LXD mode
-          // For Docker mode, auto-create sandbox by opening editor directly
-          if (statusData.backend === 'docker') {
-            console.log('[Sandbox] Docker mode: auto-creating sandbox via editor');
-            let editorUrl = '/editor';
-            editorIframe.src = editorUrl;
-            editorModal.classList.remove('hidden');
-            editorModal.classList.add('flex');
-            return;
-          }
+          // No sandbox exists - show wizard for BOTH Docker and LXD modes
+          // User must accept terms before sandbox is created
           showSandboxWizard();
           return;
         }
