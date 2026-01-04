@@ -98,9 +98,24 @@ usage() {
     echo ""
 }
 
+# Set up environment variables for Docker Compose
+setup_env_vars() {
+    # Export current user's UID and GID for file permissions
+    export HOST_UID=$(id -u)
+    export HOST_GID=$(id -g)
+    
+    # Export Docker group GID for socket access
+    if [ -S /var/run/docker.sock ]; then
+        export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+    else
+        export DOCKER_GID=999
+    fi
+}
+
 # Start services
 cmd_up() {
     check_env
+    setup_env_vars
     
     local compose=$(compose_cmd)
     local args=""

@@ -189,9 +189,26 @@ setup_env() {
     print_success "Environment configured"
 }
 
+# Set up environment variables for Docker Compose
+setup_host_env() {
+    # Export current user's UID and GID for file permissions
+    export HOST_UID=$(id -u)
+    export HOST_GID=$(id -g)
+    
+    # Export Docker group GID for socket access
+    if [ -S /var/run/docker.sock ]; then
+        export DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+    else
+        export DOCKER_GID=999
+    fi
+}
+
 # Build and start containers
 start_services() {
     print_header "Building Docker Images"
+    
+    # Set up host environment variables
+    setup_host_env
     
     print_info "Building images (this may take a few minutes)..."
     $COMPOSE_CMD build --parallel
