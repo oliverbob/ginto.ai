@@ -5,6 +5,12 @@
 A powerful **local AI Agent** that runs entirely on your machine. Works with OpenAI-compatible APIs and leverages the fastest inference engines on the planet: **Groq** and **Cerebras**.
 
 <p align="center">
+  <video src="public/assets/videos/superman.mp4" width="100%" autoplay loop muted playsinline>
+    Your browser does not support the video tag.
+  </video>
+</p>
+
+<p align="center">
   <img src="public/assets/images/success.png" alt="Ginto AI Success" width="48%">
   <img src="public/assets/images/features.png" alt="Ginto AI Features - Multi-provider model selection with Ollama, Groq, Cerebras and more" width="48%">
 </p>
