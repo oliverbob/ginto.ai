@@ -311,8 +311,6 @@
 <?php include __DIR__ . '/scripts-vnc-console.php'; ?>
 <?php include __DIR__ . '/scripts-prompts.php'; ?>
 <?php include __DIR__ . '/scripts-transaction-modal.php'; ?>
-<?php if (!empty($isAdmin)): ?>
 <?php include __DIR__ . '/scripts-model-selector.php'; ?>
-<?php endif; ?>
 
 <script src="/assets/js/chat.js?v=<?= time() ?>"></script>
