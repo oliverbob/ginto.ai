@@ -137,7 +137,7 @@ class ClientsController
         $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
         
         // Ensure container is running
-        if (!\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
+        if (!\Ginto\Helpers\UnifiedSandbox::isRunning($sandboxId)) {
             // Try starting it
             $startResult = \Ginto\Helpers\UnifiedSandbox::ensureRunning($sandboxId);
             
@@ -291,7 +291,7 @@ class ClientsController
         if (!$isOwner && $isDev) {
             // Check if the sandbox actually exists in the system (works for both Docker and LXD)
             try {
-                if (\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
+                if (\Ginto\Helpers\UnifiedSandbox::isRunning($sandboxId)) {
                     $isOwner = true; // Allow access in dev mode if container exists
                 }
             } catch (\Throwable $e) {
@@ -318,7 +318,7 @@ class ClientsController
         $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
         
         // Ensure container is running
-        if (!\Ginto\Helpers\UnifiedSandbox::running($sandboxId)) {
+        if (!\Ginto\Helpers\UnifiedSandbox::isRunning($sandboxId)) {
             // Try starting it
             $startResult = \Ginto\Helpers\UnifiedSandbox::ensureRunning($sandboxId);
             
