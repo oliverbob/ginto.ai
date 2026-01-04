@@ -548,4 +548,115 @@ class UnifiedSandbox
         
         return @rmdir($path);
     }
+    
+    /**
+     * Check if a path exists in the sandbox
+     */
+    public static function pathExists(string $sandboxId, string $path): bool
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            // Docker: use exec to check
+            $result = DockerSandboxManager::execInSandbox($sandboxId, 'test -e ' . escapeshellarg($path) . ' && echo 1 || echo 0', '/home/sandbox', 5);
+            return isset($result[1]) && trim($result[1]) === '1';
+        }
+        
+        return LxdSandboxManager::pathExists($sandboxId, $path);
+    }
+    
+    /**
+     * Create a file or folder in the sandbox
+     */
+    public static function createItem(string $sandboxId, string $path, string $type = 'file'): array
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            if ($type === 'folder' || $type === 'directory') {
+                $result = DockerSandboxManager::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg($path), '/home/sandbox', 10);
+                return [
+                    'success' => ($result[0] ?? 1) === 0,
+                    'error' => $result[2] ?? null
+                ];
+            } else {
+                // Create parent directory first, then touch file
+                $dir = dirname($path);
+                if ($dir !== '.' && $dir !== '/') {
+                    DockerSandboxManager::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg($dir), '/home/sandbox', 10);
+                }
+                $result = DockerSandboxManager::execInSandbox($sandboxId, 'touch ' . escapeshellarg($path), '/home/sandbox', 10);
+                return [
+                    'success' => ($result[0] ?? 1) === 0,
+                    'error' => $result[2] ?? null
+                ];
+            }
+        }
+        
+        return LxdSandboxManager::createItem($sandboxId, $path, $type);
+    }
+    
+    /**
+     * Delete a file or folder in the sandbox
+     */
+    public static function deleteItem(string $sandboxId, string $path): array
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            $result = DockerSandboxManager::execInSandbox($sandboxId, 'rm -rf ' . escapeshellarg($path), '/home/sandbox', 10);
+            return [
+                'success' => ($result[0] ?? 1) === 0,
+                'error' => $result[2] ?? null
+            ];
+        }
+        
+        return LxdSandboxManager::deleteItem($sandboxId, $path);
+    }
+    
+    /**
+     * Rename/move a file or folder in the sandbox
+     */
+    public static function renameItem(string $sandboxId, string $oldPath, string $newPath): array
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            // Ensure parent directory exists
+            $dir = dirname($newPath);
+            if ($dir !== '.' && $dir !== '/') {
+                DockerSandboxManager::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg($dir), '/home/sandbox', 10);
+            }
+            $result = DockerSandboxManager::execInSandbox($sandboxId, 'mv ' . escapeshellarg($oldPath) . ' ' . escapeshellarg($newPath), '/home/sandbox', 10);
+            return [
+                'success' => ($result[0] ?? 1) === 0,
+                'error' => $result[2] ?? null
+            ];
+        }
+        
+        return LxdSandboxManager::renameItem($sandboxId, $oldPath, $newPath);
+    }
+    
+    /**
+     * Copy a file or folder in the sandbox
+     */
+    public static function copyItem(string $sandboxId, string $sourcePath, string $destPath): array
+    {
+        $backend = self::getBackend();
+        
+        if ($backend === self::BACKEND_DOCKER) {
+            // Ensure parent directory exists
+            $dir = dirname($destPath);
+            if ($dir !== '.' && $dir !== '/') {
+                DockerSandboxManager::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg($dir), '/home/sandbox', 10);
+            }
+            $result = DockerSandboxManager::execInSandbox($sandboxId, 'cp -r ' . escapeshellarg($sourcePath) . ' ' . escapeshellarg($destPath), '/home/sandbox', 10);
+            return [
+                'success' => ($result[0] ?? 1) === 0,
+                'error' => $result[2] ?? null
+            ];
+        }
+        
+        return LxdSandboxManager::copyItem($sandboxId, $sourcePath, $destPath);
+    }
 }

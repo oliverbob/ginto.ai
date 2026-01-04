@@ -5,20 +5,23 @@ declare(strict_types=1);
 namespace App\Handlers;
 
 use PhpMcp\Server\Attributes\McpTool;
-use Ginto\Helpers\LxdSandboxManager;
+use Ginto\Helpers\UnifiedSandbox;
 
 /**
  * Sandbox File MCP Tools
  * 
  * Provides MCP tools for agents to interact with user sandbox containers.
- * All file operations are scoped to /root/ inside the LXD container.
+ * All file operations are scoped to the home directory inside the container.
+ * 
+ * Supports both LXC (default) and Docker backends via UnifiedSandbox.
+ * The backend is automatically detected based on server configuration.
  * 
  * The sandbox_id is obtained from the session context, ensuring users
  * can only access their own sandbox.
  * 
  * Security:
  * - All paths are sanitized to prevent traversal attacks
- * - Operations are confined to the user's LXD container
+ * - Operations are confined to the user's container
  * - Sandbox must exist and be running for operations to succeed
  */
 final class SandboxMcp
@@ -50,16 +53,18 @@ final class SandboxMcp
             return ['valid' => false, 'error' => 'No sandbox ID available. Please create a sandbox first.'];
         }
         
-        if (!LxdSandboxManager::sandboxExists($sandboxId)) {
-            return ['valid' => false, 'error' => 'Sandbox does not exist. Please create a sandbox first.'];
+        if (!UnifiedSandbox::exists($sandboxId)) {
+            $backend = UnifiedSandbox::getBackend();
+            $backendName = $backend === 'docker' ? 'Docker' : 'LXC';
+            return ['valid' => false, 'error' => "Sandbox does not exist. Please create a sandbox first. (Backend: {$backendName})"];
         }
         
         // Ensure sandbox is running
-        if (!LxdSandboxManager::sandboxRunning($sandboxId)) {
-            LxdSandboxManager::ensureSandboxRunning($sandboxId);
+        if (!UnifiedSandbox::isRunning($sandboxId)) {
+            UnifiedSandbox::ensureRunning($sandboxId);
             usleep(500000); // Wait 0.5s for container to start
             
-            if (!LxdSandboxManager::sandboxRunning($sandboxId)) {
+            if (!UnifiedSandbox::isRunning($sandboxId)) {
                 return ['valid' => false, 'error' => 'Failed to start sandbox container.'];
             }
         }
@@ -94,7 +99,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_list_files',
-        description: 'List files and directories in the user\'s sandbox. Returns a tree structure of files and folders. The sandbox home directory is /root/. Use this to explore what files exist in the sandbox before reading or modifying them.'
+        description: 'List files and directories in the user\'s sandbox. Returns a tree structure of files and folders. Use this to explore what files exist in the sandbox before reading or modifying them.'
     )]
     public function listFiles(
         ?string $path = '',
@@ -107,15 +112,16 @@ final class SandboxMcp
             return ['success' => false, 'error' => $validation['error']];
         }
         
-        $remotePath = '/root';
+        $homePath = UnifiedSandbox::getHomePath();
+        $remotePath = $homePath;
         if (!empty($path)) {
             $path = self::normalizePath($path);
             if (!empty($path)) {
-                $remotePath = '/root/' . $path;
+                $remotePath = $homePath . '/' . $path;
             }
         }
         
-        $result = LxdSandboxManager::listFiles($sandboxId, $remotePath, $maxDepth ?? 5);
+        $result = UnifiedSandbox::listFiles($sandboxId, $remotePath, $maxDepth ?? 5);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to list files'];
@@ -131,7 +137,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_read_file',
-        description: 'Read the contents of a file from the user\'s sandbox. The path is relative to /root/ in the sandbox. For example, to read /root/project/index.php, pass "project/index.php" as the path.'
+        description: 'Read the contents of a file from the user\'s sandbox. The path is relative to the home directory in the sandbox. For example, to read project/index.php, pass "project/index.php" as the path.'
     )]
     public function readFile(
         string $path,
@@ -154,7 +160,7 @@ final class SandboxMcp
             return ['success' => false, 'error' => 'Invalid path'];
         }
         
-        $result = LxdSandboxManager::readFile($sandboxId, $path);
+        $result = UnifiedSandbox::readFile($sandboxId, $path);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to read file'];
@@ -171,7 +177,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_write_file',
-        description: 'Write content to a file in the user\'s sandbox. Creates the file if it doesn\'t exist. Creates parent directories automatically. The path is relative to /root/ in the sandbox. For example, to write /root/project/index.php, pass "project/index.php" as the path.'
+        description: 'Write content to a file in the user\'s sandbox. Creates the file if it doesn\'t exist. Creates parent directories automatically. The path is relative to the home directory in the sandbox. For example, to write project/index.php, pass "project/index.php" as the path.'
     )]
     public function writeFile(
         string $path,
@@ -198,14 +204,14 @@ final class SandboxMcp
         // Read original content before writing (for checkpoint/restore support)
         $originalContent = null;
         $isNewFile = false;
-        $readResult = LxdSandboxManager::readFile($sandboxId, $path);
+        $readResult = UnifiedSandbox::readFile($sandboxId, $path);
         if ($readResult['success']) {
             $originalContent = $readResult['content'];
         } else {
             $isNewFile = true;
         }
         
-        $result = LxdSandboxManager::writeFile($sandboxId, $path, $content);
+        $result = UnifiedSandbox::writeFile($sandboxId, $path, $content);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to write file'];
@@ -247,7 +253,7 @@ final class SandboxMcp
         }
         
         $itemType = ($type === 'folder' || $type === 'directory') ? 'folder' : 'file';
-        $result = LxdSandboxManager::createItem($sandboxId, $path, $itemType);
+        $result = UnifiedSandbox::createItem($sandboxId, $path, $itemType);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to create item'];
@@ -264,7 +270,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_delete',
-        description: 'Delete a file or folder from the user\'s sandbox. Use type="file" to delete ONLY files (skip folders), type="folder" to delete ONLY folders, or type="any" (default) for both. The path is relative to /root/ in the sandbox.'
+        description: 'Delete a file or folder from the user\'s sandbox. Use type="file" to delete ONLY files (skip folders), type="folder" to delete ONLY folders, or type="any" (default) for both. The path is relative to the home directory in the sandbox.'
     )]
     public function deleteFile(
         string $path,
@@ -291,11 +297,12 @@ final class SandboxMcp
         }
         
         // Type filtering: check if path is file or folder before deleting
+        $homePath = UnifiedSandbox::getHomePath();
         if ($type === 'file' || $type === 'folder') {
-            // Use execInSandbox - returns [exit_code, stdout, stderr]
+            // Use exec - returns [exit_code, stdout, stderr]
             // We need to check if path is a directory
-            $checkCmd = "test -d " . escapeshellarg("/root/$cleanPath") . " && echo folder || echo file";
-            [$exitCode, $stdout, $stderr] = LxdSandboxManager::execInSandbox($sandboxId, $checkCmd, '/root', 10);
+            $checkCmd = "test -d " . escapeshellarg("$homePath/$cleanPath") . " && echo folder || echo file";
+            [$exitCode, $stdout, $stderr] = UnifiedSandbox::exec($sandboxId, $checkCmd, $homePath, 10);
             $actualType = trim($stdout ?: 'file');
             
             if ($type === 'file' && $actualType === 'folder') {
@@ -306,7 +313,7 @@ final class SandboxMcp
             }
         }
         
-        $result = LxdSandboxManager::deleteItem($sandboxId, $path);
+        $result = UnifiedSandbox::deleteItem($sandboxId, $homePath . '/' . $cleanPath);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to delete item'];
@@ -347,7 +354,7 @@ final class SandboxMcp
             return ['success' => false, 'error' => 'Invalid path'];
         }
         
-        $result = LxdSandboxManager::renameItem($sandboxId, $old_path, $new_path);
+        $result = UnifiedSandbox::renameItem($sandboxId, $old_path, $new_path);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to rename item'];
@@ -389,7 +396,7 @@ final class SandboxMcp
             return ['success' => false, 'error' => 'Invalid path'];
         }
         
-        $result = LxdSandboxManager::copyItem($sandboxId, $source_path, $dest_path);
+        $result = UnifiedSandbox::copyItem($sandboxId, $source_path, $dest_path);
         
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to copy item'];
@@ -410,11 +417,11 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_exec',
-        description: 'Execute a shell command in the user\'s sandbox container. Commands run as a non-root user inside an isolated LXD container. The working directory defaults to /root. Common use cases: running npm/composer install, running scripts, checking installed packages. Returns stdout/stderr and exit code.'
+        description: 'Execute a shell command in the user\'s sandbox container. Commands run inside an isolated container. The working directory defaults to the home directory. Common use cases: running npm/composer install, running scripts, checking installed packages. Returns stdout/stderr and exit code.'
     )]
     public function execCommand(
         string $command,
-        ?string $cwd = '/root',
+        ?string $cwd = null,
         ?int $timeout = 30,
         ?string $sandbox_id = null
     ): array {
@@ -431,13 +438,14 @@ final class SandboxMcp
         // Limit timeout to reasonable bounds
         $timeout = max(1, min($timeout ?? 30, 120));
         
-        // Ensure cwd is within /root
-        $cwd = $cwd ?? '/root';
-        if (strpos($cwd, '/root') !== 0) {
-            $cwd = '/root/' . ltrim(str_replace(['../', '..\\', '..'], '', $cwd), '/');
+        // Use home path for cwd, ensure it's within bounds
+        $homePath = UnifiedSandbox::getHomePath();
+        $cwd = $cwd ?? $homePath;
+        if (strpos($cwd, $homePath) !== 0 && strpos($cwd, '/') !== 0) {
+            $cwd = $homePath . '/' . ltrim(str_replace(['../', '..\\', '..'], '', $cwd), '/');
         }
         
-        [$exitCode, $stdout, $stderr] = LxdSandboxManager::execInSandbox($sandboxId, $command, $cwd, $timeout);
+        [$exitCode, $stdout, $stderr] = UnifiedSandbox::exec($sandboxId, $command, $cwd, $timeout);
         
         return [
             'success' => $exitCode === 0,
@@ -456,7 +464,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_compose_project',
-        description: 'Create multiple files and directories at once in the user\'s sandbox. Ideal for scaffolding new projects or features. Pass an array of file definitions with path and content. Creates parent directories automatically. Paths are relative to /root/.'
+        description: 'Create multiple files and directories at once in the user\'s sandbox. Ideal for scaffolding new projects or features. Pass an array of file definitions with path and content. Creates parent directories automatically. Paths are relative to home directory..'
     )]
     public function composeProject(
         array $files,
@@ -488,9 +496,9 @@ final class SandboxMcp
             
             try {
                 if ($type === 'folder' || $type === 'directory') {
-                    $result = LxdSandboxManager::createItem($sandboxId, $path, 'folder');
+                    $result = UnifiedSandbox::createItem($sandboxId, $path, 'folder');
                 } else {
-                    $result = LxdSandboxManager::writeFile($sandboxId, $path, $content);
+                    $result = UnifiedSandbox::writeFile($sandboxId, $path, $content);
                 }
                 
                 if ($result['success']) {
@@ -545,9 +553,9 @@ final class SandboxMcp
             ];
         }
         
-        $exists = LxdSandboxManager::sandboxExists($sandboxId);
-        $running = $exists ? LxdSandboxManager::sandboxRunning($sandboxId) : false;
-        $ip = $running ? LxdSandboxManager::getSandboxIp($sandboxId) : null;
+        $exists = UnifiedSandbox::sandboxExists($sandboxId);
+        $running = $exists ? UnifiedSandbox::sandboxRunning($sandboxId) : false;
+        $ip = $running ? UnifiedSandbox::getSandboxIp($sandboxId) : null;
         
         return [
             'success' => true,
@@ -555,7 +563,7 @@ final class SandboxMcp
             'running' => $running,
             'ip' => $ip,
             'sandbox_id' => $sandboxId,
-            'container_name' => LxdSandboxManager::containerName($sandboxId),
+            'container_name' => UnifiedSandbox::containerName($sandboxId),
             'message' => $running 
                 ? 'Sandbox is running and ready.' 
                 : ($exists ? 'Sandbox exists but is not running.' : 'Sandbox does not exist.')
@@ -564,7 +572,7 @@ final class SandboxMcp
 
     #[McpTool(
         name: 'sandbox_file_exists',
-        description: 'Check if a file or directory exists in the user\'s sandbox. The path is relative to /root/ in the sandbox.'
+        description: 'Check if a file or directory exists in the user\'s sandbox. The path is relative to the home directory in the sandbox.'
     )]
     public function fileExists(
         string $path,
@@ -580,7 +588,7 @@ final class SandboxMcp
             return ['success' => false, 'error' => 'Path is required'];
         }
         
-        $exists = LxdSandboxManager::pathExists($sandboxId, $path);
+        $exists = UnifiedSandbox::pathExists($sandboxId, $path);
         
         return [
             'success' => true,
@@ -629,7 +637,7 @@ final class SandboxMcp
         $description = $description ?? 'A new project';
 
         // Create project directory
-        $createDirResult = LxdSandboxManager::createItem($sandboxId, $projectPath, 'folder');
+        $createDirResult = UnifiedSandbox::createItem($sandboxId, $projectPath, 'folder');
         if (!$createDirResult['success']) {
             return ['success' => false, 'error' => 'Failed to create project directory: ' . ($createDirResult['error'] ?? 'Unknown error')];
         }
@@ -645,10 +653,10 @@ final class SandboxMcp
             // Ensure parent directory exists
             $parentDir = dirname($filePath);
             if ($parentDir !== $projectPath && $parentDir !== '.') {
-                LxdSandboxManager::createItem($sandboxId, $parentDir, 'folder');
+                UnifiedSandbox::createItem($sandboxId, $parentDir, 'folder');
             }
             
-            $result = LxdSandboxManager::writeFile($sandboxId, $filePath, $content);
+            $result = UnifiedSandbox::writeFile($sandboxId, $filePath, $content);
             
             if ($result['success']) {
                 $createdFiles[] = $filePath;
@@ -662,7 +670,7 @@ final class SandboxMcp
         if ($run_install && !empty($template['post_commands'])) {
             foreach ($template['post_commands'] as $cmd) {
                 $cwd = '/root/' . $projectPath;
-                [$exitCode, $stdout, $stderr] = LxdSandboxManager::execInSandbox($sandboxId, $cmd, $cwd, 120);
+                [$exitCode, $stdout, $stderr] = UnifiedSandbox::execInSandbox($sandboxId, $cmd, $cwd, 120);
                 $commandResults[] = [
                     'command' => $cmd,
                     'success' => $exitCode === 0,
@@ -775,7 +783,7 @@ final class SandboxMcp
         $markdownContent = "---\ntitle: \"{$title}\"\n---\n\n" . $content;
         
         // Ensure folder exists and write source markdown file
-        $writeResult = LxdSandboxManager::writeFile($sandboxId, $sourcePath, $markdownContent);
+        $writeResult = UnifiedSandbox::writeFile($sandboxId, $sourcePath, $markdownContent);
         
         if (!$writeResult['success']) {
             return ['success' => false, 'error' => $writeResult['error'] ?? 'Failed to write source file'];
@@ -802,14 +810,14 @@ final class SandboxMcp
             } elseif ($format === 'html') {
                 // Convert markdown to styled HTML
                 $htmlContent = DocumentFormats::markdownToHtml($content, $title);
-                $htmlWriteResult = LxdSandboxManager::writeFile($sandboxId, $outputPath, $htmlContent);
+                $htmlWriteResult = UnifiedSandbox::writeFile($sandboxId, $outputPath, $htmlContent);
                 
                 if (!$htmlWriteResult['success']) {
                     return ['success' => false, 'error' => 'Failed to write HTML file'];
                 }
                 
                 // Clean up source md file
-                LxdSandboxManager::deleteItem($sandboxId, $sourcePath);
+                UnifiedSandbox::deleteItem($sandboxId, $sourcePath);
                 
                 $url = '/clients/' . $outputPath;
                 return [
@@ -828,14 +836,14 @@ final class SandboxMcp
             } elseif ($format === 'txt') {
                 // Write as plain text (strip markdown formatting)
                 $txtContent = $content;
-                $txtWriteResult = LxdSandboxManager::writeFile($sandboxId, $outputPath, $txtContent);
+                $txtWriteResult = UnifiedSandbox::writeFile($sandboxId, $outputPath, $txtContent);
                 
                 if (!$txtWriteResult['success']) {
                     return ['success' => false, 'error' => 'Failed to write text file'];
                 }
                 
                 // Clean up source md file
-                LxdSandboxManager::deleteItem($sandboxId, $sourcePath);
+                UnifiedSandbox::deleteItem($sandboxId, $sourcePath);
                 
                 $url = '/clients/' . $outputPath;
                 return [
@@ -871,21 +879,21 @@ final class SandboxMcp
             $htmlFilename = $basename . '.html';
             $htmlPath = $folder . '/' . $htmlFilename;
             
-            $htmlWriteResult = LxdSandboxManager::writeFile($sandboxId, $htmlPath, $htmlContent);
+            $htmlWriteResult = UnifiedSandbox::writeFile($sandboxId, $htmlPath, $htmlContent);
             if (!$htmlWriteResult['success']) {
                 return ['success' => false, 'error' => 'Failed to create intermediate HTML file'];
             }
             
             // Convert HTML to PDF using weasyprint
             $weasyCmd = "weasyprint \"{$htmlFilename}\" \"{$outputFilename}\"";
-            $execResult = LxdSandboxManager::execInSandbox($sandboxId, $weasyCmd, "/root/{$folder}", 60);
+            $execResult = UnifiedSandbox::execInSandbox($sandboxId, $weasyCmd, "/root/{$folder}", 60);
             $exitCode = $execResult[0] ?? 1;
             $stdout = $execResult[1] ?? '';
             $stderr = $execResult[2] ?? '';
             
             // Clean up intermediate HTML file
-            LxdSandboxManager::deleteItem($sandboxId, $htmlPath);
-            LxdSandboxManager::deleteItem($sandboxId, $sourcePath);
+            UnifiedSandbox::deleteItem($sandboxId, $htmlPath);
+            UnifiedSandbox::deleteItem($sandboxId, $sourcePath);
             
             if ($exitCode !== 0) {
                 return [
@@ -900,13 +908,13 @@ final class SandboxMcp
             // For DOCX, ODT, RTF - use Pandoc
             $pandocCmd = "pandoc \"{$basename}.md\" -o \"{$outputFilename}\" --metadata title=\"{$title}\"";
             
-            $execResult = LxdSandboxManager::execInSandbox($sandboxId, $pandocCmd, "/root/{$folder}", 60);
+            $execResult = UnifiedSandbox::execInSandbox($sandboxId, $pandocCmd, "/root/{$folder}", 60);
             $exitCode = $execResult[0] ?? 1;
             $stdout = $execResult[1] ?? '';
             $stderr = $execResult[2] ?? '';
             
             // Clean up source markdown file
-            LxdSandboxManager::deleteItem($sandboxId, $sourcePath);
+            UnifiedSandbox::deleteItem($sandboxId, $sourcePath);
             
             if ($exitCode !== 0) {
                 return [
@@ -920,7 +928,7 @@ final class SandboxMcp
         }
         
         // Verify output file was created using execInSandbox
-        $checkResult = LxdSandboxManager::execInSandbox($sandboxId, "test -f \"{$outputFilename}\" && echo 'exists'", "/root/{$folder}", 10);
+        $checkResult = UnifiedSandbox::execInSandbox($sandboxId, "test -f \"{$outputFilename}\" && echo 'exists'", "/root/{$folder}", 10);
         $fileExists = (trim($checkResult[1] ?? '') === 'exists');
         
         if (!$fileExists) {
@@ -932,11 +940,11 @@ final class SandboxMcp
         }
         
         // Get file size
-        $statResult = LxdSandboxManager::execInSandbox($sandboxId, "stat -c %s \"{$outputFilename}\" 2>/dev/null || echo 0", "/root/{$folder}", 10);
+        $statResult = UnifiedSandbox::execInSandbox($sandboxId, "stat -c %s \"{$outputFilename}\" 2>/dev/null || echo 0", "/root/{$folder}", 10);
         $fileSize = intval(trim($statResult[1] ?? '0'));
         
         // Clean up source markdown file (keep only the final document)
-        LxdSandboxManager::deleteItem($sandboxId, $sourcePath);
+        UnifiedSandbox::deleteItem($sandboxId, $sourcePath);
         
         // Build the download/view URL
         $url = '/clients/' . $outputPath;
