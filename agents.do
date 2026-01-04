@@ -23,4 +23,5 @@ Example:
     If possible, test your work with curl.
     If you're working on endpoints, test them.
     If its chat endpoints test some prompts.
+    For credentials read .env in the lxc.
     Read this instruction everytime as part of your last task.

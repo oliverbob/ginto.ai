@@ -350,6 +350,12 @@ class DockerSandboxManager
             ];
         }
         
+        // Wait a moment for container to fully start
+        usleep(500000); // 500ms
+        
+        // Create default directory structure and files
+        self::createDefaultFiles($sandboxId);
+        
         return [
             'success' => true,
             'message' => 'Sandbox created successfully',
@@ -601,12 +607,126 @@ class DockerSandboxManager
     }
     
     /**
+     * Create default directory structure and files in a new sandbox
+     */
+    public static function createDefaultFiles(string $sandboxId): array
+    {
+        $homePath = '/home/sandbox';
+        
+        // Create standard directories
+        $dirs = ['Desktop', 'Documents', 'Downloads', 'Music', 'Pictures', 'Videos', 'Websites'];
+        foreach ($dirs as $dir) {
+            self::execInSandbox($sandboxId, 'mkdir -p ' . escapeshellarg("$homePath/$dir"));
+        }
+        
+        // Create index.php
+        $indexPhp = '<?php
+/**
+ * Welcome to your Ginto Sandbox!
+ *
+ * This is your personal development environment.
+ * Edit this file or create new ones to get started.
+ */
+
+$tools = [
+    "PHP" => phpversion(),
+    "Node.js" => trim(shell_exec("/usr/bin/node --version 2>/dev/null") ?: "Not installed"),
+    "Python" => trim(shell_exec("/usr/bin/python3 --version 2>/dev/null") ?: "Not installed"),
+    "Git" => trim(shell_exec("/usr/bin/git --version 2>/dev/null") ?: "Not installed"),
+];
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ginto Sandbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-16">
+        <div class="text-center mb-12">
+            <h1 class="text-5xl font-bold mb-4">🚀 Welcome to Ginto Sandbox</h1>
+            <p class="text-xl text-purple-200">Your personal development environment is ready!</p>
+        </div>
+        <div class="max-w-4xl mx-auto">
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8 mb-8">
+                <h2 class="text-2xl font-semibold mb-6">🛠️ Available Tools</h2>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <?php foreach ($tools as $name => $version): ?>
+                    <div class="bg-white/5 rounded-lg p-4">
+                        <div class="font-medium text-purple-200"><?= htmlspecialchars($name) ?></div>
+                        <div class="text-sm text-gray-300"><?= htmlspecialchars($version) ?></div>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+            <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-8">
+                <h2 class="text-2xl font-semibold mb-6">📁 Quick Start</h2>
+                <div class="space-y-4 text-purple-100">
+                    <p>✏️ Edit <code class="bg-white/20 px-2 py-1 rounded">index.php</code> to customize this page</p>
+                    <p>📦 Use npm/pip to install packages</p>
+                    <p>🌐 Create web projects in the Websites folder</p>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-12 text-purple-300">
+            <p>Powered by <strong>Ginto</strong> • Docker Sandbox • Agentic AI Platform</p>
+        </div>
+    </div>
+</body>
+</html>';
+        
+        self::writeFile($sandboxId, "$homePath/index.php", $indexPhp);
+        
+        // Create README.md
+        $readme = '# 🚀 Ginto Sandbox
+
+Welcome to your personal development environment!
+
+## Available Tools
+
+- **PHP** + Composer
+- **Node.js** + npm  
+- **Python 3** + pip
+- **Git** for version control
+
+## Directory Structure
+
+- **Desktop/** - Desktop files
+- **Documents/** - Your documents
+- **Downloads/** - Downloaded files
+- **Music/** - Audio files
+- **Pictures/** - Image files
+- **Videos/** - Video files
+- **Websites/** - Web projects
+
+## Getting Started
+
+1. Edit `index.php` to see your changes
+2. Create new files using the editor
+3. Use the terminal for command-line operations
+
+## Learn More
+
+Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
+';
+        
+        self::writeFile($sandboxId, "$homePath/README.md", $readme);
+        
+        return [
+            'success' => true,
+            'message' => 'Default files created successfully'
+        ];
+    }
+    
+    /**
      * List files in sandbox directory
      */
     public static function listFiles(string $sandboxId, string $path = '/home/sandbox', int $maxDepth = 5): array
     {
-        // Use ls -la which works on all systems including BusyBox
-        $cmd = 'ls -la ' . escapeshellarg($path) . ' 2>/dev/null';
+        // Use simple ls -1a for reliable filename listing, then check types
+        $cmd = 'ls -1a ' . escapeshellarg($path) . ' 2>/dev/null';
         [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
         
         if ($code !== 0) {
@@ -617,37 +737,38 @@ class DockerSandboxManager
             ];
         }
         
-        // Parse ls -la output
-        $tree = [];
-        $lines = explode("\n", trim($stdout));
+        // Get list of names
+        $names = array_filter(explode("\n", trim($stdout)), function($name) {
+            return !empty($name) && $name !== '.' && $name !== '..';
+        });
         
-        foreach ($lines as $line) {
-            $line = trim($line);
-            if (empty($line)) continue;
-            if (strpos($line, 'total ') === 0) continue; // Skip total line
-            
-            // Parse ls -la output: drwxr-xr-x  2 sandbox sandbox  4096 Jan  4 14:13 Desktop
-            // First character: d=directory, -=file, l=link
-            $type = substr($line, 0, 1);
-            if ($type !== 'd' && $type !== '-' && $type !== 'l') continue;
-            
-            // Get filename (last column, may contain spaces)
-            $parts = preg_split('/\s+/', $line, 9);
-            if (count($parts) < 9) continue;
-            
-            $name = $parts[8];
-            if ($name === '.' || $name === '..') continue;
-            
-            // Skip hidden files except specific ones
-            if (strpos($name, '.') === 0 && !in_array($name, ['.config', '.local', '.pki'])) continue;
-            
+        // Filter hidden files
+        $names = array_filter($names, function($name) {
+            if (strpos($name, '.') === 0) {
+                return in_array($name, ['.config', '.local', '.pki']);
+            }
+            return true;
+        });
+        
+        if (empty($names)) {
+            return ['success' => true, 'tree' => []];
+        }
+        
+        // Check which are directories using test -d
+        $tree = [];
+        foreach ($names as $name) {
             $fullPath = rtrim($path, '/') . '/' . $name;
+            
+            // Check if directory
+            $testCmd = 'test -d ' . escapeshellarg($fullPath) . ' && echo d || echo f';
+            [$testCode, $testOut, $testErr] = self::execInSandbox($sandboxId, $testCmd);
+            $isDir = (trim($testOut) === 'd');
             
             $tree[] = [
                 'name' => $name,
                 'path' => $fullPath,
-                'type' => ($type === 'd') ? 'directory' : 'file',
-                'children' => ($type === 'd') ? [] : null
+                'type' => $isDir ? 'directory' : 'file',
+                'children' => $isDir ? [] : null
             ];
         }
         
