@@ -111,11 +111,12 @@ RUN mkdir -p /run/php && \
 
 # Configure Caddy for sandbox
 RUN mkdir -p /etc/caddy && \
-    echo ':8080 {\n\
-    root * /home/sandbox/project\n\
-    file_server\n\
-    php_fastcgi localhost:9000\n\
-}' > /etc/caddy/Caddyfile
+    printf '%s\n' \
+    ':80 {' \
+    '    root * /home/sandbox' \
+    '    file_server' \
+    '    php_fastcgi localhost:9000' \
+    '}' > /etc/caddy/Caddyfile
 
 # Configure supervisor
 COPY supervisord.conf /etc/supervisord.conf
