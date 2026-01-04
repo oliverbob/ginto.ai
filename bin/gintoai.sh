@@ -37,6 +37,7 @@ INSTALL_STEPS_NATIVE=(
     "install_nodejs"
     "install_llamacpp"
     "configure_systemd_service"
+    "configure_sdcpu_service"
     "setup_permissions"
     "configure_firewall"
     "install_dependencies"
@@ -1640,6 +1641,60 @@ EOF
     
     log_success "Ginto service configured for user: $INSTALL_USER"
     log_info "Service will start automatically on boot"
+}
+
+# Configure SDCPU (FastSD CPU Image Generation) systemd service
+configure_sdcpu_service() {
+    log_step "Configuring SDCPU systemd service..."
+    
+    SDCPU_DIR="$PROJECT_DIR/tools/sdcpu"
+    
+    # Check if SDCPU is installed (has venv and api_server.py)
+    if [ ! -d "$SDCPU_DIR/venv" ] || [ ! -f "$SDCPU_DIR/src/api_server.py" ]; then
+        log_info "SDCPU not installed, skipping service configuration"
+        log_info "To install SDCPU: cd $SDCPU_DIR && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt"
+        return 0
+    fi
+    
+    # Skip if service already exists and we're in skip mode
+    if [[ "${SKIP_CONFIGURED:-false}" == "true" ]] && [ -f "/etc/systemd/system/sdcpu.service" ]; then
+        log_info "SDCPU service already configured, skipping"
+        return 0
+    fi
+    
+    # Create the systemd service file
+    sudo tee /etc/systemd/system/sdcpu.service > /dev/null << EOF
+[Unit]
+Description=FastSD CPU Image Generation Server
+After=network.target
+
+[Service]
+Type=simple
+User=$INSTALL_USER
+Group=$INSTALL_USER
+WorkingDirectory=$SDCPU_DIR
+ExecStart=/bin/bash -c 'source venv/bin/activate && python src/api_server.py --port 8888'
+Restart=always
+RestartSec=5
+StandardOutput=append:/tmp/sdcpu.log
+StandardError=append:/tmp/sdcpu.log
+Environment=HOME=$INSTALL_USER_HOME
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    
+    # Reload systemd, enable and start the service
+    sudo systemctl daemon-reload
+    sudo systemctl enable sdcpu.service
+    sudo systemctl restart sdcpu.service
+    
+    # Verify it started
+    if sudo systemctl is-active --quiet sdcpu.service; then
+        log_success "SDCPU service installed, enabled, and running"
+    else
+        log_warning "SDCPU service installed but failed to start - check /tmp/sdcpu.log"
+    fi
 }
 
 # Fix critical file permissions (can be run anytime, idempotent)
