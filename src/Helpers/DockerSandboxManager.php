@@ -725,11 +725,22 @@ Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
      */
     public static function listFiles(string $sandboxId, string $path = '/home/sandbox', int $maxDepth = 5): array
     {
-        // Use simple ls -1a for reliable filename listing, then check types
-        $cmd = 'ls -1a ' . escapeshellarg($path) . ' 2>/dev/null';
-        [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $cmd);
+        $targetPath = rtrim($path, '/');
         
-        if ($code !== 0) {
+        // Use find command to get all files and directories with proper depth
+        // Output format: d|relative_path or f|relative_path
+        $remotePathTrailing = rtrim($targetPath, '/') . '/';
+        $escapedPath = escapeshellarg($targetPath);
+        
+        // Get directories (skip root directory itself)
+        $dirCmd = "find $escapedPath -mindepth 1 -maxdepth $maxDepth -type d 2>/dev/null | sed 's|^$remotePathTrailing||' | sed 's|^|d\\||' | head -500";
+        // Get files
+        $fileCmd = "find $escapedPath -maxdepth $maxDepth -type f 2>/dev/null | sed 's|^$remotePathTrailing||' | sed 's|^|f\\||' | head -500";
+        
+        $combinedCmd = "{ $dirCmd; $fileCmd; }";
+        [$code, $stdout, $stderr] = self::execInSandbox($sandboxId, $combinedCmd);
+        
+        if ($code !== 0 && empty($stdout)) {
             return [
                 'success' => false,
                 'error' => $stderr ?: 'Failed to list files',
@@ -737,48 +748,97 @@ Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
             ];
         }
         
-        // Get list of names
-        $names = array_filter(explode("\n", trim($stdout)), function($name) {
-            return !empty($name) && $name !== '.' && $name !== '..';
-        });
-        
-        // Filter hidden files
-        $names = array_filter($names, function($name) {
-            if (strpos($name, '.') === 0) {
-                return in_array($name, ['.config', '.local', '.pki']);
-            }
-            return true;
-        });
-        
-        if (empty($names)) {
-            return ['success' => true, 'tree' => []];
-        }
-        
-        // Check which are directories using test -d
+        // Build tree structure (matching LXD format - nested object keyed by name)
         $tree = [];
-        foreach ($names as $name) {
-            $fullPath = rtrim($path, '/') . '/' . $name;
+        $excludeDirs = ['vendor', 'node_modules', '.git', '__pycache__', '.cache', '.idea', '.npm', '.venv', 'venv'];
+        
+        $lines = array_filter(explode("\n", trim($stdout)));
+        
+        foreach ($lines as $line) {
+            $parts = explode('|', $line, 2);
+            if (count($parts) !== 2) continue;
             
-            // Check if directory
-            $testCmd = 'test -d ' . escapeshellarg($fullPath) . ' && echo d || echo f';
-            [$testCode, $testOut, $testErr] = self::execInSandbox($sandboxId, $testCmd);
-            $isDir = (trim($testOut) === 'd');
+            $type = $parts[0]; // 'd' for directory, 'f' for file
+            $relPath = $parts[1];
             
-            $tree[] = [
-                'name' => $name,
-                'path' => $fullPath,
-                'type' => $isDir ? 'directory' : 'file',
-                'children' => $isDir ? [] : null
-            ];
+            if (empty($relPath)) continue;
+            
+            // Skip excluded directories and their contents
+            $skip = false;
+            foreach ($excludeDirs as $exclude) {
+                if ($relPath === $exclude || strpos($relPath, $exclude . '/') === 0) {
+                    $skip = true;
+                    break;
+                }
+            }
+            if ($skip) continue;
+            
+            // Skip hidden files except some specific ones
+            $baseName = basename($relPath);
+            if (strpos($baseName, '.') === 0 && !in_array($baseName, ['.config', '.local', '.pki'])) {
+                continue;
+            }
+            
+            // Build nested structure (same format as LXD)
+            $pathParts = explode('/', $relPath);
+            $current = &$tree;
+            $pathSoFar = '';
+            
+            foreach ($pathParts as $i => $part) {
+                if (empty($part)) continue;
+                
+                $pathSoFar = $pathSoFar ? $pathSoFar . '/' . $part : $part;
+                $isLast = ($i === count($pathParts) - 1);
+                
+                if (!isset($current[$part])) {
+                    if ($isLast) {
+                        $current[$part] = [
+                            'type' => ($type === 'd') ? 'folder' : 'file',
+                            'path' => $pathSoFar,
+                            'encoded' => base64_encode($pathSoFar)
+                        ];
+                        if ($type === 'd') {
+                            $current[$part]['children'] = [];
+                        }
+                    } else {
+                        // Intermediate directory
+                        $current[$part] = [
+                            'type' => 'folder',
+                            'path' => $pathSoFar,
+                            'encoded' => base64_encode($pathSoFar),
+                            'children' => []
+                        ];
+                    }
+                }
+                
+                if (isset($current[$part]['children'])) {
+                    $current = &$current[$part]['children'];
+                } else {
+                    break;
+                }
+            }
         }
         
-        // Sort: directories first, then files, alphabetically
-        usort($tree, function($a, $b) {
-            if ($a['type'] !== $b['type']) {
-                return $a['type'] === 'directory' ? -1 : 1;
+        // Sort tree: folders first, then files, alphabetically
+        $sortTree = function(&$tree) use (&$sortTree) {
+            $folders = [];
+            $files = [];
+            foreach ($tree as $name => $item) {
+                if (($item['type'] ?? '') === 'folder') {
+                    if (isset($item['children'])) {
+                        $sortTree($item['children']);
+                    }
+                    $folders[$name] = $item;
+                } else {
+                    $files[$name] = $item;
+                }
             }
-            return strcasecmp($a['name'], $b['name']);
-        });
+            ksort($folders, SORT_NATURAL | SORT_FLAG_CASE);
+            ksort($files, SORT_NATURAL | SORT_FLAG_CASE);
+            $tree = array_merge($folders, $files);
+        };
+        
+        $sortTree($tree);
         
         return [
             'success' => true,
