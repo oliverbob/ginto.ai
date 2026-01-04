@@ -1104,15 +1104,16 @@ class ChatStreamHandler
             // Visitors cannot use any sandbox tools
             $systemPrompt .= $agentInstructions['visitor']();
         } else {
-            // Logged-in users - check LXC and sandbox availability
-            $lxcStatus = \Ginto\Helpers\LxdSandboxManager::checkLxcAvailability();
-            $lxcAvailable = $lxcStatus['available'] ?? false;
+            // Logged-in users - check sandbox availability using UnifiedSandbox
+            // UnifiedSandbox auto-detects backend (LXC default, Docker if configured)
+            $sandboxAvailable = \Ginto\Helpers\UnifiedSandbox::isAvailable();
+            $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
 
             $sandboxId = $_SESSION['sandbox_id'] ?? null;
-            $hasSandbox = $lxcAvailable && !empty($sandboxId) && \Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId);
+            $hasSandbox = $sandboxAvailable && !empty($sandboxId) && \Ginto\Helpers\UnifiedSandbox::exists($sandboxId);
 
-            if (!$lxcAvailable) {
-                $systemPrompt .= $agentInstructions['lxcNotInstalled']();
+            if (!$sandboxAvailable) {
+                $systemPrompt .= $agentInstructions['sandboxNotInstalled']($sandboxBackend);
             } elseif ($hasSandbox) {
                 $isPremiumUser = false;
                 if (!$isAdminUser && !empty($_SESSION['user_id']) && $this->db) {
@@ -1124,9 +1125,9 @@ class ChatStreamHandler
                         $isPremiumUser = !empty($activeSub);
                     } catch (\Throwable $_) {}
                 }
-                $systemPrompt .= $agentInstructions['withSandbox']($sandboxId, $isContinuation, $isAdminUser, $isPremiumUser);
+                $systemPrompt .= $agentInstructions['withSandbox']($sandboxId, $isContinuation, $isAdminUser, $isPremiumUser, $sandboxBackend);
             } else {
-                $systemPrompt .= $agentInstructions['noSandbox']();
+                $systemPrompt .= $agentInstructions['noSandbox']($sandboxBackend);
             }
         }
 

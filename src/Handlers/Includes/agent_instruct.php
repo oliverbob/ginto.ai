@@ -4,14 +4,16 @@
  * 
  * This file returns the system prompt instructions for agentic sandbox access.
  * It respects user permissions - non-admin/non-premium users don't see sandbox_exec.
+ * Supports both LXC (default) and Docker backends based on admin installation choice.
  * 
- * Usage in web.php:
+ * Usage in ChatStreamHandler.php:
  *   $getAgentInstructions = require __DIR__ . '/Includes/agent_instruct.php';
- *   $systemPrompt .= $getAgentInstructions['withSandbox']($sandboxId, $isContinuation, $isAdminUser, $isPremiumUser);
+ *   $backend = \Ginto\Helpers\UnifiedSandbox::getBackend(); // 'lxd' or 'docker'
+ *   $systemPrompt .= $getAgentInstructions['withSandbox']($sandboxId, $isContinuation, $isAdminUser, $isPremiumUser, $backend);
  *   // OR for no sandbox:
- *   $systemPrompt .= $getAgentInstructions['noSandbox']();
+ *   $systemPrompt .= $getAgentInstructions['noSandbox']($backend);
  * 
- * @return array Array with 'withSandbox' and 'noSandbox' callbacks
+ * @return array Array with instruction callbacks
  */
 
 return [
@@ -42,41 +44,57 @@ return [
     },
 
     /**
-     * Instructions when LXC/LXD is NOT installed on the server
+     * Instructions when LXC/LXD or Docker is NOT installed on the server
      * The agent should guide the user to install Ginto
+     * 
+     * @param string $backend The sandbox backend type ('lxd' or 'docker')
      */
-    'lxcNotInstalled' => function(): string {
-        return "\n\n## LXC/LXD NOT INSTALLED\n"
-            . "The server does not have LXC/LXD installed. The sandbox system cannot function without it.\n\n"
+    'sandboxNotInstalled' => function(string $backend = 'lxd'): string {
+        $backendName = $backend === 'docker' ? 'Docker' : 'LXC/LXD';
+        return "\n\n## SANDBOX SYSTEM NOT INSTALLED\n"
+            . "The server does not have {$backendName} installed. The sandbox system cannot function without it.\n\n"
             . "When the user asks you to:\n"
             . "- Create, edit, or manage files\n"
             . "- Run code or commands\n"
             . "- Build a project or website\n"
             . "- Set up a sandbox\n"
-            . "- Install Ginto or LXC\n\n"
+            . "- Install Ginto\n\n"
             . "You MUST:\n"
             . "1. Explain that Ginto needs to be set up first\n"
             . "2. Use the `ginto_install` tool to guide them through installation\n\n"
-            . "### Available Tool (No LXC):\n"
-            . "- `ginto_install` - Initiates Ginto installation (installs LXC/LXD and sandbox infrastructure)\n\n"
+            . "### Available Tool:\n"
+            . "- `ginto_install` - Initiates Ginto installation (installs {$backendName} and sandbox infrastructure)\n\n"
             . "### Tool Call Format:\n"
             . "{\"tool_call\": {\"name\": \"ginto_install\", \"arguments\": {}}}\n\n"
             . "### What ginto.sh Does:\n"
             . "The ginto.sh script will:\n"
-            . "- Install LXC/LXD container system\n"
-            . "- Configure network bridges and storage\n"
-            . "- Set up the Alpine Linux sandbox container\n"
+            . ($backend === 'docker' 
+                ? "- Install Docker container system\n- Configure sandbox network and storage\n- Set up the sandbox container image\n"
+                : "- Install LXC/LXD container system\n- Configure network bridges and storage\n- Set up the Alpine Linux sandbox container\n")
             . "- Initialize all required permissions\n\n"
             . "IMPORTANT: The user needs SSH access to their server to run the installation.\n\n";
     },
 
     /**
+     * Legacy alias for backward compatibility
+     */
+    'lxcNotInstalled' => function(): string {
+        $fn = require __FILE__;
+        return $fn['sandboxNotInstalled']('lxd');
+    },
+
+    /**
      * Instructions when user has NO active sandbox
      * The agent should offer to help install one
+     * 
+     * @param string $backend The sandbox backend type ('lxd' or 'docker')
      */
-    'noSandbox' => function(): string {
+    'noSandbox' => function(string $backend = 'lxd'): string {
+        $backendName = $backend === 'docker' ? 'Docker' : 'LXC';
+        $containerType = $backend === 'docker' ? 'Docker container' : 'LXC container';
         return "\n\n## SANDBOX NOT INSTALLED\n"
-            . "The user does not have an active sandbox environment.\n\n"
+            . "The user does not have an active sandbox environment.\n"
+            . "**Backend:** {$backendName} ({$containerType})\n\n"
             . "When the user asks you to:\n"
             . "- Create, edit, or manage files\n"
             . "- Run code or commands\n"
@@ -90,10 +108,10 @@ return [
             . "3. If they agree, use the `sandbox_install_wizard` tool to open the setup wizard:\n\n"
             . "### Available Tools:\n"
             . "- `sandbox_install_wizard` - Opens the sandbox installation wizard (no args required)\n"
-            . "- `ginto_install` - For fresh server setup - installs LXC/LXD first\n\n"
+            . "- `ginto_install` - For fresh server setup - installs {$backendName} first\n\n"
             . "### Tool Call Format:\n"
             . "{\"tool_call\": {\"name\": \"sandbox_install_wizard\", \"arguments\": {}}}\n\n"
-            . "If the user asks to install Ginto or mentions LXC is not installed, use `ginto_install` instead.\n\n"
+            . "If the user asks to install Ginto or mentions the sandbox system is not installed, use `ginto_install` instead.\n\n"
             . "IMPORTANT: Do NOT attempt to use any other sandbox_* tools until the sandbox is installed.\n\n";
     },
 
@@ -105,11 +123,16 @@ return [
      * @param bool $isContinuation Whether this is a continuation request
      * @param bool $isAdmin Whether the user is an admin
      * @param bool $isPremium Whether the user has a premium subscription
+     * @param string $backend The sandbox backend type ('lxd' or 'docker')
      * @return string The agent instruction block for the system prompt
      */
-    'withSandbox' => function(string $sandboxId, bool $isContinuation, bool $isAdmin = false, bool $isPremium = false): string {
+    'withSandbox' => function(string $sandboxId, bool $isContinuation, bool $isAdmin = false, bool $isPremium = false, string $backend = 'lxd'): string {
         // Determine if user can execute commands
         $canExec = $isAdmin || $isPremium;
+        
+        // Determine backend info for context
+        $backendName = $backend === 'docker' ? 'Docker' : 'LXC';
+        $containerType = $backend === 'docker' ? 'Docker container' : 'LXC container';
         
         // Build available tools list based on permissions
         // Group 1: File Operations (most common)
@@ -164,7 +187,8 @@ return [
         
         // Full agentic mode prompt - concise and focused
         // Note: Tools are now provided via OpenAI-style function calling, not text-based JSON
-        return "\n\n## SANDBOX ACCESS (ID: {$sandboxId})\n\n"
+        return "\n\n## SANDBOX ACCESS (ID: {$sandboxId})\n"
+            . "**Backend:** {$backendName} ({$containerType})\n\n"
             . "### Task Planning (REQUIRED)\n"
             . "Before starting ANY multi-step task, output a task list in this EXACT format:\n"
             . "```\n"

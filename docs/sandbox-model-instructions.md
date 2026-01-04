@@ -93,7 +93,20 @@ Ginto AI provides **secure, isolated Linux containers** (sandboxes) where users 
 **Open Source**: The sandbox infrastructure is fully open-sourced at:
 - **GitHub**: https://github.com/oliverbob/ginto.ai
 
-The sandbox uses **LXD containers** with **Alpine Linux**, featuring a **10-layer defense-in-depth security model** including:
+### Sandbox Backends
+
+Ginto supports two container backends (admin's choice during installation):
+
+| Backend | Container Type | Default | Use Case |
+|---------|---------------|---------|----------|
+| **LXC/LXD** | LXC containers (Alpine Linux) | ✅ Yes | Native Linux servers, full isolation |
+| **Docker** | Docker containers | ❌ No | Docker environments, easier deployment |
+
+The backend is automatically detected and configured. Both backends provide the same features and security model.
+
+### Security Model
+
+The sandbox uses a **10-layer defense-in-depth security model** including:
 - Unprivileged containers (UID isolation)
 - AppArmor mandatory access control
 - Syscall interception for safe nesting
@@ -335,6 +348,10 @@ When users ask about sandbox security, you can confidently state:
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    GINTO SANDBOX QUICK REFERENCE                │
+├─────────────────────────────────────────────────────────────────┤
+│ BACKENDS (admin choice during installation)                     │
+│   LXC/LXD: Default, native Linux containers (Alpine Linux)     │
+│   Docker:  Alternative, Docker containers                       │
 ├─────────────────────────────────────────────────────────────────┤
 │ VISITOR (not logged in)                                         │
 │   ❌ No sandbox access                                          │
