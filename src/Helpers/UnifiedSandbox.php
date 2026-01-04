@@ -222,6 +222,14 @@ class UnifiedSandbox
     }
     
     /**
+     * Ensure a sandbox is running (alias for start)
+     */
+    public static function ensureRunning(string $sandboxId): array
+    {
+        return self::start($sandboxId);
+    }
+    
+    /**
      * Stop a sandbox
      */
     public static function stop(string $sandboxId): array

@@ -75,6 +75,7 @@ $encoded = '';
 $needsSetup = false;
 $autoCreatedSandbox = false;
 $sandboxExpiresAt = null; // For visitor expiration warning
+$sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
 
 try {
     $db = null;
@@ -96,7 +97,7 @@ try {
         $sandboxId = null;
     } else {
         // =====================================================================
-        // SANDBOX MANAGEMENT
+        // SANDBOX MANAGEMENT (uses UnifiedSandbox for auto backend selection)
         // =====================================================================
         
         $existingSandboxId = $_SESSION['sandbox_id'] ?? null;
@@ -104,28 +105,28 @@ try {
         
         // Validate existing sandbox if present
         if (!empty($existingSandboxId)) {
-            $sandboxValid = \Ginto\Helpers\ClientSandboxHelper::validateSandboxExists($existingSandboxId, $db);
+            $sandboxValid = \Ginto\Helpers\UnifiedSandbox::exists($existingSandboxId);
             
             if (!$sandboxValid) {
                 // STALE/BROKEN SANDBOX - Clean it up completely
                 error_log("[editor.php] Stale sandbox detected: {$existingSandboxId} - cleaning up");
-                \Ginto\Helpers\LxdSandboxManager::deleteSandboxCompletely($existingSandboxId, $db);
+                \Ginto\Helpers\UnifiedSandbox::delete($existingSandboxId);
                 unset($_SESSION['sandbox_id']);
                 $existingSandboxId = null;
             }
         }
         
-        // Create sandbox if none exists (this is when "My Files" is clicked)
+        // Create sandbox if none exists (auto-create for Docker, may need setup for LXD)
         if (empty($existingSandboxId) || !$sandboxValid) {
             // Generate a new sandbox ID
             $newSandboxId = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxId($db, $_SESSION);
             
             if (!empty($newSandboxId)) {
-                // Create the LXD container
-                $createResult = \Ginto\Helpers\LxdSandboxManager::createSandbox($newSandboxId);
+                // Use UnifiedSandbox which auto-selects Docker or LXD
+                $createResult = \Ginto\Helpers\UnifiedSandbox::create($newSandboxId);
                 
                 if ($createResult['success']) {
-                    \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($newSandboxId);
+                    \Ginto\Helpers\UnifiedSandbox::ensureRunning($newSandboxId);
                     $_SESSION['sandbox_id'] = $newSandboxId;
                     $sandboxId = $newSandboxId;
                     $editorRoot = 'sandbox';
@@ -136,8 +137,13 @@ try {
                         $_SESSION['sandbox_created_at'] = time();
                     }
                     
-                    error_log("[editor.php] Created fresh sandbox: {$newSandboxId}" . ($isVisitor ? " (visitor - 1hr lifetime)" : ""));
+                    error_log("[editor.php] Created {$sandboxBackend} sandbox: {$newSandboxId}" . ($isVisitor ? " (visitor - 1hr lifetime)" : ""));
                 } else {
+                    // For Docker mode, show error directly; for LXD, show setup wizard
+                    if ($sandboxBackend === 'docker') {
+                        error_log("[editor.php] Docker sandbox creation failed: " . json_encode($createResult));
+                        // Still set needsSetup but with different messaging
+                    }
                     $needsSetup = true;
                     $editorRoot = '';
                     error_log("[editor.php] Failed to create sandbox: " . json_encode($createResult));
@@ -149,7 +155,7 @@ try {
         } else {
             // Valid sandbox exists - ensure it's running
             $sandboxId = $existingSandboxId;
-            \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($sandboxId);
+            \Ginto\Helpers\UnifiedSandbox::ensureRunning($sandboxId);
             $editorRoot = 'sandbox';
         }
         
@@ -2127,14 +2133,32 @@ html, body {
 </head>
 <body>
 <?php if ($needsSetup): ?>
-    <!-- Setup Wizard - shown when no LXD container is running -->
+    <!-- Setup Wizard - shown when sandbox creation failed -->
     <div class="editor-shell flex items-center justify-center" style="height: 100vh;">
         <div class="text-center p-8 max-w-lg">
             <div class="mb-6">
+                <?php if ($sandboxBackend === 'docker'): ?>
+                <svg class="w-20 h-20 mx-auto text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                <?php else: ?>
                 <svg class="w-20 h-20 mx-auto text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
                 </svg>
+                <?php endif; ?>
             </div>
+            <?php if ($sandboxBackend === 'docker'): ?>
+            <h1 class="text-2xl font-bold mb-4" style="color: var(--editor-text-primary);">Sandbox Unavailable</h1>
+            <p class="mb-6" style="color: var(--editor-text-secondary);">
+                Failed to create your sandbox container. This may be a temporary issue. Please try refreshing the page or contact support if the problem persists.
+            </p>
+            <button onclick="window.location.reload()" class="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors inline-flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Try Again
+            </button>
+            <?php else: ?>
             <h1 class="text-2xl font-bold mb-4" style="color: var(--editor-text-primary);">Set Up Your Sandbox</h1>
             <p class="mb-6" style="color: var(--editor-text-secondary);">
                 Your personal development environment is not running yet. Click below to create your sandbox container where you can build and run your projects.
@@ -2155,49 +2179,50 @@ html, body {
                 </div>
             </div>
             <div id="setup-error" class="mt-4 hidden text-red-600 dark:text-red-400"></div>
+            <script>
+            document.getElementById('setup-sandbox-btn').addEventListener('click', async function() {
+                const btn = this;
+                const statusDiv = document.getElementById('setup-status');
+                const statusText = document.getElementById('setup-status-text');
+                const errorDiv = document.getElementById('setup-error');
+                
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                statusDiv.classList.remove('hidden');
+                errorDiv.classList.add('hidden');
+                
+                try {
+                    statusText.textContent = 'Creating sandbox container...';
+                    
+                    const response = await fetch('/lxc/create', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': window.CSRF_TOKEN
+                        },
+                        body: JSON.stringify({})
+                    });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success || data.status === 'success') {
+                        statusText.textContent = 'Sandbox created! Refreshing...';
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        throw new Error(data.error || data.message || 'Failed to create sandbox');
+                    }
+                } catch (err) {
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    statusDiv.classList.add('hidden');
+                    errorDiv.classList.remove('hidden');
+                    errorDiv.textContent = 'Error: ' + err.message;
+                }
+            });
+            </script>
+            <?php endif; ?>
         </div>
     </div>
-    <script>
-    document.getElementById('setup-sandbox-btn').addEventListener('click', async function() {
-        const btn = this;
-        const statusDiv = document.getElementById('setup-status');
-        const statusText = document.getElementById('setup-status-text');
-        const errorDiv = document.getElementById('setup-error');
-        
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-        statusDiv.classList.remove('hidden');
-        errorDiv.classList.add('hidden');
-        
-        try {
-            statusText.textContent = 'Creating sandbox container...';
-            
-            const response = await fetch('/lxc/create', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-Token': window.CSRF_TOKEN
-                },
-                body: JSON.stringify({})
-            });
-            
-            const data = await response.json();
-            
-            if (data.success || data.status === 'success') {
-                statusText.textContent = 'Sandbox created! Refreshing...';
-                setTimeout(() => window.location.reload(), 1500);
-            } else {
-                throw new Error(data.error || data.message || 'Failed to create sandbox');
-            }
-        } catch (err) {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            statusDiv.classList.add('hidden');
-            errorDiv.classList.remove('hidden');
-            errorDiv.textContent = 'Error: ' + err.message;
-        }
-    });
-    </script>
 <?php else: ?>
     <div class="editor-shell">
         <!-- Mobile overlay for file tree -->

@@ -2697,20 +2697,22 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             </svg>
             <span class="tab-label-full">My Files</span><span class="tab-label-short">Files</span>
           </button>
-          <!-- My Computer Tab -->
+          <?php if ($sandboxBackend !== 'docker'): ?>
+          <!-- My Computer Tab (LXD only) -->
           <button id="tab-my-computer" class="editor-tab flex items-center gap-2 px-4 py-2 rounded-t-lg border-b-2 border-transparent bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25"/>
             </svg>
             <span class="tab-label-full">My Computer</span><span class="tab-label-short">Computer</span>
           </button>
-          <!-- Console Tab -->
+          <!-- Console Tab (LXD only) -->
           <button id="tab-console" class="editor-tab flex items-center gap-2 px-4 py-2 rounded-t-lg border-b-2 border-transparent bg-gray-50 dark:bg-gray-700/50 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white font-medium text-sm transition-colors">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
             </svg>
             <span class="tab-label-full">Console</span>
           </button>
+          <?php endif; ?>
         </div>
         <div class="flex items-center gap-2">
           <!-- VNC Status (only visible in My Computer view) -->
