@@ -258,9 +258,9 @@ class ClientSandboxHelper
             }
         }
         
-        // Check LXD container exists
-        if (class_exists('\\Ginto\\Helpers\\LxdSandboxManager')) {
-            $containerExists = LxdSandboxManager::sandboxExists($sandboxId);
+        // Check container exists using UnifiedSandbox (supports both Docker and LXD)
+        if (class_exists('\\Ginto\\Helpers\\UnifiedSandbox')) {
+            $containerExists = UnifiedSandbox::exists($sandboxId);
             if (!$containerExists) {
                 // Container doesn't exist - delete stale DB entry if present
                 if ($dbExists && $db) {

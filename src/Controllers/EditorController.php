@@ -241,15 +241,15 @@ class EditorController
             
             if (!$sandboxValid) {
                 // Sandbox is stale - clean up and create a new one
-                \Ginto\Helpers\LxdSandboxManager::deleteSandboxCompletely($sandboxId, $this->db);
+                \Ginto\Helpers\UnifiedSandbox::deleteCompletely($sandboxId, $this->db);
                 unset($_SESSION['sandbox_id']);
                 
                 // Create fresh sandbox
                 $newSandboxId = \Ginto\Helpers\ClientSandboxHelper::getOrCreateSandboxId($this->db, $_SESSION);
                 if ($newSandboxId) {
-                    $createResult = \Ginto\Helpers\LxdSandboxManager::createSandbox($newSandboxId);
+                    $createResult = \Ginto\Helpers\UnifiedSandbox::create($newSandboxId);
                     if ($createResult['success']) {
-                        \Ginto\Helpers\LxdSandboxManager::ensureSandboxRunning($newSandboxId);
+                        \Ginto\Helpers\UnifiedSandbox::ensureRunning($newSandboxId);
                         $_SESSION['sandbox_id'] = $newSandboxId;
                         $sandboxId = $newSandboxId;
                     } else {
