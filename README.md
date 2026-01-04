@@ -5,9 +5,11 @@
 A powerful **local AI Agent** that runs entirely on your machine. Works with OpenAI-compatible APIs and leverages the fastest inference engines on the planet: **Groq** and **Cerebras**.
 
 <p align="center">
-  <video src="public/assets/videos/superman.mp4" width="100%" autoplay loop muted playsinline>
-    Your browser does not support the video tag.
-  </video>
+  <a href="https://github.com/oliverbob/ginto.ai/raw/main/public/assets/videos/superman.mp4">
+    <img src="https://github.com/oliverbob/ginto.ai/raw/main/public/assets/images/superman-preview.png" alt="Watch Ginto AI Demo" width="100%">
+  </a>
+  <br>
+  <em>▶️ Click to watch demo video</em>
 </p>
 
 <p align="center">
