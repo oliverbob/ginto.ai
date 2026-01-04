@@ -1504,7 +1504,26 @@ XFCEEOF'
     $LXC_CMD exec "$container" -- ln -sf /usr/bin/${php_ver} /usr/bin/php
     
     log_info "Installing Composer..."
-    $LXC_CMD exec "$container" -- sh -c 'curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer'
+    # Try multiple times with different methods due to potential zlib/network issues
+    $LXC_CMD exec "$container" -- sh -c '
+        for attempt in 1 2 3; do
+            echo "Composer install attempt $attempt..."
+            # Method 1: Direct installer
+            curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php 2>/dev/null && \
+            php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer 2>/dev/null && \
+            rm -f /tmp/composer-setup.php && break
+            
+            # Method 2: Download phar directly if installer fails
+            if [ $attempt -eq 2 ]; then
+                curl -sS https://getcomposer.org/composer-stable.phar -o /usr/local/bin/composer 2>/dev/null && \
+                chmod +x /usr/local/bin/composer && break
+            fi
+            
+            sleep 2
+        done
+        # Verify installation
+        /usr/local/bin/composer --version 2>/dev/null || echo "Warning: Composer installation may have failed"
+    '
     
     log_info "Creating /root directory structure..."
     $LXC_CMD exec "$container" -- mkdir -p /root/{Desktop,Documents,Downloads,Music,Pictures,Videos,Websites}
@@ -2150,7 +2169,24 @@ bootstrap_alpine() {
     apk add --no-cache git
     
     log_info "Installing Composer..."
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    # Try multiple times with different methods due to potential zlib/network issues
+    for attempt in 1 2 3; do
+        echo "Composer install attempt $attempt..."
+        # Method 1: Direct installer
+        curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php 2>/dev/null && \
+        php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer 2>/dev/null && \
+        rm -f /tmp/composer-setup.php && break
+        
+        # Method 2: Download phar directly if installer fails
+        if [ $attempt -eq 2 ]; then
+            curl -sS https://getcomposer.org/composer-stable.phar -o /usr/local/bin/composer 2>/dev/null && \
+            chmod +x /usr/local/bin/composer && break
+        fi
+        
+        sleep 2
+    done
+    # Verify installation
+    /usr/local/bin/composer --version 2>/dev/null || log_warn "Composer installation may have failed"
     
     log_info "Creating php symlink..."
     ln -sf /usr/bin/${php_ver} /usr/bin/php
@@ -2355,7 +2391,24 @@ bootstrap_ubuntu() {
     apt-get install -y git
     
     log_info "Installing Composer..."
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    # Try multiple times with different methods due to potential zlib/network issues
+    for attempt in 1 2 3; do
+        echo "Composer install attempt $attempt..."
+        # Method 1: Direct installer
+        curl -sS https://getcomposer.org/installer -o /tmp/composer-setup.php 2>/dev/null && \
+        php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer 2>/dev/null && \
+        rm -f /tmp/composer-setup.php && break
+        
+        # Method 2: Download phar directly if installer fails
+        if [ $attempt -eq 2 ]; then
+            curl -sS https://getcomposer.org/composer-stable.phar -o /usr/local/bin/composer 2>/dev/null && \
+            chmod +x /usr/local/bin/composer && break
+        fi
+        
+        sleep 2
+    done
+    # Verify installation
+    /usr/local/bin/composer --version 2>/dev/null || log_warn "Composer installation may have failed"
     
     log_info "Installing Caddy..."
     apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
