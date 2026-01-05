@@ -589,15 +589,16 @@ docker compose exec mariadb mysql -u ginto -p ginto
 - [x] **Web-based container/VM management** - Proxmox-style LXC/LXD orchestration UI (`/admin/lxc`)
 
 ### Hosting & Infrastructure (Bare-Metal)
-- [ ] **Virtualmin/CyberPanel-style control panel** - Full web hosting management for bare-metal deployments
-- [ ] **DNS Management** - Zone editor, BIND/PowerDNS integration, DNS-over-HTTPS support
-- [ ] **Virtual Hosts** - Create and manage Apache/Caddy virtual hosts with automatic SSL
+- [x] **Server Hosting Control Panel** - Virtualmin/CyberPanel-style management UI (`/admin/hosting`)
+- [x] **DNS Management** - Zone editor with PowerDNS integration, full record management (A, AAAA, CNAME, MX, TXT, NS, SRV, CAA)
+- [ ] **Virtual Hosts** - Create and manage Caddy virtual hosts with automatic SSL
 - [ ] **Email Server** - Postfix/Dovecot integration with webmail (Roundcube/Rainloop)
-- [ ] **Database Management** - MySQL/MariaDB/PostgreSQL user and database provisioning
+- [x] **Database Management** - MySQL/MariaDB user and database provisioning via admin UI
 - [ ] **FTP/SFTP Server** - ProFTPD/Pure-FTPd with virtual users per domain
-- [ ] **Backup & Restore** - Scheduled backups with Restic/Borg to S3/B2/local storage
-- [ ] **Firewall Management** - UFW/firewalld GUI with fail2ban integration
-- [ ] **SSL/TLS Automation** - Let's Encrypt wildcard certificates with auto-renewal
+- [x] **Backup & Restore** - Manual backup creation with tar.gz, scheduled backups planned
+- [x] **Firewall Management** - UFW GUI with fail2ban status integration
+- [x] **SSL/TLS Dashboard** - Let's Encrypt certificate monitoring via Caddy auto-provisioning
+- [x] **Service Management** - Start/stop/restart system services (Caddy, PHP-FPM, MariaDB, Redis)
 - [ ] **Multi-tenant Hosting** - Reseller accounts with resource quotas and billing hooks
 
 ### AI Voice (TTS)
