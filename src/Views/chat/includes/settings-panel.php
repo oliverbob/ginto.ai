@@ -124,7 +124,17 @@
       <span id="mcp-status-text" class="text-gray-500 dark:text-gray-400">Checking...</span>
     </div>
     
-    <!-- MCP Tools List -->
+    <!-- Enable/Disable All Tools -->
+    <div class="mb-4 flex gap-2">
+      <button id="mcp-enable-all" class="flex-1 px-3 py-2 text-sm bg-green-100 dark:bg-green-900/30 hover:bg-green-200 dark:hover:bg-green-900/50 text-green-700 dark:text-green-400 rounded-lg transition-colors">
+        Enable All
+      </button>
+      <button id="mcp-disable-all" class="flex-1 px-3 py-2 text-sm bg-red-100 dark:bg-red-900/30 hover:bg-red-200 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 rounded-lg transition-colors">
+        Disable All
+      </button>
+    </div>
+    
+    <!-- MCP Tools List with Toggles -->
     <div>
       <h4 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">Available Tools</h4>
       <div id="mcp-capabilities" class="space-y-2 text-sm">

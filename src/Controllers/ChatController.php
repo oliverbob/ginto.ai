@@ -642,4 +642,46 @@ class ChatController
         $handler = new \Ginto\Handlers\ImageGenHandler($this->db);
         $handler->handle();
     }
+
+    /**
+     * Store disabled tools in session (POST /chat/disabled-tools)
+     * Called from client-side to sync disabled tools preference
+     */
+    public function disabledTools(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method Not Allowed']);
+            exit;
+        }
+
+        // Parse input
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        
+        // CSRF validation
+        $token = $input['csrf_token'] ?? '';
+        if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+
+        // Store disabled tools in session
+        $disabledTools = $input['disabled_tools'] ?? [];
+        if (!is_array($disabledTools)) {
+            $disabledTools = [];
+        }
+        
+        // Sanitize: only allow alphanumeric and underscore tool names
+        $disabledTools = array_filter($disabledTools, function($t) {
+            return is_string($t) && preg_match('/^[a-zA-Z0-9_]+$/', $t);
+        });
+        
+        $_SESSION['disabled_tools'] = array_values($disabledTools);
+        
+        echo json_encode(['success' => true, 'disabled_count' => count($_SESSION['disabled_tools'])]);
+        exit;
+    }
 }

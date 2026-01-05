@@ -4,6 +4,7 @@
 
 $router->req('/test', 'TestController@test');
 $router->req('/chat/prompts/', 'PromptsController@getPrompts');
+$router->req('/chat/disabled-tools', 'ChatController@disabledTools', ['POST']);
 
 use Core\Router;
 use Ginto\Helpers\TransactionHelper;

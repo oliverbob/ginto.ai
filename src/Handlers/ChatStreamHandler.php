@@ -848,6 +848,18 @@ class ChatStreamHandler
                 error_log("[ChatStream] No sandbox access - sandbox tools empty");
             }
             
+            // Filter out disabled tools from session
+            $disabledTools = $_SESSION['disabled_tools'] ?? [];
+            if (!empty($disabledTools) && !empty($tools)) {
+                $beforeCount = count($tools);
+                $tools = array_filter($tools, function($tool) use ($disabledTools) {
+                    $toolName = $tool['function']['name'] ?? '';
+                    return !in_array($toolName, $disabledTools, true);
+                });
+                $tools = array_values($tools); // Re-index array
+                error_log("[ChatStream] Filtered out " . ($beforeCount - count($tools)) . " disabled tools");
+            }
+            
             error_log("[ChatStream] Total tools: " . count($tools));
             
             // NOTE: Web search is now executed BEFORE the LLM call (see above)

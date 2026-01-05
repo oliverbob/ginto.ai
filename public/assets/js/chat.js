@@ -2182,16 +2182,65 @@
                 return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"})[ch];
               });
             }
+            
+            // Get disabled tools from localStorage
+            function getDisabledTools() {
+              try {
+                const stored = localStorage.getItem('ginto_disabled_tools');
+                return stored ? JSON.parse(stored) : [];
+              } catch (e) { return []; }
+            }
+            
+            function setDisabledTools(arr) {
+              localStorage.setItem('ginto_disabled_tools', JSON.stringify(arr));
+              // Sync to server via session
+              syncDisabledToolsToServer(arr);
+            }
+            
+            function isToolDisabled(toolName) {
+              return getDisabledTools().includes(toolName);
+            }
+            
+            function toggleTool(toolName) {
+              const disabled = getDisabledTools();
+              const idx = disabled.indexOf(toolName);
+              if (idx >= 0) {
+                disabled.splice(idx, 1);
+              } else {
+                disabled.push(toolName);
+              }
+              setDisabledTools(disabled);
+              return idx >= 0; // returns true if now enabled
+            }
+            
+            // Sync disabled tools to server session
+            function syncDisabledToolsToServer(disabledArr) {
+              fetch('/chat/disabled-tools', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ disabled_tools: disabledArr, csrf_token: window.CSRF_TOKEN })
+              }).catch(() => {});
+            }
+            
+            // Initial sync on load
+            syncDisabledToolsToServer(getDisabledTools());
 
             // Simpler, clearer rendering: group by MCP (if present) and list tools
             try {
               function prettyToolLine(t) {
                 const tname = (typeof t === 'string' ? t : (t.name || t['name'] || (t.name ?? 'unknown')));
                 const desc = t.description || '';
-                let line = '<div class="p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">';
+                const disabled = isToolDisabled(tname);
+                const toggleId = 'tool-toggle-' + tname.replace(/[^a-z0-9]/gi, '-');
+                let line = '<div class="p-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700 flex items-start gap-3' + (disabled ? ' opacity-50' : '') + '" data-tool-name="' + escapeHtml(tname) + '">';
+                line += '<label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">';
+                line += '<input type="checkbox" id="' + toggleId + '" class="sr-only peer tool-toggle-checkbox" data-tool="' + escapeHtml(tname) + '"' + (disabled ? '' : ' checked') + '>';
+                line += '<div class="w-9 h-5 bg-gray-300 dark:bg-gray-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[\'\'] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>';
+                line += '</label>';
+                line += '<div class="flex-1 min-w-0">';
                 line += '<code class="font-semibold text-indigo-600 dark:text-indigo-400">' + escapeHtml(tname) + '</code>';
                 if (desc) line += '<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">' + escapeHtml(desc.substring(0, 100)) + (desc.length > 100 ? '...' : '') + '</div>';
-                line += '</div>';
+                line += '</div></div>';
                 return line;
               }
 
@@ -2291,6 +2340,54 @@
                   if (success) { btn.textContent = 'Copied'; setTimeout(()=>btn.textContent='Copy discovery JSON',1200); }
                 });
               } catch (e) {}
+              
+              // Bind tool toggle event listeners
+              capContainer.querySelectorAll('.tool-toggle-checkbox').forEach(cb => {
+                cb.addEventListener('change', function() {
+                  const toolName = this.dataset.tool;
+                  const isNowEnabled = this.checked;
+                  const disabled = getDisabledTools();
+                  const idx = disabled.indexOf(toolName);
+                  if (isNowEnabled && idx >= 0) {
+                    disabled.splice(idx, 1);
+                  } else if (!isNowEnabled && idx < 0) {
+                    disabled.push(toolName);
+                  }
+                  setDisabledTools(disabled);
+                  // Update visual state
+                  const row = this.closest('[data-tool-name]');
+                  if (row) {
+                    if (isNowEnabled) row.classList.remove('opacity-50');
+                    else row.classList.add('opacity-50');
+                  }
+                });
+              });
+              
+              // Bind Enable All / Disable All buttons
+              const enableAllBtn = document.getElementById('mcp-enable-all');
+              const disableAllBtn = document.getElementById('mcp-disable-all');
+              if (enableAllBtn) {
+                enableAllBtn.addEventListener('click', () => {
+                  setDisabledTools([]);
+                  capContainer.querySelectorAll('.tool-toggle-checkbox').forEach(cb => {
+                    cb.checked = true;
+                    const row = cb.closest('[data-tool-name]');
+                    if (row) row.classList.remove('opacity-50');
+                  });
+                });
+              }
+              if (disableAllBtn) {
+                disableAllBtn.addEventListener('click', () => {
+                  const allTools = [];
+                  capContainer.querySelectorAll('.tool-toggle-checkbox').forEach(cb => {
+                    allTools.push(cb.dataset.tool);
+                    cb.checked = false;
+                    const row = cb.closest('[data-tool-name]');
+                    if (row) row.classList.add('opacity-50');
+                  });
+                  setDisabledTools(allTools);
+                });
+              }
             } catch (e) {}
           }
         }
