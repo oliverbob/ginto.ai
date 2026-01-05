@@ -1,74 +1,57 @@
-# Ginto AI Docker Compose - Sandbox Mode
-# Extends docker-compose.yml with Docker-based sandbox support
+# Ginto AI Docker Compose - Extended Sandbox Configuration
+# 
+# This file extends docker-compose.yml with additional sandbox options.
+# Use when you need custom sandbox configurations.
 #
 # Usage:
-#   docker-compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
+#   docker compose -f docker-compose.yml -f docker-compose.sandbox.yml up -d
 #
-# This file enables Docker-in-Docker sandbox mode by mounting the Docker socket
-# and adding necessary permissions for the PHP container to spawn sibling containers.
-
-version: "3.8"
+# This adds:
+#   - Custom sandbox image builds
+#   - Additional network isolation options
+#   - Resource limits for sandboxes
 
 services:
   # ==========================================================================
-  # PHP-FPM with Docker Socket Access (for sibling containers)
-  # ==========================================================================
-  php:
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    group_add:
-      - "999"  # docker group (adjust if your docker GID is different)
-    environment:
-      - DOCKER_SANDBOXES=true
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - SANDBOX_NETWORK=ginto-sandbox
-    depends_on:
-      - mariadb
-      - redis
-
-  # ==========================================================================
-  # Sandbox Manager Service
-  # Manages Docker-based sandbox containers
+  # Sandbox Manager with extended permissions
   # ==========================================================================
   sandbox-manager:
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    environment:
+      - SANDBOX_CPU_LIMIT=${SANDBOX_CPU_LIMIT:-0.5}
+      - SANDBOX_MEMORY_LIMIT=${SANDBOX_MEMORY_LIMIT:-256m}
+      - SANDBOX_PIDS_LIMIT=${SANDBOX_PIDS_LIMIT:-100}
+      - SANDBOX_NETWORK_EGRESS=${SANDBOX_NETWORK_EGRESS:-true}
+
+  # ==========================================================================
+  # Sandbox Base Image Builder
+  # Builds the base image used for user sandboxes
+  # ==========================================================================
+  sandbox-builder:
     build:
       context: .
-      dockerfile: docker/php/Dockerfile
-    container_name: ginto-sandbox-manager
-    restart: unless-stopped
-    command: ["php", "bin/sandbox_manager.php", "--daemon"]
-    volumes:
-      - .:/var/www/html
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - storage_data:/var/www/storage
-    group_add:
-      - "999"  # docker group
-    environment:
-      - DOCKER_SANDBOXES=true
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - SANDBOX_NETWORK=ginto-sandbox
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-ginto}
-      - DB_USER=${DB_USER:-ginto}
-      - DB_PASS=${DB_PASS:-secret}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - SKIP_DB_WAIT=true
-      - RUN_MIGRATIONS=false
-    depends_on:
-      - php
-      - redis
-    networks:
-      - ginto-network
-      - ginto-sandbox
+      dockerfile: docker/sandbox/Dockerfile
+    image: ginto-sandbox:latest
+    container_name: ginto-sandbox-builder
+    command: ["echo", "Sandbox base image built successfully"]
+    profiles:
+      - build
 
 # ==========================================================================
-# Additional Networks for Sandboxes
+# Additional Networks for advanced isolation
 # ==========================================================================
 networks:
-  ginto-sandbox:
+  sandbox-isolated:
+    name: ginto-sandbox-isolated
     driver: bridge
+    internal: true  # No external internet access
     ipam:
       config:
-        - subnet: 172.29.0.0/16
+        - subnet: 172.31.0.0/16

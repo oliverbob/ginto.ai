@@ -47,21 +47,36 @@ INSTALL_STEPS_NATIVE=(
 )
 
 # List of installation steps for DOCKER mode
+# Main stack (PHP, MariaDB, Caddy, Redis) installed on host
+# Docker is ONLY used for user sandboxes
 INSTALL_STEPS_DOCKER=(
     "check_home_directory"
     "prompt_docker_configuration"
     "check_sudo"
     "detect_os"
+    "update_packages"
+    "install_git"
     "install_utilities"
+    "install_redis"
+    "install_build_tools"
     "install_php"
+    "install_mariadb"
+    "install_caddy"
+    "configure_caddy"
     "install_composer"
-    "install_dependencies"
+    "install_nodejs"
     "install_llamacpp"
     "install_docker_engine"
     "install_docker_compose"
-    "setup_docker_env"
-    "build_docker_images"
-    "start_docker_services"
+    "configure_systemd_service"
+    "configure_sdcpu_service"
+    "setup_permissions"
+    "configure_firewall"
+    "install_dependencies"
+    "setup_env"
+    "build_sandbox_images"
+    "start_services"
+    "start_sandbox_services"
     "print_docker_summary"
 )
 
@@ -1978,13 +1993,16 @@ print_summary() {
 # Prompt for Docker-specific configuration
 prompt_docker_configuration() {
     echo ""
-    log_step "Docker Mode Configuration"
+    log_step "Docker Sandbox Mode Configuration"
     echo ""
-    log_info "Ginto AI will run in Docker containers."
-    log_info "This mode is ideal for:"
-    log_info "  - Quick setup without installing system packages"
-    log_info "  - Consistent environment across different systems"
-    log_info "  - Easy cleanup (just remove containers)"
+    log_info "Ginto AI will install the main stack on this system:"
+    log_info "  - PHP 8.3, MariaDB, Caddy, Redis (on host)"
+    log_info "  - Docker ONLY for user sandboxes (isolated code execution)"
+    echo ""
+    log_info "This provides:"
+    log_info "  - Better performance (main app runs natively)"
+    log_info "  - Strong isolation (user code runs in Docker containers)"
+    log_info "  - Easy management (systemd for app, Docker for sandboxes)"
     echo ""
     
     # Domain configuration
@@ -2016,37 +2034,17 @@ prompt_docker_configuration() {
         TLS_EMAIL=""
     fi
     
-    # Sandbox mode (before database for simpler flow)
+    # Sandbox mode is always docker in this mode
     echo ""
     log_step "Sandbox Configuration"
-    log_info "Sandboxes provide isolated environments for AI code execution."
-    echo ""
-    echo "  1) lxd    - LXD-based sandboxes (recommended, better isolation)"
-    echo "  2) docker - Docker-based sandboxes (simpler setup)"
-    echo "  3) none   - Disable sandboxes"
-    echo ""
+    log_info "Sandboxes will run in Docker containers for isolation."
+    SANDBOX_MODE="docker"
+    log_success "Sandbox mode: docker (containers)"
     
-    log_prompt "Choose sandbox mode (1-3) [default: 1]:"
-    read -r -p "> " sandbox_choice < /dev/tty
-    
-    case "${sandbox_choice}" in
-        2|docker)
-            SANDBOX_MODE="docker"
-            ;;
-        3|none)
-            SANDBOX_MODE="none"
-            ;;
-        *)
-            SANDBOX_MODE="lxd"
-            ;;
-    esac
-    
-    log_success "Selected sandbox mode: $SANDBOX_MODE"
-    
-    # Database password
+    # Database configuration
     echo ""
     log_step "Database Configuration"
-    log_info "Docker will create a MariaDB container with these credentials."
+    log_info "MariaDB will be installed on this system."
     echo ""
     
     DB_NAME="${DB_NAME:-ginto}"
@@ -2344,14 +2342,20 @@ start_docker_services() {
     log_success "Docker services started"
 }
 
-# Print Docker mode summary
+# Print Docker mode summary (new architecture: host stack + Docker sandboxes)
 print_docker_summary() {
     echo ""
     echo -e "${GREEN}============================================${NC}"
-    echo -e "${GREEN}  Ginto AI Docker Installation Complete!${NC}"
+    echo -e "${GREEN}  Ginto AI Installation Complete!${NC}"
     echo -e "${GREEN}============================================${NC}"
     echo ""
-    echo "Docker containers:"
+    echo "Main stack (running on host):"
+    echo "  - PHP-FPM:  $(php-fpm8.3 -v 2>/dev/null | head -1 || echo 'checking...')"
+    echo "  - MariaDB:  $(mysql --version 2>/dev/null | cut -d' ' -f1-5 || echo 'checking...')"
+    echo "  - Caddy:    $(caddy version 2>/dev/null | head -1 || echo 'checking...')"
+    echo "  - Redis:    $(redis-server --version 2>/dev/null | cut -d' ' -f1-3 || echo 'checking...')"
+    echo ""
+    echo "Sandbox services (Docker containers):"
     
     cd "$PROJECT_DIR"
     local COMPOSE_CMD="docker compose"
@@ -2362,10 +2366,10 @@ print_docker_summary() {
     
     echo ""
     echo "Configuration:"
-    echo "  - Mode: Docker"
+    echo "  - Mode: Docker Sandbox (host + containers)"
     echo "  - Domain: $CADDY_DOMAIN"
     echo "  - Database: $DB_NAME (user: $DB_USER)"
-    echo "  - Sandbox Mode: $SANDBOX_MODE"
+    echo "  - Sandbox Mode: docker"
     echo ""
     local server_ip=$(get_server_ip)
     echo "Access your site:"
@@ -2378,15 +2382,77 @@ print_docker_summary() {
         fi
     fi
     echo ""
-    echo "Docker commands:"
+    echo "System commands:"
+    echo "  - Start app:     sudo systemctl start ginto"
+    echo "  - Stop app:      sudo systemctl stop ginto"
+    echo "  - App logs:      journalctl -u ginto -f"
+    echo "  - App status:    sudo systemctl status ginto"
+    echo ""
+    echo "Sandbox commands:"
     echo "  - Start:   docker compose up -d"
     echo "  - Stop:    docker compose down"
     echo "  - Logs:    docker compose logs -f"
     echo "  - Status:  docker compose ps"
-    echo "  - Shell:   docker compose exec php bash"
     echo ""
     echo "Database access:"
-    echo "  - docker compose exec mariadb mysql -u $DB_USER -p$DB_PASS $DB_NAME"
+    echo "  - mysql -u $DB_USER -p $DB_NAME"
+    echo ""
+}
+
+# Build sandbox images only (for new architecture)
+build_sandbox_images() {
+    log_step "Building Docker sandbox images..."
+    
+    cd "$PROJECT_DIR"
+    
+    # Use docker compose (plugin) or docker-compose (standalone)
+    local COMPOSE_CMD="docker compose"
+    if ! docker compose version &>/dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    fi
+    
+    # Build sandbox-related images only
+    log_info "Building sandbox containers..."
+    $COMPOSE_CMD build sandbox-proxy terminal-server sandbox-manager 2>/dev/null || {
+        log_info "Building all containers in docker-compose.yml..."
+        $COMPOSE_CMD build
+    }
+    
+    # Build the base sandbox image if Dockerfile exists
+    if [ -f "$PROJECT_DIR/docker/sandbox/Dockerfile" ]; then
+        log_info "Building base sandbox image..."
+        docker build -t ginto-sandbox:latest -f docker/sandbox/Dockerfile docker/sandbox/ || true
+    fi
+    
+    log_success "Sandbox images built successfully"
+}
+
+# Start sandbox services only (main stack runs on host)
+start_sandbox_services() {
+    log_step "Starting Docker sandbox services..."
+    
+    cd "$PROJECT_DIR"
+    
+    local COMPOSE_CMD="docker compose"
+    if ! docker compose version &>/dev/null 2>&1; then
+        COMPOSE_CMD="docker-compose"
+    fi
+    
+    # Start sandbox services
+    log_info "Starting sandbox proxy and terminal server..."
+    $COMPOSE_CMD up -d
+    
+    # Wait for services to be ready
+    sleep 3
+    
+    # Check service status
+    $COMPOSE_CMD ps
+    
+    log_success "Sandbox services started"
+    echo ""
+    echo "Sandbox services:"
+    echo "  - Sandbox Proxy:     http://localhost:${SANDBOX_PROXY_PORT:-3000}"
+    echo "  - Terminal Server:   ws://localhost:${TERMINAL_SERVER_PORT:-3001}"
     echo ""
 }
 

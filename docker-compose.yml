@@ -1,195 +1,33 @@
-# Ginto AI Docker Compose
-# Full stack deployment with all services
+# Ginto AI Docker Compose - Sandbox Only
+# 
+# This compose file is for Docker-based user sandboxes ONLY.
+# The main application stack (PHP, MariaDB, Caddy, Redis) runs on the host.
+#
+# Architecture:
+#   Host/LXC/LXD:
+#     - PHP 8.3 + FPM (serves the Ginto.ai application)
+#     - MariaDB (database)
+#     - Caddy (web server with auto-SSL)
+#     - Redis (caching)
+#     - PowerDNS (DNS management - optional)
+#
+#   Docker (this file):
+#     - User sandboxes (isolated code execution)
+#     - Sandbox proxy (routes traffic to user sandboxes)
+#     - Terminal server (WebSocket PTY for sandbox terminals)
 #
 # Usage:
-#   docker compose up -d              # Start all services
-#   docker compose up -d --build      # Rebuild and start
+#   docker compose up -d              # Start sandbox services
+#   docker compose down               # Stop sandbox services
 #   docker compose logs -f            # Follow logs
-#   docker compose down               # Stop all services
-#   docker compose down -v            # Stop and remove volumes
+#
+# The sandbox containers are created dynamically by the application
+# when users request sandbox environments.
 
 services:
   # ==========================================================================
-  # Caddy Web Server
-  # ==========================================================================
-  caddy:
-    build:
-      context: .
-      dockerfile: docker/caddy/Dockerfile
-    container_name: ginto-caddy
-    restart: unless-stopped
-    ports:
-      - "${HTTP_PORT:-80}:80"
-      - "${HTTPS_PORT:-443}:443"
-    volumes:
-      - .:/var/www/html:ro
-      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    environment:
-      - CADDY_DOMAIN=${CADDY_DOMAIN:-localhost}
-      - TLS_EMAIL=${TLS_EMAIL:-}
-    depends_on:
-      - php
-    networks:
-      - ginto-network
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-
-  # ==========================================================================
-  # PHP-FPM Application Server
-  # ==========================================================================
-  php:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-    container_name: ginto-php
-    restart: unless-stopped
-    user: "${HOST_UID:-1001}:${HOST_GID:-1001}"
-    group_add:
-      - "${DOCKER_GID:-999}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    volumes:
-      - .:/var/www/html
-      # Bind mount to host's storage dir outside repo (persists across restarts)
-      # Same location as non-docker LXC: ~/ginto.ai/../storage
-      - ../storage:/var/www/storage
-      # Mount Docker socket for Docker-based sandboxes (requires write access)
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-ginto}
-      - DB_USER=${DB_USER:-ginto}
-      - DB_PASS=${DB_PASS:-secret}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - LLM_PROVIDER=${LLM_PROVIDER:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - APP_ENV=${APP_ENV:-production}
-      - APP_DEBUG=${APP_DEBUG:-false}
-      - RUN_MIGRATIONS=${RUN_MIGRATIONS:-true}
-      # Docker sandbox configuration
-      - SANDBOX_MODE=${SANDBOX_MODE:-docker}
-      - DOCKER_SANDBOX_SUBNET=${DOCKER_SANDBOX_SUBNET:-172.30.0.0/16}
-      # Local LLM configuration (use host.docker.internal to reach host machine)
-      - INSTALL_MODE=${INSTALL_MODE:-docker}
-      - LOCAL_LLM_URL=${LOCAL_LLM_URL:-http://host.docker.internal:8034/v1}
-      - LOCAL_LLM_MODEL=${LOCAL_LLM_MODEL:-local}
-      - VISION_MODEL_URL=${VISION_MODEL_URL:-http://host.docker.internal:8033/v1}
-      - VISION_MODEL_NAME=${VISION_MODEL_NAME:-SmolVLM2}
-    depends_on:
-      mariadb:
-        condition: service_healthy
-      redis:
-        condition: service_started
-    networks:
-      - ginto-network
-      - sandbox-network
-    healthcheck:
-      test: ["CMD", "php-fpm", "-t"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-
-  # ==========================================================================
-  # Ratchet WebSocket Server (for real-time streaming)
-  # ==========================================================================
-  websocket:
-    build:
-      context: .
-      dockerfile: docker/php/Dockerfile
-    container_name: ginto-websocket
-    restart: unless-stopped
-    user: "${HOST_UID:-1001}:${HOST_GID:-1001}"
-    command: ["php", "bin/start_rachet_stream.php"]
-    volumes:
-      - .:/var/www/html
-      # Bind mount to host's storage dir (same as php service)
-      - ../storage:/var/www/storage
-      # Mount Docker socket for sandbox operations
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      - DB_HOST=mariadb
-      - DB_PORT=3306
-      - DB_NAME=${DB_NAME:-ginto}
-      - DB_USER=${DB_USER:-ginto}
-      - DB_PASS=${DB_PASS:-secret}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - LLM_PROVIDER=${LLM_PROVIDER:-}
-      - GROQ_API_KEY=${GROQ_API_KEY:-}
-      - CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
-      - SKIP_DB_WAIT=true
-      - RUN_MIGRATIONS=false
-      # Docker sandbox configuration
-      - SANDBOX_MODE=${SANDBOX_MODE:-docker}
-      - DOCKER_SANDBOX_SUBNET=${DOCKER_SANDBOX_SUBNET:-172.30.0.0/16}
-    expose:
-      - "8080"
-    depends_on:
-      - php
-    networks:
-      - ginto-network
-      - sandbox-network
-
-  # ==========================================================================
-  # MariaDB Database
-  # ==========================================================================
-  mariadb:
-    image: mariadb:10.11
-    container_name: ginto-mariadb
-    restart: unless-stopped
-    environment:
-      - MYSQL_ROOT_PASSWORD=${DB_ROOT_PASS:-rootsecret}
-      - MYSQL_DATABASE=${DB_NAME:-ginto}
-      - MYSQL_USER=${DB_USER:-ginto}
-      - MYSQL_PASSWORD=${DB_PASS:-secret}
-    volumes:
-      - mariadb_data:/var/lib/mysql
-      - ./database/migrations:/docker-entrypoint-initdb.d:ro
-    ports:
-      - "${DB_PORT:-3306}:3306"
-    networks:
-      - ginto-network
-    healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 10s
-
-  # ==========================================================================
-  # Redis Cache
-  # ==========================================================================
-  redis:
-    image: redis:7-alpine
-    container_name: ginto-redis
-    restart: unless-stopped
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    networks:
-      - ginto-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-
-  # ==========================================================================
   # Sandbox Proxy (Node.js)
+  # Routes HTTP traffic to the appropriate user sandbox container
   # ==========================================================================
   sandbox-proxy:
     build:
@@ -199,17 +37,23 @@ services:
     restart: unless-stopped
     environment:
       - SERVICE=sandbox-proxy
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    expose:
-      - "3000"
-    depends_on:
-      - redis
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    ports:
+      - "${SANDBOX_PROXY_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
-      - ginto-network
+      - sandbox-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
 
   # ==========================================================================
   # Terminal Server (Node.js WebSocket PTY)
+  # Provides WebSocket-based terminal access to user sandboxes
   # ==========================================================================
   terminal-server:
     build:
@@ -219,26 +63,60 @@ services:
     restart: unless-stopped
     environment:
       - SERVICE=terminal-server
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    expose:
-      - "3001"
-    depends_on:
-      - redis
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    ports:
+      - "${TERMINAL_SERVER_PORT:-3001}:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - ginto-network
+      - sandbox-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================================================
+  # Sandbox Manager (PHP daemon)
+  # Manages lifecycle of user sandbox containers
+  # ==========================================================================
+  sandbox-manager:
+    build:
+      context: .
+      dockerfile: docker/sandbox/manager.Dockerfile
+    container_name: ginto-sandbox-manager
+    restart: unless-stopped
+    command: ["php", "bin/sandbox_manager.php", "--daemon"]
+    environment:
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-ginto}
+      - DB_USER=${DB_USER:-ginto}
+      - DB_PASS=${DB_PASS:-}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - SANDBOX_NETWORK=sandbox-network
+      - SANDBOX_IMAGE=${SANDBOX_IMAGE:-ginto-sandbox:latest}
+      - SANDBOX_TIMEOUT=${SANDBOX_TIMEOUT:-3600}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-storage:/var/www/storage
+    networks:
+      - sandbox-network
+    depends_on:
+      - sandbox-proxy
+      - terminal-server
 
 # ==========================================================================
 # Networks
 # ==========================================================================
 networks:
-  ginto-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.28.0.0/16
-  
-  # Sandbox network for Docker-based sandboxes
   sandbox-network:
     name: ginto-sandbox
     driver: bridge
@@ -250,11 +128,5 @@ networks:
 # Volumes
 # ==========================================================================
 volumes:
-  mariadb_data:
-    driver: local
-  redis_data:
-    driver: local
-  caddy_data:
-    driver: local
-  caddy_config:
+  sandbox-storage:
     driver: local
