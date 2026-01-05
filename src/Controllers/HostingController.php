@@ -582,18 +582,37 @@ class HostingController
             mkdir($root, 0755, true);
         }
 
-        // Create Caddy config
+        // Generate Caddy config
         $config = $this->generateCaddyConfig($domain, $root, $php, $ssl);
-        $configFile = "/etc/caddy/sites-available/{$domain}.caddy";
         
-        if (file_put_contents($configFile, $config) === false) {
-            return ['success' => false, 'error' => 'Failed to write config'];
+        // Write to temp file first (PHP has permissions here)
+        $tempFile = sys_get_temp_dir() . '/caddy_' . uniqid() . '.caddy';
+        if (file_put_contents($tempFile, $config) === false) {
+            return ['success' => false, 'error' => 'Failed to write temporary config'];
         }
 
-        // Enable site
+        $configFile = "/etc/caddy/sites-available/{$domain}.caddy";
+        
+        // Move with sudo
+        $result = $this->runCommand("sudo mv " . escapeshellarg($tempFile) . " " . escapeshellarg($configFile));
+        if ($result['code'] !== 0) {
+            @unlink($tempFile);
+            return ['success' => false, 'error' => 'Failed to move config: ' . $result['output']];
+        }
+
+        // Set proper permissions (only if file exists)
+        if (file_exists($configFile)) {
+            $this->runCommand("sudo chown root:root " . escapeshellarg($configFile));
+            $this->runCommand("sudo chmod 644 " . escapeshellarg($configFile));
+        }
+
+        // Enable site (create symlink)
         $enabledFile = "/etc/caddy/sites-enabled/{$domain}.caddy";
         if (!file_exists($enabledFile)) {
-            symlink($configFile, $enabledFile);
+            $result = $this->runCommand("sudo ln -sf " . escapeshellarg($configFile) . " " . escapeshellarg($enabledFile));
+            if ($result['code'] !== 0) {
+                return ['success' => false, 'error' => 'Failed to create symlink: ' . $result['output']];
+            }
         }
 
         // Reload Caddy
