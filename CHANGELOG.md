@@ -16,6 +16,11 @@ This provides:
 
 ### Added
 
+- **Lightpanda Web Tools in Chat** - `web_fetch`, `web_search`, `web_extract_links` now available as agent tools
+  - Real-time activity streaming with status indicators (Reading URL, Searching, etc.)
+  - Model instructed to use Lightpanda instead of curl for URL fetching
+  - Collapsible activity timeline showing fetch/search progress
+
 - **Server Hosting Control Panel** (`/admin/hosting`)
   - Virtualmin/CyberPanel-style management UI for bare-metal deployments
   - Dashboard with system stats (CPU, memory, disk, uptime)

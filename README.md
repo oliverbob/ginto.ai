@@ -79,12 +79,14 @@ The "My Files" interface follows the familiar [Microsoft Windows](https://www.mi
 - **Memory** - context retention for smarter, personalized responses
 - **Groq TTS** - Text-to-speech adopted from the original [Groq MCP Server](https://github.com/groq/groq-mcp-server/)
 
-### 🐼 Panda Search
+### 🐼 Panda Search & Web Browsing
 - **AI-powered web search** - Real-time web search integrated into chat conversations
-- **LightPanda browser engine** - Fast, headless browser for web content extraction
-- **Activity timeline** - Collapsible view showing search queries and sources
+- **LightPanda browser engine** - Fast, headless browser for web content extraction (11x faster than Chrome)
+- **Direct URL fetching** - Ask the AI to read any URL (GitHub, docs, articles) using `web_fetch`
+- **Activity timeline** - Collapsible view showing search queries, URL fetches, and sources
 - **Smart summarization** - Source deduplication and content summarization
 - **Works with all LLMs** - Available across all supported model providers
+- **No curl fallback** - Agent always uses Lightpanda, never sandbox_exec with curl
 
 ### 💬 Enhanced Conversation UI
 - **Messenger-style interface** - Clean, modern chat bubble design

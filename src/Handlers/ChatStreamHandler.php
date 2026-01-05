@@ -946,6 +946,9 @@ class ChatStreamHandler
                         // Special handling for generate_image with progress streaming
                         if ($toolName === 'generate_image') {
                             $result = $this->executeImageGeneration($toolArgs['prompt'] ?? '');
+                        } elseif (in_array($toolName, ['web_fetch', 'web_search', 'web_extract_links'])) {
+                            // Special handling for Lightpanda web tools with activity streaming
+                            $result = $this->executeWebTool($toolName, $toolArgs);
                         } else {
                             // Execute the tool via McpInvoker
                             $result = \App\Core\McpInvoker::invoke($toolName, $toolArgs);
@@ -1468,6 +1471,143 @@ class ChatStreamHandler
     /**
      * Send final SSE response with HTML and reasoning
      */
+    /**
+     * Execute Lightpanda web tools with activity streaming
+     * Provides real-time UI feedback similar to web search
+     */
+    private function executeWebTool(string $toolName, array $toolArgs): array
+    {
+        $startTime = microtime(true);
+        
+        // Helper to emit activity events
+        $emitActivity = function(array $event) use ($startTime) {
+            $event['elapsed_ms'] = round((microtime(true) - $startTime) * 1000);
+            echo "data: " . json_encode($event, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+            flush();
+        };
+        
+        if ($toolName === 'web_fetch') {
+            $url = $toolArgs['url'] ?? '';
+            $domain = parse_url($url, PHP_URL_HOST) ?: $url;
+            
+            // Emit: Starting fetch
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'fetch',
+                'message' => 'Fetching URL...',
+                'url' => $url,
+                'domain' => $domain,
+                'status' => 'reading'
+            ]);
+            
+            // Emit: Reading domain
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'read',
+                'message' => 'Reading: ' . $domain,
+                'url' => $url,
+                'domain' => $domain,
+                'status' => 'reading'
+            ]);
+            
+            // Execute the actual tool
+            $result = \App\Core\McpInvoker::invoke($toolName, $toolArgs);
+            
+            // Emit: Complete
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'fetch_complete',
+                'message' => 'Fetched: ' . $domain,
+                'url' => $url,
+                'domain' => $domain,
+                'status' => ($result['success'] ?? false) ? 'complete' : 'error'
+            ]);
+            
+            return $result;
+            
+        } elseif ($toolName === 'web_search') {
+            $query = $toolArgs['query'] ?? '';
+            $engine = $toolArgs['engine'] ?? 'duckduckgo';
+            
+            // Emit: Starting search
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'search',
+                'message' => 'Searching the web...',
+                'query' => $query,
+                'status' => 'searching'
+            ]);
+            
+            // Emit: Search query
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'search_query',
+                'message' => 'Searched: "' . $query . '"',
+                'query' => $query,
+                'engine' => $engine,
+                'status' => 'searching'
+            ]);
+            
+            // Execute the actual tool
+            $result = \App\Core\McpInvoker::invoke($toolName, $toolArgs);
+            
+            // Emit: Complete
+            $resultCount = count($result['results'] ?? []);
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'search_complete',
+                'message' => "Found {$resultCount} results",
+                'query' => $query,
+                'result_count' => $resultCount,
+                'status' => ($result['success'] ?? false) ? 'complete' : 'error'
+            ]);
+            
+            return $result;
+            
+        } elseif ($toolName === 'web_extract_links') {
+            $url = $toolArgs['url'] ?? '';
+            $domain = parse_url($url, PHP_URL_HOST) ?: $url;
+            
+            // Emit: Extracting links
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'extract',
+                'message' => 'Extracting links from: ' . $domain,
+                'url' => $url,
+                'domain' => $domain,
+                'status' => 'extracting'
+            ]);
+            
+            // Execute the actual tool
+            $result = \App\Core\McpInvoker::invoke($toolName, $toolArgs);
+            
+            // Emit: Complete
+            $linkCount = $result['count'] ?? count($result['links'] ?? []);
+            $emitActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'extract_complete',
+                'message' => "Extracted {$linkCount} links",
+                'url' => $url,
+                'domain' => $domain,
+                'link_count' => $linkCount,
+                'status' => ($result['success'] ?? false) ? 'complete' : 'error'
+            ]);
+            
+            return $result;
+        }
+        
+        // Fallback - shouldn't happen but just in case
+        return \App\Core\McpInvoker::invoke($toolName, $toolArgs);
+    }
+
     /**
      * Execute image generation with progress streaming
      */
