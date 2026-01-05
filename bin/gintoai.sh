@@ -1678,19 +1678,25 @@ install_sdcpu() {
         return 0
     fi
     
-    # Ensure python3-venv and pip are available (need version-specific package on Ubuntu)
-    log_info "Ensuring Python venv and pip packages are installed..."
+    # Install system dependencies for Pillow and other Python packages
+    log_info "Installing system dependencies for SDCPU..."
     if command -v apt-get &>/dev/null; then
         # Get Python version (e.g., 3.12)
         local py_version
         py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        # Install version-specific venv package (e.g., python3.12-venv) and generic packages
-        sudo apt-get install -y "python${py_version}-venv" python3-venv python3-pip 2>/dev/null || \
-        sudo apt-get install -y python3-venv python3-pip
+        # Install version-specific venv package, pip, and Pillow build dependencies
+        sudo apt-get install -y "python${py_version}-venv" python3-venv python3-pip \
+            libjpeg-dev zlib1g-dev libpng-dev libfreetype6-dev liblcms2-dev \
+            libopenjp2-7-dev libtiff-dev libwebp-dev 2>/dev/null || \
+        sudo apt-get install -y python3-venv python3-pip libjpeg-dev zlib1g-dev
     elif command -v dnf &>/dev/null; then
-        sudo dnf install -y python3-virtualenv python3-pip
+        sudo dnf install -y python3-virtualenv python3-pip \
+            libjpeg-devel zlib-devel libpng-devel freetype-devel lcms2-devel \
+            openjpeg2-devel libtiff-devel libwebp-devel
     elif command -v apk &>/dev/null; then
-        sudo apk add --no-cache python3 py3-pip py3-virtualenv
+        sudo apk add --no-cache python3 py3-pip py3-virtualenv \
+            jpeg-dev zlib-dev libpng-dev freetype-dev lcms2-dev \
+            openjpeg-dev tiff-dev libwebp-dev
     fi
     
     # Verify venv is now available
