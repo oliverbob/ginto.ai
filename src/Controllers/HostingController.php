@@ -582,10 +582,16 @@ class HostingController
             mkdir($root, 0755, true);
         }
 
+        // Ensure configuration directories exist
+        $caddyConfigDir = '/etc/caddy/sites-available';
+        if (!is_dir($caddyConfigDir)) {
+            mkdir($caddyConfigDir, 0755, true);
+        }
+
         // Create Caddy config
         $config = $this->generateCaddyConfig($domain, $root, $php, $ssl);
-        $configFile = "/etc/caddy/sites-available/{$domain}.caddy";
-        
+        $configFile = "{$caddyConfigDir}/{$domain}.caddy";
+
         if (file_put_contents($configFile, $config) === false) {
             return ['success' => false, 'error' => 'Failed to write config'];
         }
