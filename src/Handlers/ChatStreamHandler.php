@@ -818,11 +818,11 @@ class ChatStreamHandler
                 $tools = $mcpUnifier->getToolsAsOpenAI(['generate_image']);
                 error_log("[ChatStream] Image gen tool loaded");
                 
-                // Add Lightpanda web tools for URL fetching and web search
-                // These should be preferred over sandbox_exec with curl
+                // Add Lightpanda web tools for URL fetching (NOT web_search - that's handled by pre-LLM search)
+                // web_fetch is for reading specific URLs the user provides
+                // web_extract_links is for extracting links from pages
                 $webTools = $mcpUnifier->getToolsAsOpenAI([
-                    'web_fetch',      // Fetch URL content with Lightpanda browser
-                    'web_search',     // Search the web via DuckDuckGo/Google/Bing
+                    'web_fetch',         // Fetch URL content with Lightpanda browser
                     'web_extract_links', // Extract links from a page
                 ]);
                 $tools = array_merge($tools, $webTools);
@@ -946,7 +946,7 @@ class ChatStreamHandler
                         // Special handling for generate_image with progress streaming
                         if ($toolName === 'generate_image') {
                             $result = $this->executeImageGeneration($toolArgs['prompt'] ?? '');
-                        } elseif (in_array($toolName, ['web_fetch', 'web_search', 'web_extract_links'])) {
+                        } elseif (in_array($toolName, ['web_fetch', 'web_extract_links'])) {
                             // Special handling for Lightpanda web tools with activity streaming
                             $result = $this->executeWebTool($toolName, $toolArgs);
                         } else {
@@ -1167,15 +1167,10 @@ class ChatStreamHandler
                 . 'use the `web_fetch` tool with that URL. It uses Lightpanda headless browser for fast, accurate content extraction. '
                 . 'NEVER use curl or wget via sandbox_exec for URL fetching - always use web_fetch. ';
             
-            if ($useLightpandaSearch) {
-                $systemPrompt .= 'When the user asks about current events, news, or information that would benefit from web search, use your lightpanda_search tool. '
-                    . 'This tool searches the web and fetches content from top results. Call it with a clear search query. '
-                    . 'Be efficient: request only 2-3 results per search. ';
-            } else {
-                $systemPrompt .= 'When the user asks about current events, news, or information that would benefit from web search, use your web_search tool. '
-                    . 'Be efficient: search only 3-5 most relevant sources, not more. '
-                    . 'Keep your reasoning concise and focused. ';
-            }
+            // Web search is handled automatically by the system - no tool needed
+            // The system will search the web before LLM runs when queries need it
+            $systemPrompt .= 'For web searches about current events or general information, the system handles this automatically - '
+                . 'you do NOT need to call a web search tool. Just respond based on the web search results provided in context. ';
 
             if ($hadImageInHistory) {
                 $systemPrompt .= 'Note: Earlier in this conversation, the user shared an image which you analyzed. '
@@ -1523,48 +1518,6 @@ class ChatStreamHandler
                 'message' => 'Fetched: ' . $domain,
                 'url' => $url,
                 'domain' => $domain,
-                'status' => ($result['success'] ?? false) ? 'complete' : 'error'
-            ]);
-            
-            return $result;
-            
-        } elseif ($toolName === 'web_search') {
-            $query = $toolArgs['query'] ?? '';
-            $engine = $toolArgs['engine'] ?? 'duckduckgo';
-            
-            // Emit: Starting search
-            $emitActivity([
-                'activity' => true,
-                'type' => 'websearch',
-                'phase' => 'search',
-                'message' => 'Searching the web...',
-                'query' => $query,
-                'status' => 'searching'
-            ]);
-            
-            // Emit: Search query
-            $emitActivity([
-                'activity' => true,
-                'type' => 'websearch',
-                'phase' => 'search_query',
-                'message' => 'Searched: "' . $query . '"',
-                'query' => $query,
-                'engine' => $engine,
-                'status' => 'searching'
-            ]);
-            
-            // Execute the actual tool
-            $result = \App\Core\McpInvoker::invoke($toolName, $toolArgs);
-            
-            // Emit: Complete
-            $resultCount = count($result['results'] ?? []);
-            $emitActivity([
-                'activity' => true,
-                'type' => 'websearch',
-                'phase' => 'search_complete',
-                'message' => "Found {$resultCount} results",
-                'query' => $query,
-                'result_count' => $resultCount,
                 'status' => ($result['success'] ?? false) ? 'complete' : 'error'
             ]);
             

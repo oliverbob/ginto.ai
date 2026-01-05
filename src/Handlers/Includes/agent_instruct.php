@@ -172,9 +172,9 @@ return [
         ];
         
         // Group 6: Web Browsing (Lightpanda - use INSTEAD of curl!)
+        // Note: web_search is NOT a tool - the system handles web searching automatically via pre-LLM search
         $webTools = [
             '`web_fetch` - **PRIMARY for URLs** - Fetch any URL content using Lightpanda headless browser (url). Use this to read GitHub repos, documentation, articles, etc.',
-            '`web_search` - Search the web via DuckDuckGo/Google/Bing (query, engine, maxResults)',
             '`web_extract_links` - Extract all links from a webpage (url)',
         ];
         
