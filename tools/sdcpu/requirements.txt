@@ -1,10 +1,13 @@
 # FastSD CPU - API Only (Stripped)
+# Pin torch to avoid optimum/onnx compatibility issues
+torch==2.3.1
 accelerate==1.6.0
 diffusers==0.33.0
 transformers==4.48.0
-Pillow==9.4.0
+Pillow>=9.4.0
 openvino==2025.1.0
 optimum-intel==1.23.0
+optimum==1.23.3
 numpy==1.26.4
 pydantic
 typing-extensions==4.10.0
