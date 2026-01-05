@@ -1678,14 +1678,25 @@ install_sdcpu() {
         return 0
     fi
     
-    # Ensure python3-venv is available
+    # Ensure python3-venv and pip are available (need version-specific package on Ubuntu)
+    log_info "Ensuring Python venv and pip packages are installed..."
+    if command -v apt-get &>/dev/null; then
+        # Get Python version (e.g., 3.12)
+        local py_version
+        py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
+        # Install version-specific venv package (e.g., python3.12-venv) and generic packages
+        sudo apt-get install -y "python${py_version}-venv" python3-venv python3-pip 2>/dev/null || \
+        sudo apt-get install -y python3-venv python3-pip
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y python3-virtualenv python3-pip
+    elif command -v apk &>/dev/null; then
+        sudo apk add --no-cache python3 py3-pip py3-virtualenv
+    fi
+    
+    # Verify venv is now available
     if ! python3 -m venv --help &>/dev/null; then
-        log_info "Installing python3-venv..."
-        if command -v apt-get &>/dev/null; then
-            sudo apt-get install -y python3-venv python3-pip
-        elif command -v dnf &>/dev/null; then
-            sudo dnf install -y python3-virtualenv python3-pip
-        fi
+        log_error "Failed to install python3-venv - cannot set up SDCPU"
+        return 1
     fi
     
     cd "$SDCPU_DIR"
