@@ -22,7 +22,7 @@ class ImageGenHandler
     private $db = null;
     
     /** @var string SDCPU API endpoint (FastSD CPU with OpenVINO - ~1 second generation!) */
-    private const SDCPU_API_URL = 'http://10.93.65.5:8888/api/generate';
+    private const SDCPU_API_URL = 'http://10.93.65.192:8888/api/generate';
     
     public function __construct($db = null)
     {

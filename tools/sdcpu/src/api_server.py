@@ -120,11 +120,17 @@ def load_img2img_pipeline(model_id: str, use_local: bool = False):
     return _img2img_pipeline
 
 
-@app.get("/api/")
+@app.get("/")
 async def root():
     return {"message": "FastSD CPU API - Ready", "status": "ok"}
 
 
+@app.get("/api/")
+async def api_root():
+    return {"message": "FastSD CPU API - Ready", "status": "ok"}
+
+
+@app.get("/health")
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "txt2img_loaded": _txt2img_pipeline is not None, "img2img_loaded": _img2img_pipeline is not None}
