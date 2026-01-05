@@ -242,6 +242,12 @@
     markdown = markdown.replace(/\*\s+(?=[a-zA-Z0-9])/g, '*');  // "* word" -> "*word" (fix opening)
     markdown = markdown.replace(/([a-zA-Z0-9])\s+\*/g, '$1*');  // "word *" -> "word*" (fix closing)
     
+    // Fix bold markers adjacent to text without spaces (LLM often outputs "word**bold**word")
+    // marked.js requires word boundaries, so we add spaces before/after ** when adjacent to text
+    // "word**bold**" -> "word **bold**" and "**bold**word" -> "**bold** word"
+    markdown = markdown.replace(/([a-zA-Z0-9,.])\*\*([^\s*])/g, '$1 **$2');  // "word**X" -> "word **X"
+    markdown = markdown.replace(/([^\s*])\*\*([a-zA-Z0-9])/g, '$1** $2');     // "X**word" -> "X** word"
+    
     // Preprocess: fix headings without space after # (LLM often outputs ###1. instead of ### 1.)
     markdown = markdown.replace(/^(#{1,6})([^\s#])/gm, '$1 $2');
     
