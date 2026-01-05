@@ -234,15 +234,12 @@
     // Preprocess: fix PHP code blocks
     markdown = fixPhpCodeBlocks(markdown);
     
-    // Preprocess: fix malformed markdown from LLM output
-    // Fix broken bold/italic markers with spaces inside: "* *" -> "**"
-    markdown = markdown.replace(/\*\s+\*/g, '**');  // "* *" -> "**"
-    markdown = markdown.replace(/\*\*\s+\*\*/g, '****');  // "** **" -> "****" (will be fixed next)
-    markdown = markdown.replace(/\*{4,}/g, '**');  // "****+" -> "**"
-    
-    // NOTE: Removed aggressive space-stripping regexes that were breaking properly-formatted markdown
-    // The regexes "/\*\s+(?=[a-zA-Z0-9])/g" and "/([a-zA-Z0-9])\s+\*/g" were stripping spaces
-    // around asterisks, corrupting patterns like "* **Bold:**" into "***Bold:**"
+    // NOTE: Removed all "fix malformed markdown" regexes - they were breaking properly-formatted 
+    // markdown. Models like gpt-oss-120b output correct markdown, and these "fixes" corrupted it.
+    // The problematic patterns were:
+    // - /\*\s+\*/g - turned "* **Bold" into "***Bold" (corrupted bullet+bold)
+    // - /\*\*\s+\*\*/g - similar issue
+    // - /\*{4,}/g - tried to fix the above but didn't work for 3 asterisks
     
     // Preprocess: fix headings without space after # (LLM often outputs ###1. instead of ### 1.)
     markdown = markdown.replace(/^(#{1,6})([^\s#])/gm, '$1 $2');
