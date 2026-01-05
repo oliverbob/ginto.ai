@@ -1008,14 +1008,23 @@ install_powerdns() {
     if ! $pdns_installed; then
         log_info "Installing PowerDNS authoritative server with MySQL backend..."
         
+        # Stop pdns if it's trying to run with bad config (from previous failed install)
+        sudo systemctl stop pdns 2>/dev/null || true
+        
         case $OS in
             ubuntu|debian)
+                # Prevent auto-start during install (config not ready yet)
+                sudo mkdir -p /etc/powerdns
+                echo "# Placeholder - will be configured after install" | sudo tee /etc/powerdns/pdns.conf > /dev/null
                 sudo apt-get install -y pdns-server pdns-backend-mysql
                 ;;
             fedora)
                 sudo dnf install -y pdns pdns-backend-mysql
                 ;;
         esac
+        
+        # Stop the service that may have started with incomplete config
+        sudo systemctl stop pdns 2>/dev/null || true
         
         # Generate API key
         local PDNS_API_KEY
