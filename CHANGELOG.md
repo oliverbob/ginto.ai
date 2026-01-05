@@ -2,7 +2,7 @@
 
 All notable changes to Ginto will be documented in this file.
 
-## [1.1.0] - 2026-01-05
+## [1.0.2] - 2026-01-05
 
 ### 🚀 Major Architecture Change
 
