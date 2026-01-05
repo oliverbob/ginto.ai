@@ -36,6 +36,7 @@ INSTALL_STEPS_NATIVE=(
     "install_composer"
     "install_nodejs"
     "install_llamacpp"
+    "install_powerdns"
     "install_sdcpu"
     "configure_systemd_service"
     "configure_sdcpu_service"
@@ -67,6 +68,7 @@ INSTALL_STEPS_DOCKER=(
     "install_composer"
     "install_nodejs"
     "install_llamacpp"
+    "install_powerdns"
     "install_docker_engine"
     "install_docker_compose"
     "install_sdcpu"
@@ -987,6 +989,116 @@ install_llamacpp() {
     cd "$PROJECT_DIR"
 }
 
+# Install and configure PowerDNS authoritative server
+# Used for hosting DNS zones via /admin/hosting/dns
+install_powerdns() {
+    log_step "Checking PowerDNS..."
+    
+    local pdns_installed=false
+    
+    # Check if PowerDNS is already installed and running
+    if command -v pdns_server &>/dev/null; then
+        if systemctl is-active --quiet pdns 2>/dev/null; then
+            log_info "PowerDNS already installed and running"
+            pdns_installed=true
+        fi
+    fi
+    
+    # Install PowerDNS if not present
+    if ! $pdns_installed; then
+        log_info "Installing PowerDNS authoritative server with MySQL backend..."
+        
+        case $OS in
+            ubuntu|debian)
+                sudo apt-get install -y pdns-server pdns-backend-mysql
+                ;;
+            fedora)
+                sudo dnf install -y pdns pdns-backend-mysql
+                ;;
+        esac
+        
+        # Generate API key
+        local PDNS_API_KEY
+        PDNS_API_KEY=$(openssl rand -hex 32)
+        
+        # Get public IP for binding
+        local PUBLIC_IP
+        PUBLIC_IP=$(curl -s -4 ifconfig.me 2>/dev/null || echo "0.0.0.0")
+        
+        # Configure PowerDNS
+        log_info "Configuring PowerDNS..."
+        sudo tee /etc/powerdns/pdns.conf > /dev/null << EOF
+# PowerDNS Authoritative Server Configuration
+# Managed by Ginto AI - https://ginto.ai
+
+# Backend: Use gmysql (MySQL/MariaDB)
+launch=gmysql
+gmysql-host=127.0.0.1
+gmysql-port=3306
+gmysql-dbname=${DB_NAME:-ginto}
+gmysql-user=${DB_USER:-ginto}
+gmysql-password=${DB_PASS:-}
+gmysql-dnssec=no
+
+# Network settings
+local-address=$PUBLIC_IP
+local-port=53
+
+# API settings for web management
+api=yes
+api-key=$PDNS_API_KEY
+webserver=yes
+webserver-address=127.0.0.1
+webserver-port=8081
+webserver-allow-from=127.0.0.1
+
+# Logging
+loglevel=4
+log-dns-queries=no
+log-dns-details=no
+
+# Security
+allow-axfr-ips=127.0.0.1
+disable-axfr=yes
+version-string=anonymous
+
+# Performance
+cache-ttl=60
+query-cache-ttl=20
+negquery-cache-ttl=60
+
+# SOA defaults
+default-soa-content=ns1.ginto.ai admin.ginto.ai 0 10800 3600 604800 3600
+EOF
+        
+        # Add PowerDNS API credentials to .env if not already present
+        if [ -f "$PROJECT_DIR/.env" ]; then
+            if ! grep -q "POWERDNS_API_KEY" "$PROJECT_DIR/.env"; then
+                echo "" >> "$PROJECT_DIR/.env"
+                echo "# PowerDNS API Configuration" >> "$PROJECT_DIR/.env"
+                echo "POWERDNS_API_KEY=$PDNS_API_KEY" >> "$PROJECT_DIR/.env"
+                echo "POWERDNS_API_URL=http://127.0.0.1:8081/api/v1" >> "$PROJECT_DIR/.env"
+                log_info "Added PowerDNS API credentials to .env"
+            fi
+        fi
+        
+        # Enable and start PowerDNS
+        sudo systemctl enable pdns
+        sudo systemctl restart pdns
+        
+        # Verify PowerDNS is running
+        sleep 2
+        if systemctl is-active --quiet pdns 2>/dev/null; then
+            log_success "PowerDNS installed and running on $PUBLIC_IP:53"
+            log_info "API available at http://127.0.0.1:8081/api/v1"
+        else
+            log_warn "PowerDNS installed but service may need manual configuration"
+            log_info "Check: sudo systemctl status pdns"
+            return 1
+        fi
+    fi
+}
+
 # Install Ollama using official installer
 # See: https://ollama.com/download/linux
 install_ollama() {
@@ -1843,7 +1955,7 @@ setup_permissions() {
 
 # Configure firewall rules for noVNC websockify ports
 configure_firewall() {
-    log_step "Configuring firewall for noVNC websockify..."
+    log_step "Configuring firewall..."
     
     # Check if ufw is installed and active
     if ! command -v ufw &>/dev/null; then
@@ -1864,6 +1976,21 @@ configure_firewall() {
         log_success "Opened ports 6170-6200 for noVNC websockify"
     else
         log_info "Websockify ports already allowed in firewall"
+    fi
+    
+    # Allow DNS ports (53/tcp and 53/udp) for PowerDNS authoritative server
+    if ! sudo ufw status | grep -q "53/tcp"; then
+        sudo ufw allow 53/tcp comment "PowerDNS TCP"
+        log_success "Opened port 53/tcp for PowerDNS"
+    else
+        log_info "DNS TCP port already allowed in firewall"
+    fi
+    
+    if ! sudo ufw status | grep -q "53/udp"; then
+        sudo ufw allow 53/udp comment "PowerDNS UDP"
+        log_success "Opened port 53/udp for PowerDNS"
+    else
+        log_info "DNS UDP port already allowed in firewall"
     fi
 }
 
