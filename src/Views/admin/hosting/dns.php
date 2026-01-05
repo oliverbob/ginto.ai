@@ -168,8 +168,8 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
           <div class="flex gap-2">
             <input type="text" name="content" id="record-content" placeholder="IP address or hostname" class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" required>
             <?php if ($serverIp): ?>
-            <button type="button" onclick="document.getElementById('record-content').value='<?= htmlspecialchars($serverIp) ?>'" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm whitespace-nowrap" title="Use server IP">
-              <i class="fas fa-server mr-1"></i><?= htmlspecialchars($serverIp) ?>
+            <button type="button" onclick="document.getElementById('record-content').value='<?= htmlspecialchars($serverIp) ?>'" class="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm whitespace-nowrap" title="Use server IP">
+              Use <?= htmlspecialchars($serverIp) ?>
             </button>
             <?php endif; ?>
           </div>
