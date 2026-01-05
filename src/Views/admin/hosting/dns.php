@@ -463,8 +463,10 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
 
     async function syncPowerDNS() {
       const result = await apiCall('sync_powerdns');
-      if (result.success) {
+      if (result.success && !result.message?.includes('failed')) {
         GintoUI.success(result.message || 'Synced to PowerDNS');
+      } else if (result.message?.includes('failed')) {
+        GintoUI.error(result.message);
       } else {
         GintoUI.error(result.error || 'Sync failed');
       }
