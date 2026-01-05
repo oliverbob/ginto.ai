@@ -1762,12 +1762,11 @@ Type=simple
 User=$INSTALL_USER
 Group=$INSTALL_USER
 WorkingDirectory=$SDCPU_DIR
-ExecStart=/bin/bash -c 'source venv/bin/activate && python src/api_server.py --port 8888'
+ExecStart=$SDCPU_DIR/venv/bin/python src/api_server.py --port 8888
 Restart=always
 RestartSec=5
-StandardOutput=append:/tmp/sdcpu.log
-StandardError=append:/tmp/sdcpu.log
 Environment=HOME=$INSTALL_USER_HOME
+Environment=PATH=$SDCPU_DIR/venv/bin:/usr/local/bin:/usr/bin:/bin
 
 [Install]
 WantedBy=multi-user.target
