@@ -171,11 +171,19 @@ return [
             '`generate_image` - Generate AI image from text prompt (prompt). Returns image URL.',
         ];
         
+        // Group 6: Web Browsing (Lightpanda - use INSTEAD of curl!)
+        $webTools = [
+            '`web_fetch` - **PRIMARY for URLs** - Fetch any URL content using Lightpanda headless browser (url). Use this to read GitHub repos, documentation, articles, etc.',
+            '`web_search` - Search the web via DuckDuckGo/Google/Bing (query, engine, maxResults)',
+            '`web_extract_links` - Extract all links from a webpage (url)',
+        ];
+        
         $toolsList = "**File Operations:**\n- " . implode("\n- ", $fileTools)
             . "\n\n**Document Creation:**\n- " . implode("\n- ", $docTools)
             . "\n\n**Project Scaffolding:**\n- " . implode("\n- ", $projectTools)
             . "\n\n**Execution & Status:**\n- " . implode("\n- ", $execTools)
-            . "\n\n**AI Image Generation:**\n- " . implode("\n- ", $imageTools);
+            . "\n\n**AI Image Generation:**\n- " . implode("\n- ", $imageTools)
+            . "\n\n**Web Browsing (Lightpanda):**\n- " . implode("\n- ", $webTools);
         
         // For continuations, use a simplified prompt
         if ($isContinuation) {
@@ -272,8 +280,15 @@ return [
             . "   - Modern styling with Tailwind utility classes\n\n"
             . "### IMPORTANT: sandbox_exec Rules\n"
             . "- **DO NOT** use sandbox_exec for file operations (delete, copy, move, read, write)\n"
+            . "- **DO NOT** use sandbox_exec with curl/wget to fetch URLs - use `web_fetch` instead!\n"
             . "- Use the dedicated tools instead: sandbox_delete, sandbox_copy_file, sandbox_rename_file, etc.\n"
             . "- sandbox_exec is ONLY for: running code, npm/pip install, git commands, compiling\n\n"
+            . "### CRITICAL: Reading URLs/Websites\n"
+            . "When user asks to read, fetch, or get content from a URL (GitHub, docs, articles, etc.):\n"
+            . "- **ALWAYS** use `web_fetch` tool - it uses Lightpanda headless browser (11x faster than Chrome)\n"
+            . "- **NEVER** use sandbox_exec with curl, wget, or any shell command for URL fetching\n"
+            . "- `web_fetch` renders JavaScript, handles dynamic content, and returns clean text\n"
+            . "- Example: To read https://github.com/user/repo, call web_fetch with that URL\n\n"
             . "### AI Image Generation\n"
             . "When user asks to create, generate, draw, or make an image/picture/artwork:\n"
             . "- Use `generate_image` tool with a descriptive prompt\n"

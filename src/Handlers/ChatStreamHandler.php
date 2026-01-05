@@ -817,6 +817,16 @@ class ChatStreamHandler
                 $mcpUnifier = new \App\Core\McpUnifier();
                 $tools = $mcpUnifier->getToolsAsOpenAI(['generate_image']);
                 error_log("[ChatStream] Image gen tool loaded");
+                
+                // Add Lightpanda web tools for URL fetching and web search
+                // These should be preferred over sandbox_exec with curl
+                $webTools = $mcpUnifier->getToolsAsOpenAI([
+                    'web_fetch',      // Fetch URL content with Lightpanda browser
+                    'web_search',     // Search the web via DuckDuckGo/Google/Bing
+                    'web_extract_links', // Extract links from a page
+                ]);
+                $tools = array_merge($tools, $webTools);
+                error_log("[ChatStream] Web tools loaded: " . count($webTools) . " tools");
             }
             
             if ($hasSandboxAccess) {
@@ -841,7 +851,7 @@ class ChatStreamHandler
             error_log("[ChatStream] Total tools: " . count($tools));
             
             // NOTE: Web search is now executed BEFORE the LLM call (see above)
-            // No need to add Lightpanda as a tool - results are already in context
+            // Lightpanda tools are now available for on-demand URL fetching
 
             // Agentic loop - keep going until model finishes (no more tool_calls)
             $maxIterations = 15;
@@ -1149,12 +1159,17 @@ class ChatStreamHandler
         }
 
         if (!$hasImage) {
+            // Add web browsing instructions - use web_fetch for URLs
+            $systemPrompt .= 'When the user asks you to read, fetch, or get content from a specific URL (like GitHub, documentation, articles), '
+                . 'use the `web_fetch` tool with that URL. It uses Lightpanda headless browser for fast, accurate content extraction. '
+                . 'NEVER use curl or wget via sandbox_exec for URL fetching - always use web_fetch. ';
+            
             if ($useLightpandaSearch) {
                 $systemPrompt .= 'When the user asks about current events, news, or information that would benefit from web search, use your lightpanda_search tool. '
                     . 'This tool searches the web and fetches content from top results. Call it with a clear search query. '
                     . 'Be efficient: request only 2-3 results per search. ';
             } else {
-                $systemPrompt .= 'When the user asks about current events, news, or information that would benefit from web search, use your browser_search tool. '
+                $systemPrompt .= 'When the user asks about current events, news, or information that would benefit from web search, use your web_search tool. '
                     . 'Be efficient: search only 3-5 most relevant sources, not more. '
                     . 'Keep your reasoning concise and focused. ';
             }
