@@ -1782,7 +1782,7 @@ EOF
     if sudo systemctl is-active --quiet sdcpu.service; then
         log_success "SDCPU service installed, enabled, and running"
     else
-        log_warning "SDCPU service installed but failed to start - check /tmp/sdcpu.log"
+        log_warn "SDCPU service installed but failed to start - check /tmp/sdcpu.log"
     fi
 }
 
