@@ -2,7 +2,7 @@
 
 You must test this repo in the LXC container:
 
-  lxc exec docker-test -- su - test
+  lxc exec box -- su - test
   cd ~/ginto.ai
 
 # IMPORTANT: Any changes to the repo must be pushed, then pulled to that container for testing.
@@ -26,7 +26,7 @@ Example:
     git add . && git commit -m "your message" && git push
 
   In container - to test:
-    lxc exec docker-test -- su - test -c "cd ~/ginto.ai && git pull"
+    lxc exec box -- su - test -c "cd ~/ginto.ai && git pull"
     after pushing there, you need to do "docker compose restart". It will restart 10 seconds.
     If possible, test your work with curl.
     If you're working on endpoints, test them.
