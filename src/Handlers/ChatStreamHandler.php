@@ -1173,6 +1173,16 @@ class ChatStreamHandler
             }
         }
 
+        // Inform model about disabled tools so it doesn't try to use unavailable features
+        $disabledTools = $_SESSION['disabled_tools'] ?? [];
+        if (!empty($disabledTools)) {
+            $disabledList = implode(', ', $disabledTools);
+            $systemPrompt .= "\n\nIMPORTANT - DISABLED TOOLS: The following tools have been disabled by the user and are NOT available: " . $disabledList . ". "
+                . "Do NOT attempt to use these tools or provide functionality that requires them. "
+                . "If a user asks for something that requires a disabled tool (e.g., image generation when generate_image is disabled), "
+                . "politely explain that this feature has been disabled in their settings. ";
+        }
+
         if (!$hasImage) {
             // Add web browsing instructions - use web_fetch for URLs
             $systemPrompt .= 'When the user asks you to read, fetch, or get content from a specific URL (like GitHub, documentation, articles), '
