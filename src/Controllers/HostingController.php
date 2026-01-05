@@ -701,20 +701,457 @@ class HostingController
         return $certs;
     }
 
+    // ========== DNS ZONE MANAGEMENT ==========
+
     private function listDnsZones(): array
     {
-        // Placeholder - would integrate with BIND/PowerDNS
-        return [];
+        try {
+            $zones = $this->db->query("SELECT z.*, 
+                (SELECT COUNT(*) FROM dns_records WHERE zone_id = z.id) as record_count
+                FROM dns_zones z ORDER BY z.name")->fetchAll(\PDO::FETCH_ASSOC);
+            return $zones ?: [];
+        } catch (\Exception $e) {
+            // Table might not exist yet
+            return [];
+        }
     }
 
     private function getDnsRecords(string $zone): array
     {
-        return [];
+        try {
+            $stmt = $this->db->prepare("SELECT r.* FROM dns_records r 
+                JOIN dns_zones z ON r.zone_id = z.id 
+                WHERE z.name = ? ORDER BY r.type, r.name");
+            $stmt->execute([$zone]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 
     private function manageDnsRecord(array $input): array
     {
-        return ['success' => false, 'error' => 'DNS management not configured'];
+        $action = $input['action'] ?? '';
+        
+        try {
+            switch ($action) {
+                case 'create_zone':
+                    return $this->createDnsZone($input);
+                case 'delete_zone':
+                    return $this->deleteDnsZone($input);
+                case 'add_record':
+                    return $this->addDnsRecord($input);
+                case 'update_record':
+                    return $this->updateDnsRecord($input);
+                case 'delete_record':
+                    return $this->deleteDnsRecordById($input);
+                case 'get_soa_defaults':
+                    return $this->getSoaDefaults();
+                case 'update_soa_defaults':
+                    return $this->updateSoaDefaults($input);
+                case 'sync_powerdns':
+                    return $this->syncWithPowerDNS();
+                default:
+                    return ['success' => false, 'error' => 'Unknown action'];
+            }
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    private function createDnsZone(array $input): array
+    {
+        $name = strtolower(trim($input['zone'] ?? ''));
+        $type = $input['type'] ?? 'NATIVE';
+        
+        if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*\.[a-z]{2,}$/i', $name)) {
+            return ['success' => false, 'error' => 'Invalid zone name'];
+        }
+
+        // Check if zone exists
+        $stmt = $this->db->prepare("SELECT id FROM dns_zones WHERE name = ?");
+        $stmt->execute([$name]);
+        if ($stmt->fetch()) {
+            return ['success' => false, 'error' => 'Zone already exists'];
+        }
+
+        // Create zone
+        $stmt = $this->db->prepare("INSERT INTO dns_zones (name, type) VALUES (?, ?)");
+        $stmt->execute([$name, $type]);
+        $zoneId = $this->db->lastInsertId();
+
+        // Get SOA defaults
+        $soa = $this->getSoaDefaults()['defaults'] ?? [];
+        $serial = date('Ymd') . '01';
+        
+        // Add default SOA record
+        $soaContent = sprintf("%s %s %s %d %d %d %d",
+            $soa['primary_ns'] ?? 'ns1.ginto.ai',
+            str_replace('@', '.', $soa['admin_email'] ?? 'admin.ginto.ai'),
+            $serial,
+            $soa['refresh'] ?? 10800,
+            $soa['retry'] ?? 3600,
+            $soa['expire'] ?? 604800,
+            $soa['minimum_ttl'] ?? 3600
+        );
+        
+        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl) VALUES (?, ?, 'SOA', ?, ?)");
+        $stmt->execute([$zoneId, $name, $soaContent, $soa['default_ttl'] ?? 3600]);
+
+        // Add default NS records
+        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl) VALUES (?, ?, 'NS', ?, ?)");
+        $stmt->execute([$zoneId, $name, $soa['primary_ns'] ?? 'ns1.ginto.ai', 86400]);
+
+        // Sync to PowerDNS if available
+        $this->syncZoneToPowerDNS($name);
+
+        return ['success' => true, 'message' => "Zone {$name} created", 'zone_id' => $zoneId];
+    }
+
+    private function deleteDnsZone(array $input): array
+    {
+        $name = strtolower(trim($input['zone'] ?? ''));
+        
+        $stmt = $this->db->prepare("DELETE FROM dns_zones WHERE name = ?");
+        $stmt->execute([$name]);
+        
+        if ($stmt->rowCount() === 0) {
+            return ['success' => false, 'error' => 'Zone not found'];
+        }
+
+        // Remove from PowerDNS if available
+        $this->deleteZoneFromPowerDNS($name);
+
+        return ['success' => true, 'message' => "Zone {$name} deleted"];
+    }
+
+    private function addDnsRecord(array $input): array
+    {
+        $zone = strtolower(trim($input['zone'] ?? ''));
+        $name = strtolower(trim($input['name'] ?? ''));
+        $type = strtoupper(trim($input['type'] ?? ''));
+        $content = trim($input['content'] ?? '');
+        $ttl = (int)($input['ttl'] ?? 3600);
+        $priority = (int)($input['priority'] ?? 0);
+
+        // Validate
+        $validTypes = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'SRV', 'CAA', 'PTR'];
+        if (!in_array($type, $validTypes)) {
+            return ['success' => false, 'error' => 'Invalid record type'];
+        }
+
+        // Get zone ID
+        $stmt = $this->db->prepare("SELECT id FROM dns_zones WHERE name = ?");
+        $stmt->execute([$zone]);
+        $zoneRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$zoneRow) {
+            return ['success' => false, 'error' => 'Zone not found'];
+        }
+
+        // Normalize name (append zone if needed)
+        if ($name === '@' || $name === '') {
+            $name = $zone;
+        } elseif (!str_ends_with($name, '.' . $zone) && $name !== $zone) {
+            $name = $name . '.' . $zone;
+        }
+
+        // Validate content based on type
+        switch ($type) {
+            case 'A':
+                if (!filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    return ['success' => false, 'error' => 'Invalid IPv4 address'];
+                }
+                break;
+            case 'AAAA':
+                if (!filter_var($content, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                    return ['success' => false, 'error' => 'Invalid IPv6 address'];
+                }
+                break;
+            case 'MX':
+                if ($priority < 0 || $priority > 65535) {
+                    return ['success' => false, 'error' => 'Invalid MX priority'];
+                }
+                break;
+        }
+
+        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl, priority) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$zoneRow['id'], $name, $type, $content, $ttl, $priority]);
+
+        // Update SOA serial
+        $this->incrementSoaSerial($zone);
+
+        // Sync to PowerDNS
+        $this->syncZoneToPowerDNS($zone);
+
+        return ['success' => true, 'message' => "{$type} record added", 'id' => $this->db->lastInsertId()];
+    }
+
+    private function updateDnsRecord(array $input): array
+    {
+        $id = (int)($input['id'] ?? 0);
+        $content = trim($input['content'] ?? '');
+        $ttl = (int)($input['ttl'] ?? 3600);
+        $priority = (int)($input['priority'] ?? 0);
+        $disabled = (bool)($input['disabled'] ?? false);
+
+        if (!$id) {
+            return ['success' => false, 'error' => 'Record ID required'];
+        }
+
+        // Get zone name for syncing
+        $stmt = $this->db->prepare("SELECT z.name as zone FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return ['success' => false, 'error' => 'Record not found'];
+        }
+
+        $stmt = $this->db->prepare("UPDATE dns_records SET content = ?, ttl = ?, priority = ?, disabled = ? WHERE id = ?");
+        $stmt->execute([$content, $ttl, $priority, $disabled, $id]);
+
+        // Update SOA serial
+        $this->incrementSoaSerial($row['zone']);
+
+        // Sync to PowerDNS
+        $this->syncZoneToPowerDNS($row['zone']);
+
+        return ['success' => true, 'message' => 'Record updated'];
+    }
+
+    private function deleteDnsRecordById(array $input): array
+    {
+        $id = (int)($input['id'] ?? 0);
+        
+        if (!$id) {
+            return ['success' => false, 'error' => 'Record ID required'];
+        }
+
+        // Get zone name for syncing
+        $stmt = $this->db->prepare("SELECT z.name as zone, r.type FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
+        $stmt->execute([$id]);
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+        if (!$row) {
+            return ['success' => false, 'error' => 'Record not found'];
+        }
+
+        // Don't allow deleting SOA
+        if ($row['type'] === 'SOA') {
+            return ['success' => false, 'error' => 'Cannot delete SOA record'];
+        }
+
+        $stmt = $this->db->prepare("DELETE FROM dns_records WHERE id = ?");
+        $stmt->execute([$id]);
+
+        // Update SOA serial
+        $this->incrementSoaSerial($row['zone']);
+
+        // Sync to PowerDNS
+        $this->syncZoneToPowerDNS($row['zone']);
+
+        return ['success' => true, 'message' => 'Record deleted'];
+    }
+
+    private function incrementSoaSerial(string $zone): void
+    {
+        // Get current SOA
+        $stmt = $this->db->prepare("SELECT r.id, r.content FROM dns_records r 
+            JOIN dns_zones z ON r.zone_id = z.id 
+            WHERE z.name = ? AND r.type = 'SOA'");
+        $stmt->execute([$zone]);
+        $soa = $stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        if ($soa) {
+            // Parse and increment serial
+            $parts = preg_split('/\s+/', $soa['content']);
+            if (count($parts) >= 3) {
+                $oldSerial = (int)$parts[2];
+                $todaySerial = (int)(date('Ymd') . '00');
+                $newSerial = max($oldSerial + 1, $todaySerial + 1);
+                $parts[2] = $newSerial;
+                $newContent = implode(' ', $parts);
+                
+                $stmt = $this->db->prepare("UPDATE dns_records SET content = ? WHERE id = ?");
+                $stmt->execute([$newContent, $soa['id']]);
+            }
+        }
+    }
+
+    private function getSoaDefaults(): array
+    {
+        try {
+            $stmt = $this->db->query("SELECT * FROM dns_soa_defaults LIMIT 1");
+            $defaults = $stmt->fetch(\PDO::FETCH_ASSOC);
+            return ['success' => true, 'defaults' => $defaults ?: []];
+        } catch (\Exception $e) {
+            return ['success' => true, 'defaults' => [
+                'primary_ns' => 'ns1.ginto.ai',
+                'admin_email' => 'admin.ginto.ai',
+                'refresh' => 10800,
+                'retry' => 3600,
+                'expire' => 604800,
+                'minimum_ttl' => 3600,
+                'default_ttl' => 3600
+            ]];
+        }
+    }
+
+    private function updateSoaDefaults(array $input): array
+    {
+        $stmt = $this->db->prepare("UPDATE dns_soa_defaults SET 
+            primary_ns = ?, admin_email = ?, refresh = ?, retry = ?, expire = ?, minimum_ttl = ?, default_ttl = ?
+            WHERE id = 1");
+        $stmt->execute([
+            $input['primary_ns'] ?? 'ns1.ginto.ai',
+            $input['admin_email'] ?? 'admin.ginto.ai',
+            (int)($input['refresh'] ?? 10800),
+            (int)($input['retry'] ?? 3600),
+            (int)($input['expire'] ?? 604800),
+            (int)($input['minimum_ttl'] ?? 3600),
+            (int)($input['default_ttl'] ?? 3600)
+        ]);
+        return ['success' => true, 'message' => 'SOA defaults updated'];
+    }
+
+    // ========== POWERDNS INTEGRATION ==========
+
+    private function getPowerDNSConfig(): ?array
+    {
+        $apiKey = getenv('POWERDNS_API_KEY');
+        $apiUrl = getenv('POWERDNS_API_URL') ?: 'http://127.0.0.1:8081/api/v1';
+        
+        if (!$apiKey) return null;
+        return ['url' => $apiUrl, 'key' => $apiKey];
+    }
+
+    private function syncZoneToPowerDNS(string $zone): bool
+    {
+        $config = $this->getPowerDNSConfig();
+        if (!$config) return false;
+
+        $records = $this->getDnsRecords($zone);
+        if (empty($records)) return false;
+
+        // Group records by name+type for RRsets
+        $rrsets = [];
+        foreach ($records as $r) {
+            $key = $r['name'] . '|' . $r['type'];
+            if (!isset($rrsets[$key])) {
+                $rrsets[$key] = [
+                    'name' => $r['name'] . '.',
+                    'type' => $r['type'],
+                    'ttl' => $r['ttl'],
+                    'changetype' => 'REPLACE',
+                    'records' => []
+                ];
+            }
+            $content = $r['content'];
+            if ($r['type'] === 'MX') {
+                $content = $r['priority'] . ' ' . $content;
+            }
+            if (!str_ends_with($content, '.') && in_array($r['type'], ['NS', 'CNAME', 'MX', 'PTR'])) {
+                $content .= '.';
+            }
+            $rrsets[$key]['records'][] = [
+                'content' => $content,
+                'disabled' => (bool)$r['disabled']
+            ];
+        }
+
+        $payload = ['rrsets' => array_values($rrsets)];
+
+        // Check if zone exists in PowerDNS
+        $ch = curl_init($config['url'] . "/servers/localhost/zones/{$zone}.");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER => ['X-API-Key: ' . $config['key']]
+        ]);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode === 404) {
+            // Create zone
+            $createPayload = [
+                'name' => $zone . '.',
+                'kind' => 'Native',
+                'nameservers' => [],
+                'rrsets' => array_values($rrsets)
+            ];
+            $ch = curl_init($config['url'] . "/servers/localhost/zones");
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($createPayload),
+                CURLOPT_HTTPHEADER => [
+                    'X-API-Key: ' . $config['key'],
+                    'Content-Type: application/json'
+                ]
+            ]);
+            $response = curl_exec($ch);
+            $success = curl_getinfo($ch, CURLINFO_HTTP_CODE) < 300;
+            curl_close($ch);
+            return $success;
+        }
+
+        // Update zone
+        $ch = curl_init($config['url'] . "/servers/localhost/zones/{$zone}.");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => 'PATCH',
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_HTTPHEADER => [
+                'X-API-Key: ' . $config['key'],
+                'Content-Type: application/json'
+            ]
+        ]);
+        $response = curl_exec($ch);
+        $success = curl_getinfo($ch, CURLINFO_HTTP_CODE) < 300;
+        curl_close($ch);
+        
+        return $success;
+    }
+
+    private function deleteZoneFromPowerDNS(string $zone): bool
+    {
+        $config = $this->getPowerDNSConfig();
+        if (!$config) return false;
+
+        $ch = curl_init($config['url'] . "/servers/localhost/zones/{$zone}.");
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CUSTOMREQUEST => 'DELETE',
+            CURLOPT_HTTPHEADER => ['X-API-Key: ' . $config['key']]
+        ]);
+        curl_exec($ch);
+        $success = curl_getinfo($ch, CURLINFO_HTTP_CODE) < 300;
+        curl_close($ch);
+        
+        return $success;
+    }
+
+    private function syncWithPowerDNS(): array
+    {
+        $config = $this->getPowerDNSConfig();
+        if (!$config) {
+            return ['success' => false, 'error' => 'PowerDNS not configured. Set POWERDNS_API_KEY and POWERDNS_API_URL environment variables.'];
+        }
+
+        $zones = $this->listDnsZones();
+        $synced = 0;
+        $failed = 0;
+
+        foreach ($zones as $zone) {
+            if ($this->syncZoneToPowerDNS($zone['name'])) {
+                $synced++;
+            } else {
+                $failed++;
+            }
+        }
+
+        return [
+            'success' => true,
+            'message' => "Synced {$synced} zones to PowerDNS" . ($failed > 0 ? ", {$failed} failed" : "")
+        ];
     }
 
     private function listEmailAccounts(): array
