@@ -1631,7 +1631,8 @@ configure_systemd_service() {
 [Unit]
 Description=Ginto AI PHP Application
 After=network.target mariadb.service caddy.service
-Wants=caddy.service
+Wants=caddy.service sdcpu.service
+After=sdcpu.service
 
 [Service]
 Type=simple
@@ -2845,7 +2846,7 @@ do_install() {
     local run_step
     # Steps that should always run (idempotent, critical for correct state)
     # install_llamacpp/install_sdcpu included because they were added later and checkpoints may skip them
-    local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service")
+    local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service" "configure_systemd_service")
     
     for step in "${INSTALL_STEPS[@]}"; do
         # Check if step should always run
@@ -2965,7 +2966,7 @@ do_docker_install() {
                 fi
                 
                 # Run ALWAYS_RUN_STEPS (permissions, utilities, llama.cpp, sdcpu)
-                local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service")
+                local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service" "configure_systemd_service")
                 for step in "${ALWAYS_RUN_STEPS[@]}"; do
                     log_info "Running: $step"
                     $step
