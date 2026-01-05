@@ -140,7 +140,7 @@
     </div>
     
     <!-- Composer -->
-    <div id="composer" class="sticky bottom-0 pb-6 pt-4 bg-gradient-to-t from-gray-50 dark:from-gray-950 via-gray-50 dark:via-gray-950 to-transparent" style="z-index: 50; position: sticky;">
+    <div id="composer" class="sticky bottom-0 pb-6 pt-4 bg-gradient-to-t from-gray-50 dark:from-gray-950 via-gray-50 dark:via-gray-950 to-transparent z-40 lg:z-50">
       <div class="relative bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-xl">
         <!-- Attachment Preview -->
         <div id="attach-preview" class="hidden px-4 pt-3 pb-2 border-b border-gray-200 dark:border-gray-700">
