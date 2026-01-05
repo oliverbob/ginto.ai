@@ -590,7 +590,7 @@ sudo systemctl restart php8.3-fpm
 - [ ] Sandbox templates (Laravel, Next.js, Django, etc.)
 
 ### Features
-- [ ] **Ollama proxy support** - Use Ollama as a local inference backend
+- [x] **Ollama proxy support** - Use Ollama as a local inference backend
 - [ ] **Svelte dev proxy** - Hot-reload proxy service for faster frontend development
 - [ ] Resource usage dashboard
 - [ ] Web-based model management
