@@ -777,22 +777,6 @@ class ChatStreamHandler
             // If we have web search context, append it to system prompt
             if (!empty($webSearchContext)) {
                 $systemPrompt .= "\n\n## Web Search Results\nThe following information was found from web search. Use this to answer the user's question:\n\n" . $webSearchContext;
-                
-                // DEBUG: Log web search context
-                $logDir = dirname(__DIR__, 2) . '/storage/logs';
-                if (!is_dir($logDir)) {
-                    @mkdir($logDir, 0755, true);
-                }
-                $logFile = $logDir . '/model_response.log';
-                $logEntry = [
-                    'timestamp' => date('Y-m-d H:i:s'),
-                    'type' => 'web_search_context',
-                    'query' => $prompt,
-                    'sources_count' => count($webSearchSources),
-                    'context_length' => strlen($webSearchContext),
-                    'context_preview' => substr($webSearchContext, 0, 2000),
-                ];
-                @file_put_contents($logFile, json_encode($logEntry, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n\n---\n\n", FILE_APPEND);
             }
 
             // Build messages
@@ -1056,23 +1040,6 @@ class ChatStreamHandler
             // Send final response
             $finalContent = self::stripMarkers($accumulatedContent ?: ($response->getContent() ?? ''));
             $accumulatedReasoning = self::stripMarkers($accumulatedReasoning);
-
-            // DEBUG: Log raw model response to file for debugging
-            $logDir = dirname(__DIR__, 2) . '/storage/logs';
-            if (!is_dir($logDir)) {
-                @mkdir($logDir, 0755, true);
-            }
-            $logFile = $logDir . '/model_response.log';
-            $logEntry = [
-                'timestamp' => date('Y-m-d H:i:s'),
-                'provider' => $selectedProvider ?? 'unknown',
-                'model' => $modelName ?? 'unknown',
-                'prompt' => substr($prompt, 0, 500),
-                'raw_accumulated' => $accumulatedContent,
-                'final_content' => $finalContent,
-                'reasoning' => substr($accumulatedReasoning, 0, 1000),
-            ];
-            @file_put_contents($logFile, json_encode($logEntry, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n\n---\n\n", FILE_APPEND);
 
             self::sendFinalResponse($finalContent, $accumulatedReasoning, $parsedown);
 

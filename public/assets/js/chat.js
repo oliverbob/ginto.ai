@@ -223,7 +223,6 @@
       }
     });
     
-    console.log('[MarkdownRenderer] marked.js + highlight.js initialized');
     return true;
   }
   
@@ -308,9 +307,7 @@
     let html = '';
     if (typeof marked !== 'undefined') {
       try {
-        console.log('[MarkdownRenderer] Input markdown (first 500 chars):', markdown.substring(0, 500));
         html = marked.parse(markdown);
-        console.log('[MarkdownRenderer] Output HTML (first 500 chars):', html.substring(0, 500));
       } catch (e) {
         console.error('[MarkdownRenderer] marked.parse error:', e);
         html = fallbackMarkdownToHtml(markdown);
@@ -342,13 +339,6 @@
       return;
     }
     
-    // Debug: Check if element contains potential math
-    const text = element.textContent || '';
-    const hasMath = text.includes('$') || text.includes('\\[') || text.includes('\\(');
-    if (hasMath) {
-      console.log('[KaTeX] Rendering math in element, text preview:', text.substring(0, 200));
-    }
-    
     try {
       renderMathInElement(element, {
         delimiters: [
@@ -360,16 +350,8 @@
         ],
         throwOnError: false,
         errorColor: '#cc0000',
-        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
-        // Add preProcess to debug what KaTeX receives
-        preProcess: (math) => {
-          console.log('[KaTeX] Processing math:', math.substring(0, 100));
-          return math;
-        }
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
       });
-      if (hasMath) {
-        console.log('[KaTeX] Rendering complete, katex elements:', element.querySelectorAll('.katex').length);
-      }
     } catch (e) {
       console.warn('[MarkdownRenderer] KaTeX error:', e);
     }
@@ -425,11 +407,6 @@
   function fixLatexDelimiters(markdown) {
     if (!markdown) return '';
     
-    // Debug: log input to help diagnose LaTeX issues
-    if (markdown.includes('\\[') || markdown.includes('\\\\')) {
-      console.log('[fixLatexDelimiters] Input (first 800 chars):', markdown.substring(0, 800));
-    }
-    
     // Step 1: Protect LaTeX line breaks with spacing in matrices: \\[2pt], \\[5mm], etc.
     // After JSON parsing/storage, these may appear as:
     //   - \\[2pt] (two backslashes - original)
@@ -446,7 +423,6 @@
       if (spacingPattern.test(bracket)) {
         const placeholder = '\u0000LB' + linebreakPlaceholders.length + '\u0000';
         linebreakPlaceholders.push('\\\\' + bracket); // Store as \\[2pt]
-        console.log('[fixLatexDelimiters] Protected (double): ' + match + ' -> placeholder');
         return placeholder;
       }
       return match;
@@ -458,7 +434,6 @@
       if (spacingPattern.test(bracket)) {
         const placeholder = '\u0000LB' + linebreakPlaceholders.length + '\u0000';
         linebreakPlaceholders.push('\\\\' + bracket); // Store as \\[2pt] for proper LaTeX
-        console.log('[fixLatexDelimiters] Protected (single): ' + match + ' -> placeholder');
         return prefix + placeholder;
       }
       return match;
@@ -469,7 +444,6 @@
       if (spacingPattern.test(bracket)) {
         const placeholder = '\u0000LB' + linebreakPlaceholders.length + '\u0000';
         linebreakPlaceholders.push('\\\\' + bracket);
-        console.log('[fixLatexDelimiters] Protected (start): ' + match + ' -> placeholder');
         return placeholder;
       }
       return match;
@@ -490,7 +464,6 @@
     // Step 3: Handle properly closed \[ ... \] (standard LaTeX display math)
     // IMPORTANT: Keep $$ and content on SAME LINE for KaTeX to recognize
     markdown = markdown.replace(/\\\[\s*([\s\S]*?)\s*\\\]/g, function(match, content) {
-      console.log('[fixLatexDelimiters] Matched \\[...\\]:', match.substring(0, 50));
       // Collapse newlines within content so it stays as single display math block
       const cleaned = content.trim().replace(/\n+/g, ' ');
       return '\n\n$$' + cleaned + '$$\n\n';
@@ -502,7 +475,6 @@
     markdown = markdown.replace(/\\\[\s*([^\n\|]+?)(?=\n|\||$)/g, function(match, content) {
       // Only if content looks like math (has LaTeX commands) and doesn't contain pipe (table separator)
       if (content && /\\[a-zA-Z]+/.test(content) && !content.includes('|')) {
-        console.log('[fixLatexDelimiters] Matched unclosed \\[:', match.substring(0, 80));
         const cleaned = content.trim();
         return '$$' + cleaned + '$$';
       }
@@ -511,7 +483,6 @@
     
     // Step 5: Handle properly closed \( ... \) (standard LaTeX inline math)
     markdown = markdown.replace(/\\\(\s*([\s\S]*?)\s*\\\)/g, function(match, content) {
-      console.log('[fixLatexDelimiters] Matched \\(...\\):', match.substring(0, 50));
       const cleaned = content.trim().replace(/\n+/g, ' ');
       return '$' + cleaned + '$';
     });
@@ -531,8 +502,6 @@
       const cleaned = content.trim().replace(/\n+/g, ' ');
       return '$$' + cleaned + '$$';
     });
-    
-    console.log('[fixLatexDelimiters] Output:', markdown.substring(0, 500));
     
     return markdown;
   }
@@ -4151,12 +4120,6 @@
               // Client-side markdown rendering (preferred)
               // Strip tool_call JSON artifacts and render with markdown-it
               const displayContent = stripToolCallJson(accumulatedContent);
-              
-              // DEBUG: Log the exact content being rendered to find bold marker issues
-              if (displayContent.includes('**')) {
-                console.log('[streaming] Content has bold markers, displayContent:', displayContent.substring(Math.max(0, displayContent.indexOf('**') - 20), displayContent.indexOf('**') + 50));
-              }
-              
               let displayHtml = simpleMarkdownToHtml(displayContent);
               
               // If server still sends HTML (legacy mode), use it as fallback
@@ -4202,20 +4165,17 @@
 
             // Handle final HTML response
             if (data.final) {
-              console.log('[streaming] data.final received, accumulatedContent length:', accumulatedContent?.length, 'data.html length:', data.html?.length, 'hasToolResults:', currentCard.hasToolResults);
               // Always show the response label and handle content
               currentCard.responseLabel.classList.remove('hidden');
               
               // If we have tool results, preserve them - just save for persistence
               if (currentCard.hasToolResults) {
-                console.log('[streaming] Preserving tool results, saving for persistence');
                 lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
                 lastAssistantContent = accumulatedContent || '';
                 enhanceCodeBlocks(currentCard.response);
                 setTimeout(() => initStickyCodeButtons(), 100);
               } else if (accumulatedContent) {
                 // DON'T re-render if streaming already rendered content - just save for persistence
-                console.log('[streaming] Keeping streamed render, saving content for persistence');
                 const cleanedContent = stripToolCallJson(accumulatedContent);
                 
                 // Save the current rendered HTML and raw content for persistence
@@ -4228,7 +4188,6 @@
                 setTimeout(() => initStickyCodeButtons(), 100);
               } else if (data.html) {
                 // Fallback: Use server-rendered HTML only if no streaming happened
-                console.log('[streaming] FALLBACK - Using server-rendered HTML (data.html)');
                 let cleanedHtml = stripToolCallJson(data.html);
                 cleanedHtml = ensureCodeBlockAttributes(cleanedHtml);
                 currentCard.response.innerHTML = cleanedHtml;
