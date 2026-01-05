@@ -1071,6 +1071,19 @@ class HostingController
                 ];
             }
             $content = $r['content'];
+            
+            // Handle SOA record - add trailing dots to MNAME and RNAME
+            if ($r['type'] === 'SOA') {
+                $parts = preg_split('/\s+/', $content);
+                if (count($parts) >= 7) {
+                    // MNAME (primary NS) - add trailing dot
+                    if (!str_ends_with($parts[0], '.')) $parts[0] .= '.';
+                    // RNAME (admin email) - add trailing dot
+                    if (!str_ends_with($parts[1], '.')) $parts[1] .= '.';
+                    $content = implode(' ', $parts);
+                }
+            }
+            
             if ($r['type'] === 'MX') {
                 $content = $r['priority'] . ' ' . $content;
             }
