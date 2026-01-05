@@ -904,23 +904,41 @@ class LightpandaSearchHandler
         
         error_log("[LightpandaSearch] Starting incremental analysis for source $sourceNum");
         
+        $gotAnyOutput = false;
         try {
             $llm->chatStream(
                 messages: $messages,
                 tools: [],
                 options: ['max_tokens' => 150, 'temperature' => 0.3],
-                onChunk: function($chunk) use ($onReasoning, $sourceNum) {
+                onChunk: function($chunk) use ($onReasoning, $sourceNum, &$gotAnyOutput) {
                     if ($chunk !== '' && $chunk !== null) {
+                        $gotAnyOutput = true;
                         error_log("[LightpandaSearch] Streaming chunk for source $sourceNum: " . strlen($chunk) . " chars");
                         $onReasoning(['reasoning' => true, 'text' => $chunk]);
                     }
                 }
             );
-            error_log("[LightpandaSearch] Finished incremental analysis for source $sourceNum");
+            error_log("[LightpandaSearch] Finished incremental analysis for source $sourceNum, gotOutput: " . ($gotAnyOutput ? 'yes' : 'no'));
+            
+            // If we didn't get any output, provide a fallback from the snippet
+            if (!$gotAnyOutput) {
+                $snippet = $source['snippet'] ?? '';
+                if ($snippet) {
+                    $onReasoning(['reasoning' => true, 'text' => substr($snippet, 0, 200) . (strlen($snippet) > 200 ? '...' : '')]);
+                } else {
+                    $onReasoning(['reasoning' => true, 'text' => '[Content available in search results]']);
+                }
+            }
             $onReasoning(['reasoning' => true, 'text' => "\n\n"]);
         } catch (\Throwable $e) {
             error_log('[LightpandaSearch] Incremental analysis failed: ' . $e->getMessage());
-            $onReasoning(['reasoning' => true, 'text' => "[Analysis pending...]\n\n"]);
+            // Provide fallback content from snippet on error
+            $snippet = $source['snippet'] ?? '';
+            if ($snippet) {
+                $onReasoning(['reasoning' => true, 'text' => substr($snippet, 0, 200) . (strlen($snippet) > 200 ? '...' : '') . "\n\n"]);
+            } else {
+                $onReasoning(['reasoning' => true, 'text' => "[Analysis pending...]\n\n"]);
+            }
         }
     }
     
@@ -946,19 +964,27 @@ class LightpandaSearchHandler
             ['role' => 'user', 'content' => $prompt],
         ];
         
+        $gotAnyOutput = false;
         try {
             $llm->chatStream(
                 messages: $messages,
                 tools: [],
                 options: ['max_tokens' => 100, 'temperature' => 0.3],
-                onChunk: function($chunk) use ($onReasoning) {
+                onChunk: function($chunk) use ($onReasoning, &$gotAnyOutput) {
                     if ($chunk !== '' && $chunk !== null) {
+                        $gotAnyOutput = true;
                         $onReasoning(['reasoning' => true, 'text' => $chunk]);
                     }
                 }
             );
+            
+            // Fallback if no output received
+            if (!$gotAnyOutput) {
+                $onReasoning(['reasoning' => true, 'text' => 'Multiple sources analyzed. See results below.']);
+            }
         } catch (\Throwable $e) {
             error_log('[LightpandaSearch] Synthesis failed: ' . $e->getMessage());
+            $onReasoning(['reasoning' => true, 'text' => 'See search results below for details.']);
         }
     }
     
