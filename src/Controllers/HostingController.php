@@ -719,7 +719,8 @@ class HostingController
     private function listDnsZones(): array
     {
         try {
-            $zones = $this->db->query("SELECT z.*, 
+            $pdo = $this->db->pdo;
+            $zones = $pdo->query("SELECT z.*, 
                 (SELECT COUNT(*) FROM dns_records WHERE zone_id = z.id) as record_count
                 FROM dns_zones z ORDER BY z.name")->fetchAll(\PDO::FETCH_ASSOC);
             return $zones ?: [];
@@ -732,7 +733,8 @@ class HostingController
     private function getDnsRecords(string $zone): array
     {
         try {
-            $stmt = $this->db->prepare("SELECT r.* FROM dns_records r 
+            $pdo = $this->db->pdo;
+            $stmt = $pdo->prepare("SELECT r.* FROM dns_records r 
                 JOIN dns_zones z ON r.zone_id = z.id 
                 WHERE z.name = ? ORDER BY r.type, r.name");
             $stmt->execute([$zone]);
@@ -782,16 +784,14 @@ class HostingController
         }
 
         // Check if zone exists
-        $stmt = $this->db->prepare("SELECT id FROM dns_zones WHERE name = ?");
-        $stmt->execute([$name]);
-        if ($stmt->fetch()) {
+        $existing = $this->db->get('dns_zones', 'id', ['name' => $name]);
+        if ($existing) {
             return ['success' => false, 'error' => 'Zone already exists'];
         }
 
         // Create zone
-        $stmt = $this->db->prepare("INSERT INTO dns_zones (name, type) VALUES (?, ?)");
-        $stmt->execute([$name, $type]);
-        $zoneId = $this->db->lastInsertId();
+        $this->db->insert('dns_zones', ['name' => $name, 'type' => $type]);
+        $zoneId = $this->db->id();
 
         // Get SOA defaults
         $soa = $this->getSoaDefaults()['defaults'] ?? [];
@@ -808,12 +808,22 @@ class HostingController
             $soa['minimum_ttl'] ?? 3600
         );
         
-        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl) VALUES (?, ?, 'SOA', ?, ?)");
-        $stmt->execute([$zoneId, $name, $soaContent, $soa['default_ttl'] ?? 3600]);
+        $this->db->insert('dns_records', [
+            'zone_id' => $zoneId,
+            'name' => $name,
+            'type' => 'SOA',
+            'content' => $soaContent,
+            'ttl' => $soa['default_ttl'] ?? 3600
+        ]);
 
         // Add default NS records
-        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl) VALUES (?, ?, 'NS', ?, ?)");
-        $stmt->execute([$zoneId, $name, $soa['primary_ns'] ?? 'ns1.ginto.ai', 86400]);
+        $this->db->insert('dns_records', [
+            'zone_id' => $zoneId,
+            'name' => $name,
+            'type' => 'NS',
+            'content' => $soa['primary_ns'] ?? 'ns1.ginto.ai',
+            'ttl' => 86400
+        ]);
 
         // Sync to PowerDNS if available
         $this->syncZoneToPowerDNS($name);
@@ -825,12 +835,14 @@ class HostingController
     {
         $name = strtolower(trim($input['zone'] ?? ''));
         
-        $stmt = $this->db->prepare("DELETE FROM dns_zones WHERE name = ?");
-        $stmt->execute([$name]);
-        
-        if ($stmt->rowCount() === 0) {
+        $zone = $this->db->get('dns_zones', 'id', ['name' => $name]);
+        if (!$zone) {
             return ['success' => false, 'error' => 'Zone not found'];
         }
+        
+        // Delete records first (foreign key)
+        $this->db->delete('dns_records', ['zone_id' => $zone]);
+        $this->db->delete('dns_zones', ['name' => $name]);
 
         // Remove from PowerDNS if available
         $this->deleteZoneFromPowerDNS($name);
@@ -854,9 +866,7 @@ class HostingController
         }
 
         // Get zone ID
-        $stmt = $this->db->prepare("SELECT id FROM dns_zones WHERE name = ?");
-        $stmt->execute([$zone]);
-        $zoneRow = $stmt->fetch(\PDO::FETCH_ASSOC);
+        $zoneRow = $this->db->get('dns_zones', ['id'], ['name' => $zone]);
         if (!$zoneRow) {
             return ['success' => false, 'error' => 'Zone not found'];
         }
@@ -887,8 +897,15 @@ class HostingController
                 break;
         }
 
-        $stmt = $this->db->prepare("INSERT INTO dns_records (zone_id, name, type, content, ttl, priority) VALUES (?, ?, ?, ?, ?, ?)");
-        $stmt->execute([$zoneRow['id'], $name, $type, $content, $ttl, $priority]);
+        $this->db->insert('dns_records', [
+            'zone_id' => $zoneRow['id'],
+            'name' => $name,
+            'type' => $type,
+            'content' => $content,
+            'ttl' => $ttl,
+            'priority' => $priority
+        ]);
+        $recordId = $this->db->id();
 
         // Update SOA serial
         $this->incrementSoaSerial($zone);
@@ -896,7 +913,7 @@ class HostingController
         // Sync to PowerDNS
         $this->syncZoneToPowerDNS($zone);
 
-        return ['success' => true, 'message' => "{$type} record added", 'id' => $this->db->lastInsertId()];
+        return ['success' => true, 'message' => "{$type} record added", 'id' => $recordId];
     }
 
     private function updateDnsRecord(array $input): array
@@ -911,16 +928,21 @@ class HostingController
             return ['success' => false, 'error' => 'Record ID required'];
         }
 
-        // Get zone name for syncing
-        $stmt = $this->db->prepare("SELECT z.name as zone FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
+        // Get zone name for syncing using raw PDO for JOIN
+        $pdo = $this->db->pdo;
+        $stmt = $pdo->prepare("SELECT z.name as zone FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
             return ['success' => false, 'error' => 'Record not found'];
         }
 
-        $stmt = $this->db->prepare("UPDATE dns_records SET content = ?, ttl = ?, priority = ?, disabled = ? WHERE id = ?");
-        $stmt->execute([$content, $ttl, $priority, $disabled, $id]);
+        $this->db->update('dns_records', [
+            'content' => $content,
+            'ttl' => $ttl,
+            'priority' => $priority,
+            'disabled' => $disabled ? 1 : 0
+        ], ['id' => $id]);
 
         // Update SOA serial
         $this->incrementSoaSerial($row['zone']);
@@ -939,8 +961,9 @@ class HostingController
             return ['success' => false, 'error' => 'Record ID required'];
         }
 
-        // Get zone name for syncing
-        $stmt = $this->db->prepare("SELECT z.name as zone, r.type FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
+        // Get zone name for syncing using raw PDO for JOIN
+        $pdo = $this->db->pdo;
+        $stmt = $pdo->prepare("SELECT z.name as zone, r.type FROM dns_records r JOIN dns_zones z ON r.zone_id = z.id WHERE r.id = ?");
         $stmt->execute([$id]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$row) {
@@ -952,8 +975,7 @@ class HostingController
             return ['success' => false, 'error' => 'Cannot delete SOA record'];
         }
 
-        $stmt = $this->db->prepare("DELETE FROM dns_records WHERE id = ?");
-        $stmt->execute([$id]);
+        $this->db->delete('dns_records', ['id' => $id]);
 
         // Update SOA serial
         $this->incrementSoaSerial($row['zone']);
@@ -966,8 +988,9 @@ class HostingController
 
     private function incrementSoaSerial(string $zone): void
     {
-        // Get current SOA
-        $stmt = $this->db->prepare("SELECT r.id, r.content FROM dns_records r 
+        // Get current SOA using raw PDO for JOIN
+        $pdo = $this->db->pdo;
+        $stmt = $pdo->prepare("SELECT r.id, r.content FROM dns_records r 
             JOIN dns_zones z ON r.zone_id = z.id 
             WHERE z.name = ? AND r.type = 'SOA'");
         $stmt->execute([$zone]);
@@ -983,8 +1006,7 @@ class HostingController
                 $parts[2] = $newSerial;
                 $newContent = implode(' ', $parts);
                 
-                $stmt = $this->db->prepare("UPDATE dns_records SET content = ? WHERE id = ?");
-                $stmt->execute([$newContent, $soa['id']]);
+                $this->db->update('dns_records', ['content' => $newContent], ['id' => $soa['id']]);
             }
         }
     }
@@ -992,8 +1014,7 @@ class HostingController
     private function getSoaDefaults(): array
     {
         try {
-            $stmt = $this->db->query("SELECT * FROM dns_soa_defaults LIMIT 1");
-            $defaults = $stmt->fetch(\PDO::FETCH_ASSOC);
+            $defaults = $this->db->get('dns_soa_defaults', '*', ['id' => 1]);
             return ['success' => true, 'defaults' => $defaults ?: []];
         } catch (\Exception $e) {
             return ['success' => true, 'defaults' => [
@@ -1010,18 +1031,15 @@ class HostingController
 
     private function updateSoaDefaults(array $input): array
     {
-        $stmt = $this->db->prepare("UPDATE dns_soa_defaults SET 
-            primary_ns = ?, admin_email = ?, refresh = ?, retry = ?, expire = ?, minimum_ttl = ?, default_ttl = ?
-            WHERE id = 1");
-        $stmt->execute([
-            $input['primary_ns'] ?? 'ns1.ginto.ai',
-            $input['admin_email'] ?? 'admin.ginto.ai',
-            (int)($input['refresh'] ?? 10800),
-            (int)($input['retry'] ?? 3600),
-            (int)($input['expire'] ?? 604800),
-            (int)($input['minimum_ttl'] ?? 3600),
-            (int)($input['default_ttl'] ?? 3600)
-        ]);
+        $this->db->update('dns_soa_defaults', [
+            'primary_ns' => $input['primary_ns'] ?? 'ns1.ginto.ai',
+            'admin_email' => $input['admin_email'] ?? 'admin.ginto.ai',
+            'refresh' => (int)($input['refresh'] ?? 10800),
+            'retry' => (int)($input['retry'] ?? 3600),
+            'expire' => (int)($input['expire'] ?? 604800),
+            'minimum_ttl' => (int)($input['minimum_ttl'] ?? 3600),
+            'default_ttl' => (int)($input['default_ttl'] ?? 3600)
+        ], ['id' => 1]);
         return ['success' => true, 'message' => 'SOA defaults updated'];
     }
 
