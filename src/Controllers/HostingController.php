@@ -506,13 +506,19 @@ class HostingController
     {
         $certDir = '/etc/caddy/certificates';
         if (!is_dir($certDir)) $certDir = '/var/lib/caddy/.local/share/caddy/certificates';
-        if (!is_dir($certDir)) return 0;
-        $count = 0;
-        $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($certDir));
-        foreach ($iterator as $file) {
-            if ($file->getExtension() === 'crt' || $file->getExtension() === 'pem') $count++;
+        if (!is_dir($certDir) || !is_readable($certDir)) return 0;
+        
+        try {
+            $count = 0;
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($certDir));
+            foreach ($iterator as $file) {
+                if ($file->getExtension() === 'crt' || $file->getExtension() === 'pem') $count++;
+            }
+            return $count;
+        } catch (\Throwable $e) {
+            // Directory may exist but not be readable
+            return 0;
         }
-        return $count;
     }
 
     private function getServicesStatus(): array

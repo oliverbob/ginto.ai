@@ -19,6 +19,7 @@ Workflow:
 1. Make changes to the repo
 2. Push changes to git
 3. Pull changes in the container for testing
+4. Logs are found in ~/ginto.ai/../storage/logs/
 
 Example:
 
