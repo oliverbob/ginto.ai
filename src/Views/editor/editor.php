@@ -215,7 +215,7 @@ if (empty($_SESSION['csrf_token'])) {
 $csrf_token = $_SESSION['csrf_token'];
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -238,12 +238,17 @@ $csrf_token = $_SESSION['csrf_token'];
     <script src="/lib/katex/contrib/auto-render.min.js"></script>
     
     <!-- Theme detection - check ginto-theme (parent chat), editor-theme, or playground-theme -->
+    <!-- Default to dark mode if no preference is set (matching /chat behavior) -->
     <script>
     (function() {
         const stored = localStorage.getItem('ginto-theme') || localStorage.getItem('editor-theme') || localStorage.getItem('playground-theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const shouldBeDark = stored === 'dark' || (!stored && prefersDark);
-        if (shouldBeDark) document.documentElement.classList.add('dark');
+        // Default to dark mode if no preference is saved (matching chat behavior)
+        const shouldBeDark = stored !== 'light';
+        if (shouldBeDark) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
         window.__initialTheme = shouldBeDark ? 'dark' : 'light';
     })();
     </script>
