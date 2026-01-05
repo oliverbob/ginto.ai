@@ -2584,12 +2584,24 @@ prompt_configuration() {
         echo "  - .env: configured"
         echo ""
         
-        # Give user a choice
-        echo "  1) Update only     - Pull changes, run migrations (recommended)"
-        echo "  2) Fresh install   - Remove all and reinstall from scratch"
-        echo ""
-        log_prompt "Choose option (1-2) [default: 1]:"
-        read -r -p "> " reinstall_choice < /dev/tty
+        # Check for non-interactive mode (env var or no tty)
+        local reinstall_choice="${GINTO_UPDATE_MODE:-}"
+        if [ -z "$reinstall_choice" ]; then
+            if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
+                # Give user a choice
+                echo "  1) Update only     - Pull changes, run migrations (recommended)"
+                echo "  2) Fresh install   - Remove all and reinstall from scratch"
+                echo ""
+                log_prompt "Choose option (1-2) [default: 1]:"
+                read -r -p "> " reinstall_choice < /dev/tty
+            else
+                # Non-interactive mode - default to update
+                log_info "Non-interactive mode detected, defaulting to update..."
+                reinstall_choice="1"
+            fi
+        else
+            log_info "Using GINTO_UPDATE_MODE=$reinstall_choice"
+        fi
         
         if [[ "$reinstall_choice" == "2" ]]; then
             log_warn "Fresh install selected - clearing all checkpoints..."
