@@ -112,6 +112,75 @@ class DockerSandboxManager
     }
     
     /**
+     * Ensure the base sandbox image exists, building it if necessary
+     * This is called automatically before creating a sandbox
+     * 
+     * @return array Result with 'success' boolean and 'message' or 'error'
+     */
+    public static function ensureBaseImage(): array
+    {
+        // Check if image already exists
+        exec(self::DOCKER_CMD . ' image inspect ' . self::BASE_IMAGE . ' 2>/dev/null', $output, $code);
+        if ($code === 0) {
+            return [
+                'success' => true,
+                'message' => 'Base image already exists',
+                'built' => false
+            ];
+        }
+        
+        // Find the project root (where docker/sandbox/Dockerfile is)
+        $possiblePaths = [
+            '/var/www/html',           // Production path
+            dirname(__DIR__, 2),        // From src/Helpers -> project root
+            getenv('GINTO_ROOT') ?: '', // Environment variable
+        ];
+        
+        $projectRoot = null;
+        foreach ($possiblePaths as $path) {
+            if ($path && file_exists($path . '/docker/sandbox/Dockerfile')) {
+                $projectRoot = $path;
+                break;
+            }
+        }
+        
+        if (!$projectRoot) {
+            return [
+                'success' => false,
+                'error' => 'Cannot find docker/sandbox/Dockerfile. Project root not detected.',
+                'searched_paths' => $possiblePaths
+            ];
+        }
+        
+        $dockerfilePath = $projectRoot . '/docker/sandbox/Dockerfile';
+        $contextPath = $projectRoot . '/docker/sandbox';
+        
+        // Build the image
+        $cmd = self::DOCKER_CMD . ' build ' .
+               '-t ' . escapeshellarg(self::BASE_IMAGE) . ' ' .
+               '-f ' . escapeshellarg($dockerfilePath) . ' ' .
+               escapeshellarg($contextPath) . ' 2>&1';
+        
+        // Execute build (this may take a few minutes)
+        exec($cmd, $buildOutput, $buildCode);
+        
+        if ($buildCode !== 0) {
+            return [
+                'success' => false,
+                'error' => 'Failed to build sandbox image: ' . implode("\n", array_slice($buildOutput, -20)),
+                'command' => $cmd
+            ];
+        }
+        
+        return [
+            'success' => true,
+            'message' => 'Base image built successfully',
+            'built' => true,
+            'image' => self::BASE_IMAGE
+        ];
+    }
+    
+    /**
      * Get the container name for a user/sandbox ID
      */
     public static function containerName(string $sandboxId): string
@@ -298,6 +367,16 @@ class DockerSandboxManager
     {
         $name = self::containerName($sandboxId);
         $ip = self::sandboxToIp($sandboxId);
+        
+        // Ensure base image exists (auto-build if needed)
+        $imageResult = self::ensureBaseImage();
+        if (!$imageResult['success']) {
+            return [
+                'success' => false,
+                'error' => 'Failed to create container: ' . ($imageResult['error'] ?? 'Unable to find image \'' . self::BASE_IMAGE . '\' locally') .
+                          '. Run: docker build -t ' . self::BASE_IMAGE . ' -f docker/sandbox/Dockerfile docker/sandbox/'
+            ];
+        }
         
         // Ensure network exists
         if (!self::ensureNetwork()) {
