@@ -3,6 +3,20 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 $csrfToken = $_SESSION['csrf_token'] ?? bin2hex(random_bytes(32));
 $_SESSION['csrf_token'] = $csrfToken;
 $currentPage = 'dns';
+
+// Detect server public IP
+$serverIp = $_SERVER['SERVER_ADDR'] ?? '';
+if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, '10.') || str_starts_with($serverIp, '192.168.')) {
+    // Try to get public IP from external service (cached)
+    $cacheFile = sys_get_temp_dir() . '/ginto_public_ip.txt';
+    if (file_exists($cacheFile) && (time() - filemtime($cacheFile)) < 3600) {
+        $serverIp = trim(file_get_contents($cacheFile));
+    } else {
+        $serverIp = @file_get_contents('https://api.ipify.org') ?: @file_get_contents('https://icanhazip.com') ?: '';
+        $serverIp = trim($serverIp);
+        if ($serverIp) @file_put_contents($cacheFile, $serverIp);
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
@@ -151,7 +165,14 @@ $currentPage = 'dns';
         </div>
         <div class="mb-4">
           <label class="block text-sm text-gray-500 mb-1">Content</label>
-          <input type="text" name="content" id="record-content" placeholder="IP address or hostname" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" required>
+          <div class="flex gap-2">
+            <input type="text" name="content" id="record-content" placeholder="IP address or hostname" class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" required>
+            <?php if ($serverIp): ?>
+            <button type="button" onclick="document.getElementById('record-content').value='<?= htmlspecialchars($serverIp) ?>'" class="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm whitespace-nowrap" title="Use server IP">
+              <i class="fas fa-server mr-1"></i><?= htmlspecialchars($serverIp) ?>
+            </button>
+            <?php endif; ?>
+          </div>
           <p id="content-hint" class="text-xs text-gray-400 mt-1">Enter IPv4 address (e.g., 10.0.0.1)</p>
         </div>
         <div class="grid grid-cols-2 gap-4 mb-4">
