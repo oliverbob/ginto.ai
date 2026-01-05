@@ -27,6 +27,7 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
   <title>DNS Zones - Server Hosting</title>
   <script src="/assets/js/tailwindcss.js"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
+  <script src="/assets/js/ui-components.js"></script>
   <link rel="stylesheet" href="/lib/fontawesome/css/all.min.css">
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -394,8 +395,9 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
       if (result.success) {
         hideAddZoneModal();
         loadZones();
+        GintoUI.success('Zone created successfully');
       } else {
-        alert(result.error || 'Failed to create zone');
+        GintoUI.error(result.error || 'Failed to create zone');
       }
     };
 
@@ -415,8 +417,9 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
         toggleZoneRecords(form.get('zone')); // Refresh records
         toggleZoneRecords(form.get('zone'));
         loadZones();
+        GintoUI.success('Record added successfully');
       } else {
-        alert(result.error || 'Failed to add record');
+        GintoUI.error(result.error || 'Failed to add record');
       }
     };
 
@@ -426,33 +429,45 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
       const data = {};
       form.forEach((v, k) => data[k] = v);
       const result = await apiCall('update_soa_defaults', data);
-      alert(result.message || result.error);
+      if (result.success) {
+        GintoUI.success(result.message || 'SOA defaults updated');
+      } else {
+        GintoUI.error(result.error || 'Failed to update SOA defaults');
+      }
     };
 
     async function deleteZone(zone) {
-      if (!confirm(`Delete zone ${zone}? This will remove all records.`)) return;
+      const confirmed = await GintoUI.confirm(`Delete zone <strong>${zone}</strong>? This will remove all records.`, 'Delete Zone');
+      if (!confirmed) return;
       const result = await apiCall('delete_zone', { zone });
       if (result.success) {
         loadZones();
+        GintoUI.success(`Zone ${zone} deleted`);
       } else {
-        alert(result.error || 'Failed to delete zone');
+        GintoUI.error(result.error || 'Failed to delete zone');
       }
     }
 
     async function deleteRecord(id, zone) {
-      if (!confirm('Delete this record?')) return;
+      const confirmed = await GintoUI.confirm('Delete this DNS record?', 'Delete Record');
+      if (!confirmed) return;
       const result = await apiCall('delete_record', { id });
       if (result.success) {
         toggleZoneRecords(zone);
         toggleZoneRecords(zone);
+        GintoUI.success('Record deleted');
       } else {
-        alert(result.error || 'Failed to delete record');
+        GintoUI.error(result.error || 'Failed to delete record');
       }
     }
 
     async function syncPowerDNS() {
       const result = await apiCall('sync_powerdns');
-      alert(result.message || result.error);
+      if (result.success) {
+        GintoUI.success(result.message || 'Synced to PowerDNS');
+      } else {
+        GintoUI.error(result.error || 'Sync failed');
+      }
     }
 
     // Load on init
