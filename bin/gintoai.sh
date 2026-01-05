@@ -1941,10 +1941,20 @@ setup_env() {
     # Update database configuration in .env
     log_info "Writing database configuration to .env..."
     
-    # Function to update or add key=value in .env
+    # Function to update or add key=value in .env (only if value is non-empty)
     update_env_var() {
         local key="$1"
         local value="$2"
+        local skip_if_empty="${3:-false}"
+        
+        # If value is empty and skip_if_empty is true, don't overwrite existing
+        if [ -z "$value" ] && [ "$skip_if_empty" = "true" ]; then
+            if grep -q "^${key}=" "$env_file" 2>/dev/null; then
+                log_info "Preserving existing $key (new value empty)"
+                return 0
+            fi
+        fi
+        
         if grep -q "^${key}=" "$env_file" 2>/dev/null; then
             # Update existing key
             sed -i "s|^${key}=.*|${key}=${value}|" "$env_file"
@@ -1954,13 +1964,13 @@ setup_env() {
         fi
     }
     
-    # Set database variables
+    # Set database variables (preserve password if new value is empty)
     update_env_var "DB_TYPE" "mysql"
     update_env_var "DB_HOST" "localhost"
     update_env_var "DB_PORT" "3306"
     update_env_var "DB_NAME" "$DB_NAME"
     update_env_var "DB_USER" "$DB_USER"
-    update_env_var "DB_PASS" "$DB_PASS"
+    update_env_var "DB_PASS" "$DB_PASS" "true"
     
     # Set APP_URL based on Caddy mode
     if [[ "$CADDY_LIVE_MODE" == "yes" ]]; then
