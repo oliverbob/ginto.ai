@@ -2805,8 +2805,8 @@ do_install() {
     # Run steps with checkpoint tracking
     local run_step
     # Steps that should always run (idempotent, critical for correct state)
-    # install_llamacpp is included because it was added later and checkpoints may skip it
-    local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp")
+    # install_llamacpp/install_sdcpu included because they were added later and checkpoints may skip them
+    local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service")
     
     for step in "${INSTALL_STEPS[@]}"; do
         # Check if step should always run
@@ -2925,8 +2925,8 @@ do_docker_install() {
                     log_success "Selected llama.cpp option: $LLAMACPP_MODE"
                 fi
                 
-                # Run ALWAYS_RUN_STEPS (permissions, utilities, llama.cpp)
-                local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp")
+                # Run ALWAYS_RUN_STEPS (permissions, utilities, llama.cpp, sdcpu)
+                local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp" "install_sdcpu" "configure_sdcpu_service")
                 for step in "${ALWAYS_RUN_STEPS[@]}"; do
                     log_info "Running: $step"
                     $step
