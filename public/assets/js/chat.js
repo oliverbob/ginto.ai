@@ -289,10 +289,20 @@
     });
     
     // Protect inline math $ ... $ (but not $$ which is already protected)
+    // IMPORTANT: Skip currency patterns like $100, $1.5M, $436 billion
+    // Real LaTeX typically has backslash commands or operators: $x^2$, $\frac{1}{2}$, $a + b$
     markdown = markdown.replace(/\$([^\$\n]+?)\$/g, function(match, content) {
-      const placeholder = '\u0002MATH' + mathBlocks.length + 'MATH\u0003';
-      mathBlocks.push({ type: 'inline', content: content });
-      return placeholder;
+      // Skip if content looks like currency (starts with number or is just numbers with optional suffix)
+      if (/^\d/.test(content.trim()) || /^[\d,.\s]+(?:billion|million|trillion|k|m|b)?$/i.test(content.trim())) {
+        return match; // Keep as-is, it's currency not math
+      }
+      // Only protect if it looks like actual LaTeX (has operators, backslash, or math symbols)
+      if (/[\\^_{}+\-*/=<>]|\\[a-z]+/i.test(content)) {
+        const placeholder = '\u0002MATH' + mathBlocks.length + 'MATH\u0003';
+        mathBlocks.push({ type: 'inline', content: content });
+        return placeholder;
+      }
+      return match; // Not obviously math, keep as-is
     });
     
     // Initialize renderer
