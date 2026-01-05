@@ -7,6 +7,14 @@ You must test this repo in the LXC container:
 
 # IMPORTANT: Any changes to the repo must be pushed, then pulled to that container for testing.
 
+# ANTI RATE-LIMIT GUIDELINES
+# To avoid hitting response length limits:
+# 1. Create large files in smaller chunks (split controllers/views into multiple create_file calls)
+# 2. Don't read entire large files when only a portion is needed
+# 3. When creating controllers with many methods, create base structure first, then add methods incrementally
+# 4. Prefer using replace_string_in_file for edits rather than rewriting entire files
+# 5. Keep tool call responses focused - don't include unnecessary context in prompts
+
 Workflow:
 1. Make changes to the repo
 2. Push changes to git

@@ -97,3 +97,44 @@ $req('/network/{name}/exec', 'NetworkController@exec', ['POST']);
 // Database Migrations
 $req('/migrate', 'MigrationController@status', ['GET']);
 $req('/migrate/run', 'MigrationController@index', ['POST']);
+
+// --- Server Hosting (Virtualmin/CyberPanel-style Control Panel) ---
+// Dashboard
+$req('/hosting', 'HostingController@index');
+
+// Virtual Hosts / Domains
+$req('/hosting/domains', 'HostingController@domains');
+$req('/hosting/domains/api', 'HostingController@domainsApi');
+$req('/hosting/domains/{domain}', 'HostingController@domainAction');
+
+// DNS Management
+$req('/hosting/dns', 'HostingController@dns');
+$req('/hosting/dns/api', 'HostingController@dnsApi');
+
+// Email Server
+$req('/hosting/email', 'HostingController@email');
+$req('/hosting/email/api', 'HostingController@emailApi');
+
+// Database Management
+$req('/hosting/databases', 'HostingController@databases');
+$req('/hosting/databases/api', 'HostingController@databasesApi');
+
+// FTP/SFTP
+$req('/hosting/ftp', 'HostingController@ftp');
+$req('/hosting/ftp/api', 'HostingController@ftpApi');
+
+// Backups
+$req('/hosting/backups', 'HostingController@backups');
+$req('/hosting/backups/api', 'HostingController@backupsApi');
+
+// SSL/TLS Certificates
+$req('/hosting/ssl', 'HostingController@ssl');
+$req('/hosting/ssl/api', 'HostingController@sslApi');
+
+// Firewall
+$req('/hosting/firewall', 'HostingController@firewall');
+$req('/hosting/firewall/api', 'HostingController@firewallApi');
+
+// System Services
+$req('/hosting/services', 'HostingController@services');
+$req('/hosting/services/api', 'HostingController@servicesApi');

@@ -273,6 +273,17 @@ $activeClass = function($path) use ($currentPath) {
             <span class="font-medium">LXC Manager</span>
         </a>
         
+        <!-- Server Hosting (Virtualmin/CyberPanel-style) -->
+        <a href="/admin/hosting" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/hosting') ?> <?= activeIconClass('/admin/hosting') ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5" style="color: #10b981;">
+                <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>
+                <rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+                <line x1="6" y1="6" x2="6.01" y2="6"/>
+                <line x1="6" y1="18" x2="6.01" y2="18"/>
+            </svg>
+            <span class="font-medium">Server Hosting</span>
+        </a>
+        
         <!-- Settings -->
         <a href="/admin/settings" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/settings') ?> <?= activeIconClass('/admin/settings') ?>">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 <?= iconClassForAdmin('/admin/settings') ?>" <?= iconStyleForAdmin('/admin/settings') ?>>
