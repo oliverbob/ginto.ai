@@ -20,6 +20,7 @@ Workflow:
 2. Push changes to git
 3. Pull changes in the container for testing
 4. Logs are found in ~/ginto.ai/../storage/logs/
+5. Always prioritize security in your design to avoid vulnerabilites
 
 Example:
 
