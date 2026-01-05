@@ -156,6 +156,12 @@ class PandaSearchHandler
     ): array {
         $numResults = min(max($numResults, 1), 10);
         
+        // URL DETECTION: If query is a URL or contains URLs, fetch them directly
+        $directUrls = $this->extractUrls($query);
+        if (!empty($directUrls)) {
+            return $this->fetchDirectUrls($directUrls, $query, $startTime, $onActivity, $onReasoning);
+        }
+        
         // Phase 1: Search for URLs
         $this->emit([
             'phase' => 'search',
@@ -324,6 +330,119 @@ class PandaSearchHandler
         } catch (\Throwable $e) {
             error_log('[PandaSearch] Synthesis failed: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * Extract URLs from query string
+     * Returns URLs if the query contains valid URLs
+     */
+    private function extractUrls(string $query): array
+    {
+        $urls = [];
+        
+        // Pattern to match URLs (http, https, or www)
+        $pattern = '/(?:https?:\/\/|www\.)[^\s<>\[\]]+/i';
+        
+        if (preg_match_all($pattern, $query, $matches)) {
+            foreach ($matches[0] as $url) {
+                // Add https:// if it starts with www.
+                if (stripos($url, 'www.') === 0) {
+                    $url = 'https://' . $url;
+                }
+                // Validate URL
+                if (filter_var($url, FILTER_VALIDATE_URL)) {
+                    $urls[] = $url;
+                }
+            }
+        }
+        
+        return array_unique($urls);
+    }
+    
+    /**
+     * Fetch URLs directly without searching
+     * Used when the user provides specific URLs in the query
+     */
+    private function fetchDirectUrls(
+        array $urls,
+        string $originalQuery,
+        float $startTime,
+        callable $onActivity,
+        callable $onReasoning
+    ): array {
+        $sources = [];
+        
+        // Emit that we're directly fetching URLs
+        $this->emit([
+            'phase' => 'direct_fetch',
+            'message' => 'Fetching ' . count($urls) . ' URL(s) directly...',
+            'urls' => $urls,
+            'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
+        ]);
+        
+        // Get LLM for reasoning
+        $llm = $this->getReasoningLLM();
+        
+        // Extract any additional context from the query (text that's not a URL)
+        $context = trim(preg_replace('/(?:https?:\/\/|www\.)[^\s<>\[\]]+/i', '', $originalQuery));
+        if (!empty($context)) {
+            $onReasoning(['reasoning' => true, 'text' => "Analyzing: \"$context\"\n\n"]);
+        }
+        
+        foreach ($urls as $index => $url) {
+            $domain = parse_url($url, PHP_URL_HOST) ?: $url;
+            
+            // Emit that we're about to fetch
+            $this->emit([
+                'phase' => 'fetch',
+                'message' => 'Reading: ' . $domain,
+                'url' => $url,
+                'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
+            ]);
+            
+            // Fetch the page
+            $fetchResult = LightpandaSearchHandler::fetch($url, $onActivity);
+            
+            if ($fetchResult['success'] ?? false) {
+                $source = [
+                    'title' => $fetchResult['title'] ?? $domain,
+                    'url' => $url,
+                    'domain' => $domain,
+                    'snippet' => '',
+                    'content' => $fetchResult['content'] ?? '',
+                ];
+                $sources[] = $source;
+                
+                // Analyze this source if we have an LLM
+                if ($llm) {
+                    $analysisContext = !empty($context) ? $context : "the content of this page";
+                    $this->analyzeSourceIncrementally($llm, $analysisContext, $source, $index + 1, $onReasoning);
+                }
+            } else {
+                $onReasoning(['reasoning' => true, 'text' => "**Source " . ($index + 1) . " ({$domain}):** Unable to fetch content.\n\n"]);
+            }
+        }
+        
+        // Final synthesis if we have multiple sources
+        if (count($sources) > 1 && $llm) {
+            $onReasoning(['reasoning' => true, 'text' => "\n\n**Summary:** "]);
+            $synthesisContext = !empty($context) ? $context : "the content from these URLs";
+            $this->synthesizeSources($llm, $synthesisContext, $sources, $onReasoning);
+        }
+        
+        $this->emit([
+            'phase' => 'search_complete',
+            'success' => true,
+            'source_count' => count($sources),
+            'direct_fetch' => true,
+            'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
+        ]);
+        
+        return [
+            'success' => true,
+            'sources' => $sources,
+            'direct_fetch' => true,
+        ];
     }
     
     /**

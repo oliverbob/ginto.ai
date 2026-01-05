@@ -36,6 +36,7 @@ INSTALL_STEPS_NATIVE=(
     "install_composer"
     "install_nodejs"
     "install_llamacpp"
+    "install_sdcpu"
     "configure_systemd_service"
     "configure_sdcpu_service"
     "setup_permissions"
@@ -68,6 +69,7 @@ INSTALL_STEPS_DOCKER=(
     "install_llamacpp"
     "install_docker_engine"
     "install_docker_compose"
+    "install_sdcpu"
     "configure_systemd_service"
     "configure_sdcpu_service"
     "setup_permissions"
@@ -1656,6 +1658,53 @@ EOF
     
     log_success "Ginto service configured for user: $INSTALL_USER"
     log_info "Service will start automatically on boot"
+}
+
+# Install SDCPU (FastSD CPU Image Generation) - creates venv and installs dependencies
+install_sdcpu() {
+    log_step "Installing SDCPU (FastSD CPU Image Generation)..."
+    
+    SDCPU_DIR="$PROJECT_DIR/tools/sdcpu"
+    
+    # Check if SDCPU source exists
+    if [ ! -f "$SDCPU_DIR/requirements.txt" ] || [ ! -f "$SDCPU_DIR/src/api_server.py" ]; then
+        log_info "SDCPU source not found at $SDCPU_DIR, skipping"
+        return 0
+    fi
+    
+    # Skip if already installed
+    if [ -d "$SDCPU_DIR/venv" ] && [ -f "$SDCPU_DIR/venv/bin/python" ]; then
+        log_info "SDCPU already installed (venv exists)"
+        return 0
+    fi
+    
+    # Ensure python3-venv is available
+    if ! python3 -m venv --help &>/dev/null; then
+        log_info "Installing python3-venv..."
+        if command -v apt-get &>/dev/null; then
+            sudo apt-get install -y python3-venv python3-pip
+        elif command -v dnf &>/dev/null; then
+            sudo dnf install -y python3-virtualenv python3-pip
+        fi
+    fi
+    
+    cd "$SDCPU_DIR"
+    
+    log_info "Creating Python virtual environment..."
+    python3 -m venv venv
+    
+    log_info "Installing SDCPU dependencies (this may take a few minutes)..."
+    source venv/bin/activate
+    pip install --upgrade pip
+    pip install -r requirements.txt
+    deactivate
+    
+    # Fix ownership
+    chown -R "$INSTALL_USER:$INSTALL_USER" "$SDCPU_DIR/venv"
+    
+    cd "$PROJECT_DIR"
+    
+    log_success "SDCPU installed successfully"
 }
 
 # Configure SDCPU (FastSD CPU Image Generation) systemd service

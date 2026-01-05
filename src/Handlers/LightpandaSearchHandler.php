@@ -774,6 +774,12 @@ class LightpandaSearchHandler
             ];
         }
         
+        // URL DETECTION: If query contains URLs, fetch them directly instead of searching
+        $directUrls = self::extractUrlsFromQuery($query);
+        if (!empty($directUrls)) {
+            return self::fetchDirectUrls($directUrls, $query, $onActivity, $onReasoning, $providerName, $apiKey, $modelName);
+        }
+        
         // Get LLM for incremental reasoning - use passed API key and model if available
         $llm = self::getReasoningLLM($providerName, $apiKey, $modelName);
         
@@ -954,6 +960,129 @@ class LightpandaSearchHandler
         } catch (\Throwable $e) {
             error_log('[LightpandaSearch] Synthesis failed: ' . $e->getMessage());
         }
+    }
+    
+    /**
+     * Extract URLs from a query string
+     * Returns array of valid URLs found in the query
+     */
+    private static function extractUrlsFromQuery(string $query): array
+    {
+        $urls = [];
+        
+        // Pattern to match URLs (http, https, or www)
+        $pattern = '/(?:https?:\/\/|www\.)[^\s<>\[\]]+/i';
+        
+        if (preg_match_all($pattern, $query, $matches)) {
+            foreach ($matches[0] as $url) {
+                // Add https:// if it starts with www.
+                if (stripos($url, 'www.') === 0) {
+                    $url = 'https://' . $url;
+                }
+                // Clean trailing punctuation that might have been captured
+                $url = rtrim($url, '.,;:!?)\'\"');
+                // Validate URL
+                if (filter_var($url, FILTER_VALIDATE_URL)) {
+                    $urls[] = $url;
+                }
+            }
+        }
+        
+        return array_unique($urls);
+    }
+    
+    /**
+     * Fetch URLs directly without searching
+     * Used when the user provides specific URLs in their query
+     */
+    private static function fetchDirectUrls(
+        array $urls,
+        string $originalQuery,
+        ?callable $onActivity = null,
+        ?callable $onReasoning = null,
+        ?string $providerName = null,
+        ?string $apiKey = null,
+        ?string $modelName = null
+    ): array {
+        $sources = [];
+        
+        // Get LLM for reasoning
+        $llm = self::getReasoningLLM($providerName, $apiKey, $modelName);
+        
+        // Extract any additional context from the query (text that's not a URL)
+        $context = trim(preg_replace('/(?:https?:\/\/|www\.)[^\s<>\[\]]+/i', '', $originalQuery));
+        
+        if ($onActivity) {
+            $onActivity([
+                'activity' => true,
+                'type' => 'websearch',
+                'phase' => 'direct_fetch',
+                'message' => 'Fetching ' . count($urls) . ' URL(s) directly...',
+                'urls' => $urls,
+            ]);
+        }
+        
+        if ($onReasoning && !empty($context)) {
+            $onReasoning(['reasoning' => true, 'text' => "Analyzing: \"$context\"\n\n"]);
+        } elseif ($onReasoning) {
+            $onReasoning(['reasoning' => true, 'text' => "Fetching and analyzing " . count($urls) . " URL(s)...\n\n"]);
+        }
+        
+        foreach ($urls as $index => $url) {
+            $domain = parse_url($url, PHP_URL_HOST) ?: $url;
+            
+            if ($onActivity) {
+                $onActivity([
+                    'phase' => 'fetch',
+                    'message' => 'Reading: ' . $domain,
+                    'url' => $url,
+                ]);
+            }
+            
+            // Fetch the page
+            $fetchResult = self::fetch($url, $onActivity);
+            
+            if ($fetchResult['success'] ?? false) {
+                $source = [
+                    'title' => $fetchResult['title'] ?? $domain,
+                    'url' => $url,
+                    'domain' => $domain,
+                    'snippet' => '',
+                    'content' => $fetchResult['content'] ?? '',
+                ];
+                $sources[] = $source;
+                
+                // Analyze this source if we have an LLM
+                if ($onReasoning && $llm) {
+                    $analysisContext = !empty($context) ? $context : "the content of this page";
+                    self::analyzeSourceIncrementally($llm, $analysisContext, $source, $index + 1, $onReasoning);
+                }
+            } else {
+                if ($onReasoning) {
+                    $onReasoning(['reasoning' => true, 'text' => "**Source " . ($index + 1) . " ({$domain}):** Unable to fetch content.\n\n"]);
+                }
+            }
+        }
+        
+        // Final synthesis if we have multiple sources
+        if (count($sources) > 1 && $llm && $onReasoning) {
+            $onReasoning(['reasoning' => true, 'text' => "\n\n**Summary:** "]);
+            $synthesisContext = !empty($context) ? $context : "the content from these URLs";
+            self::synthesizeSources($llm, $synthesisContext, $sources, $onReasoning);
+        }
+        
+        // Build content summary
+        $contentParts = [];
+        foreach ($sources as $source) {
+            $contentParts[] = "## {$source['title']}\nURL: {$source['url']}\n\n{$source['content']}";
+        }
+        
+        return [
+            'success' => true,
+            'content' => implode("\n\n---\n\n", $contentParts),
+            'sources' => $sources,
+            'direct_fetch' => true,
+        ];
     }
     
     /**
