@@ -1458,7 +1458,7 @@ class ChatStreamHandler
      */
     private function executeImageGeneration(string $prompt): array
     {
-        $sdcpuBaseUrl = 'http://10.93.65.192:8888';
+        $sdcpuBaseUrl = 'http://127.0.0.1:8888';
         $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
         
         if (empty(trim($prompt))) {
