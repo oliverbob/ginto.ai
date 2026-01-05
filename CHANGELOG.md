@@ -2,6 +2,68 @@
 
 All notable changes to Ginto will be documented in this file.
 
+## [1.1.0] - 2026-01-05
+
+### 🚀 Major Architecture Change
+
+**Docker is now for sandboxes only** - The main application stack (PHP, MariaDB, Caddy, Redis) now runs directly on the host system. Docker is used exclusively for user sandbox containers.
+
+This provides:
+- Better performance (main app runs natively)
+- Strong isolation (user code runs in Docker containers)
+- Unified experience across LXC/LXD/bare-metal deployments
+- `ginto.service` systemd unit works universally
+
+### Added
+
+- **Server Hosting Control Panel** (`/admin/hosting`)
+  - Virtualmin/CyberPanel-style management UI for bare-metal deployments
+  - Dashboard with system stats (CPU, memory, disk, uptime)
+  - Service management (start/stop/restart Caddy, PHP-FPM, MariaDB, Redis)
+
+- **DNS Zone Management** 
+  - Full zone editor with PowerDNS integration
+  - Support for all record types: A, AAAA, CNAME, MX, TXT, NS, SRV, CAA, SOA
+  - SOA defaults configuration
+  - Automatic serial incrementation
+
+- **Database Management**
+  - Create/delete databases via admin UI
+  - User provisioning with proper privileges
+
+- **Firewall Management**
+  - UFW rule management GUI
+  - fail2ban status integration
+
+- **SSL/TLS Dashboard**
+  - Let's Encrypt certificate monitoring via Caddy auto-provisioning
+
+- **Backup Management**
+  - Manual backup creation with tar.gz
+  - Backup listing and deletion
+
+### Changed
+
+- **docker-compose.yml**: Now contains ONLY sandbox services
+  - Removed: php, mariadb, caddy, redis containers
+  - Added: sandbox-proxy, terminal-server, sandbox-manager
+
+- **Installation Script** (`gintoai.sh`):
+  - Docker mode now installs full stack on host + Docker for sandboxes
+  - Updated prompts to clarify architecture
+  - Added `build_sandbox_images()` and `start_sandbox_services()` functions
+
+- **Image Generation**: Now uses SDCPU (FastSD CPU with OpenVINO)
+  - ~1 second generation on CPU, no GPU required
+  - Replaced experimental LightPanda + Raphael AI approach
+
+### Fixed
+
+- Installation mode prompts now accurately describe the architecture
+- README documentation updated to reflect new architecture
+
+---
+
 ## [1.0.2] - 2026-01-02
 
 ### Added
