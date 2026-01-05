@@ -1047,15 +1047,14 @@ class HostingController
         return ['url' => $apiUrl, 'key' => $apiKey];
     }
 
-    private function syncZoneToPowerDNS(string $zone): bool
+    private function syncZoneToPowerDNS(string $zone): bool|string
     {
         $config = $this->getPowerDNSConfig();
-        if (!$config) return false;
+        if (!$config) return 'PowerDNS not configured';
 
         $records = $this->getDnsRecords($zone);
         if (empty($records)) {
-            // No records to sync - not necessarily a failure
-            return true;
+            return 'No records found for zone';
         }
 
         // Group records by name+type for RRsets
@@ -1066,7 +1065,7 @@ class HostingController
                 $rrsets[$key] = [
                     'name' => $r['name'] . '.',
                     'type' => $r['type'],
-                    'ttl' => $r['ttl'],
+                    'ttl' => (int)$r['ttl'],
                     'changetype' => 'REPLACE',
                     'records' => []
                 ];
@@ -1080,7 +1079,7 @@ class HostingController
             }
             $rrsets[$key]['records'][] = [
                 'content' => $content,
-                'disabled' => (bool)$r['disabled']
+                'disabled' => (bool)($r['disabled'] ?? false)
             ];
         }
 
@@ -1115,9 +1114,13 @@ class HostingController
                 ]
             ]);
             $response = curl_exec($ch);
-            $success = curl_getinfo($ch, CURLINFO_HTTP_CODE) < 300;
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
-            return $success;
+            if ($httpCode >= 300) {
+                $error = json_decode($response, true);
+                return 'Create failed: ' . ($error['error'] ?? $response);
+            }
+            return true;
         }
 
         // Update zone
@@ -1164,20 +1167,36 @@ class HostingController
         }
 
         $zones = $this->listDnsZones();
+        if (empty($zones)) {
+            return ['success' => false, 'error' => 'No DNS zones to sync'];
+        }
+        
         $synced = 0;
         $failed = 0;
+        $errors = [];
 
         foreach ($zones as $zone) {
-            if ($this->syncZoneToPowerDNS($zone['name'])) {
+            $result = $this->syncZoneToPowerDNS($zone['name']);
+            if ($result === true) {
                 $synced++;
             } else {
                 $failed++;
+                if (is_string($result)) {
+                    $errors[] = "{$zone['name']}: {$result}";
+                }
             }
         }
 
+        if ($failed > 0 && $synced === 0) {
+            return [
+                'success' => false,
+                'error' => "Sync failed: " . implode('; ', $errors)
+            ];
+        }
+
         return [
-            'success' => true,
-            'message' => "Synced {$synced} zones to PowerDNS" . ($failed > 0 ? ", {$failed} failed" : "")
+            'success' => $failed === 0,
+            'message' => "Synced {$synced} zones to PowerDNS" . ($failed > 0 ? ", {$failed} failed: " . implode('; ', $errors) : "")
         ];
     }
 
