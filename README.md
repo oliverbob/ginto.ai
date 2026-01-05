@@ -486,11 +486,11 @@ docker compose logs -f
 
 Access the web interface at `http://localhost`
 
-### Architecture (Docker Mode)
+### Architecture (Docker Sandbox Mode)
 
 ```text
 ┌───────────────────────────────────────────────────────────────┐
-│                    Containerized Environment                  │
+│                    Host / LXC / LXD Container                 │
 ├───────────────────────────────────────────────────────────────┤
 │                                                               │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
@@ -501,15 +501,23 @@ Access the web interface at `http://localhost`
 │         │                  │                  │               │
 │         ▼                  ▼                  ▼               │
 │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐        │
-│  │Sandbox Proxy│    │  MariaDB    │    │    Redis    │        │
-│  │    :3000    │    │    :3306    │    │    :6379    │        │
+│  │  MariaDB    │    │    Redis    │    │  PowerDNS   │        │
+│  │    :3306    │    │    :6379    │    │  (optional) │        │
 │  └─────────────┘    └─────────────┘    └─────────────┘        │
-│         │                                                     │
-│         ▼                                                     │
+│                                                               │
 │  ┌─────────────────────────────────────────────────┐          │
-│  │              Sandbox Containers                 │          │
-│  │   (Alpine Linux via container API)             │          │
-│  │   Network: 172.30.0.0/16 (deterministic IPs)   │          │
+│  │              Docker (sandboxes only)            │          │
+│  ├─────────────────────────────────────────────────┤          │
+│  │  ┌─────────────┐    ┌─────────────┐             │          │
+│  │  │Sandbox Proxy│    │Terminal Srv │             │          │
+│  │  │    :3000    │    │    :3001    │             │          │
+│  │  └─────────────┘    └─────────────┘             │          │
+│  │         │                                       │          │
+│  │         ▼                                       │          │
+│  │  ┌─────────────────────────────────────────┐    │          │
+│  │  │         User Sandbox Containers         │    │          │
+│  │  │   Network: 172.30.0.0/16                │    │          │
+│  │  └─────────────────────────────────────────┘    │          │
 │  └─────────────────────────────────────────────────┘          │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
@@ -518,32 +526,32 @@ Access the web interface at `http://localhost`
 ### Commands
 
 ```bash
-# Start services
+# Start/stop main application (systemd)
+sudo systemctl start ginto
+sudo systemctl stop ginto
+sudo systemctl status ginto
+
+# View application logs
+journalctl -u ginto -f
+
+# Start/stop Docker sandbox services
 docker compose up -d
-
-# Stop services
 docker compose down
+docker compose logs -f
 
-# View logs
-docker compose logs -f php
+# Database access (runs on host)
+mysql -u ginto -p ginto
 
-# Rebuild after changes
-docker compose up -d --build
-
-# Shell access
-docker compose exec php bash
-
-# Database access
-docker compose exec mariadb mysql -u ginto -p ginto
+# Restart PHP-FPM after code changes
+sudo systemctl restart php8.3-fpm
 ```
 
 ### Installation Mode Comparison
 
-| Mode | Target Platform | Services | Sandboxes | Complexity |
-|------|-----------------|----------|-----------|------------|
-| **Full mode** | Linux | Native | LXD | Low (native) |
-| **Docker mode** | Any OS | Docker | Docker | Medium |
-| **WSL2 mode** | Windows | Native (WSL) | LXD | Medium |
+| Mode | Target Platform | Main Stack | Sandboxes | Complexity |
+|------|-----------------|------------|-----------|------------|
+| **Native mode** | Linux | Host | LXD | Low |
+| **Docker mode** | Linux | Host | Docker | Low |
 
 ### Docker Sandboxes vs LXD
 
@@ -556,7 +564,7 @@ docker compose exec mariadb mysql -u ginto -p ginto
 | **Performance** | Excellent | Excellent |
 | **Nested Containers** | Supported (DinD) | Supported (nested LXD) |
 
-### Environment Variables (Docker)
+### Environment Variables
 
 | Variable | Description | Default |
 |----------|-------------|---------|
