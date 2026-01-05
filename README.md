@@ -93,11 +93,12 @@ The "My Files" interface follows the familiar [Microsoft Windows](https://www.mi
 - **Response versions** - Navigate between regenerated responses (< 2/3 >)
 - **Smooth animations** - Polished transitions and hover effects
 
-### 🎨 Image Generation *(Testing)*
-- **AI image generation** - Text-to-image via LightPanda + Raphael AI
-- **Web scraping approach** - No API keys required
-- **Test endpoint** - `/imagegen` with streaming events
-- *Status: Experimental, requires LightPanda browser*
+### 🎨 Image Generation
+- **AI image generation** - Text-to-image via SDCPU (FastSD CPU with OpenVINO)
+- **Fast local generation** - ~1 second generation on CPU, no GPU required
+- **Streaming progress** - Real-time generation progress via SSE
+- **Chat integration** - Generate images directly from chat with `/image` tool
+- **Endpoint** - `/imagegen` with streaming events
 
 ### 📝 Rich Content Rendering
 - **LaTeX Math Support** - Full KaTeX rendering for mathematical equations (`$...$` inline, `$$...$$` display)
