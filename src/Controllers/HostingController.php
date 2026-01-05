@@ -229,15 +229,8 @@ class HostingController
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $this->validateCsrf();
-            $rawInput = file_get_contents('php://input');
-            $input = json_decode($rawInput, true) ?: $_POST;
-            
-            try {
-                $result = $this->manageDnsRecord($input);
-                echo json_encode($result);
-            } catch (\Throwable $e) {
-                echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            }
+            $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+            echo json_encode($this->manageDnsRecord($input));
             exit;
         }
 
