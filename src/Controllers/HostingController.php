@@ -1040,8 +1040,8 @@ class HostingController
 
     private function getPowerDNSConfig(): ?array
     {
-        $apiKey = getenv('POWERDNS_API_KEY');
-        $apiUrl = getenv('POWERDNS_API_URL') ?: 'http://127.0.0.1:8081/api/v1';
+        $apiKey = $_ENV['POWERDNS_API_KEY'] ?? getenv('POWERDNS_API_KEY') ?: null;
+        $apiUrl = $_ENV['POWERDNS_API_URL'] ?? getenv('POWERDNS_API_URL') ?: 'http://127.0.0.1:8081/api/v1';
         
         if (!$apiKey) return null;
         return ['url' => $apiUrl, 'key' => $apiKey];
@@ -1053,7 +1053,10 @@ class HostingController
         if (!$config) return false;
 
         $records = $this->getDnsRecords($zone);
-        if (empty($records)) return false;
+        if (empty($records)) {
+            // No records to sync - not necessarily a failure
+            return true;
+        }
 
         // Group records by name+type for RRsets
         $rrsets = [];
