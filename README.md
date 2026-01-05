@@ -594,7 +594,8 @@ sudo systemctl restart php8.3-fpm
 
 ### Sandbox
 - [ ] **Multi-distro support** - Debian, Fedora, Arch, Rocky Linux base images
-- [ ] **Podman/Docker alternative** - For systems without LXD
+- [x] **Docker sandboxes** - For systems without LXD (cross-platform support)
+- [ ] **Podman sandboxes** - Rootless alternative to Docker for enhanced security
 - [ ] Automatic SSL certificate provisioning per sandbox
 - [ ] Sandbox templates (Laravel, Next.js, Django, etc.)
 
