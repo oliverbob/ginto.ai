@@ -2513,6 +2513,9 @@ class ApiController
             $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
             $action = $input['action'] ?? 'add';
             
+            // Get registry instance for cache invalidation
+            $registry = \App\Core\LLM\ProviderRegistry::getInstance()->setDatabase($this->db);
+            
             switch ($action) {
                 case 'add':
                     if (empty($input['provider']) || empty($input['api_key'])) {
@@ -2527,6 +2530,8 @@ class ApiController
                         'is_default' => !empty($input['is_default']),
                         'priority' => $input['priority'] ?? null,
                     ]);
+                    // Invalidate cache so models are re-fetched with new key
+                    $registry->clearProviderCache($input['provider']);
                     echo json_encode(['success' => true, 'id' => $id, 'message' => 'API key added successfully']);
                     break;
                     
@@ -2535,7 +2540,12 @@ class ApiController
                         echo json_encode(['success' => false, 'error' => 'Key ID is required']);
                         exit;
                     }
+                    // Get provider before update for cache invalidation
+                    $existingKey = $keyManager->getKeyById((int)$input['id']);
                     $success = $keyManager->updateKey((int)$input['id'], $input);
+                    if ($success && $existingKey) {
+                        $registry->clearProviderCache($existingKey['provider']);
+                    }
                     echo json_encode(['success' => $success, 'message' => $success ? 'Key updated' : 'Update failed']);
                     break;
                     
@@ -2544,7 +2554,12 @@ class ApiController
                         echo json_encode(['success' => false, 'error' => 'Key ID is required']);
                         exit;
                     }
+                    // Get provider before delete for cache invalidation
+                    $existingKey = $keyManager->getKeyById((int)$input['id']);
                     $success = $keyManager->deleteKey((int)$input['id']);
+                    if ($success && $existingKey) {
+                        $registry->clearProviderCache($existingKey['provider']);
+                    }
                     echo json_encode(['success' => $success, 'message' => $success ? 'Key deleted' : 'Delete failed']);
                     break;
                     

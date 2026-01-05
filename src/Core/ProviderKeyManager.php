@@ -256,6 +256,22 @@ class ProviderKeyManager
     }
 
     /**
+     * Get a single key by ID.
+     */
+    public function getKeyById(int $id): ?array
+    {
+        return $this->db->get('provider_keys', [
+            'id',
+            'provider',
+            'key_name',
+            'api_key',
+            'tier',
+            'is_default',
+            'is_active',
+        ], ['id' => $id]) ?: null;
+    }
+
+    /**
      * Add a new API key.
      */
     public function addKey(array $data): int

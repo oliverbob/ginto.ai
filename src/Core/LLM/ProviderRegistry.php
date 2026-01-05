@@ -687,6 +687,19 @@ class ProviderRegistry
     }
     
     /**
+     * Clear model cache for a specific provider.
+     * Call this when a provider's API key is added, updated, or deleted.
+     */
+    public function clearProviderCache(string $provider): void
+    {
+        $cacheKey = $provider . '_models';
+        if (isset($this->modelCache[$cacheKey])) {
+            unset($this->modelCache[$cacheKey]);
+            $this->saveCacheToDisk();
+        }
+    }
+    
+    /**
      * Get provider priority order for UI display.
      * Local/offline providers first, then cloud APIs.
      */
