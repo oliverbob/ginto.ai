@@ -4154,6 +4154,12 @@
               // Client-side markdown rendering (preferred)
               // Strip tool_call JSON artifacts and render with markdown-it
               const displayContent = stripToolCallJson(accumulatedContent);
+              
+              // DEBUG: Log the exact content being rendered to find bold marker issues
+              if (displayContent.includes('**')) {
+                console.log('[streaming] Content has bold markers, displayContent:', displayContent.substring(Math.max(0, displayContent.indexOf('**') - 20), displayContent.indexOf('**') + 50));
+              }
+              
               let displayHtml = simpleMarkdownToHtml(displayContent);
               
               // If server still sends HTML (legacy mode), use it as fallback
