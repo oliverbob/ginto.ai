@@ -254,8 +254,10 @@ This runs `./bin/ginto.sh` which sets up:
 ## 📁 Project Structure
 
 ```
-ginto/
+ginto.ai/
 ├── run.sh                 # Main entry point
+├── install.sh             # One-line installer
+├── docker-compose.yml     # Docker sandbox services only
 ├── bin/
 │   ├── gintoai.sh         # Core installation script
 │   ├── ginto.sh           # Sandbox management script
@@ -266,6 +268,7 @@ ginto/
 │   ├── Handlers/          # MCP tool handlers (AgentTools, DevTools, etc.)
 │   ├── Helpers/           # Utilities and sandbox management
 │   ├── Models/            # Data models
+│   ├── Views/             # PHP view templates (admin, hosting, etc.)
 │   └── Routes/            # FastRoute definitions
 ├── public/                # Web root (front controller)
 ├── tools/                 # MCP servers and utilities
@@ -273,6 +276,10 @@ ginto/
 │   ├── paypal-mcp/        # PayPal integration
 │   ├── sandbox-proxy/     # Node.js reverse proxy
 │   └── terminal-server/   # Terminal WebSocket server
+├── docker/                # Docker build files
+│   ├── sandbox/           # Sandbox container images
+│   └── ...                # Other Docker configs
+├── database/              # SQL migrations
 ├── docs/                  # Documentation
 └── config/                # Configuration files
 ```
