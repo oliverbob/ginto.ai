@@ -356,7 +356,8 @@
       renderMathInElement(element, {
         delimiters: [
           { left: '$$', right: '$$', display: true },
-          { left: '$', right: '$', display: false },
+          // DISABLED: Single $ delimiters conflict with currency ($100, $1 trillion, etc.)
+          // { left: '$', right: '$', display: false },
           { left: '\\[', right: '\\]', display: true },
           { left: '\\(', right: '\\)', display: false }
         ],
