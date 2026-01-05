@@ -590,6 +590,7 @@ sudo systemctl restart php8.3-fpm
 - [x] **Docker-based sandboxes** - Cross-platform sandbox support via Docker
 - [ ] **Pre-built OS images** - Ready-to-use VM images for quick deployment
 - [x] One-click web installer at `https://ginto.ai/install.sh`
+- [ ] **CMS-only mode** - Lightweight install for shared hosting (cPanel, Plesk, DirectAdmin). Upload files, run `/install/` web installer, focuses on CMS/MVC features only (no sandboxes, no Docker, no system services)
 
 ### Sandbox
 - [ ] **Multi-distro support** - Debian, Fedora, Arch, Rocky Linux base images
