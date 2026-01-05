@@ -1684,17 +1684,18 @@ install_sdcpu() {
         # Get Python version (e.g., 3.12)
         local py_version
         py_version=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        # Install version-specific venv package, pip, and Pillow build dependencies
-        sudo apt-get install -y "python${py_version}-venv" python3-venv python3-pip \
+        # Install version-specific venv package, pip, dev headers, and Pillow build dependencies
+        sudo apt-get install -y "python${py_version}-venv" "python${py_version}-dev" \
+            python3-venv python3-dev python3-pip \
             libjpeg-dev zlib1g-dev libpng-dev libfreetype6-dev liblcms2-dev \
             libopenjp2-7-dev libtiff-dev libwebp-dev 2>/dev/null || \
-        sudo apt-get install -y python3-venv python3-pip libjpeg-dev zlib1g-dev
+        sudo apt-get install -y python3-venv python3-dev python3-pip libjpeg-dev zlib1g-dev
     elif command -v dnf &>/dev/null; then
-        sudo dnf install -y python3-virtualenv python3-pip \
+        sudo dnf install -y python3-virtualenv python3-pip python3-devel \
             libjpeg-devel zlib-devel libpng-devel freetype-devel lcms2-devel \
             openjpeg2-devel libtiff-devel libwebp-devel
     elif command -v apk &>/dev/null; then
-        sudo apk add --no-cache python3 py3-pip py3-virtualenv \
+        sudo apk add --no-cache python3 py3-pip py3-virtualenv python3-dev \
             jpeg-dev zlib-dev libpng-dev freetype-dev lcms2-dev \
             openjpeg-dev tiff-dev libwebp-dev
     fi
