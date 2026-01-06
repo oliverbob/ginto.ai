@@ -261,9 +261,14 @@ $currentPage = 'domains';
         searchApi: '/admin/users/search?q=',
         minChars: 2,
         renderItem: (user) => `
-          <div class="flex justify-between items-center">
-            <span class="font-medium">${esc(user.username)}</span>
-            <span class="text-gray-500 text-sm">${esc(user.fullname || '')}</span>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+              ${esc((user.username || '?')[0].toUpperCase())}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.username)}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${esc(user.fullname || user.email || 'No name')}</div>
+            </div>
           </div>
         `,
         onSelect: (user) => {
@@ -285,9 +290,14 @@ $currentPage = 'domains';
         searchApi: '/admin/users/search?q=',
         minChars: 2,
         renderItem: (user) => `
-          <div class="flex justify-between items-center">
-            <span class="font-medium">${esc(user.fullname || user.username)}</span>
-            <span class="text-gray-500 text-sm">${esc(user.username)}</span>
+          <div class="flex items-center gap-3">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+              ${esc((user.fullname || user.username || '?')[0].toUpperCase())}
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.fullname || user.username)}</div>
+              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">@${esc(user.username)}</div>
+            </div>
           </div>
         `,
         getDisplayValue: (user) => user.fullname || user.username,

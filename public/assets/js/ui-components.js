@@ -280,7 +280,7 @@ const GintoUI = {
         wrapper.appendChild(input);
 
         const dropdown = document.createElement('div');
-        dropdown.className = 'ginto-autocomplete-dropdown absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto z-50 hidden';
+        dropdown.className = 'ginto-autocomplete-dropdown absolute left-0 right-0 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl max-h-64 overflow-y-auto z-50 hidden backdrop-blur-sm';
         wrapper.appendChild(dropdown);
 
         // Loading indicator
@@ -310,8 +310,8 @@ const GintoUI = {
         const highlightItem = (index) => {
             const items = dropdown.querySelectorAll('.ginto-autocomplete-item');
             items.forEach((item, i) => {
-                item.classList.toggle('bg-blue-100', i === index);
-                item.classList.toggle('dark:bg-blue-900', i === index);
+                item.classList.toggle('bg-emerald-50', i === index);
+                item.classList.toggle('dark:bg-emerald-900/30', i === index);
             });
             selectedIndex = index;
             // Scroll into view
@@ -329,14 +329,14 @@ const GintoUI = {
         const renderItems = (items) => {
             currentItems = items;
             if (!items.length) {
-                dropdown.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm italic">No results found</div>';
+                dropdown.innerHTML = '<div class="px-4 py-3 text-gray-400 dark:text-gray-500 text-sm text-center"><i class="fas fa-search mr-2"></i>No results found</div>';
                 showDropdown();
                 return;
             }
 
             dropdown.innerHTML = items.map((item, index) => {
                 const html = config.renderItem(item);
-                return `<div class="ginto-autocomplete-item cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-index="${index}">${html}</div>`;
+                return `<div class="ginto-autocomplete-item cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-900/30 px-4 py-2.5 border-b border-gray-100 dark:border-gray-700/50 last:border-b-0 transition-all duration-150" data-index="${index}">${html}</div>`;
             }).join('');
 
             dropdown.querySelectorAll('.ginto-autocomplete-item').forEach((el, index) => {
