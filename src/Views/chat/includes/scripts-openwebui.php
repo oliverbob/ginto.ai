@@ -110,7 +110,7 @@
       isInstalling = true;
       updateOpenWebuiUI();
       
-      // Get the git clone command from API
+      // Get the pip install command from API
       try {
         const csrfToken = await getCsrfToken();
         const res = await fetch('/api/sandbox/openwebui/install', {
@@ -126,7 +126,7 @@
           return;
         }
         
-        // Open console and run the git clone command
+        // Open console and run the pip install command
         // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
         if (typeof window.openConsoleWithCommand === 'function') {
           const cmd = data.command || 'pip install open-webui && open-webui serve';
