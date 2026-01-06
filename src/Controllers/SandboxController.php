@@ -1028,27 +1028,31 @@ class SandboxController
             $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
-            // Check if OpenWebUI is installed (marker file or pip package)
+            // Check if OpenWebUI Docker container exists
             [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
-                "(test -f $homeDir/open-webui/.installed || which open-webui > /dev/null 2>&1 || test -f $homeDir/.local/bin/open-webui) && echo 'installed'",
+                'docker ps -a --filter "name=open-webui" --format "{{.Names}}" 2>/dev/null | grep -q "open-webui" && echo "installed"',
                 $homeDir,
                 10
             );
             
             $installed = trim($output) === 'installed';
             
-            // Check if OpenWebUI is running (port 3000)
+            // Check if OpenWebUI is running (Docker container running on port 8088)
             $running = false;
             if ($installed) {
                 [$code2, $output2, $err2] = \Ginto\Helpers\UnifiedSandbox::exec(
                     $sandboxId,
-                    'pgrep -f "open-webui" > /dev/null 2>&1 && echo "running" || (ss -tlnp 2>/dev/null | grep -q ":3000 " && echo "running")',
+                    'docker ps --filter "name=open-webui" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "open-webui" && echo "running"',
                     $homeDir,
                     5
                 );
                 $running = trim($output2) === 'running';
             }
+            
+            // Get server IP for OpenWebUI URL
+            $hostIp = $_SERVER['SERVER_ADDR'] ?? $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $hostIp = preg_replace('/:\d+$/', '', $hostIp);
             
             echo json_encode([
                 'success' => true,
@@ -1056,7 +1060,8 @@ class SandboxController
                 'running' => $running,
                 'sandbox_exists' => true,
                 'sandbox_id' => $sandboxId,
-                'backend' => $backend
+                'backend' => $backend,
+                'url' => $running ? 'http://' . $hostIp . ':8088/' : null
             ]);
             
         } catch (\Throwable $e) {

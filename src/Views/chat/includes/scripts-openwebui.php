@@ -25,6 +25,7 @@
   let openWebuiRunning = false;
   let sandboxExists = false;
   let isInstalling = false;
+  let openWebuiUrl = null;
   
   // Check OpenWebUI status on page load
   async function checkOpenWebuiStatus() {
@@ -36,6 +37,7 @@
         sandboxExists = data.sandbox_exists;
         openWebuiInstalled = data.installed;
         openWebuiRunning = data.running;
+        openWebuiUrl = data.url || null;
         updateOpenWebuiUI();
       }
     } catch (e) {
@@ -64,7 +66,7 @@
       openWebuiLabel.textContent = 'OpenWebUI';
       openWebuiStatus.classList.remove('hidden');
       openWebuiStatus.querySelector('span').className = 'w-2 h-2 rounded-full bg-green-400 inline-block';
-      openWebuiStatus.querySelector('span').title = 'Running';
+      openWebuiStatus.querySelector('span').title = 'Running - Click to open';
     } else {
       openWebuiLabel.textContent = 'Start OpenWebUI';
       openWebuiStatus.classList.remove('hidden');
@@ -204,20 +206,14 @@
   }
   
   function openOpenWebUI() {
-    // Open in user's sandbox via clients proxy
-    // The sandbox Caddy is configured to forward port 80 to 3000
-    fetch('/api/sandbox/status')
-      .then(r => r.json())
-      .then(data => {
-        if (data.sandbox_id) {
-          window.open('/clients/' + data.sandbox_id + '/', '_blank');
-        } else {
-          showToast('Could not determine sandbox URL', 'error');
-        }
-      })
-      .catch(e => {
-        showToast('Failed to get sandbox info: ' + e.message, 'error');
-      });
+    // Use the URL from status check (http://server:8088/)
+    if (openWebuiUrl) {
+      window.open(openWebuiUrl, '_blank');
+    } else {
+      // Fallback: construct URL from current host
+      const host = window.location.hostname;
+      window.open('http://' + host + ':8088/', '_blank');
+    }
   }
   
   // Check status on page load
