@@ -73,7 +73,7 @@
 </div>
 
 <!-- Minimized Iframe Tabs Container (stacked vertically) -->
-<div id="iframe-minimized-container" class="fixed bottom-4 right-20 z-[55] flex flex-col-reverse gap-2"></div>
+<div id="iframe-minimized-container" class="fixed bottom-4 right-4 z-[55] flex flex-col-reverse items-end gap-2"></div>
 
 <style>
 .iframe-modal-normal {
