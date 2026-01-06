@@ -252,6 +252,13 @@
         window.pendingOpenWebuiInstall = false;
         sandboxExists = true;
         
+        // Update GINTO_AUTH with new sandbox ID so Console can connect
+        if (d.id && window.GINTO_AUTH) {
+          if (!window.GINTO_AUTH.sandbox) window.GINTO_AUTH.sandbox = {};
+          window.GINTO_AUTH.sandbox.id = d.id;
+          console.log('[OWUI DEBUG] Updated GINTO_AUTH.sandbox.id to:', d.id);
+        }
+        
         // Wait a moment for sandbox to be ready
         await new Promise(r => setTimeout(r, 2000));
         
