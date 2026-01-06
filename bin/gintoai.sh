@@ -18,6 +18,22 @@ CHECKPOINT_CONFIG="$PROJECT_DIR/.install_config"
 # Installation mode: "native" (default) or "docker"
 INSTALL_MODE="${GINTO_INSTALL_MODE:-native}"
 
+# PowerDNS control flags (set via command line or env vars)
+SKIP_POWERDNS="${GINTO_SKIP_POWERDNS:-false}"
+FORCE_POWERDNS="${GINTO_FORCE_POWERDNS:-false}"
+
+# Parse additional flags from command line
+for arg in "$@"; do
+    case "$arg" in
+        --skip-powerdns)
+            SKIP_POWERDNS=true
+            ;;
+        --force-powerdns)
+            FORCE_POWERDNS=true
+            ;;
+    esac
+done
+
 # List of installation steps for NATIVE mode
 INSTALL_STEPS_NATIVE=(
     "check_home_directory"
@@ -991,8 +1007,39 @@ install_llamacpp() {
 
 # Install and configure PowerDNS authoritative server
 # Used for hosting DNS zones via /admin/hosting/dns
+# Skipped on local/development machines (use --force-powerdns to override)
 install_powerdns() {
     log_step "Checking PowerDNS..."
+    
+    # Skip if --skip-powerdns flag was passed
+    if [[ "$SKIP_POWERDNS" == "true" ]]; then
+        log_info "Skipping PowerDNS (--skip-powerdns flag)"
+        return 0
+    fi
+    
+    # Auto-detect if this is a local machine (not a public server)
+    # Skip PowerDNS on local machines unless --force-powerdns is set
+    if [[ "$FORCE_POWERDNS" != "true" ]]; then
+        # Check if running in LXC/container (not a bare-metal server)
+        if [[ -f /run/host_configured ]] || grep -q "container=lxc" /proc/1/environ 2>/dev/null || [[ -f /.dockerenv ]]; then
+            log_info "Skipping PowerDNS (detected container/LXC environment)"
+            log_info "Use --force-powerdns to install anyway"
+            return 0
+        fi
+        
+        # Check if public IP differs from local IPs (indicates NAT/local network)
+        local PUBLIC_IP
+        PUBLIC_IP=$(curl -s -4 --connect-timeout 5 ifconfig.me 2>/dev/null || echo "")
+        if [[ -n "$PUBLIC_IP" ]]; then
+            # Check if public IP is assigned to any local interface
+            if ! ip addr show 2>/dev/null | grep -q "$PUBLIC_IP"; then
+                log_info "Skipping PowerDNS (public IP $PUBLIC_IP not bound to local interfaces)"
+                log_info "This indicates NAT/local network - DNS server wouldn't be reachable"
+                log_info "Use --force-powerdns to install anyway"
+                return 0
+            fi
+        fi
+    fi
     
     local pdns_installed=false
     
@@ -3307,6 +3354,12 @@ case "${1:-help}" in
         echo ""
         echo "Environment Variables:"
         echo "  GINTO_INSTALL_MODE=docker|native  - Pre-select installation mode"
+        echo "  GINTO_SKIP_POWERDNS=true          - Skip PowerDNS installation"
+        echo "  GINTO_FORCE_POWERDNS=true         - Force PowerDNS even in containers"
+        echo ""
+        echo "Optional Flags:"
+        echo "  --skip-powerdns   - Skip PowerDNS installation (for local dev)"
+        echo "  --force-powerdns  - Force PowerDNS in containers/NAT environments"
         echo ""
         echo "Native mode installs:"
         echo "  - PHP 8.x with required extensions"
