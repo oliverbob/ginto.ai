@@ -82,7 +82,15 @@
     
     if (!openWebuiInstalled) {
       // Install OpenWebUI
-      if (!confirm('Install OpenWebUI in your sandbox? This may take several minutes.')) {
+      const confirmed = await showConfirmModal({
+        title: 'Install OpenWebUI',
+        message: 'Install OpenWebUI in your sandbox? This may take several minutes.',
+        confirmText: 'Install',
+        confirmIcon: 'fa-download',
+        type: 'info'
+      });
+      
+      if (!confirmed) {
         return;
       }
       
