@@ -1,0 +1,379 @@
+/* Minimal fallback dark-theme overrides for environments where Tailwind dark variants
+   were not generated. This file deliberately uses high-specificity selectors and
+   !important to ensure it overrides prebuilt utility classes when the `.dark`
+   class is present on <html> or <body>. Keep this small — it's a compatibility shim.
+*/
+
+/* Palette variables so we can tune contrast in one place.
+   Default (light) values are defined on :root, dark values are defined when
+   the page has the `.dark` class. These are used below in key selectors. */
+:root {
+  --bg: #ffffff;
+  --surface: #ffffff;
+  --text: #111827;
+  --muted: #6b7280;
+  --accent: #f59e0b; /* yellow-500 */
+}
+
+/* Light-mode tuning: make outlines/rings much more subtle in light mode so
+   highlights don't appear as jarring bright outlines. */
+html:not(.dark) .ring-yellow-300,
+html:not(.dark) .ring-amber-300,
+html:not(.dark) .ring-yellow-400,
+html:not(.dark) .ring-amber-400 {
+  /* very subtle shadow so "ring" is a soft tone, not a neon outline */
+  box-shadow: 0 0 0 3px rgba(16,24,39,0.035) !important;
+}
+
+/* Ensure admin buttons are readable in light mode even when other layout
+   rules reduce contrast (some panels use softer borders/opacity). We want
+   outline buttons to remain clearly legible and affordant. */
+html:not(.dark) .admin-btn {
+  color: #0b1220 !important; /* very readable text */
+  background-color: #ffffff !important; /* keep clean white button */
+  border-color: rgba(15,23,42,0.12) !important; /* slightly stronger border */
+  font-weight: 600 !important; /* ensure readable weight */
+  box-shadow: 0 1px 0 rgba(2,6,23,0.04) !important; /* subtle surface separation */
+  text-shadow: none !important;
+}
+html:not(.dark) .admin-btn:hover {
+  background-color: #f8fafc !important; /* gentle hover */
+  border-color: rgba(15,23,42,0.16) !important;
+}
+
+/* Light-mode cards/panels: reduce overly-strong outlines and soft shadows so
+   content reads cleanly while still having structure. Exclude buttons with colored backgrounds. */
+html:not(.dark) .rounded-xl:not(button), html:not(.dark) .card, html:not(.dark) .panel, html:not(.dark) .rounded-lg:not(button) {
+  border: 1px solid rgba(15,23,42,0.06) !important; /* softer border */
+  box-shadow: 0 6px 18px rgba(2,6,23,0.04) !important; /* subtle lift */
+}
+
+/* Preserve colored button backgrounds in light mode */
+html:not(.dark) button.bg-orange-600 { background-color: #ea580c !important; color: #fff !important; }
+html:not(.dark) button.bg-violet-600 { background-color: #7c3aed !important; color: #fff !important; }
+html:not(.dark) button.bg-red-600 { background-color: #dc2626 !important; color: #fff !important; }
+html:not(.dark) button.bg-green-600 { background-color: #16a34a !important; color: #fff !important; }
+html:not(.dark) button.bg-blue-600 { background-color: #2563eb !important; color: #fff !important; }
+
+html.dark, body.dark {
+  --bg: #0b1220; /* match sidebar background */
+  /* surface is the same as --bg for consistent look */
+  --surface: #111827; /* card/panel background - slightly lighter for contrast */
+  --surface-2: #1f2937; /* form inputs / controls */
+  --text: #e9eef6; /* a touch brighter text for better contrast */
+  --muted: #a4b1bf;
+  --accent: rgba(207,160,85,1);
+  background-color: var(--bg) !important;
+  color: var(--text) !important;
+}
+
+/* Common utility overrides used in templates */
+.dark .bg-white { background-color: var(--surface) !important; color: var(--text) !important; }
+
+/* Rich editor lives inside panels that use .bg-white — prevent the panel-level
+  color override from breaking the rich editor's token CSS (which may not use !important).
+  We explicitly reset color on the editor root so the editor's token styles show through. */
+.dark #editor-canvas, .dark .editor-pane #editor-canvas, .editor-fullscreen #editor-canvas { color: initial !important; background: transparent !important; }
+.dark .bg-gray-100, .dark .bg-gray-200 { background-color: var(--bg) !important; }
+.dark .bg-gray-700, .dark .bg-gray-800 { background-color: var(--surface) !important; }
+.dark .text-gray-900 { color: #e5e7eb !important; }
+.dark .text-gray-700 { color: #cbd5e1 !important; }
+.dark .text-gray-400, .dark .placeholder-gray-400 { color: #9ca3af !important; }
+.dark .border-gray-200 { border-color: rgba(255,255,255,0.10) !important; }
+.dark .border-gray-700 { border-color: rgba(255,255,255,0.14) !important; }
+.dark .shadow { box-shadow: 0 1px 2px rgba(255,255,255,0.02), 0 1px 3px rgba(0,0,0,0.4) !important; }
+
+/* Sidebar and header specifics (common layout parts) */
+.dark header, .dark .header, .dark #sidebar { background-color: var(--bg) !important; }
+.dark #main-content { background-color: transparent !important; }
+.dark .bg-gray-800 { background-color: var(--bg) !important; }
+.dark .bg-gray-900 { background-color: var(--bg) !important; }
+
+/* Buttons and controls */
+.dark .bg-gray-300 { background-color: #374151 !important; }
+.dark .bg-gray-200 { background-color: #1f2937 !important; }
+
+/* Ensure cards and panels contrast on dark backgrounds */
+.dark .card, .dark .panel, .dark .rounded-lg { background-color: var(--surface) !important; }
+
+/* Rich editor fallback (if present) */
+html.dark #editor-canvas { background-color: #0b1220 !important; }
+
+/* Small helpers — avoid turning all anchors yellow; exclude admin buttons so
+  primary/CTA buttons keep their intended contrast (they include the admin-btn class). */
+.dark a:not(.admin-btn) { color: var(--accent) !important; }
+
+/* Notifications: remove the strong outlined square in dark mode and soften badge */
+.dark .notification-btn { background-color: transparent !important; border-color: rgba(255,255,255,0.04) !important; box-shadow: none !important; }
+.dark .notification-btn svg { color: #d1e6ee !important; }
+.dark .notification-badge { border-color: transparent !important; box-shadow: 0 2px 6px rgba(0,0,0,0.6) !important; }
+
+/* Cards: make them read like cards in dark mode — slightly lighter surface, soft border and deeper shadow */
+.dark .rounded-xl, .dark .card, .dark .panel, .dark .rounded-lg { 
+  background-color: var(--surface) !important; /* use the tuned surface */
+  border: 1px solid rgba(255,255,255,0.06) !important; 
+  /* lighten the heavy shadows for a cleaner, flatter appearance */
+  box-shadow: 0 8px 20px rgba(0,0,0,0.45), 0 1px 0 rgba(255,255,255,0.02) inset !important; 
+}
+
+/* Form controls in dark mode: give inputs and textareas more contrast against the page
+   by using a slightly lighter surface color and stronger borders and text color. */
+.dark input, .dark textarea, .dark select, .dark .form-input, .dark .form-select, .dark .form-textarea {
+  background-color: var(--surface-2) !important;
+  color: var(--text) !important;
+  /* softer border so inputs are visible without looking like framed boxes */
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.02) !important;
+  border-radius: 6px !important;
+}
+.dark textarea::placeholder, .dark input::placeholder { color: var(--muted) !important; }
+
+/* Provide a slightly stronger focus ring for accessibility */
+.dark input:focus, .dark textarea:focus, .dark select:focus {
+  outline: none !important;
+  /* make focus visible but not neon — softer warm halo */
+  box-shadow: 0 0 0 4px rgba(207,160,85,0.05), 0 0 0 4px rgba(255,255,255,0.02) !important;
+  border-color: rgba(207,160,85,0.14) !important;
+}
+
+/* Target the Settings listing rows (server-side rendered li.border) and reduce their
+   looped 'framed' look. Instead of bright outlines, give them a subtle fill and soft border. */
+.dark li.p-2.border.rounded {
+  background-color: rgba(255,255,255,0.012) !important; /* slight lift from panel */
+  border-color: rgba(255,255,255,0.06) !important;
+  box-shadow: none !important;
+}
+
+/* For the inner 'strong' value block inside rows, avoid adding additional borders */
+.dark li.p-2.border.rounded > strong.block { 
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+/* Subtle active dashboard surface for dark mode: low-opacity warm overlay, soft border and muted label.
+   This keeps the item visible but removes the high-contrast saturated gradient.
+*/
+.dark a.active-dashboard {
+  /* Use a subtle left accent and color the icon/text instead of a full button */
+  background: transparent !important;
+  color: var(--dashboard-accent, var(--accent, #f59e0b)) !important;
+  border-left: 4px solid var(--dashboard-accent, var(--accent, #f59e0b)) !important;
+  padding-left: calc(1rem - 0.5rem) !important; /* maintain visual spacing */
+  box-shadow: none !important;
+}
+.dark a.active-dashboard svg { opacity: 0.98; filter: none !important; }
+.dark a.active-dashboard .font-medium { color: var(--dashboard-accent, var(--accent, #f59e0b)) !important; }
+
+/* Light-mode active dashboard (use the accent var if set) */
+a.active-dashboard {
+  /* Active in light mode: subtle left accent + colored icon/text (no full button) */
+  background: transparent !important;
+  color: var(--dashboard-accent, var(--accent, #f59e0b)) !important;
+  border-left: 4px solid var(--dashboard-accent, var(--accent, #f59e0b)) !important;
+  padding-left: calc(1rem - 0.5rem) !important;
+}
+
+
+/* Keep gradient-backed active sidebar items' text visible in dark mode */
+.dark a.bg-gradient-to-r, .dark a.bg-gradient-to-r .font-medium { color: #ffffff !important; }
+.dark a.bg-gradient-to-r.text-white .font-medium { color: #ffffff !important; }
+
+/* Make shadow-lg more visible for elevated elements (cards, big panels) */
+.dark .shadow-lg { box-shadow: 0 12px 36px rgba(0,0,0,0.55) !important; }
+
+/* Sidebar nav: reduce contrast in dark mode — make items read as subtle panels */
+.dark #sidebar nav a,
+.dark #sidebar nav button {
+  /* Flat nav: make items read like icon + label (no button appearance) */
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  border-radius: 0 !important;
+  color: var(--text) !important;
+}
+.dark #sidebar nav a:hover,
+.dark #sidebar nav button:hover {
+  /* Subtle hover tint rather than a button fill */
+  background: rgba(255,255,255,0.022) !important;
+}
+
+/* Light-mode (non-dark) — make sidebar nav items flat too */
+/* Sidebar nav items should read as flat rows in light mode —
+   remove the framed/button look so icon + label are the primary visual.
+   Hover still shows a subtle tint to indicate interactivity. */
+html:not(.dark) #sidebar nav a,
+html:not(.dark) #sidebar nav button {
+  background: transparent !important;
+  border: none !important; /* remove light-mode framed border */
+  box-shadow: none !important; /* remove card-like shadow */
+  border-radius: 0 !important;
+  color: #0f172a !important;
+}
+html:not(.dark) #sidebar nav a:hover,
+html:not(.dark) #sidebar nav button:hover {
+  background: rgba(2,6,23,0.02) !important;
+}
+
+/* Active indicator (left border) — soften instead of bright yellow */
+.dark .border-l-4.border-yellow-400 { border-left-color: rgba(207,160,85,0.14) !important; }
+.dark .ring-yellow-300 { box-shadow: 0 0 0 4px rgba(207,160,85,0.06) !important; }
+
+/* Make icon colors slightly muted in sidebar so they aren't visually competing with content */
+.dark #sidebar svg { opacity: 0.92; filter: saturate(0.85); }
+
+/* Dark-mode scrollbars — style main scrollbars subtly to match the dark surfaces.
+   Use webkit pseudo elements for Chromium-based browsers and a Firefox-friendly
+   fallback using scrollbar-color/width. Keep thumb translucent and track transparent.
+*/
+html.dark, body.dark {
+  scrollbar-color: rgba(255,255,255,0.08) transparent; /* firefox */
+  scrollbar-width: thin; /* firefox */
+}
+
+/* Chromium-based browsers */
+html.dark ::-webkit-scrollbar, body.dark ::-webkit-scrollbar, .dark ::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+html.dark ::-webkit-scrollbar-track, body.dark ::-webkit-scrollbar-track, .dark ::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.dark ::-webkit-scrollbar-thumb, body.dark ::-webkit-scrollbar-thumb, .dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.07);
+  border-radius: 9999px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+html.dark ::-webkit-scrollbar-thumb:hover, body.dark ::-webkit-scrollbar-thumb:hover, .dark ::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255,255,255,0.12);
+}
+
+/* For any overlays/sidebars where a lighter thumb is better, allow specific classes
+   to use a slightly more visible variant. Example: .scroll-thumb-strong */
+.dark ::-webkit-scrollbar-thumb.scroll-thumb-strong { background-color: rgba(255,255,255,0.12) !important; }
+
+/* Collapsed / compact sidebar (desktop toggle) */
+/* compact/expanded widths with smooth animation */
+#sidebar {
+  transition: width 220ms ease, padding 200ms ease, background-color 220ms ease;
+}
+
+body.sidebar-collapsed #sidebar {
+  width: 72px !important; /* compact */
+}
+
+body.sidebar-collapsed #main-content, body.sidebar-collapsed .lg\:pl-64 { /* ensure main content shifts */
+  padding-left: 72px !important;
+  transition: padding-left 220ms ease;
+}
+
+/* Hide the header title, keep the logo icon */
+/* hide the large title when collapsed — keep logo visible */
+/* Title inside the header: animate hiding by shrinking and fading not by display:none */
+#sidebar .sidebar-title {
+  display: inline-block;
+  max-width: 320px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 180ms ease, transform 180ms ease, max-width 200ms ease;
+}
+body.sidebar-collapsed #sidebar .sidebar-title {
+  opacity: 0 !important;
+  transform: translateX(-4px) !important;
+  max-width: 0 !important;
+}
+
+/* Specific tuning for the admin palette editor (rendered by admin-icon-color-picker.js).
+   Those rows were using bordered rounded boxes that read like heavy frames — soften them. */
+.dark #icon-colors-editor .border.rounded,
+.dark #icon-colors-editor .p-2.border.rounded {
+  background-color: rgba(255,255,255,0.01) !important; /* subtle lift from surface */
+  border-color: rgba(255,255,255,0.06) !important;     /* softer border */
+  box-shadow: none !important;                          /* remove framed shadow */
+}
+
+.dark #icon-colors-editor .swatch {
+  border: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: none !important;
+}
+
+.dark #icon-colors-editor .px-3.px-2.p-1, .dark #icon-colors-editor button {
+  /* make small buttons less visually heavy */
+  box-shadow: none !important;
+}
+
+/* ensure the preview square doesn't have a harsh border in dark mode */
+.dark #icon-colors-editor div[style*="border-radius: 6px"] {
+  border: 1px solid rgba(255,255,255,0.06) !important;
+}
+
+/* Make nav items icon-first and flat */
+/* Make all nav items (including buttons used for groups) behave the same when collapsed */
+body.sidebar-collapsed #sidebar nav a,
+body.sidebar-collapsed #sidebar nav button {
+  justify-content: center !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+}
+/* Nav labels: animate by fading and shrinking the width */
+#sidebar nav a span.font-medium {
+  display: inline-block;
+  max-width: 240px;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity 180ms ease, max-width 180ms ease, transform 160ms ease;
+}
+body.sidebar-collapsed #sidebar nav a span.font-medium { opacity: 0 !important; transform: translateX(-6px); max-width: 0 !important; }
+body.sidebar-collapsed #sidebar nav a svg { margin-right: 0 !important; }
+
+/* Animate the logo shrink and chevron smoothly */
+#sidebar > div.flex.items-center.space-x-2 img { transition: width 160ms ease, height 160ms ease, transform 160ms ease, opacity 160ms ease; }
+body.sidebar-collapsed #sidebar > div.flex.items-center.space-x-2 img { width: 28px !important; height: 28px !important; transform: translateX(0) !important; opacity: 1; }
+
+/* Ensure chevron rotates smoothly */
+#sidebar-collapse-icon { transition: transform 200ms ease; }
+
+/* Hide nested submenu labels entirely when compact */
+body.sidebar-collapsed #content-sub { display: none !important; }
+
+/* For the Content group button: hide its label and the chevron when collapsed */
+body.sidebar-collapsed #content-group #content-toggle span.font-medium { opacity: 0 !important; transform: translateX(-6px) !important; max-width: 0 !important; }
+body.sidebar-collapsed #content-group #content-chevron { opacity: 0 !important; transform: translateX(-6px) !important; display: none !important; }
+
+/* Keep collapse button icon rotated when collapsed */
+body.sidebar-collapsed #sidebar-collapse-icon { transform: rotate(180deg) !important; }
+
+/* ------------------------------------------------------------------
+   Map common amber/yellow utility classes used across admin views to
+   the currently-applied palette variables. This keeps the admin theme
+   unified when the settings palette is applied.
+   ------------------------------------------------------------------ */
+
+/* Provide sane defaults for accent variables if not set */
+:root {
+  --accent-hover: #d97706;
+  --accent-text: #fff;
+}
+
+/* Gradient helpers used in a few places (sidebar active, header buttons) */
+.bg-gradient-to-r.from-yellow-400, .bg-gradient-to-r.from-yellow-400.to-yellow-500 {
+  background-image: linear-gradient(90deg, var(--dashboard-accent, var(--accent)) 0%, var(--accent-hover) 100%) !important;
+}
+
+/* Background utility overrides */
+.bg-yellow-400, .bg-yellow-500, .bg-amber-400, .bg-amber-500 { background-color: var(--dashboard-accent, var(--accent)) !important; }
+
+/* Ensure bg-gray-50 doesn't remain pale white inside dark mode — make it follow surface-2 */
+.dark .bg-gray-50 { background-color: var(--surface-2) !important; color: var(--text) !important; }
+
+/* Text color override so links/buttons using text-yellow follow the palette */
+.text-yellow-400, .text-yellow-500, .text-yellow-600, .text-amber-600 { color: var(--dashboard-accent, var(--accent)) !important; }
+.dark .text-yellow-300, .dark .text-amber-400 { color: var(--dashboard-accent, var(--accent)) !important; }
+
+/* Ring focus styles (visuals use a faint spread of the accent) */
+.ring-yellow-300 { box-shadow: 0 0 0 4px rgba(0,0,0,0.06), 0 0 0 4px var(--accent-hover, rgba(0,0,0,0.12)) !important; }
+
+/* small utility: badges and small UI accents */
+.badge-yellow, .badge-amber { background-color: var(--dashboard-accent, var(--accent)) !important; color: var(--accent-text, #fff) !important; }
+
+

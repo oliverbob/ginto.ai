@@ -1,0 +1,20 @@
+{
+  "name": "lightpanda-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for Lightpanda headless browser - web automation tools for AI agents",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "upgrade-browser": "npx @lightpanda/browser upgrade"
+  },
+  "dependencies": {
+    "@lightpanda/browser": "^1.0.1",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "puppeteer-core": "^23.0.0"
+  },
+  "keywords": ["mcp", "lightpanda", "browser", "headless", "automation"],
+  "author": "Ginto.ai",
+  "license": "MIT"
+}
