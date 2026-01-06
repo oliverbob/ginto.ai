@@ -25,19 +25,26 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
           </svg>
         </button>
-        <!-- Minimize -->
-        <button id="iframe-modal-minimize" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Minimize">
+        <div class="w-px h-4 bg-gray-600 mx-1"></div>
+        <!-- Minimize (-) -->
+        <button id="iframe-modal-minimize" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-yellow-400 transition-colors" title="Minimize">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M19 14H5"/>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14"/>
           </svg>
         </button>
-        <!-- Maximize/Restore -->
-        <button id="iframe-modal-maximize" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Maximize">
+        <!-- Maximize (square) -->
+        <button id="iframe-modal-maximize" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-green-400 transition-colors" title="Maximize">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z"/>
+          </svg>
+        </button>
+        <!-- Fullscreen (arrows out) -->
+        <button id="iframe-modal-fullscreen" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-blue-400 transition-colors" title="Fullscreen">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
           </svg>
         </button>
-        <!-- Close -->
+        <!-- Close (x) -->
         <button id="iframe-modal-close" class="p-2 rounded-lg hover:bg-red-600/20 text-gray-400 hover:text-red-400 transition-colors" title="Close">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
             <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
@@ -184,6 +191,32 @@
     }
   }
   
+  function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+      // Enter fullscreen
+      container.requestFullscreen().catch(err => {
+        console.log('Fullscreen error:', err);
+        // Fallback: just maximize
+        if (!isMaximized) toggleMaximize();
+      });
+    } else {
+      // Exit fullscreen
+      document.exitFullscreen();
+    }
+  }
+  
+  // Update fullscreen button state on fullscreen change
+  document.addEventListener('fullscreenchange', function() {
+    const fullscreenBtn = document.getElementById('iframe-modal-fullscreen');
+    if (document.fullscreenElement) {
+      fullscreenBtn.title = 'Exit Fullscreen';
+      fullscreenBtn.classList.add('text-blue-400');
+    } else {
+      fullscreenBtn.title = 'Fullscreen';
+      fullscreenBtn.classList.remove('text-blue-400');
+    }
+  });
+  
   function openInNewTab() {
     if (currentUrl) {
       window.open(currentUrl, '_blank');
@@ -197,16 +230,19 @@
     }
   });
   
+  const fullscreenBtn = document.getElementById('iframe-modal-fullscreen');
+  
   // Button handlers
   closeBtn.addEventListener('click', window.closeIframeModal);
   minimizeBtn.addEventListener('click', minimizeIframeModal);
   maximizeBtn.addEventListener('click', toggleMaximize);
+  fullscreenBtn.addEventListener('click', toggleFullscreen);
   newtabBtn.addEventListener('click', openInNewTab);
   minimizedIndicator.addEventListener('click', restoreIframeModal);
   
-  // Close on Escape (only if not minimized)
+  // Close on Escape (only if not minimized and not fullscreen)
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden') && !document.fullscreenElement) {
       window.closeIframeModal();
     }
   });
