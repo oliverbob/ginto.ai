@@ -192,26 +192,30 @@ class HostingController
         header('Content-Type: application/json');
         $this->requireAdmin();
 
-        $lxcContainers = $this->isLxdInstalled() ? $this->getAvailableLxcContainers() : [];
-        $dockerContainers = $this->isDockerInstalled() ? $this->getAvailableDockerContainers() : [];
-        
-        // Get users who have sandboxes for the owner dropdown
-        $usersWithSandboxes = [];
         try {
-            $stmt = $this->db->query("SELECT id, username, fullname, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
-            $usersWithSandboxes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-        } catch (\PDOException $e) {
-            // Ignore
-        }
+            $lxcContainers = $this->isLxdInstalled() ? $this->getAvailableLxcContainers() : [];
+            $dockerContainers = $this->isDockerInstalled() ? $this->getAvailableDockerContainers() : [];
+            
+            // Get users who have sandboxes for the owner dropdown
+            $usersWithSandboxes = [];
+            try {
+                $stmt = $this->db->query("SELECT id, username, fullname, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
+                $usersWithSandboxes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            } catch (\PDOException $e) {
+                // Ignore
+            }
 
-        echo json_encode([
-            'success' => true,
-            'lxd_installed' => $this->isLxdInstalled(),
-            'docker_installed' => $this->isDockerInstalled(),
-            'lxc_containers' => $lxcContainers,
-            'docker_containers' => $dockerContainers,
-            'users_with_sandboxes' => $usersWithSandboxes
-        ]);
+            echo json_encode([
+                'success' => true,
+                'lxd_installed' => $this->isLxdInstalled(),
+                'docker_installed' => $this->isDockerInstalled(),
+                'lxc_containers' => $lxcContainers,
+                'docker_containers' => $dockerContainers,
+                'users_with_sandboxes' => $usersWithSandboxes
+            ]);
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+        }
         exit;
     }
 
