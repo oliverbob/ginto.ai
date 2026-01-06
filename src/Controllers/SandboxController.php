@@ -1100,8 +1100,8 @@ echo ""
 
 # Install dependencies
 echo "Installing dependencies..."
-sudo apt-get update -qq
-sudo apt-get install -y -qq git python3 python3-pip python3-venv nodejs npm curl
+apt-get update -qq
+apt-get install -y -qq git python3 python3-pip python3-venv nodejs npm curl
 
 # Clone OpenWebUI
 echo ""
@@ -1118,7 +1118,7 @@ fi
 # Install backend dependencies
 echo ""
 echo "Installing Python dependencies..."
-pip3 install -r requirements.txt --user 2>/dev/null || pip3 install -r backend/requirements.txt --user
+pip3 install -r requirements.txt 2>/dev/null || pip3 install -r backend/requirements.txt 2>/dev/null || true
 
 # Install frontend dependencies
 echo ""
