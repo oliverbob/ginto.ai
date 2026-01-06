@@ -251,10 +251,12 @@
   function openSandboxAfterInstall() {
     closeSandboxWizard();
     
+    console.log('[OWUI DEBUG] openSandboxAfterInstall called, pendingOpenWebuiInstall:', window.pendingOpenWebuiInstall);
+    
     // Check if we have a pending OpenWebUI install
     if (window.pendingOpenWebuiInstall) {
-      window.pendingOpenWebuiInstall = false;
-      // Post message to trigger OpenWebUI install
+      console.log('[OWUI DEBUG] Posting sandbox_created message');
+      // Post message BEFORE clearing the flag (listener will clear it)
       window.postMessage({ type: 'sandbox_created', id: window.installedSandboxId }, '*');
       return;
     }

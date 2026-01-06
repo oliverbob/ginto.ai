@@ -139,6 +139,9 @@
     }, 10 * 60 * 1000);
   }
   
+  // Expose installOpenWebUI globally so it can be called from sandbox wizard
+  window.installOpenWebUI = installOpenWebUI;
+  
   // Handle click on OpenWebUI link
   openWebuiLink.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -156,10 +159,12 @@
       // Need to create sandbox first - show wizard with terms acceptance
       // Set a flag so after sandbox is created, we auto-install OpenWebUI
       window.pendingOpenWebuiInstall = true;
+      console.log('[OWUI DEBUG] Set pendingOpenWebuiInstall = true');
       showToast('Please accept the terms to create a sandbox first', 'info');
       
       // Trigger the sandbox wizard (same as "My Files" does)
       if (typeof showSandboxWizard === 'function') {
+        console.log('[OWUI DEBUG] Calling showSandboxWizard()');
         showSandboxWizard();
       } else {
         // Fallback: click the My Files button
@@ -239,8 +244,11 @@
       const d = ev && ev.data;
       if (!d) return;
       
+      console.log('[OWUI DEBUG] Message received:', d.type, 'pendingOpenWebuiInstall:', window.pendingOpenWebuiInstall);
+      
       // When sandbox is created and we have a pending OpenWebUI install
       if (d.type === 'sandbox_created' && window.pendingOpenWebuiInstall) {
+        console.log('[OWUI DEBUG] Triggering installOpenWebUI!');
         window.pendingOpenWebuiInstall = false;
         sandboxExists = true;
         
