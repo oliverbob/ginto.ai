@@ -22,7 +22,23 @@ Workflow:
 4. Logs are found in ~/ginto.ai/../storage/logs/
 5. Always prioritize security in your design to avoid vulnerabilites
 
+# FORM SECURITY GUIDELINES
+# When creating or modifying forms:
+# 1. ALWAYS sanitize ALL user inputs on the server side:
+#    - Use strip_tags() for text fields (names, descriptions)
+#    - Use preg_replace('/[^a-zA-Z0-9_\-]/', '', $input) for usernames/identifiers
+#    - Use FILTER_SANITIZE_EMAIL for email fields
+#    - Use (int) or (float) casting for numeric inputs
+# 2. ALWAYS escape output in views to prevent XSS:
+#    - Use htmlspecialchars($var, ENT_QUOTES, 'UTF-8') or an esc() helper function
+#    - In JavaScript, escape dynamic content before inserting into DOM
+# 3. ALWAYS use CSRF tokens for state-changing operations (POST, PUT, DELETE)
+# 4. ALWAYS validate data types and ranges server-side (don't trust client validation)
+# 5. Use prepared statements / Medoo's parameterized queries - NEVER concatenate SQL
+# 6. For file uploads: validate MIME type, extension, and scan content; store outside webroot
+
 Example:
+
 
   On host - after making changes:
     git add . && git commit -m "your message" && git push
