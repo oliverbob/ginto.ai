@@ -6,8 +6,14 @@
 ?>
 <script>
 (function() {
-  // Get CSRF token for POST requests
-  const getCsrfToken = () => window.GINTO_AUTH?.csrfToken || window.CSRF_TOKEN || '';
+  // Get CSRF token for POST requests - wait for auth promise if needed
+  async function getCsrfToken() {
+    // Wait for auth to be ready if promise exists
+    if (window.GINTO_AUTH_PROMISE) {
+      await window.GINTO_AUTH_PROMISE;
+    }
+    return window.GINTO_AUTH?.csrfToken || window.CSRF_TOKEN || '';
+  }
   
   const openWebuiLink = document.getElementById('open-webui-link');
   const openWebuiLabel = document.getElementById('open-webui-label');
@@ -102,9 +108,10 @@
       showToast('Installing OpenWebUI... This may take 5-10 minutes.', 'info', 10000);
       
       try {
+        const csrfToken = await getCsrfToken();
         const res = await fetch('/api/sandbox/openwebui/install', {
           method: 'POST',
-          headers: { 'X-CSRF-Token': getCsrfToken() }
+          headers: { 'X-CSRF-Token': csrfToken }
         });
         const data = await res.json();
         
@@ -139,9 +146,10 @@
     showToast('Starting OpenWebUI...', 'info');
     
     try {
+      const csrfToken = await getCsrfToken();
       const res = await fetch('/api/sandbox/openwebui/start', {
         method: 'POST',
-        headers: { 'X-CSRF-Token': getCsrfToken() }
+        headers: { 'X-CSRF-Token': csrfToken }
       });
       const data = await res.json();
       
