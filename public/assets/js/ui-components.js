@@ -396,7 +396,10 @@ const GintoUI = {
         });
 
         input.addEventListener('focus', () => {
-            if (input.value.length >= config.minChars && currentItems.length) {
+            // Show initial items on focus (up to 10)
+            if (config.data && config.data.length > 0 && !isOpen) {
+                renderItems(config.data.slice(0, 10));
+            } else if (input.value.length >= config.minChars && currentItems.length) {
                 showDropdown();
             }
         });

@@ -764,18 +764,23 @@ class HostingController
                 // Extract sandbox ID: "ginto-sandbox" -> "" or "ginto-sandbox-abc123" -> "abc123"
                 $sandboxId = (strlen($name) > 13 && $name[13] === '-') 
                     ? substr($name, 14) 
-                    : ($name === 'ginto-sandbox' ? 'ginto-sandbox' : '');
+                    : '';
+                
                 if ($sandboxId) {
                     try {
-                        $user = $this->db->get('users', ['username', 'fullname'], [
-                            'OR' => [
-                                'sandbox_id' => $sandboxId,
-                                'lxc_sandbox_id' => $sandboxId
-                            ]
-                        ]);
-                        if ($user) {
-                            $ownerUsername = $user['username'];
-                            $ownerFullname = $user['fullname'];
+                        // Look up in client_sandboxes table and join to users
+                        $result = $this->db->query(
+                            "SELECT u.username, u.fullname 
+                             FROM client_sandboxes cs 
+                             JOIN users u ON (cs.user_id = u.id OR cs.public_id = u.public_id)
+                             WHERE cs.sandbox_id = :sandbox_id 
+                             LIMIT 1",
+                            [':sandbox_id' => $sandboxId]
+                        )->fetch(\PDO::FETCH_ASSOC);
+                        
+                        if ($result) {
+                            $ownerUsername = $result['username'];
+                            $ownerFullname = $result['fullname'];
                         }
                     } catch (\Exception $e) {
                         // Ignore
