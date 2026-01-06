@@ -361,15 +361,15 @@
     
     console.log('[Console Tab] sandboxId:', sandboxId, 'isAdmin:', isAdmin, 'GINTO_AUTH:', window.GINTO_AUTH);
     
-    if (sandboxId) {
-      // Connect to user's sandbox container
+    if (isAdmin) {
+      // Admin gets host (OS) terminal by default
+      wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=os&cols=${cols}&rows=${rows}`;
+      connectionMessage = '\r\n\x1b[32m*** Connected to host terminal (admin) ***\x1b[0m\r\n\r\n';
+    } else if (sandboxId) {
+      // Non-admin users with sandbox get sandbox terminal
       const containerName = 'ginto-sandbox-' + sandboxId;
       wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=sandbox&container=${encodeURIComponent(containerName)}&cols=${cols}&rows=${rows}`;
       connectionMessage = '\r\n\x1b[32m*** Connected to your sandbox terminal ***\x1b[0m\r\n\r\n';
-    } else if (isAdmin) {
-      // Admin can access host terminal
-      wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=os&cols=${cols}&rows=${rows}`;
-      connectionMessage = '\r\n\x1b[32m*** Connected to host terminal (admin) ***\x1b[0m\r\n\r\n';
     } else {
       // No sandbox and not admin - show error
       updateConsoleTabStatus('No Sandbox', 'bg-yellow-600 text-yellow-100');
