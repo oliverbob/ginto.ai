@@ -79,17 +79,18 @@ $currentPage = 'domains';
             class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
         </div>
 
-        <!-- Owner Information -->
+        <!-- Owner Information (searchable dropdowns) -->
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">Owner Username</label>
-            <input type="text" name="owner_username" placeholder="username"
+            <input type="text" name="owner_username" id="owner-username" placeholder="Search username..." list="owner-username-list"
               class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <datalist id="owner-username-list"></datalist>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Owner Full Name</label>
-            <input type="text" name="owner_fullname" placeholder="John Doe"
-              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <input type="text" name="owner_fullname" id="owner-fullname" placeholder="Auto-filled from username" readonly
+              class="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-600 text-gray-500">
           </div>
         </div>
 
@@ -123,7 +124,7 @@ $currentPage = 'domains';
         <!-- LXC Container Options -->
         <div id="lxc-options" class="hidden">
           <label class="block text-sm font-medium mb-1">Select LXC Container</label>
-          <select name="lxc_container" id="lxc-container-select"
+          <select name="lxc_container" id="lxc-container-select" onchange="onLxcContainerSelect()"
             class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
             <option value="">Loading containers...</option>
           </select>
@@ -178,24 +179,34 @@ $currentPage = 'domains';
         const res = await fetch('/admin/hosting/domains/containers');
         containerData = await res.json();
         
-        // Populate LXC dropdown
+        // Populate LXC dropdown with owner info
         const lxcSelect = document.getElementById('lxc-container-select');
         if (containerData.lxc_containers?.length) {
-          lxcSelect.innerHTML = containerData.lxc_containers.map(c => 
-            `<option value="${c.ip}">${c.name} (${c.ip})</option>`
-          ).join('');
+          lxcSelect.innerHTML = '<option value="">-- Select Container --</option>' + containerData.lxc_containers.map(c => {
+            const ownerInfo = c.owner_username ? ` [${c.owner_username}]` : '';
+            const statusIcon = c.status === 'running' ? '🟢' : '⚪';
+            return `<option value="${c.ip || ''}" data-name="${c.name}" data-owner="${c.owner_username || ''}" data-fullname="${c.owner_fullname || ''}" data-status="${c.status}">${statusIcon} ${c.name}${ownerInfo} ${c.ip ? '(' + c.ip + ')' : '(no IP)'}</option>`;
+          }).join('');
         } else {
-          lxcSelect.innerHTML = '<option value="">No running LXC containers</option>';
+          lxcSelect.innerHTML = '<option value="">No LXC containers found</option>';
         }
         
         // Populate Docker dropdown
         const dockerSelect = document.getElementById('docker-container-select');
         if (containerData.docker_containers?.length) {
-          dockerSelect.innerHTML = containerData.docker_containers.map(c => 
+          dockerSelect.innerHTML = '<option value="">-- Select Container --</option>' + containerData.docker_containers.map(c => 
             `<option value="127.0.0.1:${c.port}" data-name="${c.name}">${c.name} (port ${c.port || 'N/A'})</option>`
           ).join('');
         } else {
           dockerSelect.innerHTML = '<option value="">No running Docker containers</option>';
+        }
+        
+        // Populate owner username datalist
+        const ownerDatalist = document.getElementById('owner-username-list');
+        if (containerData.users_with_sandboxes?.length) {
+          ownerDatalist.innerHTML = containerData.users_with_sandboxes.map(u => 
+            `<option value="${u.username}" data-fullname="${u.name || ''}">${u.username} - ${u.name || 'No name'}</option>`
+          ).join('');
         }
         
         // Hide unavailable options
@@ -211,6 +222,25 @@ $currentPage = 'domains';
         console.error('Failed to load containers:', e);
       }
     }
+
+    // Auto-fill owner when selecting LXC container
+    function onLxcContainerSelect() {
+      const select = document.getElementById('lxc-container-select');
+      const option = select.options[select.selectedIndex];
+      if (option && option.dataset.owner) {
+        document.getElementById('owner-username').value = option.dataset.owner;
+        document.getElementById('owner-fullname').value = option.dataset.fullname || '';
+      }
+    }
+
+    // Auto-fill fullname when typing username
+    document.getElementById('owner-username').addEventListener('input', function() {
+      const username = this.value;
+      const user = containerData.users_with_sandboxes?.find(u => u.username === username);
+      if (user) {
+        document.getElementById('owner-fullname').value = user.name || '';
+      }
+    });
 
     function toggleProxyOptions() {
       const type = document.getElementById('proxy-type').value;

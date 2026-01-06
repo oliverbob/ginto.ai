@@ -194,13 +194,23 @@ class HostingController
 
         $lxcContainers = $this->isLxdInstalled() ? $this->getAvailableLxcContainers() : [];
         $dockerContainers = $this->isDockerInstalled() ? $this->getAvailableDockerContainers() : [];
+        
+        // Get users who have sandboxes for the owner dropdown
+        $usersWithSandboxes = [];
+        try {
+            $stmt = $this->db->query("SELECT id, username, name, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
+            $usersWithSandboxes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            // Ignore
+        }
 
         echo json_encode([
             'success' => true,
             'lxd_installed' => $this->isLxdInstalled(),
             'docker_installed' => $this->isDockerInstalled(),
             'lxc_containers' => $lxcContainers,
-            'docker_containers' => $dockerContainers
+            'docker_containers' => $dockerContainers,
+            'users_with_sandboxes' => $usersWithSandboxes
         ]);
         exit;
     }
@@ -673,31 +683,84 @@ class HostingController
     private function getAvailableLxcContainers(): array
     {
         $containers = [];
-        $output = [];
-        exec("lxc list --format csv -c ns4 2>/dev/null", $output, $code);
+        $socket = '/var/snap/lxd/common/lxd/unix.socket';
         
-        if ($code === 0) {
-            foreach ($output as $line) {
-                $parts = str_getcsv($line);
-                if (count($parts) >= 3) {
-                    $name = trim($parts[0]);
-                    $status = strtolower(trim($parts[1]));
-                    $ipv4 = trim($parts[2] ?? '');
-                    
-                    // Extract just the IP
-                    if (preg_match('/^([\d.]+)/', $ipv4, $m)) {
-                        $ipv4 = $m[1];
-                    }
-                    
-                    if ($status === 'running' && $ipv4) {
-                        $containers[] = [
-                            'name' => $name,
-                            'ip' => $ipv4,
-                            'status' => $status
-                        ];
+        if (!file_exists($socket)) {
+            return [];
+        }
+        
+        // Get list of instances via LXD API
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_UNIX_SOCKET_PATH, $socket);
+        curl_setopt($ch, CURLOPT_URL, 'http://localhost/1.0/instances');
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        $result = curl_exec($ch);
+        curl_close($ch);
+        
+        if (!$result) {
+            return [];
+        }
+        
+        $data = json_decode($result, true);
+        if (!isset($data['metadata']) || !is_array($data['metadata'])) {
+            return [];
+        }
+        
+        // Get each container's state to get IP
+        foreach ($data['metadata'] as $instancePath) {
+            $name = basename($instancePath);
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_UNIX_SOCKET_PATH, $socket);
+            curl_setopt($ch, CURLOPT_URL, "http://localhost/1.0/instances/{$name}/state");
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+            $stateResult = curl_exec($ch);
+            curl_close($ch);
+            
+            if (!$stateResult) continue;
+            
+            $stateData = json_decode($stateResult, true);
+            $status = strtolower($stateData['metadata']['status'] ?? 'unknown');
+            
+            // Get IPv4 address from eth0
+            $ipv4 = null;
+            $network = $stateData['metadata']['network']['eth0'] ?? null;
+            if ($network && isset($network['addresses'])) {
+                foreach ($network['addresses'] as $addr) {
+                    if ($addr['family'] === 'inet' && $addr['scope'] === 'global') {
+                        $ipv4 = $addr['address'];
+                        break;
                     }
                 }
             }
+            
+            // Get owner info from database if this is a sandbox
+            $ownerUsername = null;
+            $ownerFullname = null;
+            if (strpos($name, 'ginto-sandbox-') === 0) {
+                $sandboxId = substr($name, strlen('ginto-sandbox-'));
+                try {
+                    $stmt = $this->db->prepare("SELECT u.username, u.name FROM users u WHERE u.sandbox_id = ? OR u.lxc_sandbox_id = ?");
+                    $stmt->execute([$sandboxId, $sandboxId]);
+                    $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+                    if ($user) {
+                        $ownerUsername = $user['username'];
+                        $ownerFullname = $user['name'];
+                    }
+                } catch (\PDOException $e) {
+                    // Ignore
+                }
+            }
+            
+            $containers[] = [
+                'name' => $name,
+                'ip' => $ipv4,
+                'status' => $status,
+                'owner_username' => $ownerUsername,
+                'owner_fullname' => $ownerFullname
+            ];
         }
         
         return $containers;
@@ -742,8 +805,8 @@ class HostingController
      */
     private function isDockerInstalled(): bool
     {
-        exec("which docker 2>/dev/null", $output, $code);
-        return $code === 0;
+        // Check for docker socket or command
+        return file_exists('/var/run/docker.sock') || is_executable('/usr/bin/docker');
     }
 
     /**
@@ -751,8 +814,8 @@ class HostingController
      */
     private function isLxdInstalled(): bool
     {
-        exec("which lxc 2>/dev/null", $output, $code);
-        return $code === 0;
+        // Check for LXD Unix socket
+        return file_exists('/var/snap/lxd/common/lxd/unix.socket');
     }
 
     private function createDomain(array $input): array

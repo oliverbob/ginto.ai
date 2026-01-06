@@ -243,6 +243,7 @@ $title = 'Network Dashboard';
                             <thead class="bg-gray-100 dark:bg-gray-700">
                                 <tr class="text-xs uppercase text-gray-500 dark:text-gray-400">
                                     <th class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">Container</th>
+                                    <th class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">Owner</th>
                                     <th class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">Status</th>
                                     <th class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap">IP</th>
                                     <th class="px-3 sm:px-4 py-2 sm:py-3 whitespace-nowrap hidden md:table-cell">CPU</th>
@@ -252,14 +253,36 @@ $title = 'Network Dashboard';
                                 </tr>
                             </thead>
                             <tbody id="containers-tbody" class="divide-y divide-gray-200 dark:divide-gray-800">
-                                <?php foreach (($containers ?? []) as $c): ?>
-                                <tr class="hover:bg-gray-100 dark:hover:bg-[#151f2e]" data-container="<?= htmlspecialchars($c['name']) ?>">
+                                <?php foreach (($containers ?? []) as $c): 
+                                    // Get owner info from database
+                                    $ownerInfo = null;
+                                    if (!empty($c['user_id'])) {
+                                        try {
+                                            $stmt = $db->prepare("SELECT username, name FROM users WHERE sandbox_id = ? OR lxc_sandbox_id = ? LIMIT 1");
+                                            $stmt->execute([$c['user_id'], $c['user_id']]);
+                                            $ownerInfo = $stmt->fetch(\PDO::FETCH_ASSOC);
+                                        } catch (\Exception $e) {}
+                                    }
+                                ?>
+                                <tr class="hover:bg-gray-100 dark:hover:bg-[#151f2e]" data-container="<?= htmlspecialchars($c['name']) ?>" data-ip="<?= htmlspecialchars($c['ip'] ?? '') ?>">
                                     <td class="px-3 sm:px-4 py-2 sm:py-3">
                                         <a href="/admin/network/<?= htmlspecialchars($c['name']) ?>" class="font-mono text-violet-600 dark:text-violet-400 hover:underline text-xs sm:text-sm">
                                             <?= htmlspecialchars($c['name']) ?>
                                         </a>
                                         <?php if (isset($c['name']) && is_string($c['name']) && str_starts_with($c['name'], 'sandbox-')): ?>
                                         <span class="ml-1 sm:ml-2 text-xs bg-violet-100 text-violet-700 px-1.5 sm:px-2 py-0.5 rounded hidden sm:inline">sandbox</span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td class="px-3 sm:px-4 py-2 sm:py-3">
+                                        <?php if ($ownerInfo): ?>
+                                        <div class="text-xs">
+                                            <span class="font-medium text-gray-900 dark:text-white"><?= htmlspecialchars($ownerInfo['username'] ?? '') ?></span>
+                                            <?php if (!empty($ownerInfo['name'])): ?>
+                                            <br><span class="text-gray-500"><?= htmlspecialchars($ownerInfo['name']) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <?php else: ?>
+                                        <span class="text-gray-400">—</span>
                                         <?php endif; ?>
                                     </td>
                                     <td class="px-3 sm:px-4 py-2 sm:py-3">
@@ -341,6 +364,13 @@ $title = 'Network Dashboard';
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                 </svg>
                                             </a>
+                                            <?php if (!empty($c['ip'])): ?>
+                                            <button onclick="openAssignDomainModal('<?= htmlspecialchars($c['name']) ?>', '<?= htmlspecialchars($c['ip'] ?? '') ?>', '<?= htmlspecialchars($ownerInfo['username'] ?? '') ?>', '<?= htmlspecialchars($ownerInfo['name'] ?? '') ?>')" class="p-1.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 rounded" title="Assign Domain">
+                                                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                                                </svg>
+                                            </button>
+                                            <?php endif; ?>
                                             <form method="post" action="/admin/network/<?= htmlspecialchars($c['name']) ?>/delete" class="inline" onsubmit="return handleDeleteContainer(event, '<?= htmlspecialchars($c['name']) ?>');">
                                                 <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
                                                 <button type="submit" class="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded" title="Delete">
@@ -355,7 +385,7 @@ $title = 'Network Dashboard';
                                 <?php endforeach; ?>
                                 <?php if (empty($containers)): ?>
                                 <tr>
-                                    <td colspan="7" class="px-3 sm:px-4 py-6 sm:py-8 text-center text-gray-500 text-sm">
+                                    <td colspan="8" class="px-3 sm:px-4 py-6 sm:py-8 text-center text-gray-500 text-sm">
                                         No LXD containers found. Create one to get started.
                                     </td>
                                 </tr>
@@ -723,6 +753,7 @@ $title = 'Network Dashboard';
             if (e.key === 'Escape') {
                 closeCreateModal();
                 closeExecModal();
+                closeAssignDomainModal();
             }
         });
 
@@ -733,7 +764,98 @@ $title = 'Network Dashboard';
         document.getElementById('exec-modal').addEventListener('click', (e) => {
             if (e.target === e.currentTarget) closeExecModal();
         });
+        document.getElementById('assign-domain-modal').addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeAssignDomainModal();
+        });
+
+        // Assign Domain Modal Functions
+        function openAssignDomainModal(containerName, containerIp, ownerUsername, ownerFullname) {
+            document.getElementById('assign-container-name').value = containerName;
+            document.getElementById('assign-container-ip').value = containerIp;
+            document.getElementById('assign-owner-username').value = ownerUsername || '';
+            document.getElementById('assign-owner-fullname').value = ownerFullname || '';
+            document.getElementById('assign-container-display').textContent = containerName + ' (' + containerIp + ')';
+            document.getElementById('assign-domain-modal').classList.remove('hidden');
+            document.getElementById('assign-domain-modal').classList.add('flex');
+            document.getElementById('assign-domain-name').focus();
+        }
+
+        function closeAssignDomainModal() {
+            document.getElementById('assign-domain-modal').classList.add('hidden');
+            document.getElementById('assign-domain-modal').classList.remove('flex');
+        }
+
+        document.getElementById('assign-domain-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const form = new FormData(e.target);
+            const domain = form.get('domain');
+            const containerIp = form.get('container_ip');
+            const port = form.get('port') || '80';
+            
+            try {
+                const response = await fetch('/admin/hosting/domains/api', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        domain: domain,
+                        proxy_type: 'lxc',
+                        proxy_target: containerIp + ':' + port,
+                        proxy_container_name: form.get('container_name'),
+                        owner_username: form.get('owner_username'),
+                        owner_fullname: form.get('owner_fullname'),
+                        ssl: true,
+                        csrf_token: form.get('csrf_token')
+                    })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showNotification(`Domain ${domain} assigned successfully!`, 'success');
+                    closeAssignDomainModal();
+                    e.target.reset();
+                } else {
+                    showNotification('Error: ' + (data.error || 'Failed to assign domain'), 'error');
+                }
+            } catch (err) {
+                showNotification('Error: ' + err.message, 'error');
+            }
+        });
     </script>
+
+    <!-- Assign Domain Modal -->
+    <div id="assign-domain-modal" class="fixed inset-0 hidden items-center justify-center z-50 p-3 sm:p-4" style="background: rgba(0,0,0,0.75);">
+        <div style="background: #1f2937; border: 1px solid #374151; border-radius: 8px; max-width: 28rem; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);">
+            <div class="p-4 sm:p-6">
+                <h3 style="font-size: 1.125rem; font-weight: 600; color: #fff; margin-bottom: 0.5rem;">Assign Domain to Container</h3>
+                <p id="assign-container-display" class="text-sm text-gray-400 mb-4"></p>
+                <form id="assign-domain-form">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token ?? '') ?>">
+                    <input type="hidden" name="container_name" id="assign-container-name">
+                    <input type="hidden" name="container_ip" id="assign-container-ip">
+                    <input type="hidden" name="owner_username" id="assign-owner-username">
+                    <input type="hidden" name="owner_fullname" id="assign-owner-fullname">
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-size: 0.875rem; color: #9ca3af; margin-bottom: 0.375rem;">Domain Name</label>
+                        <input type="text" name="domain" id="assign-domain-name" required placeholder="example.com"
+                            style="width: 100%; padding: 0.5rem 0.75rem; background: #111827; border: 1px solid #374151; border-radius: 6px; color: #fff; font-size: 0.875rem;">
+                    </div>
+                    
+                    <div style="margin-bottom: 1rem;">
+                        <label style="display: block; font-size: 0.875rem; color: #9ca3af; margin-bottom: 0.375rem;">Container Port</label>
+                        <input type="number" name="port" value="80" placeholder="80"
+                            style="width: 100%; padding: 0.5rem 0.75rem; background: #111827; border: 1px solid #374151; border-radius: 6px; color: #fff; font-size: 0.875rem;">
+                    </div>
+                    
+                    <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+                        <button type="button" onclick="closeAssignDomainModal()"
+                            style="padding: 0.5rem 1rem; background: #374151; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; cursor: pointer;">Cancel</button>
+                        <button type="submit"
+                            style="padding: 0.5rem 1rem; background: #10b981; color: #fff; border: none; border-radius: 6px; font-size: 0.875rem; cursor: pointer;">Assign Domain</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
     <?php include __DIR__ . '/../parts/confirm-modal.php'; ?>
 </body>
