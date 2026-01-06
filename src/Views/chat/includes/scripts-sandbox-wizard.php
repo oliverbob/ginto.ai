@@ -250,6 +250,15 @@
   
   function openSandboxAfterInstall() {
     closeSandboxWizard();
+    
+    // Check if we have a pending OpenWebUI install
+    if (window.pendingOpenWebuiInstall) {
+      window.pendingOpenWebuiInstall = false;
+      // Post message to trigger OpenWebUI install
+      window.postMessage({ type: 'sandbox_created', id: window.installedSandboxId }, '*');
+      return;
+    }
+    
     const sandboxId = window.installedSandboxId || (sandboxIdDisplay?.textContent || '').trim();
     let editorUrl = '/editor';
     if (sandboxId && sandboxId !== 'unavailable' && sandboxId !== 'default') {
