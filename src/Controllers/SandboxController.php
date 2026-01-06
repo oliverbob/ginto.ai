@@ -991,4 +991,267 @@ class SandboxController
         }
         exit;
     }
+    
+    /**
+     * Check if OpenWebUI is installed in user's sandbox
+     */
+    public function openwebuiStatus(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            // Get user's sandbox ID
+            $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
+            
+            if (!$sandboxId) {
+                echo json_encode([
+                    'success' => true,
+                    'installed' => false,
+                    'sandbox_exists' => false,
+                    'message' => 'No sandbox installed'
+                ]);
+                exit;
+            }
+            
+            // Check if sandbox exists and is running
+            if (!\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+                echo json_encode([
+                    'success' => true,
+                    'installed' => false,
+                    'sandbox_exists' => false,
+                    'message' => 'Sandbox does not exist'
+                ]);
+                exit;
+            }
+            
+            // Check if OpenWebUI directory exists
+            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                $sandboxId,
+                'test -d /root/open-webui && test -f /root/open-webui/backend/requirements.txt && echo "installed"',
+                '/root',
+                10
+            );
+            
+            $installed = trim($output) === 'installed';
+            
+            // Check if OpenWebUI is running (port 3000)
+            $running = false;
+            if ($installed) {
+                [$code2, $output2, $err2] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                    $sandboxId,
+                    'pgrep -f "open-webui" > /dev/null && echo "running"',
+                    '/root',
+                    5
+                );
+                $running = trim($output2) === 'running';
+            }
+            
+            echo json_encode([
+                'success' => true,
+                'installed' => $installed,
+                'running' => $running,
+                'sandbox_exists' => true,
+                'sandbox_id' => $sandboxId
+            ]);
+            
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    /**
+     * Install OpenWebUI in user's sandbox
+     */
+    public function openwebuiInstall(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            // Get user's sandbox ID
+            $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
+            
+            if (!$sandboxId) {
+                echo json_encode(['success' => false, 'error' => 'No sandbox installed. Please create a sandbox first.']);
+                exit;
+            }
+            
+            if (!\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+                echo json_encode(['success' => false, 'error' => 'Sandbox does not exist']);
+                exit;
+            }
+            
+            // Ensure sandbox is running
+            if (!\Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId)) {
+                \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
+                sleep(3);
+            }
+            
+            // Install OpenWebUI dependencies and clone repo
+            $installScript = <<<'BASH'
+#!/bin/sh
+set -e
+
+# Install Python dependencies
+apk add --no-cache python3 py3-pip py3-virtualenv git nodejs npm
+
+# Clone OpenWebUI if not exists
+if [ ! -d /root/open-webui ]; then
+    cd /root
+    git clone https://github.com/open-webui/open-webui.git --depth 1
+fi
+
+cd /root/open-webui
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install backend dependencies
+cd backend
+pip install --no-cache-dir -r requirements.txt -q
+
+# Build frontend
+cd /root/open-webui
+npm install
+npm run build
+
+# Create startup script
+cat > /root/start-openwebui.sh << 'EOF'
+#!/bin/sh
+cd /root/open-webui/backend
+source ../venv/bin/activate
+export DATA_DIR=/root/open-webui/data
+mkdir -p $DATA_DIR
+exec python -m open_webui --port 3000 --host 0.0.0.0
+EOF
+chmod +x /root/start-openwebui.sh
+
+# Update Caddy to forward port 80 to 3000
+cat > /etc/caddy/Caddyfile << 'EOF'
+:80 {
+    reverse_proxy localhost:3000
 }
+EOF
+
+# Restart Caddy
+rc-service caddy restart 2>/dev/null || true
+
+echo "OPENWEBUI_INSTALLED"
+BASH;
+            
+            // Execute installation (longer timeout for npm install)
+            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                $sandboxId,
+                $installScript,
+                '/root',
+                600 // 10 minute timeout
+            );
+            
+            if (strpos($output, 'OPENWEBUI_INSTALLED') !== false) {
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'OpenWebUI installed successfully',
+                    'output' => $output
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Installation may have failed',
+                    'output' => $output,
+                    'exit_code' => $code
+                ]);
+            }
+            
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    /**
+     * Start OpenWebUI in user's sandbox
+     */
+    public function openwebuiStart(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
+            
+            if (!$sandboxId) {
+                echo json_encode(['success' => false, 'error' => 'No sandbox installed']);
+                exit;
+            }
+            
+            // Ensure sandbox is running
+            if (!\Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId)) {
+                \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
+                sleep(2);
+            }
+            
+            // Start OpenWebUI in background
+            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                $sandboxId,
+                'nohup /root/start-openwebui.sh > /root/openwebui.log 2>&1 & sleep 2 && pgrep -f "open_webui" && echo "STARTED"',
+                '/root',
+                30
+            );
+            
+            if (strpos($output, 'STARTED') !== false) {
+                // Get container IP for redirect URL
+                $containerIp = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
+                
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'OpenWebUI started',
+                    'url' => '/clients/' . $sandboxId . '/'
+                ]);
+            } else {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Failed to start OpenWebUI',
+                    'output' => $output
+                ]);
+            }
+            
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+    
+    /**
+     * Stop OpenWebUI in user's sandbox
+     */
+    public function openwebuiStop(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
+            
+            if (!$sandboxId) {
+                echo json_encode(['success' => false, 'error' => 'No sandbox installed']);
+                exit;
+            }
+            
+            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                $sandboxId,
+                'pkill -f "open_webui" 2>/dev/null; echo "STOPPED"',
+                '/root',
+                10
+            );
+            
+            echo json_encode([
+                'success' => true,
+                'message' => 'OpenWebUI stopped'
+            ]);
+            
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+}
+

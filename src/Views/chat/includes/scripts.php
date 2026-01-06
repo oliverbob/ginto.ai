@@ -312,5 +312,6 @@
 <?php include __DIR__ . '/scripts-prompts.php'; ?>
 <?php include __DIR__ . '/scripts-transaction-modal.php'; ?>
 <?php include __DIR__ . '/scripts-model-selector.php'; ?>
+<?php include __DIR__ . '/scripts-openwebui.php'; ?>
 
 <script src="/assets/js/chat.js?v=<?= time() ?>"></script>

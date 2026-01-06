@@ -93,6 +93,12 @@ $router->req('/api/sandbox/call', 'SandboxController@call', ['POST']);
 $router->req('/api/sandbox/vnc', 'SandboxController@vnc', ['POST']);
 $router->req('/api/sandbox/destroy', 'SandboxController@destroy', ['POST']);
 
+// OpenWebUI API routes
+$router->req('/api/sandbox/openwebui/status', 'SandboxController@openwebuiStatus');
+$router->req('/api/sandbox/openwebui/install', 'SandboxController@openwebuiInstall', ['POST']);
+$router->req('/api/sandbox/openwebui/start', 'SandboxController@openwebuiStart', ['POST']);
+$router->req('/api/sandbox/openwebui/stop', 'SandboxController@openwebuiStop', ['POST']);
+
 // LXC binary path helper
 function getLxcBin(): ?string {
     static $lxcBin = null;

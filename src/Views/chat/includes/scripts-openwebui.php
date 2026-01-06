@@ -1,0 +1,171 @@
+<?php
+/**
+ * OpenWebUI Integration Scripts
+ * Handles checking status, installing, and launching OpenWebUI in user's sandbox
+ */
+?>
+<script>
+(function() {
+  const openWebuiLink = document.getElementById('open-webui-link');
+  const openWebuiLabel = document.getElementById('open-webui-label');
+  const openWebuiStatus = document.getElementById('open-webui-status');
+  
+  if (!openWebuiLink) return;
+  
+  let openWebuiInstalled = false;
+  let openWebuiRunning = false;
+  let sandboxExists = false;
+  let isInstalling = false;
+  
+  // Check OpenWebUI status on page load
+  async function checkOpenWebuiStatus() {
+    try {
+      const res = await fetch('/api/sandbox/openwebui/status');
+      const data = await res.json();
+      
+      if (data.success) {
+        sandboxExists = data.sandbox_exists;
+        openWebuiInstalled = data.installed;
+        openWebuiRunning = data.running;
+        updateOpenWebuiUI();
+      }
+    } catch (e) {
+      console.error('Failed to check OpenWebUI status:', e);
+    }
+  }
+  
+  function updateOpenWebuiUI() {
+    if (isInstalling) {
+      openWebuiLabel.textContent = 'Installing...';
+      openWebuiStatus.classList.remove('hidden');
+      openWebuiStatus.querySelector('span').className = 'w-2 h-2 rounded-full bg-yellow-400 inline-block animate-pulse';
+      openWebuiStatus.querySelector('span').title = 'Installing OpenWebUI...';
+      return;
+    }
+    
+    if (!sandboxExists) {
+      openWebuiLabel.textContent = 'Install OpenWebUI';
+      openWebuiStatus.classList.add('hidden');
+    } else if (!openWebuiInstalled) {
+      openWebuiLabel.textContent = 'Install OpenWebUI';
+      openWebuiStatus.classList.remove('hidden');
+      openWebuiStatus.querySelector('span').className = 'w-2 h-2 rounded-full bg-gray-400 inline-block';
+      openWebuiStatus.querySelector('span').title = 'Not installed';
+    } else if (openWebuiRunning) {
+      openWebuiLabel.textContent = 'OpenWebUI';
+      openWebuiStatus.classList.remove('hidden');
+      openWebuiStatus.querySelector('span').className = 'w-2 h-2 rounded-full bg-green-400 inline-block';
+      openWebuiStatus.querySelector('span').title = 'Running';
+    } else {
+      openWebuiLabel.textContent = 'Start OpenWebUI';
+      openWebuiStatus.classList.remove('hidden');
+      openWebuiStatus.querySelector('span').className = 'w-2 h-2 rounded-full bg-amber-400 inline-block';
+      openWebuiStatus.querySelector('span').title = 'Installed but not running';
+    }
+  }
+  
+  // Handle click on OpenWebUI link
+  openWebuiLink.addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    if (isInstalling) {
+      showToast('Installation in progress, please wait...', 'info');
+      return;
+    }
+    
+    if (!sandboxExists) {
+      // Show sandbox wizard to create sandbox first
+      showToast('Please create a sandbox first using "My Files"', 'info');
+      document.getElementById('open-my-files')?.click();
+      return;
+    }
+    
+    if (!openWebuiInstalled) {
+      // Install OpenWebUI
+      if (!confirm('Install OpenWebUI in your sandbox? This may take several minutes.')) {
+        return;
+      }
+      
+      isInstalling = true;
+      updateOpenWebuiUI();
+      showToast('Installing OpenWebUI... This may take 5-10 minutes.', 'info', 10000);
+      
+      try {
+        const res = await fetch('/api/sandbox/openwebui/install', { method: 'POST' });
+        const data = await res.json();
+        
+        if (data.success) {
+          openWebuiInstalled = true;
+          showToast('OpenWebUI installed successfully!', 'success');
+          // Start it after install
+          await startOpenWebUI();
+        } else {
+          showToast('Installation failed: ' + (data.error || 'Unknown error'), 'error');
+        }
+      } catch (e) {
+        showToast('Installation failed: ' + e.message, 'error');
+      } finally {
+        isInstalling = false;
+        await checkOpenWebuiStatus();
+      }
+      return;
+    }
+    
+    if (!openWebuiRunning) {
+      // Start OpenWebUI
+      await startOpenWebUI();
+      return;
+    }
+    
+    // OpenWebUI is running - open it in new tab
+    openOpenWebUI();
+  });
+  
+  async function startOpenWebUI() {
+    showToast('Starting OpenWebUI...', 'info');
+    
+    try {
+      const res = await fetch('/api/sandbox/openwebui/start', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.success) {
+        openWebuiRunning = true;
+        updateOpenWebuiUI();
+        showToast('OpenWebUI started!', 'success');
+        
+        // Wait a moment for it to fully start, then open
+        setTimeout(() => {
+          openOpenWebUI();
+        }, 2000);
+      } else {
+        showToast('Failed to start: ' + (data.error || 'Unknown error'), 'error');
+      }
+    } catch (e) {
+      showToast('Failed to start: ' + e.message, 'error');
+    }
+  }
+  
+  function openOpenWebUI() {
+    // Open in user's sandbox via clients proxy
+    // The sandbox Caddy is configured to forward port 80 to 3000
+    fetch('/api/sandbox/status')
+      .then(r => r.json())
+      .then(data => {
+        if (data.sandbox_id) {
+          window.open('/clients/' + data.sandbox_id + '/', '_blank');
+        } else {
+          showToast('Could not determine sandbox URL', 'error');
+        }
+      })
+      .catch(e => {
+        showToast('Failed to get sandbox info: ' + e.message, 'error');
+      });
+  }
+  
+  // Check status on page load
+  setTimeout(checkOpenWebuiStatus, 1000);
+  
+  // Re-check periodically (every 30 seconds)
+  setInterval(checkOpenWebuiStatus, 30000);
+})();
+</script>
