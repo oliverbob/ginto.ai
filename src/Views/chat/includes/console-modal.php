@@ -283,7 +283,27 @@ if (empty($isAdmin)) return;
     const host = window.location.hostname || '127.0.0.1';
     const cols = tab.term.cols;
     const rows = tab.term.rows;
-    const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + host + '/terminal/terminal?mode=os&cols=' + cols + '&rows=' + rows + '&session=' + encodeURIComponent(tab.sessionId);
+    const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    
+    // Check if user has a sandbox - connect to sandbox terminal, otherwise host terminal (admin only)
+    const isAdmin = window.GINTO_AUTH?.isAdmin || false;
+    const sandboxId = window.GINTO_AUTH?.sandbox?.id || null;
+    
+    let wsUrl;
+    
+    if (sandboxId) {
+      // Connect to user's sandbox container
+      const containerName = 'ginto-sandbox-' + sandboxId;
+      wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=sandbox&container=${encodeURIComponent(containerName)}&cols=${cols}&rows=${rows}&session=${encodeURIComponent(tab.sessionId)}`;
+    } else if (isAdmin) {
+      // Admin can access host terminal
+      wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=os&cols=${cols}&rows=${rows}&session=${encodeURIComponent(tab.sessionId)}`;
+    } else {
+      // No sandbox - show error in terminal
+      tab.term.write('\r\n\x1b[33m*** No sandbox available. Please create one first. ***\x1b[0m\r\n');
+      updateStatus('No Sandbox', 'bg-yellow-600 text-yellow-100');
+      return;
+    }
     
     tab.ws = new WebSocket(wsUrl);
     tab.ws.binaryType = 'arraybuffer';
