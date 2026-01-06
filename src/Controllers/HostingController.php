@@ -198,7 +198,7 @@ class HostingController
         // Get users who have sandboxes for the owner dropdown
         $usersWithSandboxes = [];
         try {
-            $stmt = $this->db->query("SELECT id, username, name, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
+            $stmt = $this->db->query("SELECT id, username, fullname, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
             $usersWithSandboxes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
             // Ignore
@@ -739,18 +739,23 @@ class HostingController
             // Get owner info from database if this is a sandbox
             $ownerUsername = null;
             $ownerFullname = null;
-            if (strpos($name, 'ginto-sandbox-') === 0) {
-                $sandboxId = substr($name, strlen('ginto-sandbox-'));
-                try {
-                    $stmt = $this->db->prepare("SELECT u.username, u.name FROM users u WHERE u.sandbox_id = ? OR u.lxc_sandbox_id = ?");
-                    $stmt->execute([$sandboxId, $sandboxId]);
-                    $user = $stmt->fetch(\PDO::FETCH_ASSOC);
-                    if ($user) {
-                        $ownerUsername = $user['username'];
-                        $ownerFullname = $user['name'];
+            if (strpos($name, 'ginto-sandbox') === 0) {
+                // Extract sandbox ID: "ginto-sandbox" -> "" or "ginto-sandbox-abc123" -> "abc123"
+                $sandboxId = (strlen($name) > 13 && $name[13] === '-') 
+                    ? substr($name, 14) 
+                    : ($name === 'ginto-sandbox' ? 'ginto-sandbox' : '');
+                if ($sandboxId) {
+                    try {
+                        $stmt = $this->db->prepare("SELECT u.username, u.fullname FROM users u WHERE u.sandbox_id = ? OR u.lxc_sandbox_id = ?");
+                        $stmt->execute([$sandboxId, $sandboxId]);
+                        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        if ($user) {
+                            $ownerUsername = $user['username'];
+                            $ownerFullname = $user['fullname'];
+                        }
+                    } catch (\PDOException $e) {
+                        // Ignore
                     }
-                } catch (\PDOException $e) {
-                    // Ignore
                 }
             }
             

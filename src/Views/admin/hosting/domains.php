@@ -209,7 +209,7 @@ $currentPage = 'domains';
         const ownerDatalist = document.getElementById('owner-username-list');
         if (containerData.users_with_sandboxes?.length) {
           ownerDatalist.innerHTML = containerData.users_with_sandboxes.map(u => 
-            `<option value="${u.username}" data-fullname="${u.name || ''}">${u.username} - ${u.name || 'No name'}</option>`
+            `<option value="${u.username}" data-fullname="${u.fullname || ''}">${u.username} - ${u.fullname || 'No name'}</option>`
           ).join('');
         }
         
