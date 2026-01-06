@@ -129,7 +129,7 @@
         // Open console and run the git clone command
         // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
         if (typeof window.openConsoleWithCommand === 'function') {
-          const cmd = data.command || 'git clone https://github.com/open-webui/open-webui.git';
+          const cmd = data.command || 'pip install open-webui && open-webui serve';
           window.openConsoleWithCommand(cmd, 'sandbox');
         } else {
           showToast('Console not available', 'error');
