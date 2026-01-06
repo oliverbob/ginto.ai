@@ -191,6 +191,9 @@ class AdminLxcController
                     $limits['disk'] = round($diskTotal / 1024 / 1024) . 'MB';
                 }
                 
+                // Lookup owner from client_sandboxes table
+                $ownerInfo = $this->getContainerOwner($c['name']);
+                
                 $result[] = [
                     'name' => $c['name'],
                     'status' => $c['status'] ?? 'Unknown',
@@ -202,6 +205,9 @@ class AdminLxcController
                     'architecture' => $c['architecture'] ?? null,
                     'created_at' => $c['created_at'] ?? null,
                     'last_used_at' => $c['last_used_at'] ?? null,
+                    'owner_username' => $ownerInfo['username'] ?? null,
+                    'owner_fullname' => $ownerInfo['fullname'] ?? null,
+                    'owner_id' => $ownerInfo['user_id'] ?? null,
                 ];
             }
             
@@ -940,5 +946,35 @@ class AdminLxcController
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+    
+    /**
+     * Get the owner of a container by looking up in client_sandboxes table
+     */
+    private function getContainerOwner(string $containerName): array
+    {
+        try {
+            $stmt = $this->db->pdo->prepare("
+                SELECT cs.user_id, u.username, u.fullname
+                FROM client_sandboxes cs
+                JOIN users u ON cs.user_id = u.id
+                WHERE cs.sandbox_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$containerName]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($row) {
+                return [
+                    'user_id' => $row['user_id'],
+                    'username' => $row['username'],
+                    'fullname' => $row['fullname']
+                ];
+            }
+        } catch (\Throwable $e) {
+            // Ignore errors - owner info is optional
+        }
+        
+        return [];
     }
 }

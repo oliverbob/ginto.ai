@@ -555,10 +555,57 @@ $currentPage = 'domains';
       }
     }
 
+    // Check for pre-filled parameters from LXC Manager
+    function handleUrlParams() {
+      const params = new URLSearchParams(window.location.search);
+      const action = params.get('action');
+      const domain = params.get('domain');
+      const container = params.get('container');
+      const ip = params.get('ip');
+      
+      if (action === 'add' && domain) {
+        // Pre-fill the form and show modal
+        const form = document.getElementById('add-form');
+        if (form) {
+          form.querySelector('[name="domain"]').value = domain;
+          
+          // Set proxy type to container if we have container info
+          if (container) {
+            const proxyType = form.querySelector('[name="proxy_type"]');
+            if (proxyType) {
+              proxyType.value = 'container';
+              toggleProxyOptions();
+            }
+          }
+        }
+        
+        // After containers load, select the right one
+        loadContainers().then(() => {
+          if (container) {
+            const containerSelect = document.getElementById('container-select');
+            if (containerSelect) {
+              containerSelect.value = container;
+            }
+          }
+          initOwnerAutocomplete();
+          showAddModal();
+        });
+        
+        // Clear URL params without reload
+        window.history.replaceState({}, '', window.location.pathname);
+        return true;
+      }
+      return false;
+    }
+
     loadDomains();
-    loadContainers().then(() => {
-      initOwnerAutocomplete();
-    });
+    
+    // Handle URL params or just load containers
+    if (!handleUrlParams()) {
+      loadContainers().then(() => {
+        initOwnerAutocomplete();
+      });
+    }
   </script>
 </body>
 </html>

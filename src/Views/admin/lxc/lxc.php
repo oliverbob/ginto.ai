@@ -297,17 +297,16 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
                 <tr>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left">Status</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left">Name</th>
+                  <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden lg:table-cell">Owner</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden lg:table-cell">Type</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left">IPv4</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden xl:table-cell">RAM</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden xl:table-cell">Disk</th>
-                  <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden 2xl:table-cell">CPU</th>
-                  <th class="px-3 sm:px-4 py-2 sm:py-3 text-left hidden 2xl:table-cell">Procs</th>
                   <th class="px-3 sm:px-4 py-2 sm:py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody id="containers-table" class="divide-y divide-gray-200 dark:divide-gray-700">
-                <tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">Loading containers...</td></tr>
+                <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">Loading containers...</td></tr>
               </tbody>
             </table>
           </div>
@@ -701,6 +700,28 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
+    
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+    
+    // Assign domain to container
+    window.assignDomain = function(containerName, containerIp) {
+      const domain = prompt('Enter domain name to assign to this container:');
+      if (!domain || !domain.trim()) return;
+      
+      // Redirect to the hosting domains page with pre-filled container info
+      const params = new URLSearchParams({
+        action: 'add',
+        domain: domain.trim(),
+        container: containerName,
+        ip: containerIp || ''
+      });
+      window.location.href = '/admin/hosting/domains?' + params.toString();
+    };
 
     function renderResourceTree() {
       // Images
@@ -741,13 +762,17 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
       const cards = document.getElementById('containers-cards');
       
       if (containers.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-8 text-center text-gray-500">No containers found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No containers found</td></tr>';
         cards.innerHTML = '<div class="text-center text-gray-500 py-4">No containers found</div>';
         return;
       }
       
       // Mobile card view
-      cards.innerHTML = containers.map(c => `
+      cards.innerHTML = containers.map(c => {
+        const ownerLine = c.owner_username 
+          ? `<div class="text-xs text-gray-400 mb-1"><i class="fas fa-user mr-1"></i>${escapeHtml(c.owner_username)}${c.owner_fullname ? ' - ' + escapeHtml(c.owner_fullname) : ''}</div>` 
+          : '';
+        return `
         <div class="lxc-card rounded-sm p-3 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors border" onclick="selectContainer('${c.name}')">
           <div class="flex items-center justify-between mb-2">
             <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -756,9 +781,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             </div>
             <span class="text-xs ${c.status === 'Running' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'} flex-shrink-0 ml-2">${c.status}</span>
           </div>
+          ${ownerLine}
           <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
             <span class="truncate">${c.ipv4 || 'No IP'}</span>
             <div class="flex items-center gap-1 flex-shrink-0" onclick="event.stopPropagation()">
+              <button onclick="assignDomain('${c.name}', '${c.ipv4 || ''}')" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-indigo-500 dark:text-indigo-400"><i class="fas fa-globe"></i></button>
               ${c.status === 'Running' ? `
                 <button onclick="containerAction('${c.name}', 'stop')" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-yellow-500 dark:text-yellow-400"><i class="fas fa-stop"></i></button>
                 <button onclick="containerAction('${c.name}', 'restart')" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-blue-500 dark:text-blue-400"><i class="fas fa-redo"></i></button>
@@ -769,10 +796,15 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             </div>
           </div>
         </div>
-      `).join('');
+      `}).join('');
       
       // Desktop table view
-      tbody.innerHTML = containers.map(c => `
+      tbody.innerHTML = containers.map(c => {
+        const ownerDisplay = c.owner_username 
+          ? `<div class="font-medium">${escapeHtml(c.owner_username)}</div><div class="text-xs text-gray-400">${escapeHtml(c.owner_fullname || '')}</div>`
+          : '<span class="text-gray-400">-</span>';
+        
+        return `
         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer border-b border-gray-200 dark:border-gray-700" onclick="selectContainer('${c.name}')">
           <td class="px-3 sm:px-4 py-2 sm:py-3">
             <span class="flex items-center gap-2">
@@ -781,6 +813,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             </span>
           </td>
           <td class="px-3 sm:px-4 py-2 sm:py-3 font-medium max-w-[150px] truncate">${c.name}</td>
+          <td class="px-3 sm:px-4 py-2 sm:py-3 hidden lg:table-cell">${ownerDisplay}</td>
           <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 hidden lg:table-cell">${c.type || 'container'}</td>
           <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 max-w-[120px] truncate">${c.ipv4 || '-'}</td>
           <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 hidden xl:table-cell">
@@ -789,10 +822,11 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
           <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 hidden xl:table-cell">
             <span class="text-white">${c.disk || '-'}</span><span class="text-gray-500"> / ${c.limits?.disk || '-'}</span>
           </td>
-          <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 hidden 2xl:table-cell">${c.limits?.cpu || '-'}</td>
-          <td class="px-3 sm:px-4 py-2 sm:py-3 text-gray-500 dark:text-gray-400 hidden 2xl:table-cell">${c.limits?.processes || '-'}</td>
           <td class="px-3 sm:px-4 py-2 sm:py-3 text-right">
             <div class="flex items-center justify-end gap-1" onclick="event.stopPropagation()">
+              <button onclick="assignDomain('${c.name}', '${c.ipv4 || ''}')" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-indigo-500 dark:text-indigo-400" title="Assign Domain">
+                <i class="fas fa-globe"></i>
+              </button>
               ${c.status === 'Running' ? `
                 <button onclick="openLxcConsole('${c.name}')" class="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-green-500 dark:text-green-400" title="Console">
                   <i class="fas fa-terminal"></i>
@@ -817,7 +851,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             </div>
           </td>
         </tr>
-      `).join('');
+      `}).join('');
     }
 
     window.selectContainer = async function(name) {
