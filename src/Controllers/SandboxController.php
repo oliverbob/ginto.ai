@@ -1086,11 +1086,11 @@ class SandboxController
                 exit;
             }
             
-            // Just return the git clone command - Console will run it
+            // Just return the pip install command - Console will run it
             echo json_encode([
                 'success' => true,
-                'message' => 'Run git clone in Console.',
-                'command' => 'cd ~ && git clone https://github.com/open-webui/open-webui.git && cd open-webui && echo "OpenWebUI cloned! Follow the README to run it."'
+                'message' => 'Run pip install in Console.',
+                'command' => 'pip install open-webui && open-webui serve'
             ]);
             
         } catch (\Throwable $e) {
