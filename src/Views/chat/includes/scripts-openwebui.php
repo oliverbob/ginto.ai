@@ -15,6 +15,39 @@
     return window.GINTO_AUTH?.csrfToken || window.CSRF_TOKEN || '';
   }
   
+  // Wait for a URL to be reachable (port listening)
+  async function waitForUrlReady(url, timeoutMs = 30000) {
+    const startTime = Date.now();
+    const checkInterval = 2000; // Check every 2 seconds
+    
+    while (Date.now() - startTime < timeoutMs) {
+      try {
+        // Use fetch with mode: 'no-cors' to check if server responds
+        // This won't give us the response, but will tell us if port is open
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        await fetch(url, { 
+          method: 'HEAD',
+          mode: 'no-cors',
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        // If we get here, the server responded
+        console.log('[OWUI] URL is ready:', url);
+        return true;
+      } catch (e) {
+        // Connection refused or timeout - wait and retry
+        console.log('[OWUI] Waiting for URL to be ready...', e.message);
+        await new Promise(r => setTimeout(r, checkInterval));
+      }
+    }
+    
+    console.log('[OWUI] Timeout waiting for URL');
+    return false;
+  }
+  
   const openWebuiLink = document.getElementById('open-webui-link');
   const openWebuiLabel = document.getElementById('open-webui-label');
   const openWebuiStatus = document.getElementById('open-webui-status');
@@ -121,23 +154,24 @@
         clearInterval(pollInstall);
         isInstalling = false;
         updateOpenWebuiUI();
-        showToast('OpenWebUI installed! Opening...', 'success');
+        showToast('OpenWebUI installed! Waiting for service to start...', 'success');
         
         // Minimize the console
         if (typeof window.minimizeConsole === 'function') {
           window.minimizeConsole();
         }
         
+        // Wait for the port to actually be ready before opening iframe
+        await waitForUrlReady(openWebuiUrl, 60000); // Wait up to 60 seconds
+        
         // Open OpenWebUI in iframe modal
-        setTimeout(() => {
-          if (typeof window.openIframeModal === 'function') {
-            const owuiIcon = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>';
-            window.openIframeModal(openWebuiUrl, { title: 'OpenWebUI', icon: owuiIcon });
-          } else {
-            // Fallback: open in new tab
-            window.open(openWebuiUrl, '_blank');
-          }
-        }, 500);
+        if (typeof window.openIframeModal === 'function') {
+          const owuiIcon = '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>';
+          window.openIframeModal(openWebuiUrl, { title: 'OpenWebUI', icon: owuiIcon });
+        } else {
+          // Fallback: open in new tab
+          window.open(openWebuiUrl, '_blank');
+        }
       }
     }, 5000); // Check every 5 seconds
     
