@@ -75,6 +75,70 @@
     }
   }
   
+  // Install OpenWebUI (called after sandbox is ready)
+  async function installOpenWebUI() {
+    isInstalling = true;
+    updateOpenWebuiUI();
+    
+    // Get the docker install command from API
+    try {
+      const csrfToken = await getCsrfToken();
+      const res = await fetch('/api/sandbox/openwebui/install', {
+        method: 'POST',
+        headers: { 'X-CSRF-Token': csrfToken }
+      });
+      const data = await res.json();
+      
+      if (!data.success) {
+        showToast('Failed to prepare install: ' + (data.error || 'Unknown error'), 'error');
+        isInstalling = false;
+        updateOpenWebuiUI();
+        return;
+      }
+      
+      // Open console and run the docker install command
+      // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
+      if (typeof window.openConsoleWithCommand === 'function') {
+        const cmd = data.command;
+        window.openConsoleWithCommand(cmd, 'sandbox');
+      } else {
+        showToast('Console not available', 'error');
+        isInstalling = false;
+        updateOpenWebuiUI();
+        return;
+      }
+    } catch (e) {
+      showToast('Failed to prepare install: ' + e.message, 'error');
+      isInstalling = false;
+      updateOpenWebuiUI();
+      return;
+    }
+    
+    // Poll for completion and auto-navigate on success
+    const pollInstall = setInterval(async () => {
+      await checkOpenWebuiStatus();
+      if (openWebuiRunning && openWebuiUrl) {
+        clearInterval(pollInstall);
+        isInstalling = false;
+        updateOpenWebuiUI();
+        showToast('OpenWebUI installed! Opening...', 'success');
+        // Auto-navigate to OpenWebUI
+        setTimeout(() => {
+          window.open(openWebuiUrl, '_blank');
+        }, 1000);
+      }
+    }, 5000); // Check every 5 seconds
+    
+    // Stop polling after 10 minutes
+    setTimeout(() => {
+      clearInterval(pollInstall);
+      if (isInstalling) {
+        isInstalling = false;
+        updateOpenWebuiUI();
+      }
+    }, 10 * 60 * 1000);
+  }
+  
   // Handle click on OpenWebUI link
   openWebuiLink.addEventListener('click', async (e) => {
     e.preventDefault();
@@ -89,9 +153,46 @@
     }
     
     if (!sandboxExists) {
-      // Show sandbox wizard to create sandbox first
-      showToast('Please create a sandbox first using "My Files"', 'info');
-      document.getElementById('open-my-files')?.click();
+      // Auto-install sandbox first, then OpenWebUI
+      const confirmed = await showConfirmModal({
+        title: 'Install OpenWebUI',
+        message: 'This will create a sandbox environment and install OpenWebUI. Continue?',
+        confirmText: 'Install',
+        confirmIcon: 'fa-download',
+        type: 'info'
+      });
+      
+      if (!confirmed) return;
+      
+      showToast('Creating sandbox...', 'info');
+      
+      // Install sandbox first
+      try {
+        const csrfToken = await getCsrfToken();
+        const res = await fetch('/api/sandbox/install', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken 
+          },
+          body: JSON.stringify({ accept_terms: true, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        
+        if (!data.success) {
+          showToast('Failed to create sandbox: ' + (data.error || 'Unknown error'), 'error');
+          return;
+        }
+        
+        sandboxExists = true;
+        showToast('Sandbox created! Installing OpenWebUI...', 'success');
+        
+        // Now install OpenWebUI
+        await installOpenWebUI();
+        
+      } catch (e) {
+        showToast('Failed to create sandbox: ' + e.message, 'error');
+      }
       return;
     }
     
@@ -105,65 +206,9 @@
         type: 'info'
       });
       
-      if (!confirmed) {
-        return;
-      }
+      if (!confirmed) return;
       
-      isInstalling = true;
-      updateOpenWebuiUI();
-      
-      // Get the pip install command from API
-      try {
-        const csrfToken = await getCsrfToken();
-        const res = await fetch('/api/sandbox/openwebui/install', {
-          method: 'POST',
-          headers: { 'X-CSRF-Token': csrfToken }
-        });
-        const data = await res.json();
-        
-        if (!data.success) {
-          showToast('Failed to prepare install: ' + (data.error || 'Unknown error'), 'error');
-          isInstalling = false;
-          updateOpenWebuiUI();
-          return;
-        }
-        
-        // Open console and run the pip install command
-        // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
-        if (typeof window.openConsoleWithCommand === 'function') {
-          const cmd = data.command || 'pip install open-webui && open-webui serve';
-          window.openConsoleWithCommand(cmd, 'sandbox');
-        } else {
-          showToast('Console not available', 'error');
-          isInstalling = false;
-          updateOpenWebuiUI();
-          return;
-        }
-      } catch (e) {
-        showToast('Failed to prepare install: ' + e.message, 'error');
-        isInstalling = false;
-        updateOpenWebuiUI();
-        return;
-      }
-      
-      // Poll for completion
-      const pollInstall = setInterval(async () => {
-        await checkOpenWebuiStatus();
-        if (openWebuiInstalled) {
-          clearInterval(pollInstall);
-          isInstalling = false;
-          updateOpenWebuiUI();
-          showToast('OpenWebUI installed! Click to open.', 'success');
-        }
-      }, 10000); // Check every 10 seconds
-      
-      // Stop polling after 15 minutes
-      setTimeout(() => {
-        clearInterval(pollInstall);
-        isInstalling = false;
-        updateOpenWebuiUI();
-      }, 15 * 60 * 1000);
-      
+      await installOpenWebUI();
       return;
     }
     
