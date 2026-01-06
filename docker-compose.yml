@@ -66,6 +66,7 @@ services:
       - SERVICE=terminal-server
       - SANDBOX_MODE=docker
       - GINTO_TERMINAL_PORT=3001
+      - GINTO_TERMINAL_ALLOW_REMOTE=1
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       - REDIS_PORT=${REDIS_PORT:-6379}
     ports:
