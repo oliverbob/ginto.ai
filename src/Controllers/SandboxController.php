@@ -1090,13 +1090,14 @@ class SandboxController
             // Use Docker-in-Docker for simplicity - avoids Alpine compilation issues
             // Use port 8088 to avoid conflicts with other services
             // Remove existing container if any, then create new one
+            // Use docker host IP (gateway) which is the LXC IP
             $installCmd = 'docker rm -f open-webui 2>/dev/null; ' .
                 'docker run -d --name open-webui ' .
                 '-p 8088:8080 ' .
                 '-v open-webui:/app/backend/data ' .
                 '-e WEBUI_AUTH=false ' .
                 'ghcr.io/open-webui/open-webui:main && ' .
-                'IP=$(hostname -i 2>/dev/null | awk \'{print $1}\' || ip route get 1 | awk \'{print $7}\') && ' .
+                'IP=$(ip route | grep default | awk \'{print $3}\') && ' .
                 'echo "" && echo "✅ OpenWebUI installed successfully!" && ' .
                 'echo "🌐 Access it at: http://${IP}:8088/"';
             
