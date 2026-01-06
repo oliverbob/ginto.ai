@@ -708,17 +708,44 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
       return div.innerHTML;
     }
     
-    // Assign domain to container
+    // Assign domain to container - opens modal
+    let assignDomainData = { containerName: '', containerIp: '' };
+    
     window.assignDomain = function(containerName, containerIp) {
-      const domain = prompt('Enter domain name to assign to this container:');
-      if (!domain || !domain.trim()) return;
+      assignDomainData = { containerName, containerIp };
+      const modal = document.getElementById('assign-domain-modal');
+      const input = document.getElementById('assign-domain-input');
+      const containerLabel = document.getElementById('assign-domain-container');
+      
+      containerLabel.textContent = containerName;
+      input.value = '';
+      modal.classList.remove('hidden');
+      modal.style.display = 'flex';
+      setTimeout(() => input.focus(), 100);
+    };
+    
+    window.closeAssignDomainModal = function() {
+      const modal = document.getElementById('assign-domain-modal');
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
+    };
+    
+    window.confirmAssignDomain = function() {
+      const input = document.getElementById('assign-domain-input');
+      const domain = input.value.trim();
+      if (!domain) {
+        input.focus();
+        return;
+      }
+      
+      closeAssignDomainModal();
       
       // Redirect to the hosting domains page with pre-filled container info
       const params = new URLSearchParams({
         action: 'add',
-        domain: domain.trim(),
-        container: containerName,
-        ip: containerIp || ''
+        domain: domain,
+        container: assignDomainData.containerName,
+        ip: assignDomainData.containerIp || ''
       });
       window.location.href = '/admin/hosting/domains?' + params.toString();
     };
@@ -1749,6 +1776,56 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
     // Expose to global scope
     window.openVncDesktop = openVncDesktop;
   })();
+  </script>
+
+  <!-- Assign Domain Modal -->
+  <div id="assign-domain-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4" style="background: rgba(0,0,0,0.5);">
+    <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl" style="max-width: 28rem; width: 100%;">
+      <!-- Header -->
+      <div class="border-b border-gray-200 dark:border-gray-700 px-5 py-4 flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0" style="background: rgba(99,102,241,0.2);">
+          <i class="fas fa-globe text-indigo-500"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Assign Domain</h3>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Container: <span id="assign-domain-container" class="font-medium text-gray-700 dark:text-gray-300"></span></p>
+        </div>
+      </div>
+      <!-- Body -->
+      <div class="px-5 py-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Domain Name</label>
+        <input type="text" id="assign-domain-input" placeholder="example.com" 
+          class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          onkeydown="if(event.key === 'Enter') confirmAssignDomain();">
+        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">Enter the domain you want to point to this container.</p>
+      </div>
+      <!-- Footer -->
+      <div class="border-t border-gray-200 dark:border-gray-700 px-5 py-4 flex justify-end gap-3">
+        <button onclick="closeAssignDomainModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors">
+          Cancel
+        </button>
+        <button onclick="confirmAssignDomain()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <i class="fas fa-arrow-right"></i>
+          Continue
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  // Handle Escape key for assign domain modal
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      const modal = document.getElementById('assign-domain-modal');
+      if (modal && !modal.classList.contains('hidden')) {
+        closeAssignDomainModal();
+      }
+    }
+  });
+  // Close on backdrop click
+  document.getElementById('assign-domain-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeAssignDomainModal();
+  });
   </script>
 </body>
 </html>
