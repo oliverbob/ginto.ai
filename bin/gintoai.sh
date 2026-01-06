@@ -1261,9 +1261,16 @@ configure_caddy() {
         return 0
     fi
     
+    # Determine terminal server port based on install mode
+    # Docker mode uses port 3001 (Docker terminal-server), native uses 31827 (PHP)
+    local TERMINAL_PORT=31827
+    if [[ "${INSTALL_MODE:-}" == "docker" ]]; then
+        TERMINAL_PORT=3001
+    fi
+    
     if [[ "$CADDY_LIVE_MODE" == "yes" ]]; then
         # Live server mode
-        log_info "Configuring Caddy for live server: $CADDY_DOMAIN"
+        log_info "Configuring Caddy for live server: $CADDY_DOMAIN (terminal port: $TERMINAL_PORT)"
         
         sudo tee /etc/caddy/Caddyfile > /dev/null << EOF
 $CADDY_DOMAIN {
@@ -1273,14 +1280,14 @@ $CADDY_DOMAIN {
 
     handle /stream/* {
         uri strip_prefix /stream
-        reverse_proxy 127.0.0.1:31827 {
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
             header_up Host localhost
         }
     }
 
     handle /terminal/* {
         uri strip_prefix /terminal
-        reverse_proxy 127.0.0.1:31827 {
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
             header_up Host localhost
         }
     }
@@ -1495,9 +1502,9 @@ $CADDY_DOMAIN {
 EOF
     else
         # Local development mode
-        log_info "Configuring Caddy for local development (port 80)"
+        log_info "Configuring Caddy for local development (port 80, terminal port: $TERMINAL_PORT)"
         
-        sudo tee /etc/caddy/Caddyfile > /dev/null << 'EOF'
+        sudo tee /etc/caddy/Caddyfile > /dev/null << EOF
 {
     auto_https off
 }
@@ -1507,14 +1514,14 @@ http://localhost, :80 {
 
     handle /stream/* {
         uri strip_prefix /stream
-        reverse_proxy 127.0.0.1:31827 {
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
             header_up Host localhost
         }
     }
 
     handle /terminal/* {
         uri strip_prefix /terminal
-        reverse_proxy 127.0.0.1:31827 {
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
             header_up Host localhost
         }
     }
