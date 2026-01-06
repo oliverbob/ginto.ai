@@ -302,30 +302,21 @@ $currentPage = 'domains';
       
       // Username autocomplete - only users with containers
       usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
-        placeholder: 'Search owner with container...',
+        placeholder: 'Search owner...',
         data: usersWithContainers,
-        minChars: 1,
+        minChars: 0,
         renderItem: (user) => `
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                ${esc((user.username || '?')[0].toUpperCase())}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.username)}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${esc(user.fullname || 'No name')}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-xs font-medium text-emerald-600 dark:text-emerald-400">${esc(user.container_name)}</div>
-                <div class="text-xs text-gray-400">${esc(user.container_ip || 'No IP')}</div>
-              </div>
+            <div class="py-1">
+              <div class="font-semibold text-gray-900 dark:text-white">${esc(user.username)}</div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">${esc(user.fullname || 'No name')} • ${esc(user.container_name)}</div>
             </div>
           `,
           onSelect: (user) => {
             document.getElementById('owner-username-hidden').value = user.username;
             // Auto-fill fullname
-            if (user.fullname && fullnameAutocomplete) {
-              fullnameAutocomplete.setValue(user.fullname);
-              document.getElementById('owner-fullname-hidden').value = user.fullname;
+            if (fullnameAutocomplete) {
+              fullnameAutocomplete.setValue(user.fullname || '');
+              document.getElementById('owner-fullname-hidden').value = user.fullname || '';
             }
             // Auto-select their container
             selectUserContainer(user);
@@ -339,27 +330,18 @@ $currentPage = 'domains';
         fullnameAutocomplete = GintoUI.autocomplete('#owner-fullname-wrapper', {
           placeholder: 'Search name...',
           data: usersWithContainers,
-          minChars: 1,
+          minChars: 0,
           renderItem: (user) => `
-            <div class="flex items-center gap-3">
-              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-                ${esc((user.fullname || user.username || '?')[0].toUpperCase())}
-              </div>
-              <div class="flex-1 min-w-0">
-                <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.fullname || user.username)}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">@${esc(user.username)}</div>
-              </div>
-              <div class="text-right">
-                <div class="text-xs font-medium text-blue-600 dark:text-blue-400">${esc(user.container_name)}</div>
-                <div class="text-xs text-gray-400">${esc(user.container_ip || 'No IP')}</div>
-              </div>
+            <div class="py-1">
+              <div class="font-semibold text-gray-900 dark:text-white">${esc(user.fullname || user.username)}</div>
+              <div class="text-sm text-gray-500 dark:text-gray-400">@${esc(user.username)} • ${esc(user.container_name)}</div>
             </div>
           `,
           getDisplayValue: (user) => user.fullname || user.username,
           onSelect: (user) => {
             document.getElementById('owner-fullname-hidden').value = user.fullname || '';
             // Auto-fill username
-            if (user.username && usernameAutocomplete) {
+            if (usernameAutocomplete) {
               usernameAutocomplete.setValue(user.username);
               document.getElementById('owner-username-hidden').value = user.username;
             }
