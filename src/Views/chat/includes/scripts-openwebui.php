@@ -127,9 +127,10 @@
         }
         
         // Open console and run the install script (use path from API response)
+        // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
         if (typeof window.openConsoleWithCommand === 'function') {
           const scriptPath = data.script || '~/install-openwebui.sh';
-          window.openConsoleWithCommand('bash ' + scriptPath);
+          window.openConsoleWithCommand('bash ' + scriptPath, 'sandbox');
         } else {
           showToast('Console not available', 'error');
           isInstalling = false;

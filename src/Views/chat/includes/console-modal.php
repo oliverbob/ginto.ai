@@ -124,7 +124,7 @@ if (empty($isAdmin)) return;
   if (minimizeBtn) minimizeBtn.onclick = minimizeConsole;
   if (restoreBtn) restoreBtn.onclick = restoreConsole;
   
-  function createTab(initialCommand) {
+  function createTab(initialCommand, targetMode = null) {
     tabCounter++;
     const tabId = 'tab-' + tabCounter;
     
@@ -186,6 +186,7 @@ if (empty($isAdmin)) return;
       reconnectTimeout: null,
       autoReconnect: true,
       pendingCommand: initialCommand || null,
+      targetMode: targetMode,  // 'sandbox' or null (default to host for admin)
       sessionId: 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)
     };
     
@@ -211,7 +212,7 @@ if (empty($isAdmin)) return;
     });
     
     switchToTab(tabId);
-    connectTab(tab);
+    connectTab(tab, targetMode);
     
     return tab;
   }
@@ -272,7 +273,7 @@ if (empty($isAdmin)) return;
     }
   }
   
-  async function connectTab(tab) {
+  async function connectTab(tab, targetMode = null) {
     if (tab.ws && tab.ws.readyState === WebSocket.OPEN) return;
     if (tab.reconnectTimeout) { clearTimeout(tab.reconnectTimeout); tab.reconnectTimeout = null; }
     
@@ -290,21 +291,27 @@ if (empty($isAdmin)) return;
     const rows = tab.term.rows;
     const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
     
-    // Check if user has a sandbox - connect to sandbox terminal, otherwise host terminal (admin only)
     const isAdmin = window.GINTO_AUTH?.isAdmin || false;
     const sandboxId = window.GINTO_AUTH?.sandbox?.id || null;
     
-    console.log('[Console] Auth ready, sandboxId:', sandboxId, 'isAdmin:', isAdmin);
+    console.log('[Console] Auth ready, sandboxId:', sandboxId, 'isAdmin:', isAdmin, 'targetMode:', targetMode);
     
     let wsUrl;
     
-    if (sandboxId) {
-      // Connect to user's sandbox container
+    // targetMode can be 'sandbox' (for OpenWebUI install) or 'os' (default for admin console)
+    if (targetMode === 'sandbox' && sandboxId) {
+      // Explicitly requested sandbox connection (e.g. for OpenWebUI install)
       const containerName = 'ginto-sandbox-' + sandboxId;
       wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=sandbox&container=${encodeURIComponent(containerName)}&cols=${cols}&rows=${rows}&session=${encodeURIComponent(tab.sessionId)}`;
+      tab.tabBtn.querySelector('.tab-title').textContent = 'Sandbox';
     } else if (isAdmin) {
-      // Admin can access host terminal
+      // Admin gets host terminal by default
       wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=os&cols=${cols}&rows=${rows}&session=${encodeURIComponent(tab.sessionId)}`;
+    } else if (sandboxId) {
+      // Non-admin users with sandbox get sandbox terminal
+      const containerName = 'ginto-sandbox-' + sandboxId;
+      wsUrl = `${wsProtocol}//${host}/terminal/terminal?mode=sandbox&container=${encodeURIComponent(containerName)}&cols=${cols}&rows=${rows}&session=${encodeURIComponent(tab.sessionId)}`;
+      tab.tabBtn.querySelector('.tab-title').textContent = 'Sandbox';
     } else {
       // No sandbox - show error in terminal
       tab.term.write('\r\n\x1b[33m*** No sandbox available. Please create one first. ***\x1b[0m\r\n');
@@ -388,7 +395,8 @@ if (empty($isAdmin)) return;
   }
   
   // Open console with command - creates new tab if session already active
-  window.openConsoleWithCommand = function(command) {
+  // targetMode: 'sandbox' to connect to user's sandbox, null for default (host for admin)
+  window.openConsoleWithCommand = function(command, targetMode = null) {
     // Hide minimized indicator if visible
     isMinimized = false;
     if (minimizedIndicator) minimizedIndicator.classList.add('hidden');
@@ -398,10 +406,10 @@ if (empty($isAdmin)) return;
     
     if (tabs.length === 0) {
       // No active session - create first tab with command
-      createTab(command);
+      createTab(command, targetMode);
     } else {
       // Already have active session(s) - create new tab for this command
-      createTab(command);
+      createTab(command, targetMode);
     }
   };
   
