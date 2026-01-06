@@ -66,6 +66,13 @@ https://github.com/user-attachments/assets/62220ea5-453b-4774-b13a-1cca89f728ff
 
 *Left: AI-powered web search with LightPanda browser engine — real-time search during chat. Right: Search results with collapsible activity timeline and source citations.*
 
+<p align="center">
+  <img src="public/assets/images/openwebui.png" alt="Ginto AI OpenWebUI - Embedded iframe modal for OpenWebUI" width="48%">
+  <img src="public/assets/images/openwebui-fullscreen.png" alt="Ginto AI OpenWebUI Fullscreen - Full-featured iframe viewer" width="48%">
+</p>
+
+*Left: OpenWebUI embedded in Ginto AI's universal iframe modal with minimize, maximize, and fullscreen controls. Right: Full-screen view with stacked minimized tabs for Console and OpenWebUI running simultaneously.*
+
 ### 📜 Acknowledgments & Inspirations
 
 This project's web UI draws inspiration from [Open WebUI](https://github.com/open-webui/open-webui), [Ollama](https://ollama.com/), and [llama.cpp WebUI](https://github.com/ggml-org/llama.cpp/discussions/16938) — pioneering projects that shaped the local AI landscape.

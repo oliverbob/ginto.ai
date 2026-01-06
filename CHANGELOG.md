@@ -2,6 +2,29 @@
 
 All notable changes to Ginto will be documented in this file.
 
+## [1.0.5] - 2026-01-07 - OpenWebUI Iframe Modal Improvements
+
+### Added
+
+- **Refresh button** in iframe modal toolbar for reloading embedded content
+- **Backend URL readiness check** via `/api/sandbox/check-url-ready` endpoint with curl-based HTTP status verification
+- **localStorage persistence** for iframe tabs and console minimized state
+- **Shared minimized container** for Console and iframe tabs positioned above composer (bottom-36)
+
+### Changed
+
+- **Button order reordering** - Now displays as [Refresh | Minimize | Maximize | Fullscreen | NewTab | Close]
+- **Minimized tabs style** - Circle indicators (44x44px) that expand to pill shape on hover with smooth CSS transitions
+- **Vertical tab stacking** - Minimized tabs stack vertically on same x-axis using flexbox layout
+- **Console integration** - Console minimized indicator now uses shared container with iframe tabs
+- **Toast z-index** - Increased from z-[100] to z-[200] to appear above sandbox wizard modal
+- **URL readiness flow** - Modal opens immediately with loading state while backend polls for HTTP 200 response
+
+### Fixed
+
+- Console minimized indicator not appearing (container lookup at runtime instead of init time)
+- Duplicate `</style>` tags causing CSS parsing issues
+
 ## [1.0.4] - 2026-01-06 - Hosting DNS Management
 
 ### Added
