@@ -35,7 +35,11 @@ class FixedPtyServer implements MessageComponentInterface
         ]);
 
         $cmd = null;
-        if ($mode === 'sandbox' && $container) {
+        if ($mode === 'os') {
+            // Admin OS mode: use nsenter to access the host (LXC) namespace
+            // This breaks out of the Docker container to the LXC host
+            $cmd = ['nsenter', '-t', '1', '-m', '-u', '-i', '-n', '-p', '--', '/bin/bash', '-l'];
+        } elseif ($mode === 'sandbox' && $container) {
             $safe = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)$container);
             try {
                 if (\Ginto\Helpers\SandboxManager::sandboxExists($safe)) {
