@@ -1098,7 +1098,7 @@ class SandboxController
                 'python3 -m venv --system-site-packages /home/sandbox/openwebui-venv && ' .
                 'source /home/sandbox/openwebui-venv/bin/activate && ' .
                 'pip install --upgrade pip && ' .
-                'pip install --no-cache-dir open-webui 2>&1 | tee /home/sandbox/openwebui-install.log && ' .
+                'pip install --no-cache-dir open-webui && ' .
                 'open-webui serve';
             
             echo json_encode([
