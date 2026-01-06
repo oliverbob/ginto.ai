@@ -73,7 +73,7 @@
 </div>
 
 <!-- Minimized Iframe Tabs Container (stacked vertically above composer) -->
-<div id="iframe-minimized-container" class="fixed bottom-32 right-4 z-[55] flex flex-col items-end gap-2"></div>
+<div id="iframe-minimized-container" class="fixed bottom-36 right-4 z-[55] flex flex-col items-end gap-2"></div>
 
 <style>
 /* Minimized tab - circle by default, expands on hover */

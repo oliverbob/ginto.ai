@@ -52,7 +52,7 @@ if (empty($isAdmin)) return;
 </div>
 
 <!-- Minimized Console Indicator (Floating) -->
-<div id="console-minimized" class="fixed bottom-32 right-4 z-50 hidden">
+<div id="console-minimized" class="fixed bottom-36 right-4 z-50 hidden">
   <button id="restore-console" class="console-minimized-tab flex items-center bg-gray-800 hover:bg-gray-700 text-white shadow-lg border border-gray-600 cursor-pointer">
     <div class="flex items-center justify-center gap-2 p-3 flex-shrink-0">
       <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
