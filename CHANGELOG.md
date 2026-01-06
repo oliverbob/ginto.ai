@@ -2,7 +2,7 @@
 
 All notable changes to Ginto will be documented in this file.
 
-## [1.0.3] - 2026-01-06
+## [1.0.4] - 2026-01-06
 
 ### Added
 
@@ -29,7 +29,7 @@ All notable changes to Ginto will be documented in this file.
 
 ---
 
-## [1.0.2] - 2026-01-05
+## [1.0.3] - 2026-01-05
 
 ### 🚀 Major Architecture Change
 
@@ -96,7 +96,7 @@ This provides:
 
 ---
 
-## [1.0.1] - 2026-01-02
+## [1.0.2] - 2026-01-02
 
 ### Added
 
