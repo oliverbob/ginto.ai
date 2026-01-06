@@ -2,6 +2,33 @@
 
 All notable changes to Ginto will be documented in this file.
 
+## [1.0.3] - 2026-01-06
+
+### Added
+
+- **Orphaned Image Detection** in LXC Manager
+  - Images now show status indicators (red = orphaned/safe to delete, green = in use, amber = template)
+  - Image detail view displays status badges and explanatory text
+  - API returns `is_orphaned` and `in_use` flags for each image
+
+- **One-Click Domain Assignment** for containers
+  - New `/admin/hosting/domains/quick-assign` API endpoint
+  - Styled modal replaces browser `prompt()` dialog
+  - Async API call without page redirect
+  - Auto-creates Caddy config, DNS zone, and A records in single operation
+
+- **Container Owner Display** in LXC Manager
+  - Added Owner column showing username and full name
+  - Properly extracts sandbox ID from container names (`ginto-sandbox-{id}`)
+
+### Fixed
+
+- **Container Proxy 403 Error** - `/root` directory permissions set to 755 during sandbox creation
+  - Caddy runs as `caddy` user and needs read access to web roots under `/root`
+  - Applied fix to both `LxdSandboxManager.php` and `ginto.sh`
+
+---
+
 ## [1.0.2] - 2026-01-05
 
 ### 🚀 Major Architecture Change

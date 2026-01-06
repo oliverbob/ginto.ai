@@ -32,6 +32,13 @@ https://github.com/user-attachments/assets/62220ea5-453b-4774-b13a-1cca89f728ff
 *Left: Interactive web console with full terminal emulation for sandbox access. Right: Proxmox-style LXC/LXD admin interface for container and image management.*
 
 <p align="center">
+  <img src="public/assets/images/dns.png" alt="Ginto AI DNS Manager - PowerDNS zone management" width="48%">
+  <img src="public/assets/images/hosting.png" alt="Ginto AI Hosting Panel - Server administration dashboard" width="48%">
+</p>
+
+*Left: DNS Zone Manager with PowerDNS integration — full support for A, AAAA, CNAME, MX, TXT, NS, SRV, CAA, and SOA records. Right: Server Hosting Panel with system stats, service management, database provisioning, and firewall controls.*
+
+<p align="center">
   <img src="public/assets/images/network.png" alt="Ginto AI Network Dashboard - Dark theme" width="48%">
   <img src="public/assets/images/models.png" alt="Ginto AI Network Dashboard - Light theme" width="48%">
 </p>
