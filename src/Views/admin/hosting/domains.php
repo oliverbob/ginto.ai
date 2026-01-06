@@ -83,14 +83,15 @@ $currentPage = 'domains';
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">Owner Username</label>
-            <input type="text" name="owner_username" id="owner-username" placeholder="Search username..." list="owner-username-list"
+            <input type="text" name="owner_username" id="owner-username" placeholder="Search username..." list="owner-username-list" autocomplete="off"
               class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
             <datalist id="owner-username-list"></datalist>
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Owner Full Name</label>
-            <input type="text" name="owner_fullname" id="owner-fullname" placeholder="Auto-filled from username" readonly
-              class="w-full px-3 py-2 border rounded-lg bg-gray-100 dark:bg-gray-600 border-gray-300 dark:border-gray-600 text-gray-500">
+            <input type="text" name="owner_fullname" id="owner-fullname" placeholder="Search or type name..." list="owner-fullname-list" autocomplete="off"
+              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <datalist id="owner-fullname-list"></datalist>
           </div>
         </div>
 
@@ -102,6 +103,7 @@ $currentPage = 'domains';
             <option value="none">Standard (Document Root)</option>
             <option value="lxc" id="lxc-option">LXC/LXD Container</option>
             <option value="docker" id="docker-option">Docker Container</option>
+            <option value="internal">Internal IP (Custom)</option>
             <option value="external">External IP/Port</option>
           </select>
         </div>
@@ -149,6 +151,23 @@ $currentPage = 'domains';
           <label class="block text-sm font-medium mb-1">Proxy Target (IP:Port)</label>
           <input type="text" name="external_target" placeholder="192.168.1.100:8080"
             class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+        </div>
+
+        <!-- Internal IP Options -->
+        <div id="internal-options" class="hidden">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium mb-1">Internal IP</label>
+              <input type="text" name="internal_ip" id="internal-ip" placeholder="10.185.95.100"
+                class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            </div>
+            <div>
+              <label class="block text-sm font-medium mb-1">Port</label>
+              <input type="number" name="internal_port" id="internal-port" value="80" placeholder="80"
+                class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            </div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Use for custom implementations on internal network IPs</p>
         </div>
 
         <!-- SSL Option (always visible) -->
@@ -212,11 +231,20 @@ $currentPage = 'domains';
           dockerSelect.innerHTML = '<option value="">No running Docker containers</option>';
         }
         
-        // Populate owner username datalist
+        // Populate owner username datalist with ALL users
         const ownerDatalist = document.getElementById('owner-username-list');
-        if (containerData.users_with_sandboxes?.length) {
-          ownerDatalist.innerHTML = containerData.users_with_sandboxes.map(u => 
+        const allUsers = containerData.all_users || [];
+        if (allUsers.length) {
+          ownerDatalist.innerHTML = allUsers.map(u => 
             `<option value="${u.username}" data-fullname="${u.fullname || ''}">${u.username} - ${u.fullname || 'No name'}</option>`
+          ).join('');
+        }
+
+        // Populate owner fullname datalist with ALL users
+        const fullnameDatalist = document.getElementById('owner-fullname-list');
+        if (allUsers.length) {
+          fullnameDatalist.innerHTML = allUsers.filter(u => u.fullname).map(u => 
+            `<option value="${u.fullname}" data-username="${u.username}">${u.fullname} (${u.username})</option>`
           ).join('');
         }
         
@@ -244,12 +272,23 @@ $currentPage = 'domains';
       }
     }
 
-    // Auto-fill fullname when typing username
+    // Auto-fill fullname when selecting/typing username
     document.getElementById('owner-username').addEventListener('input', function() {
       const username = this.value;
-      const user = containerData.users_with_sandboxes?.find(u => u.username === username);
+      const allUsers = containerData.all_users || [];
+      const user = allUsers.find(u => u.username === username);
       if (user) {
-        document.getElementById('owner-fullname').value = user.name || '';
+        document.getElementById('owner-fullname').value = user.fullname || '';
+      }
+    });
+
+    // Auto-fill username when selecting/typing fullname
+    document.getElementById('owner-fullname').addEventListener('input', function() {
+      const fullname = this.value;
+      const allUsers = containerData.all_users || [];
+      const user = allUsers.find(u => u.fullname === fullname);
+      if (user) {
+        document.getElementById('owner-username').value = user.username || '';
       }
     });
 
@@ -259,6 +298,7 @@ $currentPage = 'domains';
       document.getElementById('lxc-options').classList.toggle('hidden', type !== 'lxc');
       document.getElementById('docker-options').classList.toggle('hidden', type !== 'docker');
       document.getElementById('external-options').classList.toggle('hidden', type !== 'external');
+      document.getElementById('internal-options').classList.toggle('hidden', type !== 'internal');
     }
 
     async function loadDomains() {
@@ -343,13 +383,17 @@ $currentPage = 'domains';
         const lxcSelect = document.getElementById('lxc-container-select');
         const lxcPort = form.get('lxc_port') || '80';
         proxyTarget = lxcSelect.value + ':' + lxcPort;
-        proxyContainerName = lxcSelect.options[lxcSelect.selectedIndex]?.text.split(' ')[0];
+        proxyContainerName = lxcSelect.options[lxcSelect.selectedIndex]?.dataset.name;
       } else if (proxyType === 'docker') {
         const dockerSelect = document.getElementById('docker-container-select');
         proxyTarget = dockerSelect.value;
         proxyContainerName = dockerSelect.options[dockerSelect.selectedIndex]?.dataset.name;
       } else if (proxyType === 'external') {
         proxyTarget = form.get('external_target');
+      } else if (proxyType === 'internal') {
+        const internalIp = form.get('internal_ip');
+        const internalPort = form.get('internal_port') || '80';
+        proxyTarget = internalIp + ':' + internalPort;
       }
 
       try {

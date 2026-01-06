@@ -210,13 +210,25 @@ class HostingController
                 // Ignore
             }
 
+            // Get ALL users for owner search (limit 500)
+            $allUsers = [];
+            try {
+                $allUsers = $this->db->select('users', ['id', 'username', 'fullname'], [
+                    'ORDER' => ['username' => 'ASC'],
+                    'LIMIT' => 500
+                ]) ?: [];
+            } catch (\Exception $e) {
+                // Ignore
+            }
+
             echo json_encode([
                 'success' => true,
                 'lxd_installed' => $this->isLxdInstalled(),
                 'docker_installed' => $this->isDockerInstalled(),
                 'lxc_containers' => $lxcContainers,
                 'docker_containers' => $dockerContainers,
-                'users_with_sandboxes' => $usersWithSandboxes
+                'users_with_sandboxes' => $usersWithSandboxes,
+                'all_users' => $allUsers
             ]);
         } catch (\Throwable $e) {
             echo json_encode(['success' => false, 'error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
