@@ -611,7 +611,7 @@ class HostingController
         $config .= "    root * {$root}\n";
         
         if ($php) {
-            $config .= "    php_fastcgi unix//run/php/php8.3-fpm.sock\n";
+            $config .= "    php_fastcgi unix/run/php/php8.3-fpm.sock\n";
         }
         
         $config .= "    file_server\n";
