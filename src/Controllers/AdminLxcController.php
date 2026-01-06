@@ -369,15 +369,36 @@ class AdminLxcController
                 exit;
             }
             
+            // Get list of containers to check which images are in use
+            $containersOutput = shell_exec("sudo $lxcBin list --format json 2>&1");
+            $containers = json_decode($containersOutput, true) ?: [];
+            
+            // Build a set of fingerprints that are in use (base images of containers)
+            $usedFingerprints = [];
+            foreach ($containers as $c) {
+                // The container's config shows which image it was created from
+                $baseImage = $c['config']['volatile.base_image'] ?? '';
+                if ($baseImage) {
+                    $usedFingerprints[$baseImage] = true;
+                }
+            }
+            
+            // Also mark images with aliases as "in use" (they are intentional templates)
             $result = [];
             foreach ($images as $img) {
+                $fingerprint = $img['fingerprint'] ?? '';
                 $alias = '';
                 if (!empty($img['aliases'])) {
                     $alias = $img['aliases'][0]['name'] ?? '';
                 }
                 
+                // Image is orphaned if: no alias AND not used by any container
+                $hasAlias = !empty($alias);
+                $isUsedByContainer = isset($usedFingerprints[$fingerprint]);
+                $isOrphaned = !$hasAlias && !$isUsedByContainer;
+                
                 $result[] = [
-                    'fingerprint' => $img['fingerprint'] ?? '',
+                    'fingerprint' => $fingerprint,
                     'alias' => $alias,
                     'description' => $img['properties']['description'] ?? ($img['update_source']['alias'] ?? ''),
                     'size' => $img['size'] ?? 0,
@@ -385,6 +406,8 @@ class AdminLxcController
                     'type' => $img['type'] ?? 'container',
                     'uploaded_at' => $img['uploaded_at'] ?? null,
                     'properties' => $img['properties'] ?? [],
+                    'is_orphaned' => $isOrphaned,
+                    'in_use' => $isUsedByContainer,
                 ];
             }
             

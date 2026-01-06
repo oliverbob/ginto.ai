@@ -730,37 +730,70 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
       modal.style.display = 'none';
     };
     
-    window.confirmAssignDomain = function() {
+    window.confirmAssignDomain = async function() {
       const input = document.getElementById('assign-domain-input');
+      const submitBtn = document.getElementById('assign-domain-submit');
       const domain = input.value.trim();
+      
       if (!domain) {
         input.focus();
         return;
       }
       
-      closeAssignDomainModal();
+      // Disable button and show loading
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
       
-      // Redirect to the hosting domains page with pre-filled container info
-      const params = new URLSearchParams({
-        action: 'add',
-        domain: domain,
-        container: assignDomainData.containerName,
-        ip: assignDomainData.containerIp || ''
-      });
-      window.location.href = '/admin/hosting/domains?' + params.toString();
+      try {
+        const res = await fetch('/admin/hosting/domains/quick-assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            csrf_token: csrfToken,
+            domain: domain,
+            container: assignDomainData.containerName,
+            ip: assignDomainData.containerIp || ''
+          })
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+          closeAssignDomainModal();
+          showToast(`Domain ${domain} assigned successfully!`, 'success');
+        } else {
+          showToast(data.error || 'Failed to assign domain', 'error');
+        }
+      } catch (e) {
+        showToast('Error: ' + e.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-check"></i> Assign Domain';
+      }
     };
 
     function renderResourceTree() {
       // Images
       const imagesList = document.getElementById('images-list');
-      imagesList.innerHTML = images.map(img => `
+      imagesList.innerHTML = images.map(img => {
+        // Status indicator for orphaned/in-use
+        let statusIcon = '';
+        let statusClass = 'text-amber-400'; // Default
+        if (img.is_orphaned) {
+          statusIcon = '<span class="ml-1 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Orphaned - safe to delete"></span>';
+          statusClass = 'text-red-400';
+        } else if (img.in_use) {
+          statusIcon = '<span class="ml-1 w-1.5 h-1.5 rounded-full bg-green-500 flex-shrink-0" title="In use by container"></span>';
+          statusClass = 'text-green-400';
+        }
+        return `
         <div class="resource-tree-item flex items-center gap-2 px-3 py-1.5 rounded cursor-pointer text-sm min-w-0" 
              data-type="image" data-id="${img.fingerprint}" onclick="selectImage('${img.fingerprint}')">
-          <i class="fas fa-layer-group text-amber-400 text-xs flex-shrink-0"></i>
-          <span class="truncate flex-1 min-w-0">${img.alias || img.fingerprint.substring(0, 12)}</span>
+          <i class="fas fa-layer-group ${statusClass} text-xs flex-shrink-0"></i>
+          <span class="truncate flex-1 min-w-0">${img.alias || img.fingerprint.substring(0, 12)}</span>${statusIcon}
           <span class="text-xs text-gray-500 flex-shrink-0">${formatBytes(img.size || 0)}</span>
         </div>
-      `).join('');
+      `}).join('');
       
       // Containers
       const containersList = document.getElementById('containers-list');
@@ -971,10 +1004,20 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
       document.getElementById('image-name').textContent = selectedImage.alias || 'Image';
       document.getElementById('image-fingerprint').textContent = fingerprint;
       
+      // Status badge for orphaned/in-use
+      let statusBadge = '';
+      if (selectedImage.is_orphaned) {
+        statusBadge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-red-500/20 text-red-400 border border-red-500/30">Orphaned - Safe to Delete</span>';
+      } else if (selectedImage.in_use) {
+        statusBadge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">In Use</span>';
+      } else if (selectedImage.alias) {
+        statusBadge = '<span class="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">Template</span>';
+      }
+      
       const content = document.getElementById('image-content');
       content.innerHTML = `
         <div class="lxc-card rounded-sm p-3 sm:p-4 border">
-          <h4 class="font-medium mb-2 sm:mb-3 text-sm sm:text-base">Image Details</h4>
+          <h4 class="font-medium mb-2 sm:mb-3 text-sm sm:text-base flex items-center flex-wrap">Image Details${statusBadge}</h4>
           <div class="space-y-2 text-xs sm:text-sm">
             <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Alias:</span><span class="truncate text-right">${selectedImage.alias || '-'}</span></div>
             <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Fingerprint:</span><span class="font-mono text-xs truncate text-right">${fingerprint.substring(0, 12)}...</span></div>
@@ -983,6 +1026,7 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Architecture:</span><span class="text-right">${selectedImage.architecture || '-'}</span></div>
             <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Type:</span><span class="text-right">${selectedImage.type || '-'}</span></div>
             <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Uploaded:</span><span class="truncate text-right">${selectedImage.uploaded_at ? new Date(selectedImage.uploaded_at).toLocaleString() : '-'}</span></div>
+            <div class="flex justify-between gap-2"><span class="text-gray-500 dark:text-gray-400 flex-shrink-0">Status:</span><span class="text-right">${selectedImage.is_orphaned ? '<span class="text-red-400">Orphaned - safe to delete</span>' : (selectedImage.in_use ? '<span class="text-green-400">In use by container</span>' : '<span class="text-blue-400">Template image</span>')}</span></div>
           </div>
         </div>
         <div class="lxc-card rounded-sm p-3 sm:p-4 border">
@@ -1804,9 +1848,9 @@ if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
         <button onclick="closeAssignDomainModal()" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-lg font-medium transition-colors">
           Cancel
         </button>
-        <button onclick="confirmAssignDomain()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
-          <i class="fas fa-arrow-right"></i>
-          Continue
+        <button id="assign-domain-submit" onclick="confirmAssignDomain()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium flex items-center gap-2 transition-colors">
+          <i class="fas fa-check"></i>
+          Assign Domain
         </button>
       </div>
     </div>

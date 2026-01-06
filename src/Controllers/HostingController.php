@@ -165,6 +165,87 @@ class HostingController
     }
 
     /**
+     * Quick one-click domain assignment to container
+     * POST /admin/hosting/api/quick-assign
+     */
+    public function quickAssignDomain(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+            exit;
+        }
+        
+        $this->validateCsrf();
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        
+        $domain = trim($input['domain'] ?? '');
+        $containerName = trim($input['container'] ?? '');
+        $containerIp = trim($input['ip'] ?? '');
+        
+        if (empty($domain)) {
+            echo json_encode(['success' => false, 'error' => 'Domain is required']);
+            exit;
+        }
+        
+        if (empty($containerName) || empty($containerIp)) {
+            echo json_encode(['success' => false, 'error' => 'Container name and IP are required']);
+            exit;
+        }
+        
+        // Get owner info from container
+        $ownerInfo = $this->getContainerOwnerInfo($containerName);
+        
+        // Create the domain with container proxy
+        $result = $this->createDomain([
+            'domain' => $domain,
+            'proxy_type' => 'container',
+            'proxy_target' => "http://{$containerIp}:80",
+            'proxy_container_name' => $containerName,
+            'ssl' => true,
+            'owner_username' => $ownerInfo['username'] ?? '',
+            'owner_fullname' => $ownerInfo['fullname'] ?? ''
+        ]);
+        
+        echo json_encode($result);
+        exit;
+    }
+    
+    /**
+     * Get container owner info from client_sandboxes table
+     */
+    private function getContainerOwnerInfo(string $containerName): array
+    {
+        try {
+            // Extract sandbox ID from container name (e.g., "ginto-sandbox-abc123" -> "abc123")
+            $sandboxId = $containerName;
+            if (preg_match('/^ginto-sandbox-(.+)$/', $containerName, $matches)) {
+                $sandboxId = $matches[1];
+            }
+            
+            $stmt = $this->db->pdo->prepare("
+                SELECT u.username, u.fullname
+                FROM client_sandboxes cs
+                JOIN users u ON cs.user_id = u.id
+                WHERE cs.sandbox_id = ?
+                LIMIT 1
+            ");
+            $stmt->execute([$sandboxId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            
+            if ($row) {
+                return $row;
+            }
+        } catch (\Throwable $e) {
+            // Ignore
+        }
+        return [];
+    }
+
+    /**
      * Domains API - List/Create virtual hosts
      */
     public function domainsApi(): void

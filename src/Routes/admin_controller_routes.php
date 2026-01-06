@@ -106,6 +106,7 @@ $req('/hosting', 'HostingController@index');
 // Virtual Hosts / Domains
 $req('/hosting/domains', 'HostingController@domains');
 $req('/hosting/domains/api', 'HostingController@domainsApi');
+$req('/hosting/domains/quick-assign', 'HostingController@quickAssignDomain', ['POST']);
 $req('/hosting/domains/containers', 'HostingController@containersApi');
 $req('/hosting/domains/{domain}', 'HostingController@domainAction');
 
