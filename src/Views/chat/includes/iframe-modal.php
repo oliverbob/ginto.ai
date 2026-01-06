@@ -72,10 +72,39 @@
   </div>
 </div>
 
-<!-- Minimized Iframe Tabs Container (stacked vertically) -->
-<div id="iframe-minimized-container" class="fixed bottom-20 right-4 z-[55] flex flex-col items-end gap-3"></div>
+<!-- Minimized Iframe Tabs Container (stacked vertically above composer) -->
+<div id="iframe-minimized-container" class="fixed bottom-32 right-4 z-[55] flex flex-col items-end gap-2"></div>
 
 <style>
+/* Minimized tab - circle by default, expands on hover */
+.minimized-tab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.minimized-tab:hover {
+  width: auto;
+  border-radius: 9999px;
+}
+.minimized-tab .tab-title,
+.minimized-tab .tab-close {
+  opacity: 0;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.minimized-tab:hover .tab-title,
+.minimized-tab:hover .tab-close {
+  opacity: 1;
+  width: auto;
+}
+.minimized-tab:hover .tab-close {
+  padding-right: 0.75rem;
+}
+</style>
 .iframe-modal-normal {
   width: calc(100vw - 80px);
   height: calc(100vh - 80px);
@@ -174,13 +203,13 @@
     
     const btn = document.createElement('div');
     btn.id = 'minimized-' + tab.id;
-    btn.className = 'flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-lg transition-colors cursor-pointer';
+    btn.className = 'minimized-tab flex items-center bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg cursor-pointer';
     btn.innerHTML = `
-      <button class="flex items-center gap-2 px-4 py-2 flex-1" title="Restore ${tab.title}">
-        <div class="w-4 h-4">${tab.icon || getDefaultIcon()}</div>
-        <span class="text-sm font-medium max-w-[120px] truncate">${tab.title}</span>
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="Restore ${tab.title}">
+        <div class="w-5 h-5 flex-shrink-0">${tab.icon || getDefaultIcon()}</div>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">${tab.title}</span>
       </button>
-      <button class="pr-3 text-white/70 hover:text-red-300 transition-colors tab-close" title="Close">
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0" title="Close">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
         </svg>
