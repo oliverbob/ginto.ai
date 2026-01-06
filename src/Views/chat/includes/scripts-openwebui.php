@@ -78,7 +78,11 @@
     e.preventDefault();
     
     if (isInstalling) {
-      showToast('Installation in progress, please wait...', 'info');
+      showToast('Installation in progress - check the Console', 'info');
+      // Open console to show progress
+      if (typeof window.openConsoleWithCommand === 'function') {
+        window.openConsoleWithCommand('');
+      }
       return;
     }
     
@@ -90,10 +94,10 @@
     }
     
     if (!openWebuiInstalled) {
-      // Install OpenWebUI
+      // Install OpenWebUI via Console so user can see progress
       const confirmed = await showConfirmModal({
         title: 'Install OpenWebUI',
-        message: 'Install OpenWebUI in your sandbox? This may take several minutes.',
+        message: 'Install OpenWebUI in your sandbox? This will open a Console to show installation progress.',
         confirmText: 'Install',
         confirmIcon: 'fa-download',
         type: 'info'
@@ -105,8 +109,8 @@
       
       isInstalling = true;
       updateOpenWebuiUI();
-      showToast('Installing OpenWebUI... This may take 5-10 minutes.', 'info', 10000);
       
+      // First, create the install script via API
       try {
         const csrfToken = await getCsrfToken();
         const res = await fetch('/api/sandbox/openwebui/install', {
@@ -115,20 +119,47 @@
         });
         const data = await res.json();
         
-        if (data.success) {
-          openWebuiInstalled = true;
-          showToast('OpenWebUI installed successfully!', 'success');
-          // Start it after install
-          await startOpenWebUI();
+        if (!data.success) {
+          showToast('Failed to prepare install: ' + (data.error || 'Unknown error'), 'error');
+          isInstalling = false;
+          updateOpenWebuiUI();
+          return;
+        }
+        
+        // Open console and run the install script
+        if (typeof window.openConsoleWithCommand === 'function') {
+          window.openConsoleWithCommand('bash ~/install-openwebui.sh');
         } else {
-          showToast('Installation failed: ' + (data.error || 'Unknown error'), 'error');
+          showToast('Console not available', 'error');
+          isInstalling = false;
+          updateOpenWebuiUI();
+          return;
         }
       } catch (e) {
-        showToast('Installation failed: ' + e.message, 'error');
-      } finally {
+        showToast('Failed to prepare install: ' + e.message, 'error');
         isInstalling = false;
-        await checkOpenWebuiStatus();
+        updateOpenWebuiUI();
+        return;
       }
+      
+      // Poll for completion
+      const pollInstall = setInterval(async () => {
+        await checkOpenWebuiStatus();
+        if (openWebuiInstalled) {
+          clearInterval(pollInstall);
+          isInstalling = false;
+          updateOpenWebuiUI();
+          showToast('OpenWebUI installed! Click to open.', 'success');
+        }
+      }, 10000); // Check every 10 seconds
+      
+      // Stop polling after 15 minutes
+      setTimeout(() => {
+        clearInterval(pollInstall);
+        isInstalling = false;
+        updateOpenWebuiUI();
+      }, 15 * 60 * 1000);
+      
       return;
     }
     

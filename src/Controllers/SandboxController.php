@@ -1028,10 +1028,10 @@ class SandboxController
             $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
-            // Check if OpenWebUI directory exists
+            // Check if OpenWebUI is installed (marker file or pip package)
             [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
-                "test -d $homeDir/open-webui && test -f $homeDir/open-webui/backend/requirements.txt && echo 'installed'",
+                "(test -f $homeDir/open-webui/.installed || which open-webui > /dev/null 2>&1 || test -f $homeDir/.local/bin/open-webui) && echo 'installed'",
                 $homeDir,
                 10
             );
@@ -1066,7 +1066,7 @@ class SandboxController
     }
     
     /**
-     * Install OpenWebUI in user's sandbox
+     * Install OpenWebUI in user's sandbox - creates install script for Console to run
      */
     public function openwebuiInstall(): void
     {
@@ -1090,125 +1090,119 @@ class SandboxController
             $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
-            // Different install scripts for Docker (Debian-based) vs LXD (Alpine)
+            // Create install script content - use pip install open-webui (the recommended way)
             if ($backend === 'docker') {
-                $installScript = <<<BASH
+                $installScript = <<<'BASH'
 #!/bin/bash
 set -e
+echo "=== Installing OpenWebUI ==="
+echo ""
 
-# Install Python dependencies (Debian-based)
-apt-get update -qq
-apt-get install -y -qq python3 python3-pip python3-venv git nodejs npm curl
+# Install Python and pip if needed
+echo "Installing Python dependencies..."
+sudo apt-get update -qq
+sudo apt-get install -y -qq python3 python3-pip python3-venv curl
 
-# Clone OpenWebUI if not exists
-if [ ! -d $homeDir/open-webui ]; then
-    cd $homeDir
-    git clone https://github.com/open-webui/open-webui.git --depth 1
-fi
+# Install OpenWebUI via pip (recommended method)
+echo ""
+echo "Installing OpenWebUI via pip..."
+pip3 install --user open-webui
 
-cd $homeDir/open-webui
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install backend dependencies
-cd backend
-pip install --no-cache-dir -r requirements.txt -q
-
-# Build frontend
-cd $homeDir/open-webui
-npm install
-npm run build
+# Create data directory
+mkdir -p ~/open-webui-data
 
 # Create startup script
-cat > $homeDir/start-openwebui.sh << 'EOF'
+cat > ~/start-openwebui.sh << 'EOF'
 #!/bin/bash
-cd $homeDir/open-webui/backend
-source ../venv/bin/activate
-export DATA_DIR=$homeDir/open-webui/data
-mkdir -p \$DATA_DIR
-exec python -m open_webui --port 3000 --host 0.0.0.0
+export DATA_DIR=~/open-webui-data
+export WEBUI_AUTH=false
+~/.local/bin/open-webui serve --host 0.0.0.0 --port 3000
 EOF
-chmod +x $homeDir/start-openwebui.sh
+chmod +x ~/start-openwebui.sh
 
-echo "OPENWEBUI_INSTALLED"
+# Mark as installed
+touch ~/open-webui/.installed 2>/dev/null || mkdir -p ~/open-webui && touch ~/open-webui/.installed
+
+echo ""
+echo "=== OpenWebUI Installed Successfully! ==="
+echo ""
+echo "To start OpenWebUI, run:"
+echo "  ~/start-openwebui.sh"
+echo ""
+echo "Or click 'Start OpenWebUI' in the sidebar."
 BASH;
             } else {
                 // LXD/Alpine install script
-                $installScript = <<<BASH
+                $installScript = <<<'BASH'
 #!/bin/sh
 set -e
+echo "=== Installing OpenWebUI ==="
+echo ""
 
-# Install Python dependencies (Alpine)
-apk add --no-cache python3 py3-pip py3-virtualenv git nodejs npm
+# Install Python and pip
+echo "Installing Python dependencies..."
+apk add --no-cache python3 py3-pip curl
 
-# Clone OpenWebUI if not exists
-if [ ! -d $homeDir/open-webui ]; then
-    cd $homeDir
-    git clone https://github.com/open-webui/open-webui.git --depth 1
-fi
+# Install OpenWebUI via pip
+echo ""
+echo "Installing OpenWebUI via pip..."
+pip3 install --user open-webui
 
-cd $homeDir/open-webui
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install backend dependencies
-cd backend
-pip install --no-cache-dir -r requirements.txt -q
-
-# Build frontend
-cd $homeDir/open-webui
-npm install
-npm run build
+# Create data directory
+mkdir -p ~/open-webui-data
 
 # Create startup script
-cat > $homeDir/start-openwebui.sh << 'EOF'
+cat > ~/start-openwebui.sh << 'EOF'
 #!/bin/sh
-cd $homeDir/open-webui/backend
-source ../venv/bin/activate
-export DATA_DIR=$homeDir/open-webui/data
-mkdir -p \$DATA_DIR
-exec python -m open_webui --port 3000 --host 0.0.0.0
+export DATA_DIR=~/open-webui-data
+export WEBUI_AUTH=false
+~/.local/bin/open-webui serve --host 0.0.0.0 --port 3000
 EOF
-chmod +x $homeDir/start-openwebui.sh
+chmod +x ~/start-openwebui.sh
+
+# Mark as installed
+mkdir -p ~/open-webui && touch ~/open-webui/.installed
 
 # Update Caddy to forward port 80 to 3000
-cat > /etc/caddy/Caddyfile << 'EOF'
+cat > /etc/caddy/Caddyfile << 'CADDYEOF'
 :80 {
     reverse_proxy localhost:3000
 }
-EOF
+CADDYEOF
 
 # Restart Caddy
 rc-service caddy restart 2>/dev/null || true
 
-echo "OPENWEBUI_INSTALLED"
+echo ""
+echo "=== OpenWebUI Installed Successfully! ==="
+echo ""
+echo "To start OpenWebUI, run:"
+echo "  ~/start-openwebui.sh"
+echo ""
+echo "Or click 'Start OpenWebUI' in the sidebar."
 BASH;
             }
             
-            // Execute installation (longer timeout for npm install)
+            // Write the install script to the sandbox
             [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
-                $installScript,
+                "cat > $homeDir/install-openwebui.sh << 'SCRIPTEOF'\n" . $installScript . "\nSCRIPTEOF\nchmod +x $homeDir/install-openwebui.sh && echo 'SCRIPT_CREATED'",
                 $homeDir,
-                600 // 10 minute timeout
+                10
             );
             
-            if (strpos($output, 'OPENWEBUI_INSTALLED') !== false) {
+            if (strpos($output, 'SCRIPT_CREATED') !== false) {
                 echo json_encode([
                     'success' => true,
-                    'message' => 'OpenWebUI installed successfully',
+                    'message' => 'Install script created. Run it in Console.',
+                    'script' => "$homeDir/install-openwebui.sh",
                     'backend' => $backend
                 ]);
             } else {
                 echo json_encode([
                     'success' => false,
-                    'error' => 'Installation may have failed',
+                    'error' => 'Failed to create install script',
                     'output' => $output,
-                    'exit_code' => $code,
                     'backend' => $backend
                 ]);
             }
