@@ -254,65 +254,157 @@ $currentPage = 'domains';
     // Initialize autocomplete for owner fields
     let usernameAutocomplete, fullnameAutocomplete;
     
+    // Build users with containers data from containerData
+    function getUsersWithContainers() {
+      const users = [];
+      const seen = new Set();
+      
+      // Get users from LXC containers that have owners
+      (containerData.lxc_containers || []).forEach(c => {
+        if (c.owner_username && !seen.has(c.owner_username)) {
+          seen.add(c.owner_username);
+          users.push({
+            username: c.owner_username,
+            fullname: c.owner_fullname || '',
+            container_name: c.name,
+            container_ip: c.ip,
+            container_type: 'lxc'
+          });
+        }
+      });
+      
+      // Also add users from users_with_sandboxes if they have matching containers
+      (containerData.users_with_sandboxes || []).forEach(u => {
+        if (!seen.has(u.username)) {
+          // Find their container
+          const container = (containerData.lxc_containers || []).find(c => 
+            c.owner_username === u.username
+          );
+          if (container) {
+            seen.add(u.username);
+            users.push({
+              username: u.username,
+              fullname: u.fullname || '',
+              container_name: container.name,
+              container_ip: container.ip,
+              container_type: 'lxc'
+            });
+          }
+        }
+      });
+      
+      return users;
+    }
+    
     function initOwnerAutocomplete() {
-      // Username autocomplete
-      usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
-        placeholder: 'Search username...',
-        searchApi: '/admin/users/search?q=',
-        minChars: 2,
-        renderItem: (user) => `
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              ${esc((user.username || '?')[0].toUpperCase())}
+      // Wait for containers to load, then init with local data
+      const initWithData = () => {
+        const usersWithContainers = getUsersWithContainers();
+        
+        // Username autocomplete - only users with containers
+        usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
+          placeholder: 'Search owner with container...',
+          data: usersWithContainers,
+          minChars: 1,
+          renderItem: (user) => `
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                ${esc((user.username || '?')[0].toUpperCase())}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.username)}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${esc(user.fullname || 'No name')}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-medium text-emerald-600 dark:text-emerald-400">${esc(user.container_name)}</div>
+                <div class="text-xs text-gray-400">${esc(user.container_ip || 'No IP')}</div>
+              </div>
             </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.username)}</div>
-              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">${esc(user.fullname || user.email || 'No name')}</div>
-            </div>
-          </div>
-        `,
-        onSelect: (user) => {
-          document.getElementById('owner-username-hidden').value = user.username;
-          // Auto-fill fullname
-          if (user.fullname && fullnameAutocomplete) {
-            fullnameAutocomplete.setValue(user.fullname);
-            document.getElementById('owner-fullname-hidden').value = user.fullname;
-          }
-        },
-        onChange: (value) => {
-          document.getElementById('owner-username-hidden').value = value;
-        }
-      });
-
-      // Fullname autocomplete
-      fullnameAutocomplete = GintoUI.autocomplete('#owner-fullname-wrapper', {
-        placeholder: 'Search name...',
-        searchApi: '/admin/users/search?q=',
-        minChars: 2,
-        renderItem: (user) => `
-          <div class="flex items-center gap-3">
-            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
-              ${esc((user.fullname || user.username || '?')[0].toUpperCase())}
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.fullname || user.username)}</div>
-              <div class="text-xs text-gray-500 dark:text-gray-400 truncate">@${esc(user.username)}</div>
-            </div>
-          </div>
-        `,
-        getDisplayValue: (user) => user.fullname || user.username,
-        onSelect: (user) => {
-          document.getElementById('owner-fullname-hidden').value = user.fullname || '';
-          // Auto-fill username
-          if (user.username && usernameAutocomplete) {
-            usernameAutocomplete.setValue(user.username);
+          `,
+          onSelect: (user) => {
             document.getElementById('owner-username-hidden').value = user.username;
+            // Auto-fill fullname
+            if (user.fullname && fullnameAutocomplete) {
+              fullnameAutocomplete.setValue(user.fullname);
+              document.getElementById('owner-fullname-hidden').value = user.fullname;
+            }
+            // Auto-select their container
+            selectUserContainer(user);
+          },
+          onChange: (value) => {
+            document.getElementById('owner-username-hidden').value = value;
           }
-        },
-        onChange: (value) => {
-          document.getElementById('owner-fullname-hidden').value = value;
+        });
+
+        // Fullname autocomplete - only users with containers
+        fullnameAutocomplete = GintoUI.autocomplete('#owner-fullname-wrapper', {
+          placeholder: 'Search name...',
+          data: usersWithContainers,
+          minChars: 1,
+          renderItem: (user) => `
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                ${esc((user.fullname || user.username || '?')[0].toUpperCase())}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold text-gray-900 dark:text-white truncate">${esc(user.fullname || user.username)}</div>
+                <div class="text-xs text-gray-500 dark:text-gray-400 truncate">@${esc(user.username)}</div>
+              </div>
+              <div class="text-right">
+                <div class="text-xs font-medium text-blue-600 dark:text-blue-400">${esc(user.container_name)}</div>
+                <div class="text-xs text-gray-400">${esc(user.container_ip || 'No IP')}</div>
+              </div>
+            </div>
+          `,
+          getDisplayValue: (user) => user.fullname || user.username,
+          onSelect: (user) => {
+            document.getElementById('owner-fullname-hidden').value = user.fullname || '';
+            // Auto-fill username
+            if (user.username && usernameAutocomplete) {
+              usernameAutocomplete.setValue(user.username);
+              document.getElementById('owner-username-hidden').value = user.username;
+            }
+            // Auto-select their container
+            selectUserContainer(user);
+          },
+          onChange: (value) => {
+            document.getElementById('owner-fullname-hidden').value = value;
+          }
+        });
+      };
+      
+      // Check if containers already loaded, otherwise wait
+      if (containerData.lxc_containers) {
+        initWithData();
+      } else {
+        // Poll until containers load
+        const checkInterval = setInterval(() => {
+          if (containerData.lxc_containers) {
+            clearInterval(checkInterval);
+            initWithData();
+          }
+        }, 100);
+      }
+    }
+    
+    // Auto-select container when owner is chosen
+    function selectUserContainer(user) {
+      if (user.container_type === 'lxc' && user.container_ip) {
+        // Switch to LXC hosting type
+        document.getElementById('proxy-type').value = 'lxc';
+        toggleProxyOptions();
+        
+        // Select the container in dropdown
+        const select = document.getElementById('lxc-container-select');
+        for (let i = 0; i < select.options.length; i++) {
+          if (select.options[i].value === user.container_ip + ':80') {
+            select.selectedIndex = i;
+            break;
+          }
         }
-      });
+        
+        GintoUI.success(`Selected container ${user.container_name} for ${user.username}`);
+      }
     }
 
     // Auto-fill owner when selecting LXC container
