@@ -1090,14 +1090,16 @@ class SandboxController
             // Use apk for Alpine Linux sandboxes, create venv for PEP 668 compliance
             // Use rustup for latest Rust (chromadb needs Cargo lockfile v4)
             // Install py3-opencv from apk to avoid compiling from source (OOM with 1GB)
+            // Skip opencv-python-headless (use system py3-opencv) to avoid OOM
             $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
-                'ffmpeg libmagic curl py3-pip py3-virtualenv py3-numpy py3-opencv && ' .
+                'ffmpeg libmagic curl py3-pip py3-virtualenv py3-numpy py3-opencv cmake && ' .
                 'apk del cargo rust 2>/dev/null; ' .
                 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && ' .
                 'source $HOME/.cargo/env && ' .
                 'python3 -m venv --system-site-packages /home/sandbox/openwebui-venv && ' .
                 'source /home/sandbox/openwebui-venv/bin/activate && ' .
-                'pip install --upgrade pip && ' .
+                'pip install --upgrade pip setuptools wheel && ' .
+                'pip install --no-cache-dir --no-build-isolation opencv-python-headless || true && ' .
                 'pip install --no-cache-dir open-webui && ' .
                 'open-webui serve';
             
