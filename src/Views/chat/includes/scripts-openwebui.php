@@ -221,7 +221,7 @@
       // Set a flag so after sandbox is created, we auto-install OpenWebUI
       window.pendingOpenWebuiInstall = true;
       console.log('[OWUI DEBUG] Set pendingOpenWebuiInstall = true');
-      showToast('Please accept the terms to create a sandbox first', 'info');
+      showToast('Please accept the terms to create a sandbox first to install OpenWebUI', 'info');
       
       // Trigger the sandbox wizard (same as "My Files" does)
       if (typeof showSandboxWizard === 'function') {
