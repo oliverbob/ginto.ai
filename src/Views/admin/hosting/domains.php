@@ -192,6 +192,14 @@ $currentPage = 'domains';
     const csrfToken = '<?= $csrfToken ?>';
     let containerData = { lxc_containers: [], docker_containers: [], lxd_installed: false, docker_installed: false };
 
+    // HTML escape function for XSS protection
+    function esc(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
     // Load available containers on page load
     async function loadContainers() {
       try {
@@ -209,13 +217,13 @@ $currentPage = 'domains';
         }
         containerData = JSON.parse(text);
         
-        // Populate LXC dropdown with owner info
+        // Populate LXC dropdown with owner info (escaped for XSS protection)
         const lxcSelect = document.getElementById('lxc-container-select');
         if (containerData.lxc_containers?.length) {
           lxcSelect.innerHTML = '<option value="">-- Select Container --</option>' + containerData.lxc_containers.map(c => {
-            const ownerInfo = c.owner_username ? ` [${c.owner_username}]` : '';
+            const ownerInfo = c.owner_username ? ` [${esc(c.owner_username)}]` : '';
             const statusIcon = c.status === 'running' ? '🟢' : '⚪';
-            return `<option value="${c.ip || ''}" data-name="${c.name}" data-owner="${c.owner_username || ''}" data-fullname="${c.owner_fullname || ''}" data-status="${c.status}">${statusIcon} ${c.name}${ownerInfo} ${c.ip ? '(' + c.ip + ')' : '(no IP)'}</option>`;
+            return `<option value="${esc(c.ip || '')}" data-name="${esc(c.name)}" data-owner="${esc(c.owner_username || '')}" data-fullname="${esc(c.owner_fullname || '')}" data-status="${esc(c.status)}">${statusIcon} ${esc(c.name)}${ownerInfo} ${c.ip ? '(' + esc(c.ip) + ')' : '(no IP)'}</option>`;
           }).join('');
         } else {
           lxcSelect.innerHTML = '<option value="">No LXC containers found</option>';
@@ -225,26 +233,26 @@ $currentPage = 'domains';
         const dockerSelect = document.getElementById('docker-container-select');
         if (containerData.docker_containers?.length) {
           dockerSelect.innerHTML = '<option value="">-- Select Container --</option>' + containerData.docker_containers.map(c => 
-            `<option value="127.0.0.1:${c.port}" data-name="${c.name}">${c.name} (port ${c.port || 'N/A'})</option>`
+            `<option value="127.0.0.1:${esc(c.port)}" data-name="${esc(c.name)}">${esc(c.name)} (port ${esc(c.port) || 'N/A'})</option>`
           ).join('');
         } else {
           dockerSelect.innerHTML = '<option value="">No running Docker containers</option>';
         }
         
-        // Populate owner username datalist with ALL users
+        // Populate owner username datalist with ALL users (escaped for XSS protection)
         const ownerDatalist = document.getElementById('owner-username-list');
         const allUsers = containerData.all_users || [];
         if (allUsers.length) {
           ownerDatalist.innerHTML = allUsers.map(u => 
-            `<option value="${u.username}" data-fullname="${u.fullname || ''}">${u.username} - ${u.fullname || 'No name'}</option>`
+            `<option value="${esc(u.username)}" data-fullname="${esc(u.fullname || '')}">${esc(u.username)} - ${esc(u.fullname) || 'No name'}</option>`
           ).join('');
         }
 
-        // Populate owner fullname datalist with ALL users
+        // Populate owner fullname datalist with ALL users (escaped for XSS protection)
         const fullnameDatalist = document.getElementById('owner-fullname-list');
         if (allUsers.length) {
           fullnameDatalist.innerHTML = allUsers.filter(u => u.fullname).map(u => 
-            `<option value="${u.fullname}" data-username="${u.username}">${u.fullname} (${u.username})</option>`
+            `<option value="${esc(u.fullname)}" data-username="${esc(u.username)}">${esc(u.fullname)} (${esc(u.username)})</option>`
           ).join('');
         }
         
