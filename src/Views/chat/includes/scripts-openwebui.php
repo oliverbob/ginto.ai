@@ -126,9 +126,10 @@
           return;
         }
         
-        // Open console and run the install script
+        // Open console and run the install script (use path from API response)
         if (typeof window.openConsoleWithCommand === 'function') {
-          window.openConsoleWithCommand('bash ~/install-openwebui.sh');
+          const scriptPath = data.script || '~/install-openwebui.sh';
+          window.openConsoleWithCommand('bash ' + scriptPath);
         } else {
           showToast('Console not available', 'error');
           isInstalling = false;

@@ -1090,7 +1090,7 @@ class SandboxController
             $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
             $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
-            // Create install script content - use pip install open-webui (the recommended way)
+            // Create install script - git clone then run
             if ($backend === 'docker') {
                 $installScript = <<<'BASH'
 #!/bin/bash
@@ -1098,30 +1098,47 @@ set -e
 echo "=== Installing OpenWebUI ==="
 echo ""
 
-# Install Python and pip if needed
-echo "Installing Python dependencies..."
+# Install dependencies
+echo "Installing dependencies..."
 sudo apt-get update -qq
-sudo apt-get install -y -qq python3 python3-pip python3-venv curl
+sudo apt-get install -y -qq git python3 python3-pip python3-venv nodejs npm curl
 
-# Install OpenWebUI via pip (recommended method)
+# Clone OpenWebUI
 echo ""
-echo "Installing OpenWebUI via pip..."
-pip3 install --user open-webui
+echo "Cloning OpenWebUI..."
+cd ~
+if [ -d "open-webui" ]; then
+    echo "Directory exists, pulling latest..."
+    cd open-webui && git pull
+else
+    git clone https://github.com/open-webui/open-webui.git
+    cd open-webui
+fi
 
-# Create data directory
-mkdir -p ~/open-webui-data
+# Install backend dependencies
+echo ""
+echo "Installing Python dependencies..."
+pip3 install -r requirements.txt --user 2>/dev/null || pip3 install -r backend/requirements.txt --user
+
+# Install frontend dependencies
+echo ""
+echo "Installing Node dependencies..."
+cd frontend 2>/dev/null || true
+npm install 2>/dev/null || true
+cd ..
 
 # Create startup script
 cat > ~/start-openwebui.sh << 'EOF'
 #!/bin/bash
+cd ~/open-webui
 export DATA_DIR=~/open-webui-data
 export WEBUI_AUTH=false
-~/.local/bin/open-webui serve --host 0.0.0.0 --port 3000
+./start.sh 2>/dev/null || python3 -m open_webui.main --host 0.0.0.0 --port 3000
 EOF
 chmod +x ~/start-openwebui.sh
 
 # Mark as installed
-touch ~/open-webui/.installed 2>/dev/null || mkdir -p ~/open-webui && touch ~/open-webui/.installed
+touch ~/open-webui/.installed
 
 echo ""
 echo "=== OpenWebUI Installed Successfully! ==="
@@ -1139,29 +1156,46 @@ set -e
 echo "=== Installing OpenWebUI ==="
 echo ""
 
-# Install Python and pip
-echo "Installing Python dependencies..."
-apk add --no-cache python3 py3-pip curl
+# Install dependencies
+echo "Installing dependencies..."
+apk add --no-cache git python3 py3-pip nodejs npm curl
 
-# Install OpenWebUI via pip
+# Clone OpenWebUI
 echo ""
-echo "Installing OpenWebUI via pip..."
-pip3 install --user open-webui
+echo "Cloning OpenWebUI..."
+cd ~
+if [ -d "open-webui" ]; then
+    echo "Directory exists, pulling latest..."
+    cd open-webui && git pull
+else
+    git clone https://github.com/open-webui/open-webui.git
+    cd open-webui
+fi
 
-# Create data directory
-mkdir -p ~/open-webui-data
+# Install backend dependencies
+echo ""
+echo "Installing Python dependencies..."
+pip3 install -r requirements.txt --user 2>/dev/null || pip3 install -r backend/requirements.txt --user
+
+# Install frontend dependencies  
+echo ""
+echo "Installing Node dependencies..."
+cd frontend 2>/dev/null || true
+npm install 2>/dev/null || true
+cd ..
 
 # Create startup script
 cat > ~/start-openwebui.sh << 'EOF'
 #!/bin/sh
+cd ~/open-webui
 export DATA_DIR=~/open-webui-data
 export WEBUI_AUTH=false
-~/.local/bin/open-webui serve --host 0.0.0.0 --port 3000
+./start.sh 2>/dev/null || python3 -m open_webui.main --host 0.0.0.0 --port 3000
 EOF
 chmod +x ~/start-openwebui.sh
 
 # Mark as installed
-mkdir -p ~/open-webui && touch ~/open-webui/.installed
+touch ~/open-webui/.installed
 
 # Update Caddy to forward port 80 to 3000
 cat > /etc/caddy/Caddyfile << 'CADDYEOF'
