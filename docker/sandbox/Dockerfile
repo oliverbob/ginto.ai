@@ -80,7 +80,9 @@ RUN apk add --no-cache \
     # Web server (optional for dev)
     caddy \
     # Supervisor for process management
-    supervisor
+    supervisor \
+    # Docker CLI for running containers
+    docker-cli
 
 # Create symlinks for PHP
 RUN ln -sf /usr/bin/php83 /usr/bin/php && \

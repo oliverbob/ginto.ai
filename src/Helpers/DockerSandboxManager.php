@@ -406,6 +406,7 @@ class DockerSandboxManager
         $pidsLimit = $options['pids_limit'] ?? self::DEFAULT_PIDS_LIMIT;
         
         // Build docker run command
+        // Mount Docker socket to allow Docker-in-Docker for OpenWebUI etc.
         $cmd = self::DOCKER_CMD . ' run -d ' .
                '--name ' . escapeshellarg($name) . ' ' .
                '--network ' . escapeshellarg(self::SANDBOX_NETWORK) . ' ' .
@@ -415,6 +416,7 @@ class DockerSandboxManager
                '--pids-limit=' . escapeshellarg((string)$pidsLimit) . ' ' .
                '--restart=unless-stopped ' .
                '--hostname=' . escapeshellarg('sandbox-' . substr($sandboxId, 0, 8)) . ' ' .
+               '-v /var/run/docker.sock:/var/run/docker.sock ' .
                '-e SANDBOX_ID=' . escapeshellarg($sandboxId) . ' ' .
                '-e SANDBOX_IP=' . escapeshellarg($ip) . ' ' .
                self::BASE_IMAGE . ' 2>&1';
