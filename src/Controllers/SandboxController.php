@@ -1267,12 +1267,18 @@ class SandboxController
                 exit;
             }
             
-            // Security: Only allow checking URLs on same host or localhost
+            // Security: Only allow checking URLs on same host, localhost, or private IPs
             $host = parse_url($url, PHP_URL_HOST);
             $serverHost = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
             $allowedHosts = ['localhost', '127.0.0.1', $serverHost, $_SERVER['SERVER_ADDR'] ?? ''];
             
-            if (!in_array($host, $allowedHosts)) {
+            // Also allow private IP ranges (10.x.x.x, 192.168.x.x, 172.16-31.x.x)
+            $isPrivateIp = filter_var($host, FILTER_VALIDATE_IP) && (
+                filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE) === false ||
+                $host === '127.0.0.1'
+            );
+            
+            if (!in_array($host, $allowedHosts) && !$isPrivateIp) {
                 echo json_encode(['success' => false, 'error' => 'URL host not allowed']);
                 exit;
             }
