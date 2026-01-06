@@ -888,34 +888,29 @@ class HostingController
             }
         }
 
-        // Save to database
+        // Save to database using Medoo
         try {
-            $stmt = $this->db->prepare("
-                INSERT INTO virtual_hosts 
-                (domain, document_root, owner_username, owner_fullname, proxy_type, proxy_target, proxy_container_name, enable_php, enable_ssl, is_enabled)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
-                ON DUPLICATE KEY UPDATE
-                document_root = VALUES(document_root),
-                owner_username = VALUES(owner_username),
-                owner_fullname = VALUES(owner_fullname),
-                proxy_type = VALUES(proxy_type),
-                proxy_target = VALUES(proxy_target),
-                proxy_container_name = VALUES(proxy_container_name),
-                enable_php = VALUES(enable_php),
-                enable_ssl = VALUES(enable_ssl)
-            ");
-            $stmt->execute([
-                $domain,
-                $proxyType === 'none' ? $root : null,
-                $ownerUsername,
-                $ownerFullname,
-                $proxyType,
-                $proxyTarget,
-                $proxyContainerName,
-                $php ? 1 : 0,
-                $ssl ? 1 : 0
-            ]);
-        } catch (\PDOException $e) {
+            // Check if exists first
+            $exists = $this->db->has('virtual_hosts', ['domain' => $domain]);
+            $data = [
+                'domain' => $domain,
+                'document_root' => $proxyType === 'none' ? $root : null,
+                'owner_username' => $ownerUsername,
+                'owner_fullname' => $ownerFullname,
+                'proxy_type' => $proxyType,
+                'proxy_target' => $proxyTarget,
+                'proxy_container_name' => $proxyContainerName,
+                'enable_php' => $php ? 1 : 0,
+                'enable_ssl' => $ssl ? 1 : 0,
+                'is_enabled' => 1
+            ];
+            
+            if ($exists) {
+                $this->db->update('virtual_hosts', $data, ['domain' => $domain]);
+            } else {
+                $this->db->insert('virtual_hosts', $data);
+            }
+        } catch (\Exception $e) {
             // Table might not exist yet, but config file was created
             error_log("Failed to save domain to database: " . $e->getMessage());
         }
@@ -1006,11 +1001,10 @@ class HostingController
         if (file_exists($enabled)) unlink($enabled);
         if (file_exists($available)) unlink($available);
         
-        // Also remove from database
+        // Also remove from database using Medoo
         try {
-            $stmt = $this->db->prepare("DELETE FROM virtual_hosts WHERE domain = ?");
-            $stmt->execute([$domain]);
-        } catch (\PDOException $e) {
+            $this->db->delete('virtual_hosts', ['domain' => $domain]);
+        } catch (\Exception $e) {
             // Table might not exist yet
         }
         
