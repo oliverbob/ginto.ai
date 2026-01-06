@@ -6,13 +6,14 @@ FROM node:20-alpine
 LABEL maintainer="Ginto AI <support@ginto.ai>"
 LABEL description="Node.js services for Ginto AI (sandbox-proxy, terminal-server)"
 
-# Install system dependencies for node-pty
+# Install system dependencies for node-pty and Docker CLI
 RUN apk add --no-cache \
     python3 \
     make \
     g++ \
     bash \
-    curl
+    curl \
+    docker-cli
 
 # Create app directory
 WORKDIR /app
