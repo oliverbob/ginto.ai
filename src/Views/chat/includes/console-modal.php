@@ -51,50 +51,7 @@ if (empty($isAdmin)) return;
   </div>
 </div>
 
-<!-- Minimized Console Indicator (Floating) -->
-<div id="console-minimized" class="fixed bottom-36 right-4 z-50 hidden">
-  <button id="restore-console" class="console-minimized-tab flex items-center bg-gray-800 hover:bg-gray-700 text-white shadow-lg border border-gray-600 cursor-pointer">
-    <div class="flex items-center justify-center gap-2 p-3 flex-shrink-0">
-      <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
-      </svg>
-      <span class="console-tab-title text-sm font-medium whitespace-nowrap">Console Running</span>
-      <span id="console-minimized-status" class="console-tab-status text-xs px-1.5 py-0.5 rounded bg-green-600 text-white">●</span>
-    </div>
-  </button>
-</div>
-
-<style>
-/* Console minimized tab - circle by default, expands on hover */
-.console-minimized-tab {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-.console-minimized-tab:hover {
-  width: auto;
-  border-radius: 9999px;
-}
-.console-minimized-tab .console-tab-title,
-.console-minimized-tab .console-tab-status {
-  opacity: 0;
-  width: 0;
-  padding: 0;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-.console-minimized-tab:hover .console-tab-title {
-  opacity: 1;
-  width: auto;
-}
-.console-minimized-tab:hover .console-tab-status {
-  opacity: 1;
-  width: auto;
-  padding: 0.125rem 0.375rem;
-}
-</style>
+<!-- Minimized Console uses shared iframe-minimized-container -->
 
 <script>
 (function() {
@@ -118,45 +75,115 @@ if (empty($isAdmin)) return;
   const RECONNECT_DELAY_MS = 2000;
   
   const minimizeBtn = document.getElementById('minimize-console');
-  const restoreBtn = document.getElementById('restore-console');
-  const minimizedIndicator = document.getElementById('console-minimized');
-  const minimizedStatus = document.getElementById('console-minimized-status');
+  const sharedMinimizedContainer = document.getElementById('iframe-minimized-container');
+  let consoleMinimizedEl = null;
+  
+  const CONSOLE_STORAGE_KEY = 'ginto_console_minimized';
+  
+  // Create minimized console indicator dynamically
+  function createConsoleMinimizedIndicator() {
+    if (consoleMinimizedEl) return;
+    
+    const div = document.createElement('div');
+    div.id = 'console-minimized-indicator';
+    div.className = 'minimized-tab flex items-center bg-gray-800 hover:bg-gray-700 text-white shadow-lg border border-gray-600 cursor-pointer';
+    div.innerHTML = `
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0">
+        <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
+        </svg>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">Console</span>
+      </button>
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0 pr-3" title="Close Console">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    `;
+    
+    // Click to restore
+    div.querySelector('button:first-child').addEventListener('click', restoreConsole);
+    // Close button
+    div.querySelector('.tab-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      closeConsoleCompletely();
+    });
+    
+    if (sharedMinimizedContainer) {
+      sharedMinimizedContainer.appendChild(div);
+    }
+    consoleMinimizedEl = div;
+  }
+  
+  function removeConsoleMinimizedIndicator() {
+    if (consoleMinimizedEl) {
+      consoleMinimizedEl.remove();
+      consoleMinimizedEl = null;
+    }
+  }
+  
+  function saveConsoleState() {
+    try {
+      localStorage.setItem(CONSOLE_STORAGE_KEY, JSON.stringify({ 
+        isMinimized: isMinimized,
+        hasOpenTabs: tabs.length > 0
+      }));
+    } catch (e) {}
+  }
+  
+  function loadConsoleState() {
+    try {
+      const data = JSON.parse(localStorage.getItem(CONSOLE_STORAGE_KEY) || '{}');
+      if (data.isMinimized && data.hasOpenTabs) {
+        // Console was minimized with open tabs - show minimized indicator
+        isMinimized = true;
+        createConsoleMinimizedIndicator();
+      }
+    } catch (e) {}
+  }
   
   function updateStatus(status, color) {
     statusEl.textContent = status;
     statusEl.className = 'ml-auto text-xs px-2 py-0.5 rounded-full ' + color;
-    if (minimizedStatus) {
-      if (status === 'Connected') {
-        minimizedStatus.className = 'text-xs px-1.5 py-0.5 rounded bg-green-600 text-white';
-        minimizedStatus.textContent = '●';
-      } else {
-        minimizedStatus.className = 'text-xs px-1.5 py-0.5 rounded bg-yellow-600 text-white';
-        minimizedStatus.textContent = '○';
-      }
-    }
   }
   
   function minimizeConsole() {
     isMinimized = true;
     modal.classList.add('hidden');
-    if (minimizedIndicator) minimizedIndicator.classList.remove('hidden');
+    createConsoleMinimizedIndicator();
+    saveConsoleState();
   }
   
   function restoreConsole() {
     isMinimized = false;
-    if (minimizedIndicator) minimizedIndicator.classList.add('hidden');
+    removeConsoleMinimizedIndicator();
     modal.classList.remove('hidden');
     const activeTab = tabs.find(t => t.id === activeTabId);
     if (activeTab && activeTab.fitAddon && activeTab.term) {
       setTimeout(() => activeTab.fitAddon.fit(), 100);
     }
+    saveConsoleState();
+  }
+  
+  function closeConsoleCompletely() {
+    // Close all tabs and remove minimized indicator
+    tabs.forEach(t => {
+      if (t.ws) t.ws.close();
+    });
+    tabs = [];
+    isMinimized = false;
+    removeConsoleMinimizedIndicator();
+    modal.classList.add('hidden');
+    localStorage.removeItem(CONSOLE_STORAGE_KEY);
   }
   
   window.minimizeConsole = minimizeConsole;
   window.restoreConsole = restoreConsole;
   
   if (minimizeBtn) minimizeBtn.onclick = minimizeConsole;
-  if (restoreBtn) restoreBtn.onclick = restoreConsole;
+  
+  // Load console state on init
+  loadConsoleState();
   
   function createTab(initialCommand, targetMode = null) {
     tabCounter++;
@@ -409,6 +436,8 @@ if (empty($isAdmin)) return;
   function openConsole(initialCommand) {
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+    isMinimized = false;
+    removeConsoleMinimizedIndicator();
     
     // Create first tab if none exist
     if (tabs.length === 0) {
@@ -426,6 +455,7 @@ if (empty($isAdmin)) return;
         }
       }
     }
+    saveConsoleState();
   }
   
   // Open console with command - creates new tab if session already active
@@ -433,7 +463,7 @@ if (empty($isAdmin)) return;
   window.openConsoleWithCommand = function(command, targetMode = null) {
     // Hide minimized indicator if visible
     isMinimized = false;
-    if (minimizedIndicator) minimizedIndicator.classList.add('hidden');
+    removeConsoleMinimizedIndicator();
     
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
@@ -445,11 +475,13 @@ if (empty($isAdmin)) return;
       // Already have active session(s) - create new tab for this command
       createTab(command, targetMode);
     }
+    saveConsoleState();
   };
   
   function closeConsole() {
     modal.classList.add('hidden');
     document.body.style.overflow = '';
+    removeConsoleMinimizedIndicator();
     
     // Close all tabs
     tabs.forEach(tab => {
@@ -463,6 +495,8 @@ if (empty($isAdmin)) return;
     });
     tabs = [];
     activeTabId = null;
+    isMinimized = false;
+    localStorage.removeItem(CONSOLE_STORAGE_KEY);
   }
   
   openBtn.addEventListener('click', function(e) {
