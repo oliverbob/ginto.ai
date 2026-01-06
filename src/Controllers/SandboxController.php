@@ -1094,7 +1094,9 @@ class SandboxController
                 '-v open-webui:/app/backend/data ' .
                 '-e WEBUI_AUTH=false ' .
                 'ghcr.io/open-webui/open-webui:main && ' .
-                'echo "OpenWebUI started on port 8088"';
+                'IP=$(hostname -i 2>/dev/null | awk \'{print $1}\' || ip route get 1 | awk \'{print $7}\') && ' .
+                'echo "" && echo "✅ OpenWebUI installed successfully!" && ' .
+                'echo "🌐 Access it at: http://${IP}:8088/"';
             
             echo json_encode([
                 'success' => true,
