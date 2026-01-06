@@ -179,9 +179,16 @@ $currentPage = 'domains';
         const res = await fetch('/admin/hosting/domains/containers', { credentials: 'include' });
         if (!res.ok) {
           console.error('Failed to load containers:', res.status);
+          document.getElementById('lxc-container-select').innerHTML = '<option value="">Error loading (status ' + res.status + ')</option>';
           return;
         }
-        containerData = await res.json();
+        const text = await res.text();
+        console.log('Container API response:', text);
+        if (!text) {
+          document.getElementById('lxc-container-select').innerHTML = '<option value="">Empty response from server</option>';
+          return;
+        }
+        containerData = JSON.parse(text);
         
         // Populate LXC dropdown with owner info
         const lxcSelect = document.getElementById('lxc-container-select');
