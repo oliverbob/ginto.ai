@@ -61,13 +61,8 @@ class UserController extends \Core\Controller
             $displayName = $user['username'];
         }
 
-        // Check if user is admin
-        $isAdmin = false;
-        if (!empty($_SESSION['is_admin']) ||
-            (!empty($_SESSION['role']) && strtolower($_SESSION['role']) === 'admin') ||
-            (!empty($user['role_id']) && in_array((int)$user['role_id'], [1, 2], true))) {
-            $isAdmin = true;
-        }
+        // Check if user is admin using the foolproof static method
+        $isAdmin = self::isAdmin($_SESSION);
 
         // Load playground_use_sandbox preference from database if not already in session
         if (!isset($_SESSION['playground_use_sandbox'])) {
