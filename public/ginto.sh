@@ -1060,6 +1060,7 @@ EOF'
     
     log_info "Setting permissions..."
     $LXC_CMD exec "$container" -- chown -R nobody:nobody /root
+    $LXC_CMD exec "$container" -- chmod 755 /root
     
     log_info "Stopping container and publishing as image..."
     $LXC_CMD stop "$container"

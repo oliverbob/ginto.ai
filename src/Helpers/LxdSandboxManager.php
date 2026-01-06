@@ -909,6 +909,9 @@ class LxdSandboxManager
         // Ensure /root/ has the standard directories
         exec(self::LXC_CMD . " exec $name -- sh -c 'mkdir -p /root/Desktop /root/Documents /root/Downloads /root/Music /root/Pictures /root/Videos /root/Websites' 2>&1");
         
+        // Fix /root permissions so Caddy (running as caddy user) can read files
+        exec(self::LXC_CMD . " exec $name -- chmod 755 /root 2>&1");
+        
         // Update Caddyfile to serve from /root/ (in case template has old /home/ config)
         exec(self::LXC_CMD . " exec $name -- sh -c 'sed -i \"s|root \\* /home|root * /root|g\" /etc/caddy/Caddyfile 2>/dev/null || true' 2>&1");
         
