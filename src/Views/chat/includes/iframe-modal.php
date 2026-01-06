@@ -65,7 +65,7 @@
       <div id="iframe-modal-loading" class="absolute inset-0 bg-gray-900 flex items-center justify-center">
         <div class="flex flex-col items-center gap-4">
           <div class="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-          <span class="text-gray-400 text-sm">Loading...</span>
+          <span id="iframe-modal-loading-text" class="text-gray-400 text-sm">Loading...</span>
         </div>
       </div>
     </div>
@@ -129,6 +129,7 @@
   const container = document.getElementById('iframe-modal-container');
   const iframe = document.getElementById('iframe-modal-frame');
   const loading = document.getElementById('iframe-modal-loading');
+  const loadingText = document.getElementById('iframe-modal-loading-text');
   const titleEl = document.getElementById('iframe-modal-title');
   const urlEl = document.getElementById('iframe-modal-url');
   const iconEl = document.getElementById('iframe-modal-icon');
@@ -276,7 +277,7 @@
   /**
    * Open URL in iframe modal
    * @param {string} url - URL to load
-   * @param {object} options - { title, icon (svg html string) }
+   * @param {object} options - { title, icon (svg html string), loadingMessage, waitForReady }
    */
   window.openIframeModal = function(url, options = {}) {
     // Check if this URL is already open in a tab
@@ -297,7 +298,51 @@
       isMaximized: false
     };
     tabs.push(tab);
-    showTab(tab);
+    
+    // If waitForReady is true, show modal with loading message first
+    if (options.waitForReady) {
+      showTabWithLoading(tab, options.loadingMessage || 'Starting service...');
+    } else {
+      showTab(tab);
+    }
+  };
+  
+  // Show tab with loading state (doesn't load iframe yet)
+  function showTabWithLoading(tab, message) {
+    titleEl.textContent = tab.title;
+    urlEl.textContent = tab.url;
+    if (tab.icon) {
+      iconEl.innerHTML = tab.icon;
+    } else {
+      iconEl.innerHTML = getDefaultIcon();
+    }
+    
+    // Show loading with custom message
+    loadingText.textContent = message;
+    loading.classList.remove('hidden');
+    iframe.src = 'about:blank'; // Don't load yet
+    
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+    activeTabId = tab.id;
+    
+    tab.isMinimized = false;
+    removeMinimizedTab(tab.id);
+    saveTabs();
+  }
+  
+  // Update loading message for current tab
+  window.updateIframeLoadingMessage = function(message) {
+    loadingText.textContent = message;
+  };
+  
+  // Load the iframe URL (after waiting for service to be ready)
+  window.loadIframeUrl = function(url) {
+    const tab = tabs.find(t => t.id === activeTabId);
+    if (tab && tab.url === url) {
+      loadingText.textContent = 'Loading...';
+      iframe.src = url;
+    }
   };
   
   // Close specific tab
