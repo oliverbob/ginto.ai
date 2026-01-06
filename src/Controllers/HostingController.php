@@ -926,7 +926,118 @@ class HostingController
         // Reload Caddy
         $this->runCommand('sudo systemctl reload caddy');
 
-        return ['success' => true, 'message' => "Domain {$domain} created"];
+        // Auto-create DNS zone and A record if zone doesn't exist
+        $dnsResult = $this->autoCreateDnsForDomain($domain);
+        if (!$dnsResult['success']) {
+            error_log("DNS auto-create warning: " . ($dnsResult['error'] ?? 'unknown'));
+        }
+
+        $message = "Domain {$domain} created";
+        if ($dnsResult['success'] && $dnsResult['created']) {
+            $message .= " with DNS records";
+        }
+
+        return ['success' => true, 'message' => $message, 'dns' => $dnsResult];
+    }
+
+    /**
+     * Auto-create DNS zone and A record for a domain
+     */
+    private function autoCreateDnsForDomain(string $domain): array
+    {
+        try {
+            // Get the server's public IP
+            $serverIp = $this->getServerPublicIp();
+            if (!$serverIp) {
+                return ['success' => false, 'error' => 'Could not determine server IP', 'created' => false];
+            }
+
+            // Check if zone already exists
+            $existingZone = $this->db->get('dns_zones', 'id', ['name' => $domain]);
+            
+            if (!$existingZone) {
+                // Create the zone
+                $zoneResult = $this->createDnsZone(['zone' => $domain, 'type' => 'NATIVE']);
+                if (!$zoneResult['success']) {
+                    return ['success' => false, 'error' => $zoneResult['error'] ?? 'Failed to create zone', 'created' => false];
+                }
+            }
+
+            // Get the zone ID
+            $zoneId = $this->db->get('dns_zones', 'id', ['name' => $domain]);
+            
+            // Check if A record for root domain already exists
+            $existingA = $this->db->get('dns_records', 'id', [
+                'zone_id' => $zoneId,
+                'name' => $domain,
+                'type' => 'A'
+            ]);
+
+            if (!$existingA) {
+                // Add A record for root domain
+                $this->db->insert('dns_records', [
+                    'zone_id' => $zoneId,
+                    'name' => $domain,
+                    'type' => 'A',
+                    'content' => $serverIp,
+                    'ttl' => 3600
+                ]);
+
+                // Add www subdomain A record
+                $this->db->insert('dns_records', [
+                    'zone_id' => $zoneId,
+                    'name' => "www.{$domain}",
+                    'type' => 'A',
+                    'content' => $serverIp,
+                    'ttl' => 3600
+                ]);
+            }
+
+            // Sync to PowerDNS
+            $this->syncZoneToPowerDNS($domain);
+
+            return ['success' => true, 'created' => !$existingZone, 'ip' => $serverIp];
+        } catch (\Exception $e) {
+            return ['success' => false, 'error' => $e->getMessage(), 'created' => false];
+        }
+    }
+
+    /**
+     * Get server's public IP address
+     */
+    private function getServerPublicIp(): ?string
+    {
+        // Try to get from environment first
+        $ip = $_ENV['SERVER_IP'] ?? null;
+        if ($ip) return $ip;
+
+        // Try to get from hostname
+        $output = shell_exec('hostname -I 2>/dev/null');
+        if ($output) {
+            $ips = explode(' ', trim($output));
+            foreach ($ips as $ip) {
+                $ip = trim($ip);
+                // Skip private IPs (10.x, 192.168.x, 172.16-31.x)
+                if (!preg_match('/^(10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[01])\.)/', $ip) && filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    return $ip;
+                }
+            }
+            // If no public IP found, return first IPv4
+            foreach ($ips as $ip) {
+                $ip = trim($ip);
+                if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                    return $ip;
+                }
+            }
+        }
+
+        // Fallback: try external service
+        $ip = @file_get_contents('https://api.ipify.org?format=text');
+        if ($ip && filter_var(trim($ip), FILTER_VALIDATE_IP)) {
+            return trim($ip);
+        }
+
+        return null;
     }
 
     private function generateCaddyConfig(string $domain, string $root, bool $php, bool $ssl, string $proxyType = 'none', ?string $proxyTarget = null): string
