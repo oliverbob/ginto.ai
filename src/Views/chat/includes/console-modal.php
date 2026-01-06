@@ -272,12 +272,17 @@ if (empty($isAdmin)) return;
     }
   }
   
-  function connectTab(tab) {
+  async function connectTab(tab) {
     if (tab.ws && tab.ws.readyState === WebSocket.OPEN) return;
     if (tab.reconnectTimeout) { clearTimeout(tab.reconnectTimeout); tab.reconnectTimeout = null; }
     
     if (tab.id === activeTabId) {
       updateStatus('Connecting...', 'bg-yellow-600 text-yellow-100');
+    }
+    
+    // Wait for auth to be ready
+    if (window.GINTO_AUTH_PROMISE) {
+      await window.GINTO_AUTH_PROMISE;
     }
     
     const host = window.location.hostname || '127.0.0.1';
@@ -288,6 +293,8 @@ if (empty($isAdmin)) return;
     // Check if user has a sandbox - connect to sandbox terminal, otherwise host terminal (admin only)
     const isAdmin = window.GINTO_AUTH?.isAdmin || false;
     const sandboxId = window.GINTO_AUTH?.sandbox?.id || null;
+    
+    console.log('[Console] Auth ready, sandboxId:', sandboxId, 'isAdmin:', isAdmin);
     
     let wsUrl;
     
