@@ -39,6 +39,7 @@ $sandboxBackend = \Ginto\Helpers\UnifiedSandbox::getBackend();
   <?php include __DIR__ . '/includes/modals.php'; ?>
   <?php include __DIR__ . '/includes/editor-modal.php'; ?>
   <?php include __DIR__ . '/includes/console-modal.php'; ?>
+  <?php include __DIR__ . '/includes/iframe-modal.php'; ?>
   <?php include __DIR__ . '/includes/settings-panel.php'; ?>
 
   <!-- Scripts -->
