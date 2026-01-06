@@ -185,6 +185,27 @@ class HostingController
     }
 
     /**
+     * Get available containers for proxy dropdown
+     */
+    public function containersApi(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+
+        $lxcContainers = $this->isLxdInstalled() ? $this->getAvailableLxcContainers() : [];
+        $dockerContainers = $this->isDockerInstalled() ? $this->getAvailableDockerContainers() : [];
+
+        echo json_encode([
+            'success' => true,
+            'lxd_installed' => $this->isLxdInstalled(),
+            'docker_installed' => $this->isDockerInstalled(),
+            'lxc_containers' => $lxcContainers,
+            'docker_containers' => $dockerContainers
+        ]);
+        exit;
+    }
+
+    /**
      * Domain actions (start/stop/delete/ssl)
      */
     public function domainAction(string $domain): void
@@ -545,7 +566,30 @@ class HostingController
         $domains = [];
         $seenDomains = [];
         
-        // Parse main Caddyfile for domains
+        // First, get domains from database with owner info
+        try {
+            $stmt = $this->db->query("SELECT * FROM virtual_hosts ORDER BY domain ASC");
+            $dbDomains = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            foreach ($dbDomains as $d) {
+                $seenDomains[$d['domain']] = true;
+                $domains[] = [
+                    'id' => $d['id'],
+                    'name' => $d['domain'],
+                    'enabled' => (bool)$d['is_enabled'],
+                    'ssl' => $this->hasSSL($d['domain']),
+                    'root' => $d['document_root'] ?: $this->getDomainRoot($d['domain']),
+                    'owner_username' => $d['owner_username'],
+                    'owner_fullname' => $d['owner_fullname'],
+                    'proxy_type' => $d['proxy_type'] ?: 'none',
+                    'proxy_target' => $d['proxy_target'],
+                    'proxy_container_name' => $d['proxy_container_name']
+                ];
+            }
+        } catch (\PDOException $e) {
+            // Table might not exist yet, fall back to file-based listing
+        }
+        
+        // Parse main Caddyfile for domains not in database
         $caddyFile = '/etc/caddy/Caddyfile';
         if (file_exists($caddyFile)) {
             $content = file_get_contents($caddyFile);
@@ -557,7 +601,12 @@ class HostingController
                         'name' => $domain,
                         'enabled' => true,
                         'ssl' => $this->hasSSL($domain),
-                        'root' => $this->getDomainRoot($domain)
+                        'root' => $this->getDomainRoot($domain),
+                        'owner_username' => null,
+                        'owner_fullname' => null,
+                        'proxy_type' => 'none',
+                        'proxy_target' => null,
+                        'proxy_container_name' => null
                     ];
                 }
             }
@@ -576,7 +625,12 @@ class HostingController
                             'name' => $domain,
                             'enabled' => true,
                             'ssl' => $this->hasSSL($domain),
-                            'root' => $this->getDomainRoot($domain)
+                            'root' => $this->getDomainRoot($domain),
+                            'owner_username' => null,
+                            'owner_fullname' => null,
+                            'proxy_type' => 'none',
+                            'proxy_target' => null,
+                            'proxy_container_name' => null
                         ];
                     }
                 }
@@ -598,7 +652,12 @@ class HostingController
                             'name' => $domain,
                             'enabled' => file_exists($enabledFile),
                             'ssl' => $this->hasSSL($domain),
-                            'root' => $this->getDomainRoot($domain)
+                            'root' => $this->getDomainRoot($domain),
+                            'owner_username' => null,
+                            'owner_fullname' => null,
+                            'proxy_type' => 'none',
+                            'proxy_target' => null,
+                            'proxy_container_name' => null
                         ];
                     }
                 }
@@ -608,24 +667,120 @@ class HostingController
         return $domains;
     }
 
+    /**
+     * Get available LXC containers for proxy dropdown
+     */
+    private function getAvailableLxcContainers(): array
+    {
+        $containers = [];
+        $output = [];
+        exec("lxc list --format csv -c ns4 2>/dev/null", $output, $code);
+        
+        if ($code === 0) {
+            foreach ($output as $line) {
+                $parts = str_getcsv($line);
+                if (count($parts) >= 3) {
+                    $name = trim($parts[0]);
+                    $status = strtolower(trim($parts[1]));
+                    $ipv4 = trim($parts[2] ?? '');
+                    
+                    // Extract just the IP
+                    if (preg_match('/^([\d.]+)/', $ipv4, $m)) {
+                        $ipv4 = $m[1];
+                    }
+                    
+                    if ($status === 'running' && $ipv4) {
+                        $containers[] = [
+                            'name' => $name,
+                            'ip' => $ipv4,
+                            'status' => $status
+                        ];
+                    }
+                }
+            }
+        }
+        
+        return $containers;
+    }
+
+    /**
+     * Get available Docker containers for proxy dropdown
+     */
+    private function getAvailableDockerContainers(): array
+    {
+        $containers = [];
+        $output = [];
+        exec("docker ps --format '{{.Names}}\t{{.Ports}}' 2>/dev/null", $output, $code);
+        
+        if ($code === 0) {
+            foreach ($output as $line) {
+                $parts = explode("\t", $line);
+                if (count($parts) >= 1) {
+                    $name = trim($parts[0]);
+                    $ports = trim($parts[1] ?? '');
+                    
+                    // Extract port mapping (e.g., 0.0.0.0:8080->80/tcp)
+                    $port = null;
+                    if (preg_match('/0\.0\.0\.0:(\d+)->(\d+)/', $ports, $m)) {
+                        $port = $m[1];
+                    }
+                    
+                    $containers[] = [
+                        'name' => $name,
+                        'port' => $port,
+                        'ports_raw' => $ports
+                    ];
+                }
+            }
+        }
+        
+        return $containers;
+    }
+
+    /**
+     * Check if Docker is installed
+     */
+    private function isDockerInstalled(): bool
+    {
+        exec("which docker 2>/dev/null", $output, $code);
+        return $code === 0;
+    }
+
+    /**
+     * Check if LXD is installed
+     */
+    private function isLxdInstalled(): bool
+    {
+        exec("which lxc 2>/dev/null", $output, $code);
+        return $code === 0;
+    }
+
     private function createDomain(array $input): array
     {
         $domain = $input['domain'] ?? '';
         $root = $input['root'] ?? '/var/www/' . $domain;
         $php = $input['php'] ?? true;
         $ssl = $input['ssl'] ?? true;
+        $ownerUsername = $input['owner_username'] ?? null;
+        $ownerFullname = $input['owner_fullname'] ?? null;
+        $proxyType = $input['proxy_type'] ?? 'none';
+        $proxyTarget = $input['proxy_target'] ?? null;
+        $proxyContainerName = $input['proxy_container_name'] ?? null;
 
         if (!preg_match('/^[a-z0-9.-]+\.[a-z]{2,}$/i', $domain)) {
             return ['success' => false, 'error' => 'Invalid domain name'];
         }
 
-        // Create document root
-        if (!is_dir($root)) {
-            mkdir($root, 0755, true);
+        // For proxied domains, we don't need document root
+        if ($proxyType === 'none') {
+            // Create document root
+            if (!is_dir($root)) {
+                mkdir($root, 0755, true);
+            }
         }
 
         // Generate Caddy config
-        $config = $this->generateCaddyConfig($domain, $root, $php, $ssl);
+        $config = $this->generateCaddyConfig($domain, $root, $php, $ssl, $proxyType, $proxyTarget);
         $configFile = "/etc/caddy/sites-available/{$domain}.caddy";
         
         // Write directly (www-data has group write permission now)
@@ -641,22 +796,66 @@ class HostingController
             }
         }
 
+        // Save to database
+        try {
+            $stmt = $this->db->prepare("
+                INSERT INTO virtual_hosts 
+                (domain, document_root, owner_username, owner_fullname, proxy_type, proxy_target, proxy_container_name, enable_php, enable_ssl, is_enabled)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                ON DUPLICATE KEY UPDATE
+                document_root = VALUES(document_root),
+                owner_username = VALUES(owner_username),
+                owner_fullname = VALUES(owner_fullname),
+                proxy_type = VALUES(proxy_type),
+                proxy_target = VALUES(proxy_target),
+                proxy_container_name = VALUES(proxy_container_name),
+                enable_php = VALUES(enable_php),
+                enable_ssl = VALUES(enable_ssl)
+            ");
+            $stmt->execute([
+                $domain,
+                $proxyType === 'none' ? $root : null,
+                $ownerUsername,
+                $ownerFullname,
+                $proxyType,
+                $proxyTarget,
+                $proxyContainerName,
+                $php ? 1 : 0,
+                $ssl ? 1 : 0
+            ]);
+        } catch (\PDOException $e) {
+            // Table might not exist yet, but config file was created
+            error_log("Failed to save domain to database: " . $e->getMessage());
+        }
+
         // Reload Caddy
         $this->runCommand('sudo systemctl reload caddy');
 
         return ['success' => true, 'message' => "Domain {$domain} created"];
     }
 
-    private function generateCaddyConfig(string $domain, string $root, bool $php, bool $ssl): string
+    private function generateCaddyConfig(string $domain, string $root, bool $php, bool $ssl, string $proxyType = 'none', ?string $proxyTarget = null): string
     {
         $config = "{$domain} {\n";
-        $config .= "    root * {$root}\n";
         
-        if ($php) {
-            $config .= "    php_fastcgi unix/run/php/php8.3-fpm.sock\n";
+        if ($proxyType !== 'none' && $proxyTarget) {
+            // Reverse proxy configuration
+            $target = $proxyTarget;
+            if (!preg_match('/^https?:\/\//', $target)) {
+                $target = "http://{$target}";
+            }
+            $config .= "    reverse_proxy {$target}\n";
+        } else {
+            // Standard file server configuration
+            $config .= "    root * {$root}\n";
+            
+            if ($php) {
+                $config .= "    php_fastcgi unix/run/php/php8.3-fpm.sock\n";
+            }
+            
+            $config .= "    file_server\n";
         }
         
-        $config .= "    file_server\n";
         $config .= "    encode gzip\n";
         $config .= "}\n";
 
@@ -714,6 +913,14 @@ class HostingController
         
         if (file_exists($enabled)) unlink($enabled);
         if (file_exists($available)) unlink($available);
+        
+        // Also remove from database
+        try {
+            $stmt = $this->db->prepare("DELETE FROM virtual_hosts WHERE domain = ?");
+            $stmt->execute([$domain]);
+        } catch (\PDOException $e) {
+            // Table might not exist yet
+        }
         
         $this->runCommand('sudo systemctl reload caddy');
         return ['success' => true, 'message' => 'Domain deleted'];

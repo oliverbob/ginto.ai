@@ -47,7 +47,8 @@ $currentPage = 'domains';
             <thead class="bg-gray-50 dark:bg-gray-700/50">
               <tr>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Domain</th>
-                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Document Root</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Owner</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Target</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SSL</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th class="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -55,7 +56,7 @@ $currentPage = 'domains';
             </thead>
             <tbody id="domains-list" class="divide-y divide-gray-200 dark:divide-gray-700">
               <tr>
-                <td colspan="5" class="px-4 py-8 text-center text-gray-500">
+                <td colspan="6" class="px-4 py-8 text-center text-gray-500">
                   <i class="fas fa-spinner fa-spin mr-2"></i> Loading domains...
                 </td>
               </tr>
@@ -67,30 +68,94 @@ $currentPage = 'domains';
   </div>
 
   <!-- Add Domain Modal -->
-  <div id="add-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
-    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-md mx-4">
+  <div id="add-modal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50 overflow-y-auto">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 my-8">
       <h3 class="text-lg font-semibold mb-4">Add New Domain</h3>
       <form id="add-form" class="space-y-4">
+        <!-- Domain Name -->
         <div>
-          <label class="block text-sm font-medium mb-1">Domain Name</label>
+          <label class="block text-sm font-medium mb-1">Domain Name <span class="text-red-500">*</span></label>
           <input type="text" name="domain" placeholder="example.com" required
             class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
         </div>
+
+        <!-- Owner Information -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium mb-1">Owner Username</label>
+            <input type="text" name="owner_username" placeholder="username"
+              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          </div>
+          <div>
+            <label class="block text-sm font-medium mb-1">Owner Full Name</label>
+            <input type="text" name="owner_fullname" placeholder="John Doe"
+              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          </div>
+        </div>
+
+        <!-- Proxy Type -->
         <div>
-          <label class="block text-sm font-medium mb-1">Document Root</label>
-          <input type="text" name="root" placeholder="/var/www/example.com"
+          <label class="block text-sm font-medium mb-1">Hosting Type</label>
+          <select name="proxy_type" id="proxy-type" onchange="toggleProxyOptions()"
+            class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <option value="none">Standard (Document Root)</option>
+            <option value="lxc" id="lxc-option">LXC/LXD Container</option>
+            <option value="docker" id="docker-option">Docker Container</option>
+            <option value="external">External IP/Port</option>
+          </select>
+        </div>
+
+        <!-- Standard Options (Document Root) -->
+        <div id="standard-options">
+          <div>
+            <label class="block text-sm font-medium mb-1">Document Root</label>
+            <input type="text" name="root" placeholder="/var/www/example.com"
+              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          </div>
+          <div class="flex items-center gap-4 mt-3">
+            <label class="flex items-center gap-2">
+              <input type="checkbox" name="php" checked class="rounded">
+              <span class="text-sm">Enable PHP</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- LXC Container Options -->
+        <div id="lxc-options" class="hidden">
+          <label class="block text-sm font-medium mb-1">Select LXC Container</label>
+          <select name="lxc_container" id="lxc-container-select"
+            class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <option value="">Loading containers...</option>
+          </select>
+          <div class="mt-2">
+            <label class="block text-sm font-medium mb-1">Container Port</label>
+            <input type="number" name="lxc_port" value="80" placeholder="80"
+              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+          </div>
+        </div>
+
+        <!-- Docker Container Options -->
+        <div id="docker-options" class="hidden">
+          <label class="block text-sm font-medium mb-1">Select Docker Container</label>
+          <select name="docker_container" id="docker-container-select"
+            class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
+            <option value="">Loading containers...</option>
+          </select>
+        </div>
+
+        <!-- External Proxy Options -->
+        <div id="external-options" class="hidden">
+          <label class="block text-sm font-medium mb-1">Proxy Target (IP:Port)</label>
+          <input type="text" name="external_target" placeholder="192.168.1.100:8080"
             class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
         </div>
-        <div class="flex items-center gap-4">
-          <label class="flex items-center gap-2">
-            <input type="checkbox" name="php" checked class="rounded">
-            <span class="text-sm">Enable PHP</span>
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="checkbox" name="ssl" checked class="rounded">
-            <span class="text-sm">Enable SSL</span>
-          </label>
+
+        <!-- SSL Option (always visible) -->
+        <div class="flex items-center gap-2">
+          <input type="checkbox" name="ssl" checked class="rounded" id="ssl-checkbox">
+          <label for="ssl-checkbox" class="text-sm">Enable SSL (Let's Encrypt)</label>
         </div>
+
         <div class="flex justify-end gap-3 mt-6">
           <button type="button" onclick="hideAddModal()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
             Cancel
@@ -105,6 +170,55 @@ $currentPage = 'domains';
 
   <script>
     const csrfToken = '<?= $csrfToken ?>';
+    let containerData = { lxc_containers: [], docker_containers: [], lxd_installed: false, docker_installed: false };
+
+    // Load available containers on page load
+    async function loadContainers() {
+      try {
+        const res = await fetch('/admin/hosting/domains/containers');
+        containerData = await res.json();
+        
+        // Populate LXC dropdown
+        const lxcSelect = document.getElementById('lxc-container-select');
+        if (containerData.lxc_containers?.length) {
+          lxcSelect.innerHTML = containerData.lxc_containers.map(c => 
+            `<option value="${c.ip}">${c.name} (${c.ip})</option>`
+          ).join('');
+        } else {
+          lxcSelect.innerHTML = '<option value="">No running LXC containers</option>';
+        }
+        
+        // Populate Docker dropdown
+        const dockerSelect = document.getElementById('docker-container-select');
+        if (containerData.docker_containers?.length) {
+          dockerSelect.innerHTML = containerData.docker_containers.map(c => 
+            `<option value="127.0.0.1:${c.port}" data-name="${c.name}">${c.name} (port ${c.port || 'N/A'})</option>`
+          ).join('');
+        } else {
+          dockerSelect.innerHTML = '<option value="">No running Docker containers</option>';
+        }
+        
+        // Hide unavailable options
+        if (!containerData.lxd_installed) {
+          document.getElementById('lxc-option').disabled = true;
+          document.getElementById('lxc-option').textContent += ' (not installed)';
+        }
+        if (!containerData.docker_installed) {
+          document.getElementById('docker-option').disabled = true;
+          document.getElementById('docker-option').textContent += ' (not installed)';
+        }
+      } catch (e) {
+        console.error('Failed to load containers:', e);
+      }
+    }
+
+    function toggleProxyOptions() {
+      const type = document.getElementById('proxy-type').value;
+      document.getElementById('standard-options').classList.toggle('hidden', type !== 'none');
+      document.getElementById('lxc-options').classList.toggle('hidden', type !== 'lxc');
+      document.getElementById('docker-options').classList.toggle('hidden', type !== 'docker');
+      document.getElementById('external-options').classList.toggle('hidden', type !== 'external');
+    }
 
     async function loadDomains() {
       try {
@@ -113,11 +227,30 @@ $currentPage = 'domains';
         const tbody = document.getElementById('domains-list');
         
         if (!data.domains?.length) {
-          tbody.innerHTML = '<tr><td colspan="5" class="px-4 py-8 text-center text-gray-500">No domains configured</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-8 text-center text-gray-500">No domains configured</td></tr>';
           return;
         }
 
-        tbody.innerHTML = data.domains.map(d => `
+        tbody.innerHTML = data.domains.map(d => {
+          // Determine target display
+          let targetDisplay = '';
+          const proxyType = d.proxy_type || 'none';
+          if (proxyType === 'none') {
+            targetDisplay = `<span class="text-gray-500 text-sm">${d.root || '/var/www/' + d.name}</span>`;
+          } else if (proxyType === 'lxc') {
+            targetDisplay = `<span class="text-purple-500"><i class="fas fa-cube mr-1"></i>LXC: ${d.proxy_target || d.proxy_container_name}</span>`;
+          } else if (proxyType === 'docker') {
+            targetDisplay = `<span class="text-blue-500"><i class="fab fa-docker mr-1"></i>Docker: ${d.proxy_container_name || d.proxy_target}</span>`;
+          } else if (proxyType === 'external') {
+            targetDisplay = `<span class="text-orange-500"><i class="fas fa-external-link-alt mr-1"></i>${d.proxy_target}</span>`;
+          }
+
+          // Owner display
+          const ownerDisplay = d.owner_username 
+            ? `<div class="text-sm"><span class="font-medium">${d.owner_username}</span>${d.owner_fullname ? `<br><span class="text-gray-400 text-xs">${d.owner_fullname}</span>` : ''}</div>`
+            : '<span class="text-gray-400 text-sm">—</span>';
+
+          return `
           <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
             <td class="px-4 py-3">
               <div class="flex items-center gap-2">
@@ -125,7 +258,8 @@ $currentPage = 'domains';
                 <span class="font-medium">${d.name}</span>
               </div>
             </td>
-            <td class="px-4 py-3 text-sm text-gray-500">${d.root}</td>
+            <td class="px-4 py-3">${ownerDisplay}</td>
+            <td class="px-4 py-3">${targetDisplay}</td>
             <td class="px-4 py-3">
               ${d.ssl ? '<span class="text-emerald-500"><i class="fas fa-lock"></i> Active</span>' : '<span class="text-gray-400"><i class="fas fa-lock-open"></i> None</span>'}
             </td>
@@ -146,7 +280,7 @@ $currentPage = 'domains';
               </div>
             </td>
           </tr>
-        `).join('');
+        `}).join('');
       } catch (e) {
         console.error(e);
       }
@@ -158,15 +292,39 @@ $currentPage = 'domains';
     document.getElementById('add-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const form = new FormData(e.target);
+      const proxyType = form.get('proxy_type');
+      
+      // Determine proxy target based on type
+      let proxyTarget = null;
+      let proxyContainerName = null;
+      
+      if (proxyType === 'lxc') {
+        const lxcSelect = document.getElementById('lxc-container-select');
+        const lxcPort = form.get('lxc_port') || '80';
+        proxyTarget = lxcSelect.value + ':' + lxcPort;
+        proxyContainerName = lxcSelect.options[lxcSelect.selectedIndex]?.text.split(' ')[0];
+      } else if (proxyType === 'docker') {
+        const dockerSelect = document.getElementById('docker-container-select');
+        proxyTarget = dockerSelect.value;
+        proxyContainerName = dockerSelect.options[dockerSelect.selectedIndex]?.dataset.name;
+      } else if (proxyType === 'external') {
+        proxyTarget = form.get('external_target');
+      }
+
       try {
         const res = await fetch('/admin/hosting/domains/api', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             domain: form.get('domain'),
-            root: form.get('root') || '/var/www/' + form.get('domain'),
+            root: proxyType === 'none' ? (form.get('root') || '/var/www/' + form.get('domain')) : null,
             php: form.has('php'),
             ssl: form.has('ssl'),
+            owner_username: form.get('owner_username') || null,
+            owner_fullname: form.get('owner_fullname') || null,
+            proxy_type: proxyType,
+            proxy_target: proxyTarget,
+            proxy_container_name: proxyContainerName,
             csrf_token: csrfToken
           })
         });
@@ -207,6 +365,7 @@ $currentPage = 'domains';
     }
 
     loadDomains();
+    loadContainers();
   </script>
 </body>
 </html>
