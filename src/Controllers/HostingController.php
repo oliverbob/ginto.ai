@@ -768,15 +768,17 @@ class HostingController
                 
                 if ($sandboxId) {
                     try {
-                        // Look up in client_sandboxes table and join to users
-                        $result = $this->db->query(
+                        // Look up in client_sandboxes table and join to users using raw PDO
+                        $pdo = $this->db->pdo;
+                        $stmt = $pdo->prepare(
                             "SELECT u.username, u.fullname 
                              FROM client_sandboxes cs 
                              JOIN users u ON (cs.user_id = u.id OR cs.public_id = u.public_id)
                              WHERE cs.sandbox_id = ?
-                             LIMIT 1",
-                            [$sandboxId]
-                        )->fetch(\PDO::FETCH_ASSOC);
+                             LIMIT 1"
+                        );
+                        $stmt->execute([$sandboxId]);
+                        $result = $stmt->fetch(\PDO::FETCH_ASSOC);
                         
                         if ($result) {
                             $ownerUsername = $result['username'];
