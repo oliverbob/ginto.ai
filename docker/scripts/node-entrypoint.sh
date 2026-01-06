@@ -70,18 +70,19 @@ trap shutdown SIGTERM SIGINT
 
 # Main entrypoint logic
 main() {
-    wait_for_redis
-    
     case "$SERVICE" in
         "proxy"|"sandbox-proxy")
+            wait_for_redis
             start_sandbox_proxy
             wait $PROXY_PID
             ;;
         "terminal"|"terminal-server")
+            # Terminal server doesn't need Redis
             start_terminal_server
             wait $TERMINAL_PID
             ;;
         "all"|*)
+            wait_for_redis
             start_sandbox_proxy
             start_terminal_server
             echo ""
