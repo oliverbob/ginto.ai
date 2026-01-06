@@ -219,9 +219,15 @@ $currentPage = 'domains';
         const lxcSelect = document.getElementById('lxc-container-select');
         if (containerData.lxc_containers?.length) {
           lxcSelect.innerHTML = '<option value="">-- Select Container --</option>' + containerData.lxc_containers.map(c => {
-            const ownerInfo = c.owner_username ? ` [${esc(c.owner_username)}]` : '';
             const statusIcon = c.status === 'running' ? '🟢' : '⚪';
-            return `<option value="${esc(c.ip || '')}" data-name="${esc(c.name)}" data-owner="${esc(c.owner_username || '')}" data-fullname="${esc(c.owner_fullname || '')}" data-status="${esc(c.status)}">${statusIcon} ${esc(c.name)}${ownerInfo} ${c.ip ? '(' + esc(c.ip) + ')' : '(no IP)'}</option>`;
+            let ownerDisplay = '';
+            if (c.owner_username) {
+              ownerDisplay = ` - ${esc(c.owner_username)}`;
+              if (c.owner_fullname) {
+                ownerDisplay += ` (${esc(c.owner_fullname)})`;
+              }
+            }
+            return `<option value="${esc(c.ip || '')}" data-name="${esc(c.name)}" data-owner="${esc(c.owner_username || '')}" data-fullname="${esc(c.owner_fullname || '')}" data-status="${esc(c.status)}">${statusIcon} ${esc(c.name)}${ownerDisplay} ${c.ip ? '[' + esc(c.ip) + ']' : '(no IP)'}</option>`;
           }).join('');
         } else {
           lxcSelect.innerHTML = '<option value="">No LXC containers found</option>';
@@ -361,16 +367,22 @@ $currentPage = 'domains';
         document.getElementById('proxy-type').value = 'lxc';
         toggleProxyOptions();
         
-        // Select the container in dropdown
+        // Select the container in dropdown by IP
         const select = document.getElementById('lxc-container-select');
+        let found = false;
         for (let i = 0; i < select.options.length; i++) {
-          if (select.options[i].value === user.container_ip + ':80') {
+          if (select.options[i].value === user.container_ip) {
             select.selectedIndex = i;
+            found = true;
             break;
           }
         }
         
-        GintoUI.success(`Selected container ${user.container_name} for ${user.username}`);
+        if (found) {
+          GintoUI.success(`Selected container ${user.container_name} for ${user.username}`);
+        } else {
+          GintoUI.warning(`Container ${user.container_name} not found in dropdown`);
+        }
       }
     }
 
