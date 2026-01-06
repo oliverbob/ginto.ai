@@ -1092,6 +1092,7 @@ class SandboxController
             // Install py3-opencv from apk to avoid compiling from source (OOM with 1GB)
             $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
                 'ffmpeg libmagic curl py3-pip py3-virtualenv py3-numpy py3-opencv && ' .
+                'apk del cargo rust 2>/dev/null; ' .
                 'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && ' .
                 'source $HOME/.cargo/env && ' .
                 'python3 -m venv --system-site-packages /home/sandbox/openwebui-venv && ' .
