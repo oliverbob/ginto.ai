@@ -556,6 +556,41 @@ class UsersAdminController extends \Core\Controller
         }
     }
 
+    /**
+     * Search users API for autocomplete
+     * GET /admin/users/search?q=searchterm
+     */
+    public function searchApi()
+    {
+        header('Content-Type: application/json');
+        
+        $query = trim($_GET['q'] ?? '');
+        
+        if (strlen($query) < 2) {
+            echo json_encode(['results' => []]);
+            exit;
+        }
+        
+        // Search users by username or fullname
+        $users = $this->db->select('users', [
+            'id',
+            'username',
+            'fullname',
+            'email'
+        ], [
+            'OR' => [
+                'username[~]' => "%{$query}%",
+                'fullname[~]' => "%{$query}%",
+                'email[~]' => "%{$query}%"
+            ],
+            'LIMIT' => 15,
+            'ORDER' => ['username' => 'ASC']
+        ]);
+        
+        echo json_encode(['results' => $users ?: []]);
+        exit;
+    }
+
     private function generateCsrfToken()
     {
         if (empty($_SESSION['csrf_token'])) {

@@ -83,15 +83,13 @@ $currentPage = 'domains';
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label class="block text-sm font-medium mb-1">Owner Username</label>
-            <input type="text" name="owner_username" id="owner-username" placeholder="Search username..." list="owner-username-list" autocomplete="off"
-              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-            <datalist id="owner-username-list"></datalist>
+            <div id="owner-username-wrapper"></div>
+            <input type="hidden" name="owner_username" id="owner-username-hidden">
           </div>
           <div>
             <label class="block text-sm font-medium mb-1">Owner Full Name</label>
-            <input type="text" name="owner_fullname" id="owner-fullname" placeholder="Search or type name..." list="owner-fullname-list" autocomplete="off"
-              class="w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600">
-            <datalist id="owner-fullname-list"></datalist>
+            <div id="owner-fullname-wrapper"></div>
+            <input type="hidden" name="owner_fullname" id="owner-fullname-hidden">
           </div>
         </div>
 
@@ -239,23 +237,6 @@ $currentPage = 'domains';
           dockerSelect.innerHTML = '<option value="">No running Docker containers</option>';
         }
         
-        // Populate owner username datalist with ALL users (escaped for XSS protection)
-        const ownerDatalist = document.getElementById('owner-username-list');
-        const allUsers = containerData.all_users || [];
-        if (allUsers.length) {
-          ownerDatalist.innerHTML = allUsers.map(u => 
-            `<option value="${esc(u.username)}" data-fullname="${esc(u.fullname || '')}">${esc(u.username)} - ${esc(u.fullname) || 'No name'}</option>`
-          ).join('');
-        }
-
-        // Populate owner fullname datalist with ALL users (escaped for XSS protection)
-        const fullnameDatalist = document.getElementById('owner-fullname-list');
-        if (allUsers.length) {
-          fullnameDatalist.innerHTML = allUsers.filter(u => u.fullname).map(u => 
-            `<option value="${esc(u.fullname)}" data-username="${esc(u.username)}">${esc(u.fullname)} (${esc(u.username)})</option>`
-          ).join('');
-        }
-        
         // Hide unavailable options
         if (!containerData.lxd_installed) {
           document.getElementById('lxc-option').disabled = true;
@@ -270,35 +251,71 @@ $currentPage = 'domains';
       }
     }
 
+    // Initialize autocomplete for owner fields
+    let usernameAutocomplete, fullnameAutocomplete;
+    
+    function initOwnerAutocomplete() {
+      // Username autocomplete
+      usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
+        placeholder: 'Search username...',
+        searchApi: '/admin/users/search?q=',
+        minChars: 2,
+        renderItem: (user) => `
+          <div class="flex justify-between items-center">
+            <span class="font-medium">${esc(user.username)}</span>
+            <span class="text-gray-500 text-sm">${esc(user.fullname || '')}</span>
+          </div>
+        `,
+        onSelect: (user) => {
+          document.getElementById('owner-username-hidden').value = user.username;
+          // Auto-fill fullname
+          if (user.fullname && fullnameAutocomplete) {
+            fullnameAutocomplete.setValue(user.fullname);
+            document.getElementById('owner-fullname-hidden').value = user.fullname;
+          }
+        },
+        onChange: (value) => {
+          document.getElementById('owner-username-hidden').value = value;
+        }
+      });
+
+      // Fullname autocomplete
+      fullnameAutocomplete = GintoUI.autocomplete('#owner-fullname-wrapper', {
+        placeholder: 'Search name...',
+        searchApi: '/admin/users/search?q=',
+        minChars: 2,
+        renderItem: (user) => `
+          <div class="flex justify-between items-center">
+            <span class="font-medium">${esc(user.fullname || user.username)}</span>
+            <span class="text-gray-500 text-sm">${esc(user.username)}</span>
+          </div>
+        `,
+        getDisplayValue: (user) => user.fullname || user.username,
+        onSelect: (user) => {
+          document.getElementById('owner-fullname-hidden').value = user.fullname || '';
+          // Auto-fill username
+          if (user.username && usernameAutocomplete) {
+            usernameAutocomplete.setValue(user.username);
+            document.getElementById('owner-username-hidden').value = user.username;
+          }
+        },
+        onChange: (value) => {
+          document.getElementById('owner-fullname-hidden').value = value;
+        }
+      });
+    }
+
     // Auto-fill owner when selecting LXC container
     function onLxcContainerSelect() {
       const select = document.getElementById('lxc-container-select');
       const option = select.options[select.selectedIndex];
       if (option && option.dataset.owner) {
-        document.getElementById('owner-username').value = option.dataset.owner;
-        document.getElementById('owner-fullname').value = option.dataset.fullname || '';
+        if (usernameAutocomplete) usernameAutocomplete.setValue(option.dataset.owner);
+        if (fullnameAutocomplete) fullnameAutocomplete.setValue(option.dataset.fullname || '');
+        document.getElementById('owner-username-hidden').value = option.dataset.owner;
+        document.getElementById('owner-fullname-hidden').value = option.dataset.fullname || '';
       }
     }
-
-    // Auto-fill fullname when selecting/typing username
-    document.getElementById('owner-username').addEventListener('input', function() {
-      const username = this.value;
-      const allUsers = containerData.all_users || [];
-      const user = allUsers.find(u => u.username === username);
-      if (user) {
-        document.getElementById('owner-fullname').value = user.fullname || '';
-      }
-    });
-
-    // Auto-fill username when selecting/typing fullname
-    document.getElementById('owner-fullname').addEventListener('input', function() {
-      const fullname = this.value;
-      const allUsers = containerData.all_users || [];
-      const user = allUsers.find(u => u.fullname === fullname);
-      if (user) {
-        document.getElementById('owner-username').value = user.username || '';
-      }
-    });
 
     function toggleProxyOptions() {
       const type = document.getElementById('proxy-type').value;
@@ -459,6 +476,7 @@ $currentPage = 'domains';
 
     loadDomains();
     loadContainers();
+    initOwnerAutocomplete();
   </script>
 </body>
 </html>

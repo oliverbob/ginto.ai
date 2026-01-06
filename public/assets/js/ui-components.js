@@ -228,6 +228,247 @@ const GintoUI = {
                 onCancel: () => resolve(false)
             });
         });
+    },
+
+    /**
+     * Create an autocomplete/typeahead input
+     * @param {HTMLElement|string} container - Container element or selector to create autocomplete in
+     * @param {Object} options - Configuration options
+     * @param {string} options.searchApi - API endpoint for searching (appends query value)
+     * @param {Array} options.data - Static data array (alternative to searchApi)
+     * @param {Function} options.renderItem - Function to render each dropdown item (item) => HTML
+     * @param {Function} options.onSelect - Callback when item is selected (item) => void
+     * @param {Function} options.onChange - Callback when input value changes (value) => void
+     * @param {Function} options.getDisplayValue - Function to get display value from item (item) => string
+     * @param {number} options.minChars - Minimum characters before searching (default: 2)
+     * @param {number} options.debounceMs - Debounce delay in ms (default: 250)
+     * @param {string} options.placeholder - Placeholder text
+     * @param {string} options.inputClass - CSS classes for the input
+     */
+    autocomplete(container, options = {}) {
+        const containerEl = typeof container === 'string' 
+            ? document.querySelector(container) 
+            : container;
+        
+        if (!containerEl) {
+            console.error('GintoUI.autocomplete: Container element not found:', container);
+            return null;
+        }
+
+        const config = {
+            searchApi: options.searchApi || '',
+            data: options.data || null,
+            renderItem: options.renderItem || (item => `<div class="px-3 py-2">${this.escapeHtml(item.name || item.label || item.username || '')}</div>`),
+            onSelect: options.onSelect || (() => {}),
+            onChange: options.onChange || (() => {}),
+            getDisplayValue: options.getDisplayValue || (item => item.username || item.name || item.label || ''),
+            minChars: options.minChars ?? 2,
+            debounceMs: options.debounceMs ?? 250,
+            placeholder: options.placeholder || 'Search...',
+            inputClass: options.inputClass || 'w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
+        };
+
+        // Create wrapper and input
+        const wrapper = document.createElement('div');
+        wrapper.className = 'ginto-autocomplete-wrapper relative';
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = config.inputClass;
+        input.placeholder = config.placeholder;
+        input.autocomplete = 'off';
+        wrapper.appendChild(input);
+
+        const dropdown = document.createElement('div');
+        dropdown.className = 'ginto-autocomplete-dropdown absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto z-50 hidden';
+        wrapper.appendChild(dropdown);
+
+        // Loading indicator
+        const loader = document.createElement('div');
+        loader.className = 'ginto-autocomplete-loader absolute right-3 top-1/2 -translate-y-1/2 hidden';
+        loader.innerHTML = '<i class="fas fa-spinner fa-spin text-gray-400"></i>';
+        wrapper.appendChild(loader);
+
+        containerEl.appendChild(wrapper);
+
+        let debounceTimer = null;
+        let currentItems = [];
+        let selectedIndex = -1;
+        let isOpen = false;
+
+        const showDropdown = () => {
+            dropdown.classList.remove('hidden');
+            isOpen = true;
+        };
+
+        const hideDropdown = () => {
+            dropdown.classList.add('hidden');
+            isOpen = false;
+            selectedIndex = -1;
+        };
+
+        const highlightItem = (index) => {
+            const items = dropdown.querySelectorAll('.ginto-autocomplete-item');
+            items.forEach((item, i) => {
+                item.classList.toggle('bg-blue-100', i === index);
+                item.classList.toggle('dark:bg-blue-900', i === index);
+            });
+            selectedIndex = index;
+            // Scroll into view
+            if (items[index]) {
+                items[index].scrollIntoView({ block: 'nearest' });
+            }
+        };
+
+        const selectItem = (item) => {
+            input.value = config.getDisplayValue(item);
+            hideDropdown();
+            config.onSelect(item);
+        };
+
+        const renderItems = (items) => {
+            currentItems = items;
+            if (!items.length) {
+                dropdown.innerHTML = '<div class="px-3 py-2 text-gray-500 text-sm italic">No results found</div>';
+                showDropdown();
+                return;
+            }
+
+            dropdown.innerHTML = items.map((item, index) => {
+                const html = config.renderItem(item);
+                return `<div class="ginto-autocomplete-item cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors" data-index="${index}">${html}</div>`;
+            }).join('');
+
+            dropdown.querySelectorAll('.ginto-autocomplete-item').forEach((el, index) => {
+                el.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectItem(currentItems[index]);
+                });
+                el.addEventListener('mouseenter', () => highlightItem(index));
+            });
+
+            showDropdown();
+        };
+
+        const search = async (query) => {
+            if (query.length < config.minChars) {
+                hideDropdown();
+                return;
+            }
+
+            // If static data provided, filter it
+            if (config.data) {
+                const q = query.toLowerCase();
+                const filtered = config.data.filter(item => {
+                    const searchFields = [
+                        item.name, item.label, item.username, 
+                        item.fullname, item.email, item.text
+                    ].filter(Boolean).map(s => s.toLowerCase());
+                    return searchFields.some(s => s.includes(q));
+                });
+                renderItems(filtered.slice(0, 15));
+                return;
+            }
+
+            // API search
+            if (!config.searchApi) return;
+            
+            loader.classList.remove('hidden');
+            try {
+                const url = config.searchApi + encodeURIComponent(query);
+                const res = await fetch(url, { credentials: 'include' });
+                const data = await res.json();
+                renderItems(data.results || data.items || data.users || data.data || []);
+            } catch (err) {
+                console.error('Autocomplete search error:', err);
+                dropdown.innerHTML = '<div class="px-3 py-2 text-red-500 text-sm">Error loading results</div>';
+                showDropdown();
+            } finally {
+                loader.classList.add('hidden');
+            }
+        };
+
+        // Event listeners
+        input.addEventListener('input', (e) => {
+            config.onChange(e.target.value);
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => search(e.target.value), config.debounceMs);
+        });
+
+        input.addEventListener('focus', () => {
+            if (input.value.length >= config.minChars && currentItems.length) {
+                showDropdown();
+            }
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (!isOpen && e.key !== 'ArrowDown') return;
+
+            switch (e.key) {
+                case 'ArrowDown':
+                    e.preventDefault();
+                    if (!isOpen && input.value.length >= config.minChars) {
+                        search(input.value);
+                    } else if (isOpen) {
+                        highlightItem(Math.min(selectedIndex + 1, currentItems.length - 1));
+                    }
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    highlightItem(Math.max(selectedIndex - 1, 0));
+                    break;
+                case 'Enter':
+                    if (selectedIndex >= 0 && currentItems[selectedIndex]) {
+                        e.preventDefault();
+                        selectItem(currentItems[selectedIndex]);
+                    }
+                    break;
+                case 'Escape':
+                    hideDropdown();
+                    break;
+                case 'Tab':
+                    hideDropdown();
+                    break;
+            }
+        });
+
+        // Close on click outside
+        document.addEventListener('click', (e) => {
+            if (!wrapper.contains(e.target)) {
+                hideDropdown();
+            }
+        });
+
+        // Return API for controlling the autocomplete
+        return {
+            clear: () => {
+                input.value = '';
+                currentItems = [];
+                hideDropdown();
+            },
+            setValue: (value) => {
+                input.value = value || '';
+            },
+            getValue: () => input.value,
+            setData: (data) => {
+                config.data = data;
+            },
+            focus: () => input.focus(),
+            destroy: () => {
+                wrapper.remove();
+            },
+            getInput: () => input
+        };
+    },
+
+    /**
+     * Escape HTML for safe output
+     */
+    escapeHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
     }
 };
 

@@ -49,6 +49,7 @@ $req('/media', 'MediaController@index');
 
 // Users
 $req('/users', 'UsersAdminController@dashboard');
+$req('/users/search', 'UsersAdminController@searchApi', ['GET']);
 $req('/users/{id}', 'UsersAdminController@userProfile');
 
 // Payments (admin approval/management)
