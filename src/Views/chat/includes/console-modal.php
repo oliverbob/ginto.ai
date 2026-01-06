@@ -75,14 +75,24 @@ if (empty($isAdmin)) return;
   const RECONNECT_DELAY_MS = 2000;
   
   const minimizeBtn = document.getElementById('minimize-console');
-  const sharedMinimizedContainer = document.getElementById('iframe-minimized-container');
   let consoleMinimizedEl = null;
   
   const CONSOLE_STORAGE_KEY = 'ginto_console_minimized';
   
+  // Get shared container (may not exist at init time)
+  function getSharedMinimizedContainer() {
+    return document.getElementById('iframe-minimized-container');
+  }
+  
   // Create minimized console indicator dynamically
   function createConsoleMinimizedIndicator() {
     if (consoleMinimizedEl) return;
+    
+    const container = getSharedMinimizedContainer();
+    if (!container) {
+      console.warn('[Console] Shared minimized container not found');
+      return;
+    }
     
     const div = document.createElement('div');
     div.id = 'console-minimized-indicator';
@@ -109,9 +119,7 @@ if (empty($isAdmin)) return;
       closeConsoleCompletely();
     });
     
-    if (sharedMinimizedContainer) {
-      sharedMinimizedContainer.appendChild(div);
-    }
+    container.appendChild(div);
     consoleMinimizedEl = div;
   }
   
@@ -182,8 +190,8 @@ if (empty($isAdmin)) return;
   
   if (minimizeBtn) minimizeBtn.onclick = minimizeConsole;
   
-  // Load console state on init
-  loadConsoleState();
+  // Load console state after DOM is fully ready (iframe-modal container needs to exist)
+  setTimeout(loadConsoleState, 100);
   
   function createTab(initialCommand, targetMode = null) {
     tabCounter++;
