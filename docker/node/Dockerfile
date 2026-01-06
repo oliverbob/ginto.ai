@@ -13,7 +13,8 @@ RUN apk add --no-cache \
     g++ \
     bash \
     curl \
-    docker-cli
+    docker-cli \
+    util-linux
 
 # Create app directory
 WORKDIR /app

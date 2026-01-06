@@ -62,6 +62,8 @@ services:
     container_name: ginto-terminal-server
     restart: unless-stopped
     user: root  # Needs root to access Docker socket for sandbox exec
+    pid: host  # Required for nsenter to access host namespace (admin OS terminal)
+    privileged: true  # Required for nsenter
     environment:
       - SERVICE=terminal-server
       - SANDBOX_MODE=docker

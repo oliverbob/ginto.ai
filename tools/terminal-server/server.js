@@ -175,8 +175,18 @@ wss.on('connection', function connection(ws, req) {
       }
     }
   } else if (mode === 'os') {
-    shell = '/bin/bash'; 
-    args = [];
+    // Admin OS mode: use nsenter to access the host (LXC) namespace
+    // This breaks out of the Docker container to the LXC host
+    // Requires pid: host and privileged: true in docker-compose
+    const fs = require('fs');
+    const inDocker = fs.existsSync('/.dockerenv');
+    if (inDocker) {
+      shell = 'nsenter';
+      args = ['-t', '1', '-m', '-u', '-i', '-n', '-p', '--', '/bin/bash', '-l'];
+    } else {
+      shell = '/bin/bash';
+      args = [];
+    }
   }
 
   // Spawn PTY
