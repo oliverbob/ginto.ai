@@ -1088,12 +1088,14 @@ class SandboxController
             
             // Install system dependencies first, then pip install open-webui
             // Use apk for Alpine Linux sandboxes, create venv for PEP 668 compliance
+            // Run with nohup so it survives terminal disconnect, use --no-cache-dir to reduce memory
             $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
                 'ffmpeg libmagic curl py3-pip py3-virtualenv && ' .
                 'python3 -m venv /home/sandbox/openwebui-venv && ' .
                 'source /home/sandbox/openwebui-venv/bin/activate && ' .
                 'pip install --upgrade pip && ' .
-                'pip install open-webui && open-webui serve';
+                'nohup sh -c "pip install --no-cache-dir open-webui && open-webui serve" > /home/sandbox/openwebui-install.log 2>&1 & ' .
+                'echo "Installation running in background. Use: tail -f /home/sandbox/openwebui-install.log"';
             
             echo json_encode([
                 'success' => true,
