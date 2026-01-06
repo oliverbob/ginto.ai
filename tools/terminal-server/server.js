@@ -127,13 +127,52 @@ wss.on('connection', function connection(ws, req) {
     const safeContainer = String(container).replace(/[^a-zA-Z0-9_\-]/g, '_');
     const lxcContainer = safeContainer.startsWith('ginto-sandbox-') ? safeContainer : 'ginto-sandbox-' + safeContainer;
     
-    const r = spawnSync('/snap/bin/lxc', ['info', lxcContainer], { encoding: 'utf8' });
-    if (r.status === 0 && r.stdout && r.stdout.includes('Status: RUNNING')) {
-      shell = '/snap/bin/lxc';
-      args = ['exec', lxcContainer, '--', '/bin/sh'];
+    // Detect sandbox backend: Docker or LXD
+    // Check SANDBOX_MODE env var first, then auto-detect
+    const sandboxMode = process.env.SANDBOX_MODE || 'auto';
+    let useDocker = false;
+    
+    if (sandboxMode === 'docker') {
+      useDocker = true;
+    } else if (sandboxMode === 'lxd') {
+      useDocker = false;
     } else {
-      shell = '/bin/bash';
-      args = ['-c', 'echo "Sandbox container not running. Please start your sandbox first." && exit 1'];
+      // Auto-detect: check if running inside Docker (/.dockerenv exists) or if docker is available
+      const fs = require('fs');
+      const inDocker = fs.existsSync('/.dockerenv');
+      if (inDocker) {
+        useDocker = true;
+      } else {
+        // Check if LXC is available
+        const lxcCheck = spawnSync('which', ['/snap/bin/lxc'], { encoding: 'utf8' });
+        if (lxcCheck.status !== 0) {
+          // LXC not available, try Docker
+          useDocker = true;
+        }
+      }
+    }
+    
+    if (useDocker) {
+      // Docker mode - use docker exec
+      const dockerCheck = spawnSync('docker', ['inspect', '--format', '{{.State.Running}}', lxcContainer], { encoding: 'utf8' });
+      if (dockerCheck.status === 0 && dockerCheck.stdout && dockerCheck.stdout.trim() === 'true') {
+        shell = 'docker';
+        args = ['exec', '-it', lxcContainer, '/bin/bash'];
+        // Fall back to /bin/sh if bash not available
+      } else {
+        shell = '/bin/bash';
+        args = ['-c', 'echo "Sandbox not found. Please create your sandbox first." && exit 1'];
+      }
+    } else {
+      // LXD mode - use lxc exec
+      const r = spawnSync('/snap/bin/lxc', ['info', lxcContainer], { encoding: 'utf8' });
+      if (r.status === 0 && r.stdout && r.stdout.includes('Status: RUNNING')) {
+        shell = '/snap/bin/lxc';
+        args = ['exec', lxcContainer, '--', '/bin/sh'];
+      } else {
+        shell = '/bin/bash';
+        args = ['-c', 'echo "Sandbox container not running. Please start your sandbox first." && exit 1'];
+      }
     }
   } else if (mode === 'os') {
     shell = '/bin/bash'; 
