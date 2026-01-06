@@ -176,7 +176,11 @@ $currentPage = 'domains';
     // Load available containers on page load
     async function loadContainers() {
       try {
-        const res = await fetch('/admin/hosting/domains/containers');
+        const res = await fetch('/admin/hosting/domains/containers', { credentials: 'include' });
+        if (!res.ok) {
+          console.error('Failed to load containers:', res.status);
+          return;
+        }
         containerData = await res.json();
         
         // Populate LXC dropdown with owner info

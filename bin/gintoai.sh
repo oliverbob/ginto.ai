@@ -1948,6 +1948,25 @@ fix_permissions() {
 setup_permissions() {
     log_step "Setting up directory permissions..."
     
+    # Ensure /var/www is owned by INSTALL_USER:www-data
+    if [ -d "/var/www" ]; then
+        local current_owner=$(stat -c '%U' /var/www 2>/dev/null)
+        local current_group=$(stat -c '%G' /var/www 2>/dev/null)
+        if [ "$current_owner" != "$INSTALL_USER" ] || [ "$current_group" != "www-data" ]; then
+            log_info "Fixing /var/www ownership: $current_owner:$current_group -> $INSTALL_USER:www-data"
+            sudo chown "$INSTALL_USER:www-data" /var/www
+            sudo chmod 775 /var/www
+            log_success "/var/www ownership fixed"
+        else
+            log_info "/var/www already owned by $INSTALL_USER:www-data"
+        fi
+    else
+        log_info "Creating /var/www with correct ownership"
+        sudo mkdir -p /var/www
+        sudo chown "$INSTALL_USER:www-data" /var/www
+        sudo chmod 775 /var/www
+    fi
+    
     # Create storage directory if it doesn't exist (outside project dir)
     STORAGE_DIR="$(dirname "$PROJECT_DIR")/storage"
     mkdir -p "$STORAGE_DIR"/{sessions,logs,cache,backups,temp,uploads}
