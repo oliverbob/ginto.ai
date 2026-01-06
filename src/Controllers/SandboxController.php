@@ -999,15 +999,16 @@ class SandboxController
     {
         header('Content-Type: application/json; charset=utf-8');
         
+        $debug = [];
+        
         try {
-            // DEBUG: Trace sandbox ID source
-            $debugInfo = [];
-            $debugInfo['session_sandbox_id'] = $_SESSION['sandbox_id'] ?? 'NOT SET';
-            $debugInfo['user_id'] = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 'NOT SET';
+            // TRACE 1: Session data
+            $debug['session_sandbox_id'] = $_SESSION['sandbox_id'] ?? 'NOT_SET';
+            $debug['session_user_id'] = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 'NOT_SET';
             
-            // Get user's sandbox ID
+            // TRACE 2: Get sandbox ID
             $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
-            $debugInfo['getSandboxIdIfExists_result'] = $sandboxId ?? 'NULL';
+            $debug['getSandboxIdIfExists'] = $sandboxId ?? 'NULL';
             
             if (!$sandboxId) {
                 echo json_encode([
@@ -1015,22 +1016,40 @@ class SandboxController
                     'installed' => false,
                     'sandbox_exists' => false,
                     'message' => 'No sandbox installed',
-                    'debug' => $debugInfo
+                    '_debug' => $debug
                 ]);
                 exit;
             }
             
-            // Check if sandbox exists using UnifiedSandbox (works for both Docker and LXD)
-            $containerExists = \Ginto\Helpers\UnifiedSandbox::exists($sandboxId);
-            $debugInfo['UnifiedSandbox_exists'] = $containerExists ? 'true' : 'false';
+            // TRACE 3: Check container exists
+            $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+            $debug['backend'] = $backend;
+            
+            $containerName = 'ginto-sandbox-' . preg_replace('/[^a-zA-Z0-9_-]/', '', $sandboxId);
+            $debug['container_name'] = $containerName;
+            
+            // Direct docker check with output capture
+            $cmd = 'docker container inspect ' . escapeshellarg($containerName) . ' 2>&1';
+            $debug['docker_cmd'] = $cmd;
+            exec($cmd, $dockerOutput, $dockerCode);
+            $debug['docker_exit_code'] = $dockerCode;
+            $debug['docker_output_first_line'] = $dockerOutput[0] ?? 'EMPTY';
+            
+            $containerExists = ($dockerCode === 0);
+            $debug['container_exists'] = $containerExists ? 'YES' : 'NO';
             
             if (!$containerExists) {
+                // Clear stale session
+                if (isset($_SESSION['sandbox_id'])) {
+                    unset($_SESSION['sandbox_id']);
+                    $debug['cleared_session'] = 'YES';
+                }
                 echo json_encode([
                     'success' => true,
                     'installed' => false,
                     'sandbox_exists' => false,
-                    'message' => 'Sandbox does not exist',
-                    'debug' => $debugInfo
+                    'message' => 'Sandbox container does not exist',
+                    '_debug' => $debug
                 ]);
                 exit;
             }
