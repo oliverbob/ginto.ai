@@ -635,7 +635,15 @@ sudo systemctl restart php8.3-fpm
 ---
 ## 📋 Release Notes
 
-See [CHANGELOG.md](CHANGELOG.md) for release notes and version history.
+| Version | Date | Description |
+|---------|------|-------------|
+| **v1.0.4** | 2026-01-06 | Hosting DNS Management |
+| **v1.0.3** | 2026-01-05 | Docker architecture change |
+| **v1.0.2** | 2026-01-02 | Panda Search |
+| **v1.0.1** | 2025-12-26 | LXC Manager improvements |
+| **v1.0.0** | 2025-12-21 | Initial release |
+
+See [CHANGELOG.md](CHANGELOG.md) for full release notes and version history.
 
 ---
 ## 📄 License
