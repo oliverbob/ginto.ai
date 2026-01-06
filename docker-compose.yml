@@ -61,8 +61,10 @@ services:
       dockerfile: docker/node/Dockerfile
     container_name: ginto-terminal-server
     restart: unless-stopped
+    user: root  # Needs root to access Docker socket for sandbox exec
     environment:
       - SERVICE=terminal-server
+      - SANDBOX_MODE=docker
       - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
       - REDIS_PORT=${REDIS_PORT:-6379}
     ports:
@@ -70,7 +72,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - sandbox-network
     healthcheck:
