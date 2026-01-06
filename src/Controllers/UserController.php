@@ -649,10 +649,34 @@ class UserController extends \Core\Controller
             $fullname = $postData['fullname'] ?? '';
         }
 
-        // Save individual name fields for DB
-        $user_first = $first;
-        $user_middle = $middle;
-        $user_last = $last;
+        // Save individual name fields for DB - SANITIZE to prevent XSS
+        $user_first = strip_tags(trim($first));
+        $user_middle = strip_tags(trim($middle));
+        $user_last = strip_tags(trim($last));
+        $fullname = strip_tags(trim($fullname));
+        
+        // Sanitize username - only allow alphanumeric, underscore, hyphen
+        $cleanUsername = preg_replace('/[^a-zA-Z0-9_\-]/', '', $postData['username']);
+        if (empty($cleanUsername) || $cleanUsername !== $postData['username']) {
+            // Username contains invalid characters
+            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                header('Content-Type: application/json');
+                http_response_code(400);
+                echo json_encode([
+                    'success' => false,
+                    'message' => 'Username can only contain letters, numbers, underscore and hyphen.'
+                ]);
+                exit;
+            } else {
+                $this->view('user/register/register', [
+                    'title' => 'Register',
+                    'error' => 'Username can only contain letters, numbers, underscore and hyphen.',
+                    'old' => $postData,
+                    'countries' => $this->countries
+                ]);
+                return;
+            }
+        }
 
         // Registration attempt — avoid noisy debug logging in production
 
@@ -661,26 +685,26 @@ class UserController extends \Core\Controller
             'firstname' => $user_first,
             'middlename' => $user_middle,
             'lastname' => $user_last,
-            'username' => $postData['username'],
-            'email' => $postData['email'],
+            'username' => $cleanUsername,
+            'email' => filter_var($postData['email'], FILTER_SANITIZE_EMAIL),
             'password' => $postData['password'],
             'referrer_id' => $referrerId,
-            'country' => $postData['country'],
-            'phone' => $postData['phone']
+            'country' => strip_tags(trim($postData['country'])),
+            'phone' => preg_replace('/[^0-9+\-\s]/', '', $postData['phone'])
         ];
 
         // Include package selection and payment metadata if provided by the UI
-        $userData['package'] = $postData['package'] ?? ($postData['package_name'] ?? null);
+        $userData['package'] = isset($postData['package']) ? strip_tags($postData['package']) : (isset($postData['package_name']) ? strip_tags($postData['package_name']) : null);
         $userData['package_amount'] = isset($postData['package_amount']) ? floatval($postData['package_amount']) : (isset($postData['amount']) ? floatval($postData['amount']) : null);
-        $userData['package_currency'] = $postData['package_currency'] ?? ($postData['currency'] ?? 'PHP');
-        $userData['pay_method'] = $postData['pay_method'] ?? ($postData['payment_method'] ?? null);
+        $userData['package_currency'] = isset($postData['package_currency']) ? preg_replace('/[^A-Z]/', '', strtoupper($postData['package_currency'])) : (isset($postData['currency']) ? preg_replace('/[^A-Z]/', '', strtoupper($postData['currency'])) : 'PHP');
+        $userData['pay_method'] = isset($postData['pay_method']) ? strip_tags($postData['pay_method']) : (isset($postData['payment_method']) ? strip_tags($postData['payment_method']) : null);
         
         // PayPal payment info
         if (!empty($postData['paypal_order_id'])) {
-            $userData['paypal_order_id'] = $postData['paypal_order_id'];
+            $userData['paypal_order_id'] = preg_replace('/[^a-zA-Z0-9]/', '', $postData['paypal_order_id']);
         }
         if (!empty($postData['paypal_payment_status'])) {
-            $userData['paypal_payment_status'] = $postData['paypal_payment_status'];
+            $userData['paypal_payment_status'] = strip_tags($postData['paypal_payment_status']);
         }
 
         $newUserId = $this->userModel->register($userData);
