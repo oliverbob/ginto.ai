@@ -1098,8 +1098,7 @@ class SandboxController
                 'source $HOME/.cargo/env && ' .
                 'python3 -m venv --system-site-packages /home/sandbox/openwebui-venv && ' .
                 'source /home/sandbox/openwebui-venv/bin/activate && ' .
-                'pip install --upgrade pip setuptools wheel && ' .
-                'pip install --no-cache-dir --no-build-isolation opencv-python-headless || true && ' .
+                'pip install --upgrade pip setuptools wheel scikit-build numpy && ' .
                 'pip install --no-cache-dir open-webui && ' .
                 'open-webui serve';
             
