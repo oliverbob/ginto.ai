@@ -78,31 +78,31 @@ if (empty($serverIp) || $serverIp === '127.0.0.1' || str_starts_with($serverIp, 
           <form id="soa-form" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label class="block text-sm text-gray-500 mb-1">Primary NS</label>
-              <input type="text" name="primary_ns" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="ns1.ginto.ai">
+              <input type="text" name="primary_ns" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="ns1.example.com">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Admin Email</label>
-              <input type="text" name="admin_email" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="admin.ginto.ai">
+              <input type="text" name="admin_email" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="admin.example.com">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Refresh (sec)</label>
-              <input type="number" name="refresh" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="10800">
+              <input type="number" name="refresh" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="10800">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Retry (sec)</label>
-              <input type="number" name="retry" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="3600">
+              <input type="number" name="retry" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="3600">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Expire (sec)</label>
-              <input type="number" name="expire" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="604800">
+              <input type="number" name="expire" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="604800">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Minimum TTL</label>
-              <input type="number" name="minimum_ttl" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="3600">
+              <input type="number" name="minimum_ttl" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="3600">
             </div>
             <div>
               <label class="block text-sm text-gray-500 mb-1">Default TTL</label>
-              <input type="number" name="default_ttl" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" value="3600">
+              <input type="number" name="default_ttl" class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg" placeholder="3600">
             </div>
             <div class="flex items-end">
               <button type="submit" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg">Save SOA Defaults</button>
