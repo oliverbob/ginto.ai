@@ -1013,8 +1013,8 @@ class SandboxController
                 exit;
             }
             
-            // Check if sandbox exists and is running
-            if (!\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+            // Check if sandbox exists using UnifiedSandbox (works for both Docker and LXD)
+            if (!\Ginto\Helpers\UnifiedSandbox::exists($sandboxId)) {
                 echo json_encode([
                     'success' => true,
                     'installed' => false,
@@ -1024,11 +1024,15 @@ class SandboxController
                 exit;
             }
             
+            // Detect backend and home directory
+            $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+            $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
+            
             // Check if OpenWebUI directory exists
-            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+            [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
-                'test -d /root/open-webui && test -f /root/open-webui/backend/requirements.txt && echo "installed"',
-                '/root',
+                "test -d $homeDir/open-webui && test -f $homeDir/open-webui/backend/requirements.txt && echo 'installed'",
+                $homeDir,
                 10
             );
             
@@ -1037,10 +1041,10 @@ class SandboxController
             // Check if OpenWebUI is running (port 3000)
             $running = false;
             if ($installed) {
-                [$code2, $output2, $err2] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+                [$code2, $output2, $err2] = \Ginto\Helpers\UnifiedSandbox::exec(
                     $sandboxId,
-                    'pgrep -f "open-webui" > /dev/null && echo "running"',
-                    '/root',
+                    'pgrep -f "open-webui" > /dev/null 2>&1 && echo "running" || (ss -tlnp 2>/dev/null | grep -q ":3000 " && echo "running")',
+                    $homeDir,
                     5
                 );
                 $running = trim($output2) === 'running';
@@ -1051,7 +1055,8 @@ class SandboxController
                 'installed' => $installed,
                 'running' => $running,
                 'sandbox_exists' => true,
-                'sandbox_id' => $sandboxId
+                'sandbox_id' => $sandboxId,
+                'backend' => $backend
             ]);
             
         } catch (\Throwable $e) {
@@ -1076,32 +1081,32 @@ class SandboxController
                 exit;
             }
             
-            if (!\Ginto\Helpers\LxdSandboxManager::sandboxExists($sandboxId)) {
+            if (!\Ginto\Helpers\UnifiedSandbox::exists($sandboxId)) {
                 echo json_encode(['success' => false, 'error' => 'Sandbox does not exist']);
                 exit;
             }
             
-            // Ensure sandbox is running
-            if (!\Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId)) {
-                \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
-                sleep(3);
-            }
+            // Detect backend and home directory
+            $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+            $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
-            // Install OpenWebUI dependencies and clone repo
-            $installScript = <<<'BASH'
-#!/bin/sh
+            // Different install scripts for Docker (Debian-based) vs LXD (Alpine)
+            if ($backend === 'docker') {
+                $installScript = <<<BASH
+#!/bin/bash
 set -e
 
-# Install Python dependencies
-apk add --no-cache python3 py3-pip py3-virtualenv git nodejs npm
+# Install Python dependencies (Debian-based)
+apt-get update -qq
+apt-get install -y -qq python3 python3-pip python3-venv git nodejs npm curl
 
 # Clone OpenWebUI if not exists
-if [ ! -d /root/open-webui ]; then
-    cd /root
+if [ ! -d $homeDir/open-webui ]; then
+    cd $homeDir
     git clone https://github.com/open-webui/open-webui.git --depth 1
 fi
 
-cd /root/open-webui
+cd $homeDir/open-webui
 
 # Create virtual environment
 python3 -m venv venv
@@ -1112,20 +1117,63 @@ cd backend
 pip install --no-cache-dir -r requirements.txt -q
 
 # Build frontend
-cd /root/open-webui
+cd $homeDir/open-webui
 npm install
 npm run build
 
 # Create startup script
-cat > /root/start-openwebui.sh << 'EOF'
-#!/bin/sh
-cd /root/open-webui/backend
+cat > $homeDir/start-openwebui.sh << 'EOF'
+#!/bin/bash
+cd $homeDir/open-webui/backend
 source ../venv/bin/activate
-export DATA_DIR=/root/open-webui/data
-mkdir -p $DATA_DIR
+export DATA_DIR=$homeDir/open-webui/data
+mkdir -p \$DATA_DIR
 exec python -m open_webui --port 3000 --host 0.0.0.0
 EOF
-chmod +x /root/start-openwebui.sh
+chmod +x $homeDir/start-openwebui.sh
+
+echo "OPENWEBUI_INSTALLED"
+BASH;
+            } else {
+                // LXD/Alpine install script
+                $installScript = <<<BASH
+#!/bin/sh
+set -e
+
+# Install Python dependencies (Alpine)
+apk add --no-cache python3 py3-pip py3-virtualenv git nodejs npm
+
+# Clone OpenWebUI if not exists
+if [ ! -d $homeDir/open-webui ]; then
+    cd $homeDir
+    git clone https://github.com/open-webui/open-webui.git --depth 1
+fi
+
+cd $homeDir/open-webui
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install backend dependencies
+cd backend
+pip install --no-cache-dir -r requirements.txt -q
+
+# Build frontend
+cd $homeDir/open-webui
+npm install
+npm run build
+
+# Create startup script
+cat > $homeDir/start-openwebui.sh << 'EOF'
+#!/bin/sh
+cd $homeDir/open-webui/backend
+source ../venv/bin/activate
+export DATA_DIR=$homeDir/open-webui/data
+mkdir -p \$DATA_DIR
+exec python -m open_webui --port 3000 --host 0.0.0.0
+EOF
+chmod +x $homeDir/start-openwebui.sh
 
 # Update Caddy to forward port 80 to 3000
 cat > /etc/caddy/Caddyfile << 'EOF'
@@ -1139,12 +1187,13 @@ rc-service caddy restart 2>/dev/null || true
 
 echo "OPENWEBUI_INSTALLED"
 BASH;
+            }
             
             // Execute installation (longer timeout for npm install)
-            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+            [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
                 $installScript,
-                '/root',
+                $homeDir,
                 600 // 10 minute timeout
             );
             
@@ -1152,14 +1201,15 @@ BASH;
                 echo json_encode([
                     'success' => true,
                     'message' => 'OpenWebUI installed successfully',
-                    'output' => $output
+                    'backend' => $backend
                 ]);
             } else {
                 echo json_encode([
                     'success' => false,
                     'error' => 'Installation may have failed',
                     'output' => $output,
-                    'exit_code' => $code
+                    'exit_code' => $code,
+                    'backend' => $backend
                 ]);
             }
             
@@ -1184,34 +1234,31 @@ BASH;
                 exit;
             }
             
-            // Ensure sandbox is running
-            if (!\Ginto\Helpers\LxdSandboxManager::sandboxRunning($sandboxId)) {
-                \Ginto\Helpers\LxdSandboxManager::startSandbox($sandboxId);
-                sleep(2);
-            }
+            // Detect backend and home directory
+            $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+            $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
             
             // Start OpenWebUI in background
-            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+            [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
-                'nohup /root/start-openwebui.sh > /root/openwebui.log 2>&1 & sleep 2 && pgrep -f "open_webui" && echo "STARTED"',
-                '/root',
+                "nohup $homeDir/start-openwebui.sh > $homeDir/openwebui.log 2>&1 & sleep 3 && (pgrep -f 'open_webui' || ss -tlnp 2>/dev/null | grep -q ':3000 ') && echo 'STARTED'",
+                $homeDir,
                 30
             );
             
             if (strpos($output, 'STARTED') !== false) {
-                // Get container IP for redirect URL
-                $containerIp = \Ginto\Helpers\LxdSandboxManager::getSandboxIp($sandboxId);
-                
                 echo json_encode([
                     'success' => true,
                     'message' => 'OpenWebUI started',
-                    'url' => '/clients/' . $sandboxId . '/'
+                    'url' => '/clients/' . $sandboxId . '/',
+                    'backend' => $backend
                 ]);
             } else {
                 echo json_encode([
                     'success' => false,
                     'error' => 'Failed to start OpenWebUI',
-                    'output' => $output
+                    'output' => $output,
+                    'backend' => $backend
                 ]);
             }
             
@@ -1236,16 +1283,20 @@ BASH;
                 exit;
             }
             
-            [$code, $output, $err] = \Ginto\Helpers\LxdSandboxManager::execInSandbox(
+            $backend = \Ginto\Helpers\UnifiedSandbox::getBackend();
+            $homeDir = ($backend === 'docker') ? '/home/sandbox' : '/root';
+            
+            [$code, $output, $err] = \Ginto\Helpers\UnifiedSandbox::exec(
                 $sandboxId,
                 'pkill -f "open_webui" 2>/dev/null; echo "STOPPED"',
-                '/root',
+                $homeDir,
                 10
             );
             
             echo json_encode([
                 'success' => true,
-                'message' => 'OpenWebUI stopped'
+                'message' => 'OpenWebUI stopped',
+                'backend' => $backend
             ]);
             
         } catch (\Throwable $e) {
