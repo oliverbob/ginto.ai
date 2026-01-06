@@ -1087,10 +1087,9 @@ class SandboxController
             }
             
             // Install system dependencies first, then pip install open-webui
-            // Dependencies: build tools, ffmpeg for audio/video, libmagic for file detection
-            $installCmd = 'apt-get update && apt-get install -y --no-install-recommends ' .
-                'build-essential python3-dev libffi-dev libssl-dev ' .
-                'ffmpeg libmagic1 curl && ' .
+            // Use apk for Alpine Linux sandboxes
+            $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
+                'ffmpeg libmagic curl && ' .
                 'pip install --upgrade pip && ' .
                 'pip install open-webui && open-webui serve';
             
