@@ -241,6 +241,13 @@
       showWizardStep(4);
       document.getElementById('wizard-sandbox-id').textContent = data.sandbox_id;
       
+      // Auto-trigger OpenWebUI install if pending
+      if (window.pendingOpenWebuiInstall) {
+        console.log('[OWUI DEBUG] Auto-calling openSandboxAfterInstall for pending OpenWebUI install');
+        await new Promise(r => setTimeout(r, 500));
+        openSandboxAfterInstall();
+      }
+      
     } catch (err) {
       console.error('Sandbox installation error:', err);
       document.getElementById('wizard-error-message').textContent = err.message || 'An unknown error occurred.';
