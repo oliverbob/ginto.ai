@@ -543,22 +543,64 @@ class HostingController
     private function listDomains(): array
     {
         $domains = [];
-        $caddyDir = '/etc/caddy/sites-enabled';
-        if (!is_dir($caddyDir)) $caddyDir = '/etc/caddy';
+        $seenDomains = [];
         
-        // Parse Caddyfile for domains
+        // Parse main Caddyfile for domains
         $caddyFile = '/etc/caddy/Caddyfile';
         if (file_exists($caddyFile)) {
             $content = file_get_contents($caddyFile);
             preg_match_all('/^([a-z0-9.-]+)\s*\{/im', $content, $matches);
             foreach ($matches[1] as $domain) {
-                if ($domain !== 'localhost' && !str_starts_with($domain, ':')) {
+                if ($domain !== 'localhost' && !str_starts_with($domain, ':') && !isset($seenDomains[$domain])) {
+                    $seenDomains[$domain] = true;
                     $domains[] = [
                         'name' => $domain,
                         'enabled' => true,
                         'ssl' => $this->hasSSL($domain),
                         'root' => $this->getDomainRoot($domain)
                     ];
+                }
+            }
+        }
+
+        // Also parse individual site configs from sites-enabled
+        $sitesEnabledDir = '/etc/caddy/sites-enabled';
+        if (is_dir($sitesEnabledDir)) {
+            foreach (glob("{$sitesEnabledDir}/*.caddy") as $siteFile) {
+                $content = file_get_contents($siteFile);
+                preg_match_all('/^([a-z0-9.-]+)\s*\{/im', $content, $matches);
+                foreach ($matches[1] as $domain) {
+                    if ($domain !== 'localhost' && !str_starts_with($domain, ':') && !isset($seenDomains[$domain])) {
+                        $seenDomains[$domain] = true;
+                        $domains[] = [
+                            'name' => $domain,
+                            'enabled' => true,
+                            'ssl' => $this->hasSSL($domain),
+                            'root' => $this->getDomainRoot($domain)
+                        ];
+                    }
+                }
+            }
+        }
+
+        // Also check sites-available for disabled sites
+        $sitesAvailableDir = '/etc/caddy/sites-available';
+        if (is_dir($sitesAvailableDir)) {
+            foreach (glob("{$sitesAvailableDir}/*.caddy") as $siteFile) {
+                $content = file_get_contents($siteFile);
+                preg_match_all('/^([a-z0-9.-]+)\s*\{/im', $content, $matches);
+                foreach ($matches[1] as $domain) {
+                    if ($domain !== 'localhost' && !str_starts_with($domain, ':') && !isset($seenDomains[$domain])) {
+                        $seenDomains[$domain] = true;
+                        // Check if enabled
+                        $enabledFile = "{$sitesEnabledDir}/" . basename($siteFile);
+                        $domains[] = [
+                            'name' => $domain,
+                            'enabled' => file_exists($enabledFile),
+                            'ssl' => $this->hasSSL($domain),
+                            'root' => $this->getDomainRoot($domain)
+                        ];
+                    }
                 }
             }
         }
