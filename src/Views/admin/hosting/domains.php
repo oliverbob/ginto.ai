@@ -14,6 +14,7 @@ $currentPage = 'domains';
   <script src="/assets/js/tailwindcss.js"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
   <link rel="stylesheet" href="/lib/fontawesome/css/all.min.css">
+  <script src="/assets/js/ui-components.js"></script>
   <style>
     ::-webkit-scrollbar { width: 6px; height: 6px; }
     ::-webkit-scrollbar-track { background: #1f2937; }
@@ -172,17 +173,21 @@ $currentPage = 'domains';
         const data = await res.json();
         if (data.success) {
           hideAddModal();
+          GintoUI.success(`Domain ${form.get('domain')} created successfully`);
           loadDomains();
         } else {
-          alert(data.error || 'Failed to create domain');
+          GintoUI.error(data.error || 'Failed to create domain');
         }
       } catch (err) {
-        alert('Error: ' + err.message);
+        GintoUI.error('Error: ' + err.message);
       }
     });
 
     async function domainAction(domain, action) {
-      if (action === 'delete' && !confirm(`Delete domain ${domain}?`)) return;
+      if (action === 'delete') {
+        const confirmed = await GintoUI.confirm(`Delete domain <strong>${domain}</strong>? This will remove the virtual host configuration.`, 'Delete Domain');
+        if (!confirmed) return;
+      }
       try {
         const res = await fetch(`/admin/hosting/domains/${domain}`, {
           method: 'POST',
@@ -190,10 +195,14 @@ $currentPage = 'domains';
           body: JSON.stringify({ action, csrf_token: csrfToken })
         });
         const data = await res.json();
-        if (data.success) loadDomains();
-        else alert(data.error || 'Action failed');
+        if (data.success) {
+          GintoUI.success(action === 'delete' ? `Domain ${domain} deleted` : `Domain ${domain} ${action}d`);
+          loadDomains();
+        } else {
+          GintoUI.error(data.error || 'Action failed');
+        }
       } catch (e) {
-        alert('Error: ' + e.message);
+        GintoUI.error('Error: ' + e.message);
       }
     }
 
