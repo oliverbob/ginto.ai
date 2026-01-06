@@ -182,7 +182,7 @@ wss.on('connection', function connection(ws, req) {
     const inDocker = fs.existsSync('/.dockerenv');
     if (inDocker) {
       shell = 'nsenter';
-      args = ['-t', '1', '-m', '-u', '-i', '-n', '-p', '--', '/bin/bash', '-l'];
+      args = ['-t', '1', '-m', '-u', '-i', '-n', '-p', '--', '/bin/bash'];
     } else {
       shell = '/bin/bash';
       args = [];
