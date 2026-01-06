@@ -1087,9 +1087,11 @@ class SandboxController
             }
             
             // Install system dependencies first, then pip install open-webui
-            // Use apk for Alpine Linux sandboxes
+            // Use apk for Alpine Linux sandboxes, create venv for PEP 668 compliance
             $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
-                'ffmpeg libmagic curl && ' .
+                'ffmpeg libmagic curl py3-pip py3-virtualenv && ' .
+                'python3 -m venv /home/sandbox/openwebui-venv && ' .
+                'source /home/sandbox/openwebui-venv/bin/activate && ' .
                 'pip install --upgrade pip && ' .
                 'pip install open-webui && open-webui serve';
             
