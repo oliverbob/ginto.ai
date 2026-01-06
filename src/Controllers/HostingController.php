@@ -199,9 +199,14 @@ class HostingController
             // Get users who have sandboxes for the owner dropdown
             $usersWithSandboxes = [];
             try {
-                $stmt = $this->db->query("SELECT id, username, fullname, sandbox_id, lxc_sandbox_id FROM users WHERE sandbox_id IS NOT NULL OR lxc_sandbox_id IS NOT NULL ORDER BY username");
-                $usersWithSandboxes = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            } catch (\PDOException $e) {
+                $usersWithSandboxes = $this->db->select('users', ['id', 'username', 'fullname', 'sandbox_id', 'lxc_sandbox_id'], [
+                    'OR' => [
+                        'sandbox_id[!]' => null,
+                        'lxc_sandbox_id[!]' => null
+                    ],
+                    'ORDER' => ['username' => 'ASC']
+                ]) ?: [];
+            } catch (\Exception $e) {
                 // Ignore
             }
 
@@ -750,14 +755,17 @@ class HostingController
                     : ($name === 'ginto-sandbox' ? 'ginto-sandbox' : '');
                 if ($sandboxId) {
                     try {
-                        $stmt = $this->db->prepare("SELECT u.username, u.fullname FROM users u WHERE u.sandbox_id = ? OR u.lxc_sandbox_id = ?");
-                        $stmt->execute([$sandboxId, $sandboxId]);
-                        $user = $stmt->fetch(\PDO::FETCH_ASSOC);
+                        $user = $this->db->get('users', ['username', 'fullname'], [
+                            'OR' => [
+                                'sandbox_id' => $sandboxId,
+                                'lxc_sandbox_id' => $sandboxId
+                            ]
+                        ]);
                         if ($user) {
                             $ownerUsername = $user['username'];
                             $ownerFullname = $user['fullname'];
                         }
-                    } catch (\PDOException $e) {
+                    } catch (\Exception $e) {
                         // Ignore
                     }
                 }
