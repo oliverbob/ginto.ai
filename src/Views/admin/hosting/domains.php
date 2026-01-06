@@ -297,16 +297,15 @@ $currentPage = 'domains';
     }
     
     function initOwnerAutocomplete() {
-      // Wait for containers to load, then init with local data
-      const initWithData = () => {
-        const usersWithContainers = getUsersWithContainers();
-        
-        // Username autocomplete - only users with containers
-        usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
-          placeholder: 'Search owner with container...',
-          data: usersWithContainers,
-          minChars: 1,
-          renderItem: (user) => `
+      const usersWithContainers = getUsersWithContainers();
+      console.log('Initializing autocomplete with users:', usersWithContainers);
+      
+      // Username autocomplete - only users with containers
+      usernameAutocomplete = GintoUI.autocomplete('#owner-username-wrapper', {
+        placeholder: 'Search owner with container...',
+        data: usersWithContainers,
+        minChars: 1,
+        renderItem: (user) => `
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white text-sm font-bold shadow-sm">
                 ${esc((user.username || '?')[0].toUpperCase())}
@@ -371,20 +370,6 @@ $currentPage = 'domains';
             document.getElementById('owner-fullname-hidden').value = value;
           }
         });
-      };
-      
-      // Check if containers already loaded, otherwise wait
-      if (containerData.lxc_containers) {
-        initWithData();
-      } else {
-        // Poll until containers load
-        const checkInterval = setInterval(() => {
-          if (containerData.lxc_containers) {
-            clearInterval(checkInterval);
-            initWithData();
-          }
-        }, 100);
-      }
     }
     
     // Auto-select container when owner is chosen
@@ -577,8 +562,9 @@ $currentPage = 'domains';
     }
 
     loadDomains();
-    loadContainers();
-    initOwnerAutocomplete();
+    loadContainers().then(() => {
+      initOwnerAutocomplete();
+    });
   </script>
 </body>
 </html>
