@@ -1088,12 +1088,13 @@ class SandboxController
             
             // Install system dependencies first, then pip install open-webui
             // Use Docker-in-Docker for simplicity - avoids Alpine compilation issues
+            // Use port 8088 to avoid conflicts with other services
             $installCmd = 'docker run -d --name open-webui ' .
-                '-p 3000:8080 ' .
+                '-p 8088:8080 ' .
                 '-v open-webui:/app/backend/data ' .
                 '-e WEBUI_AUTH=false ' .
                 'ghcr.io/open-webui/open-webui:main && ' .
-                'echo "OpenWebUI started on port 3000"';
+                'echo "OpenWebUI started on port 8088"';
             
             echo json_encode([
                 'success' => true,
