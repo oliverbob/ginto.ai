@@ -52,15 +52,49 @@ if (empty($isAdmin)) return;
 </div>
 
 <!-- Minimized Console Indicator (Floating) -->
-<div id="console-minimized" class="fixed bottom-4 right-4 z-50 hidden">
-  <button id="restore-console" class="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg shadow-lg border border-gray-700 transition-all">
-    <svg class="w-4 h-4 text-green-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
-    </svg>
-    <span class="text-sm font-medium">Console Running</span>
-    <span id="console-minimized-status" class="text-xs px-1.5 py-0.5 rounded bg-green-600 text-white">●</span>
+<div id="console-minimized" class="fixed bottom-32 right-4 z-50 hidden">
+  <button id="restore-console" class="console-minimized-tab flex items-center bg-gray-800 hover:bg-gray-700 text-white shadow-lg border border-gray-600 cursor-pointer">
+    <div class="flex items-center justify-center gap-2 p-3 flex-shrink-0">
+      <svg class="w-5 h-5 text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 7.5l3 2.25-3 2.25m4.5 0h3m-9 8.25h13.5A2.25 2.25 0 0021 18V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25z"/>
+      </svg>
+      <span class="console-tab-title text-sm font-medium whitespace-nowrap">Console Running</span>
+      <span id="console-minimized-status" class="console-tab-status text-xs px-1.5 py-0.5 rounded bg-green-600 text-white">●</span>
+    </div>
   </button>
 </div>
+
+<style>
+/* Console minimized tab - circle by default, expands on hover */
+.console-minimized-tab {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.console-minimized-tab:hover {
+  width: auto;
+  border-radius: 9999px;
+}
+.console-minimized-tab .console-tab-title,
+.console-minimized-tab .console-tab-status {
+  opacity: 0;
+  width: 0;
+  padding: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+.console-minimized-tab:hover .console-tab-title {
+  opacity: 1;
+  width: auto;
+}
+.console-minimized-tab:hover .console-tab-status {
+  opacity: 1;
+  width: auto;
+  padding: 0.125rem 0.375rem;
+}
+</style>
 
 <script>
 (function() {

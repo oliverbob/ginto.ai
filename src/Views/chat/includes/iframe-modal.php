@@ -104,7 +104,7 @@
 .minimized-tab:hover .tab-close {
   padding-right: 0.75rem;
 }
-</style>
+
 .iframe-modal-normal {
   width: calc(100vw - 80px);
   height: calc(100vh - 80px);
