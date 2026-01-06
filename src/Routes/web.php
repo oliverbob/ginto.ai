@@ -98,6 +98,7 @@ $router->req('/api/sandbox/openwebui/status', 'SandboxController@openwebuiStatus
 $router->req('/api/sandbox/openwebui/install', 'SandboxController@openwebuiInstall', ['POST']);
 $router->req('/api/sandbox/openwebui/start', 'SandboxController@openwebuiStart', ['POST']);
 $router->req('/api/sandbox/openwebui/stop', 'SandboxController@openwebuiStop', ['POST']);
+$router->req('/api/sandbox/check-url-ready', 'SandboxController@checkUrlReady');
 
 // LXC binary path helper
 function getLxcBin(): ?string {

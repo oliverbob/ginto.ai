@@ -1237,5 +1237,79 @@ class SandboxController
         }
         exit;
     }
+    
+    /**
+     * Check if a URL is ready (returns HTTP 200)
+     * Used for checking if services like OpenWebUI are fully started
+     */
+    public function checkUrlReady(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        
+        try {
+            $url = $_GET['url'] ?? $_POST['url'] ?? null;
+            
+            if (!$url) {
+                echo json_encode(['success' => false, 'error' => 'URL parameter required']);
+                exit;
+            }
+            
+            // Validate URL
+            if (!filter_var($url, FILTER_VALIDATE_URL)) {
+                echo json_encode(['success' => false, 'error' => 'Invalid URL']);
+                exit;
+            }
+            
+            // Only allow http/https
+            $scheme = parse_url($url, PHP_URL_SCHEME);
+            if (!in_array($scheme, ['http', 'https'])) {
+                echo json_encode(['success' => false, 'error' => 'Only HTTP/HTTPS URLs allowed']);
+                exit;
+            }
+            
+            // Security: Only allow checking URLs on same host or localhost
+            $host = parse_url($url, PHP_URL_HOST);
+            $serverHost = preg_replace('/:\d+$/', '', $_SERVER['HTTP_HOST'] ?? 'localhost');
+            $allowedHosts = ['localhost', '127.0.0.1', $serverHost, $_SERVER['SERVER_ADDR'] ?? ''];
+            
+            if (!in_array($host, $allowedHosts)) {
+                echo json_encode(['success' => false, 'error' => 'URL host not allowed']);
+                exit;
+            }
+            
+            // Check the URL with curl
+            $ch = curl_init();
+            curl_setopt_array($ch, [
+                CURLOPT_URL => $url,
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_CONNECTTIMEOUT => 3,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 3,
+                CURLOPT_NOBODY => true, // HEAD request
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => 0
+            ]);
+            
+            curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            // Ready if we get a 2xx or 3xx response
+            $ready = $httpCode >= 200 && $httpCode < 400;
+            
+            echo json_encode([
+                'success' => true,
+                'ready' => $ready,
+                'http_code' => $httpCode,
+                'error' => $error ?: null
+            ]);
+            
+        } catch (\Throwable $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
 }
 

@@ -7,6 +7,43 @@ You must test this repo in the LXC container:
 
 # IMPORTANT: Any changes to the repo must be pushed, then pulled to that container for testing.
 
+# DEPLOY SHORTCUT:
+git add -A && git commit -m "msg" && git push && lxc exec box -- su - test -c "cd ~/ginto.ai && git pull" && lxc exec box -- systemctl restart php8.4-fpm
+
+# CURL TEST (from within box):
+lxc exec box -- curl -s "http://127.0.0.1:8000/api/sandbox/openwebui/status" | jq .
+
+# ============================================================================
+# CURRENT TASK: OpenWebUI Iframe Modal Improvements
+# ============================================================================
+# 
+# CONTEXT:
+# - Created universal iframe modal for OpenWebUI (src/Views/chat/includes/iframe-modal.php)
+# - When user clicks "Install OpenWebUI" with no sandbox → creates sandbox → auto-installs OpenWebUI
+# - After install, console minimizes and OpenWebUI opens in iframe modal
+# - Uses waitForUrlReady() to poll until port 8088 responds before opening iframe
+#
+# PENDING TASKS:
+# 1. Add REFRESH button to iframe modal header
+# 2. Move "Open in new tab" button to be before the close button (currently first)
+# 3. Stack minimized tabs vertically (y-axis) to prevent overlapping
+# 4. Fix 500 error on OpenWebUI - need better readiness check:
+#    - Current waitForUrlReady uses fetch with no-cors which doesn't detect 500
+#    - Need to actually curl/check HTTP status code, retry until 200 OK
+# 5. PERSIST iframe tabs across page reload using localStorage:
+#    - Save open tabs (url, title, icon, minimized/maximized state)
+#    - Restore on page load
+#
+# FILES INVOLVED:
+# - src/Views/chat/includes/iframe-modal.php (modal HTML + JS)
+# - src/Views/chat/includes/scripts-openwebui.php (install flow + waitForUrlReady)
+# - src/Views/chat/chat.php (includes iframe-modal.php)
+#
+# BUTTON ORDER SHOULD BE:
+# [Refresh] | [Minimize -] [Maximize □] [Fullscreen ⛶] | [New Tab ↗] [Close ×]
+#
+# ============================================================================
+
 # ANTI RATE-LIMIT GUIDELINES
 # To avoid hitting response length limits:
 # 1. Create large files in smaller chunks (split controllers/views into multiple create_file calls)

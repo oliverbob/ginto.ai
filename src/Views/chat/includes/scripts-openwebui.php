@@ -15,30 +15,26 @@
     return window.GINTO_AUTH?.csrfToken || window.CSRF_TOKEN || '';
   }
   
-  // Wait for a URL to be reachable (port listening)
+  // Wait for a URL to be reachable (returns HTTP 200)
   async function waitForUrlReady(url, timeoutMs = 30000) {
     const startTime = Date.now();
     const checkInterval = 2000; // Check every 2 seconds
     
     while (Date.now() - startTime < timeoutMs) {
       try {
-        // Use fetch with mode: 'no-cors' to check if server responds
-        // This won't give us the response, but will tell us if port is open
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        // Use backend endpoint to check URL readiness (can detect 500 errors)
+        const res = await fetch('/api/sandbox/check-url-ready?url=' + encodeURIComponent(url));
+        const data = await res.json();
         
-        await fetch(url, { 
-          method: 'HEAD',
-          mode: 'no-cors',
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
+        if (data.success && data.ready) {
+          console.log('[OWUI] URL is ready:', url, 'HTTP', data.http_code);
+          return true;
+        }
         
-        // If we get here, the server responded
-        console.log('[OWUI] URL is ready:', url);
-        return true;
+        console.log('[OWUI] URL not ready yet, HTTP code:', data.http_code || 'N/A');
+        await new Promise(r => setTimeout(r, checkInterval));
       } catch (e) {
-        // Connection refused or timeout - wait and retry
+        // Network error - wait and retry
         console.log('[OWUI] Waiting for URL to be ready...', e.message);
         await new Promise(r => setTimeout(r, checkInterval));
       }
