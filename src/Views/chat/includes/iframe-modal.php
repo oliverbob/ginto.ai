@@ -25,7 +25,6 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
           </svg>
         </button>
-        <div class="w-px h-4 bg-gray-600 mx-1"></div>
         <!-- Minimize (-) -->
         <button id="iframe-modal-minimize" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-yellow-400 transition-colors" title="Minimize">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -44,7 +43,6 @@
             <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
           </svg>
         </button>
-        <div class="w-px h-4 bg-gray-600 mx-1"></div>
         <!-- Open in new tab -->
         <button id="iframe-modal-newtab" class="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-white transition-colors" title="Open in new tab">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
