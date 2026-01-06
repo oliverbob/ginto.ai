@@ -954,6 +954,12 @@ class AdminLxcController
     private function getContainerOwner(string $containerName): array
     {
         try {
+            // Extract sandbox ID from container name (e.g., "ginto-sandbox-abc123" -> "abc123")
+            $sandboxId = $containerName;
+            if (preg_match('/^ginto-sandbox-(.+)$/', $containerName, $matches)) {
+                $sandboxId = $matches[1];
+            }
+            
             $stmt = $this->db->pdo->prepare("
                 SELECT cs.user_id, u.username, u.fullname
                 FROM client_sandboxes cs
@@ -961,7 +967,7 @@ class AdminLxcController
                 WHERE cs.sandbox_id = ?
                 LIMIT 1
             ");
-            $stmt->execute([$containerName]);
+            $stmt->execute([$sandboxId]);
             $row = $stmt->fetch(\PDO::FETCH_ASSOC);
             
             if ($row) {
