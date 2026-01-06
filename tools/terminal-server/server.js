@@ -208,9 +208,6 @@ wss.on('connection', function connection(ws, req) {
   };
   
   sessions.set(sessionId, session);
-  
-  // Send session ID to client so it can reconnect
-  ws.send('\x1b[90m[Session: ' + sessionId + ']\x1b[0m\r\n');
 
   // Send data from PTY to client and buffer it
   term.onData(function(data) {
