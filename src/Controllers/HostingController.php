@@ -773,9 +773,9 @@ class HostingController
                             "SELECT u.username, u.fullname 
                              FROM client_sandboxes cs 
                              JOIN users u ON (cs.user_id = u.id OR cs.public_id = u.public_id)
-                             WHERE cs.sandbox_id = :sandbox_id 
+                             WHERE cs.sandbox_id = ?
                              LIMIT 1",
-                            [':sandbox_id' => $sandboxId]
+                            [$sandboxId]
                         )->fetch(\PDO::FETCH_ASSOC);
                         
                         if ($result) {
@@ -783,7 +783,8 @@ class HostingController
                             $ownerFullname = $result['fullname'];
                         }
                     } catch (\Exception $e) {
-                        // Ignore
+                        // Log error for debugging
+                        error_log("Container owner lookup error: " . $e->getMessage());
                     }
                 }
             }
