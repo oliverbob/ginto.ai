@@ -1000,26 +1000,37 @@ class SandboxController
         header('Content-Type: application/json; charset=utf-8');
         
         try {
+            // DEBUG: Trace sandbox ID source
+            $debugInfo = [];
+            $debugInfo['session_sandbox_id'] = $_SESSION['sandbox_id'] ?? 'NOT SET';
+            $debugInfo['user_id'] = $_SESSION['user']['id'] ?? $_SESSION['user_id'] ?? 'NOT SET';
+            
             // Get user's sandbox ID
             $sandboxId = \Ginto\Helpers\ClientSandboxHelper::getSandboxIdIfExists($this->db ?? null, $_SESSION ?? null, true);
+            $debugInfo['getSandboxIdIfExists_result'] = $sandboxId ?? 'NULL';
             
             if (!$sandboxId) {
                 echo json_encode([
                     'success' => true,
                     'installed' => false,
                     'sandbox_exists' => false,
-                    'message' => 'No sandbox installed'
+                    'message' => 'No sandbox installed',
+                    'debug' => $debugInfo
                 ]);
                 exit;
             }
             
             // Check if sandbox exists using UnifiedSandbox (works for both Docker and LXD)
-            if (!\Ginto\Helpers\UnifiedSandbox::exists($sandboxId)) {
+            $containerExists = \Ginto\Helpers\UnifiedSandbox::exists($sandboxId);
+            $debugInfo['UnifiedSandbox_exists'] = $containerExists ? 'true' : 'false';
+            
+            if (!$containerExists) {
                 echo json_encode([
                     'success' => true,
                     'installed' => false,
                     'sandbox_exists' => false,
-                    'message' => 'Sandbox does not exist'
+                    'message' => 'Sandbox does not exist',
+                    'debug' => $debugInfo
                 ]);
                 exit;
             }
