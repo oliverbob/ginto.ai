@@ -153,45 +153,17 @@
     }
     
     if (!sandboxExists) {
-      // Auto-install sandbox first, then OpenWebUI
-      const confirmed = await showConfirmModal({
-        title: 'Install OpenWebUI',
-        message: 'This will create a sandbox environment and install OpenWebUI. Continue?',
-        confirmText: 'Install',
-        confirmIcon: 'fa-download',
-        type: 'info'
-      });
+      // Need to create sandbox first - show wizard with terms acceptance
+      // Set a flag so after sandbox is created, we auto-install OpenWebUI
+      window.pendingOpenWebuiInstall = true;
+      showToast('Please accept the terms to create a sandbox first', 'info');
       
-      if (!confirmed) return;
-      
-      showToast('Creating sandbox...', 'info');
-      
-      // Install sandbox first
-      try {
-        const csrfToken = await getCsrfToken();
-        const res = await fetch('/api/sandbox/install', {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': csrfToken 
-          },
-          body: JSON.stringify({ accept_terms: true, csrf_token: csrfToken })
-        });
-        const data = await res.json();
-        
-        if (!data.success) {
-          showToast('Failed to create sandbox: ' + (data.error || 'Unknown error'), 'error');
-          return;
-        }
-        
-        sandboxExists = true;
-        showToast('Sandbox created! Installing OpenWebUI...', 'success');
-        
-        // Now install OpenWebUI
-        await installOpenWebUI();
-        
-      } catch (e) {
-        showToast('Failed to create sandbox: ' + e.message, 'error');
+      // Trigger the sandbox wizard (same as "My Files" does)
+      if (typeof showSandboxWizard === 'function') {
+        showSandboxWizard();
+      } else {
+        // Fallback: click the My Files button
+        document.getElementById('open-my-files')?.click();
       }
       return;
     }
@@ -260,6 +232,28 @@
       window.open('http://' + host + ':8088/', '_blank');
     }
   }
+  
+  // Listen for sandbox creation events to auto-install OpenWebUI
+  window.addEventListener('message', async (ev) => {
+    try {
+      const d = ev && ev.data;
+      if (!d) return;
+      
+      // When sandbox is created and we have a pending OpenWebUI install
+      if (d.type === 'sandbox_created' && window.pendingOpenWebuiInstall) {
+        window.pendingOpenWebuiInstall = false;
+        sandboxExists = true;
+        
+        // Wait a moment for sandbox to be ready
+        await new Promise(r => setTimeout(r, 2000));
+        
+        showToast('Sandbox created! Installing OpenWebUI...', 'success');
+        await installOpenWebUI();
+      }
+    } catch (e) {
+      console.error('Error handling sandbox message:', e);
+    }
+  });
   
   // Check status on page load
   setTimeout(checkOpenWebuiStatus, 1000);
