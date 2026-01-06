@@ -76,7 +76,7 @@ The "My Files" interface follows the familiar [Microsoft Windows](https://www.mi
 ## ✨ Features
 
 ### 🤖 AI Agent Capabilities
-- **44+ MCP Tools** for file operations, code analysis, database access, and more
+- **112 MCP Tools** for file operations, code analysis, database access, and more
 - **Multi-provider support** - OpenAI, Anthropic Claude, Groq, Together AI, Fireworks AI, Cerebras, **Ollama** (local & cloud)
 - **Auto-detection of models** - Automatically discovers available models from Ollama, llama.cpp, and active provider APIs
 - **Streaming responses** with real-time tool execution
