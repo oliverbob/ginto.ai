@@ -1087,20 +1087,13 @@ class SandboxController
             }
             
             // Install system dependencies first, then pip install open-webui
-            // Use apk for Alpine Linux sandboxes, create venv for PEP 668 compliance
-            // Use rustup for latest Rust (chromadb needs Cargo lockfile v4)
-            // Install py3-opencv from apk to avoid compiling from source (OOM with 1GB)
-            // Skip opencv-python-headless (use system py3-opencv) to avoid OOM
-            $installCmd = 'apk add --no-cache build-base python3-dev libffi-dev openssl-dev ' .
-                'ffmpeg libmagic curl py3-pip py3-virtualenv py3-numpy py3-opencv cmake && ' .
-                'apk del cargo rust 2>/dev/null; ' .
-                'curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && ' .
-                'source $HOME/.cargo/env && ' .
-                'python3 -m venv --system-site-packages /home/sandbox/openwebui-venv && ' .
-                'source /home/sandbox/openwebui-venv/bin/activate && ' .
-                'pip install --upgrade pip setuptools wheel scikit-build numpy && ' .
-                'pip install --no-cache-dir open-webui && ' .
-                'open-webui serve';
+            // Use Docker-in-Docker for simplicity - avoids Alpine compilation issues
+            $installCmd = 'docker run -d --name open-webui ' .
+                '-p 3000:8080 ' .
+                '-v open-webui:/app/backend/data ' .
+                '-e WEBUI_AUTH=false ' .
+                'ghcr.io/open-webui/open-webui:main && ' .
+                'echo "OpenWebUI started on port 3000"';
             
             echo json_encode([
                 'success' => true,
