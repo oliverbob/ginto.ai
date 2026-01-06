@@ -1091,7 +1091,8 @@ class SandboxController
                 'sandbox_exists' => true,
                 'sandbox_id' => $sandboxId,
                 'backend' => $backend,
-                'url' => $running ? 'http://' . $hostIp . ':8088/' : null
+                'url' => $running ? 'http://' . $hostIp . ':8088/' : null,
+                '_debug' => $debug
             ]);
             
         } catch (\Throwable $e) {
