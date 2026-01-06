@@ -110,7 +110,7 @@
       isInstalling = true;
       updateOpenWebuiUI();
       
-      // First, create the install script via API
+      // Get the git clone command from API
       try {
         const csrfToken = await getCsrfToken();
         const res = await fetch('/api/sandbox/openwebui/install', {
@@ -126,11 +126,11 @@
           return;
         }
         
-        // Open console and run the install script (use path from API response)
+        // Open console and run the git clone command
         // Pass 'sandbox' as targetMode to connect to user's sandbox, not host
         if (typeof window.openConsoleWithCommand === 'function') {
-          const scriptPath = data.script || '~/install-openwebui.sh';
-          window.openConsoleWithCommand('bash ' + scriptPath, 'sandbox');
+          const cmd = data.command || 'git clone https://github.com/open-webui/open-webui.git';
+          window.openConsoleWithCommand(cmd, 'sandbox');
         } else {
           showToast('Console not available', 'error');
           isInstalling = false;
