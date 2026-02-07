@@ -5447,7 +5447,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             <div class="flex items-center gap-3 ${style.text}">
               <span class="text-2xl">${style.icon}</span>
               <div>
-                <div class="font-semibold text-base">${escapeHtml(filename)}</div>
+                <div class="font-semibold text-base max-w-[12rem] truncate">${escapeHtml(filename)}</div>
                 <div class="text-sm opacity-75">${escapeHtml(format)} • Conversion queued</div>
               </div>
             </div>
@@ -5463,7 +5463,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
           <div class="flex items-center gap-3 ${style.text}">
             <span class="text-2xl">${style.icon}</span>
             <div>
-              <div class="font-semibold text-base">${escapeHtml(filename)}</div>
+              <div class="font-semibold text-base max-w-[12rem] truncate">${escapeHtml(filename)}</div>
               <div class="text-sm opacity-75">${escapeHtml(format)}${bytes > 0 ? ` • ${formatSize(bytes)}` : ''}</div>
             </div>
           </div>
