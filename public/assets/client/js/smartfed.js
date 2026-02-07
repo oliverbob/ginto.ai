@@ -254,22 +254,19 @@
                     // --- END OF MODIFICATION ---
 
                     try {
-                        // Use FormData for POSTs so server-side CSRF checks that
-                        // rely on $_POST['csrf_token'] (rather than headers) work
-                        // consistently (this matches how media uploads work).
-                        const form = new FormData();
-                        Object.keys(payload).forEach(k => {
-                            if (payload[k] !== undefined && payload[k] !== null) {
-                                form.append(k, payload[k]);
-                            }
-                        });
-                        // Always include the CSRF token as a form field for compatibility
-                        form.append('csrf_token', csrfToken);
+                        // Send JSON body (server expects JSON for SocialController::post)
+                        // Include the CSRF token both in headers and the JSON payload
+                        payload.csrf_token = csrfToken;
 
                         const response = await fetch(apiEndpoint, {
                             method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-Token': csrfToken
+                            },
                             credentials: 'same-origin',
-                            body: form
+                            body: JSON.stringify(payload)
                         });
 
                         const result = await response.json();

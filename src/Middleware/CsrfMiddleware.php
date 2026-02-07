@@ -116,6 +116,51 @@ class CsrfMiddleware
                 exit;
             }
             if (!$token || !validateCsrfToken($token)) {
+                // Extra debug: capture request headers and raw body to /tmp for live troubleshooting
+                try {
+                    $rawBodyDebug = '';
+                    if (empty($rawBody)) {
+                        $rawBodyDebug = @file_get_contents('php://input');
+                    } else {
+                        $rawBodyDebug = $rawBody;
+                    }
+                    $allHeaders = [];
+                    if (function_exists('getallheaders')) {
+                        $allHeaders = getallheaders();
+                    } else {
+                        // Fallback: collect common HTTP_ SERVER_ vars
+                        foreach ($_SERVER as $k => $v) {
+                            if (strpos($k, 'HTTP_') === 0) { $allHeaders[$k] = $v; }
+                        }
+                    }
+                    $extra = [
+                        'ts' => date('c'),
+                        'path' => $path,
+                        'method' => $method,
+                        'token_present' => $token !== null,
+                        'token_value' => is_string($token) ? substr($token,0,256) : null,
+                        'headers' => $allHeaders,
+                        'cookies' => array_intersect_key($_COOKIE, array_flip([session_name()])),
+                        'raw_body_snippet' => is_string($rawBodyDebug) ? substr($rawBodyDebug,0,2000) : null,
+                        'session_csrf' => $_SESSION['csrf_token'] ?? null,
+                        'session_id' => session_id(),
+                    ];
+                    // Always write to /tmp for quick access
+                    file_put_contents('/tmp/csrf-debug-extra.log', json_encode($extra, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+                    // Also write to the project's sibling storage/logs directory (one level up from ginto.ai)
+                    try {
+                        $projectParent = dirname(__DIR__, 3); // /.../parent of ginto.ai
+                        $storageDir = $projectParent . '/storage/logs';
+                        if (!is_dir($storageDir)) @mkdir($storageDir, 0755, true);
+                        $storageFile = rtrim($storageDir, '/') . '/csrf-debug-extra.log';
+                        file_put_contents($storageFile, json_encode($extra, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
+                    } catch (\Throwable $_) {
+                        // ignore storage write failures; /tmp is primary fallback
+                    }
+                } catch (\Throwable $_) {
+                    error_log('CsrfMiddleware: failed to write extra debug: ' . $_->getMessage());
+                }
+
                 http_response_code(403);
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
