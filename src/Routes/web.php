@@ -71,6 +71,12 @@ $router->post('/post/{id:\d+}/delete', 'ActivitiesController@deletePost');
 $router->post('/post/{id:\d+}/update', 'ActivitiesController@editPostById');
 // Create post with media ( Backwards-compatible endpoint used by mediamanager )
 $router->post('/post/create_with_media', 'UploadController@createPostWithMedia');
+// Expose media creation and streaming endpoints under /social for the social feed UI
+$router->post('/social/post/create_with_media', 'UploadController@createPostWithMedia');
+$router->post('/post/create_with_stream', 'StreamController@createPostWithStream');
+$router->post('/social/post/create_with_stream', 'StreamController@createPostWithStream');
+$router->get('/post/stream', 'StreamController@stream');
+$router->get('/social/post/stream', 'StreamController@stream');
 // Legacy stories create endpoint (clients expect this path)
 $router->post('/post/stories/create', 'StoriesController@postStoriesCreate');
 
