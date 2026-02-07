@@ -254,18 +254,24 @@
                     // --- END OF MODIFICATION ---
 
                     try {
+                        // Use FormData for POSTs so server-side CSRF checks that
+                        // rely on $_POST['csrf_token'] (rather than headers) work
+                        // consistently (this matches how media uploads work).
+                        const form = new FormData();
+                        Object.keys(payload).forEach(k => {
+                            if (payload[k] !== undefined && payload[k] !== null) {
+                                form.append(k, payload[k]);
+                            }
+                        });
+                        // Always include the CSRF token as a form field for compatibility
+                        form.append('csrf_token', csrfToken);
+
                         const response = await fetch(apiEndpoint, {
                             method: 'POST',
-                            // --- MODIFIED HEADERS ---
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/json',
-                                'X-CSRF-Token': csrfToken // Add CSRF token to the request
-                            },
-                            // Ensure cookies (session) are sent so server can validate the token
                             credentials: 'same-origin',
-                            body: JSON.stringify(payload)
+                            body: form
                         });
+
                         const result = await response.json();
 
                         if (response.ok && result.success && result.post) {
