@@ -62,6 +62,9 @@ $router->post('/post/comment', 'ActivitiesController@addComment');
 $router->get('/post/{id:\d+}/comments', 'ActivitiesController@getComments');
 $router->post('/post/comments/{id:\d+}/delete', 'ActivitiesController@deleteCommentById');
 $router->post('/post/comments/{id:\d+}/edit', 'ActivitiesController@editCommentById');
+// Like toggle endpoint (add both POST and GET for backwards compatibility with older clients)
+$router->post('/post/like', 'ActivitiesController@toggleLike');
+$router->get('/post/like', 'ActivitiesController@toggleLike');
 // Delete a post (owner only) - used by feed manager when a user deletes their own post
 $router->post('/post/{id:\d+}/delete', 'ActivitiesController@deletePost');
 // Create post with media ( Backwards-compatible endpoint used by mediamanager )
