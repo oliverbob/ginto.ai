@@ -39,6 +39,29 @@ class SocialController extends \Core\Controller
     {
         header('Content-Type: application/json');
 
+        // DEBUG: log CSRF/header/session state to help diagnose 403 issues
+        try {
+            $hdr = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $_SERVER['HTTP_X_CSRF'] ?? null;
+            $sess = $_SESSION['csrf_token'] ?? null;
+            $cookie = $_COOKIE[session_name()] ?? null;
+            $raw = @file_get_contents('php://input');
+            $dbg = [
+                'uri' => $_SERVER['REQUEST_URI'] ?? '',
+                'method' => $_SERVER['REQUEST_METHOD'] ?? '',
+                'hdr_short' => is_string($hdr) ? substr($hdr,0,16) . '...' : null,
+                'sess_short' => is_string($sess) ? substr($sess,0,16) . '...' : null,
+                'cookie' => $cookie,
+                'post_keys' => array_values(array_keys($_POST ?? [])),
+                'json_cached' => isset($GLOBALS['_JSON_BODY']) ? true : false,
+                'raw_snippet' => is_string($raw) ? substr($raw,0,200) : null,
+            ];
+            error_log('SocialController::post() csrf-debug: ' . json_encode($dbg, JSON_UNESCAPED_SLASHES));
+            if (function_exists('validateCsrfToken') && is_string($hdr) && is_string($sess)) {
+                $valid = validateCsrfToken($hdr);
+                error_log('SocialController::post() validateCsrfToken(header) => ' . ($valid ? 'true' : 'false'));
+            }
+        } catch (\Throwable $_) { error_log('SocialController::post() debug logging failed: ' . $_->getMessage()); }
+
         if (!$this->currentUserId) {
             http_response_code(401);
             echo json_encode(['success' => false, 'message' => 'User not logged in or session invalid.']);
