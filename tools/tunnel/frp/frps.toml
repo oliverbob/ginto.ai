@@ -1,0 +1,88 @@
+# frps Server Configuration for Ginto.ai
+# Place this file at /etc/frp/frps.toml on the server
+
+# === BIND SETTINGS ===
+bindAddr = "0.0.0.0"
+bindPort = 7000
+
+# KCP support (optional, for unreliable networks)
+# kcpBindPort = 7000
+
+# QUIC support (optional, for better performance)
+# quicBindPort = 7000
+
+# === VIRTUAL HOST ===
+# HTTP virtual host port (Caddy will proxy to this)
+vhostHTTPPort = 8080
+
+# HTTPS virtual host port (for direct HTTPS passthrough)
+vhostHTTPSPort = 8443
+
+# Subdomain host - clients use subdomain = "xxx" to get xxx.ginto.ai
+subDomainHost = "ginto.ai"
+
+# TCP multiplexing port for HTTP CONNECT style proxying
+# tcpmuxHTTPConnectPort = 1337
+
+# === AUTHENTICATION ===
+auth.method = "token"
+# Token is read from environment variable FRP_AUTH_TOKEN
+# Set in systemd service or .env file
+auth.token = "{{ .Envs.FRP_AUTH_TOKEN }}"
+
+# === TLS SETTINGS ===
+transport.tls.force = false
+# Enable custom TLS first byte for port multiplexing
+transport.tls.disableCustomTLSFirstByte = true
+
+# === CONNECTION POOL ===
+transport.maxPoolCount = 10
+transport.tcpMux = true
+transport.tcpMuxKeepaliveInterval = 30
+
+# === ALLOWED PORTS ===
+# Restrict which remote ports clients can request
+allowPorts = [
+    { start = 6000, end = 6999 },
+    { start = 8000, end = 8999 },
+    { start = 9000, end = 9999 }
+]
+
+# === WEB DASHBOARD ===
+webServer.addr = "127.0.0.1"
+webServer.port = 7500
+webServer.user = "admin"
+# Password is read from environment variable FRP_DASHBOARD_PWD
+webServer.password = "{{ .Envs.FRP_DASHBOARD_PWD }}"
+# Enable TLS for dashboard (optional)
+# webServer.tls.certFile = "/etc/ssl/certs/ginto.ai.crt"
+# webServer.tls.keyFile = "/etc/ssl/private/ginto.ai.key"
+
+# Prometheus metrics
+enablePrometheus = true
+
+# === LOGGING ===
+log.to = "/var/log/frps.log"
+log.level = "info"
+log.maxDays = 7
+
+# === PROXY SETTINGS ===
+# Maximum connections per proxy
+transport.maxPoolCount = 20
+
+# Heartbeat settings
+transport.heartbeatTimeout = 90
+
+# User connection timeout
+userConnTimeout = 30
+
+# === CUSTOM 404 PAGE ===
+# Custom 404 page for non-existent tunnels
+vhostHTTPTimeout = 60
+custom404Page = "/var/www/frp/404.html"
+
+# === UDP SETTINGS ===
+# udpPacketSize = 1500
+
+# === DETAILED ERRORS ===
+detailedErrorsToClient = true

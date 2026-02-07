@@ -1,0 +1,140 @@
+# frpc Client Configuration Template for Ginto.ai
+# Copy this file to frpc.toml and edit as needed
+
+# === SERVER CONNECTION ===
+serverAddr = "ginto.ai"
+serverPort = 7000
+
+# Use KCP for faster but less reliable connections
+# transport.protocol = "kcp"
+
+# Use QUIC for modern networks
+# transport.protocol = "quic"
+
+# === AUTHENTICATION ===
+auth.method = "token"
+# Get your token from https://ginto.ai/dashboard/tokens
+auth.token = "YOUR_AUTH_TOKEN_HERE"
+
+# Or read from environment variable:
+# auth.token = "{{ .Envs.GINTO_FRP_TOKEN }}"
+
+# === TLS SETTINGS ===
+transport.tls.enable = true
+transport.tls.disableCustomTLSFirstByte = true
+
+# === CONNECTION POOL ===
+transport.poolCount = 3
+
+# === LOCAL ADMIN UI ===
+# Access at http://127.0.0.1:7400 to see proxy status
+webServer.addr = "127.0.0.1"
+webServer.port = 7400
+
+# === LOGGING ===
+log.to = "./frpc.log"
+log.level = "info"
+log.maxDays = 3
+
+# === DNS SERVER ===
+# Use custom DNS for resolving serverAddr
+# dnsServer = "8.8.8.8"
+
+# ==============================================================================
+# PROXY CONFIGURATIONS
+# ==============================================================================
+
+# --- HTTP Proxy Example ---
+# Exposes local HTTP service as https://myapp.ginto.ai
+[[proxies]]
+name = "my-openwebui"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8088
+subdomain = "myapp"
+# Optional: rewrite the Host header
+hostHeaderRewrite = "127.0.0.1"
+# Optional: set custom request headers
+requestHeaders.set.x-from-frp = "true"
+
+# --- HTTPS Proxy Example ---
+# Exposes local HTTPS service with SSL passthrough
+# [[proxies]]
+# name = "secure-service"
+# type = "https"
+# localIP = "127.0.0.1"
+# localPort = 443
+# subdomain = "secure"
+
+# --- TCP Proxy Example ---
+# Exposes local TCP service (e.g., SSH) on a remote port
+# [[proxies]]
+# name = "ssh"
+# type = "tcp"
+# localIP = "127.0.0.1"
+# localPort = 22
+# remotePort = 6022
+
+# --- UDP Proxy Example ---
+# Exposes local UDP service
+# [[proxies]]
+# name = "dns"
+# type = "udp"
+# localIP = "127.0.0.1"
+# localPort = 53
+# remotePort = 6053
+
+# --- Secret TCP (Private) Example ---
+# Only accessible by clients with the secret key
+# [[proxies]]
+# name = "private-db"
+# type = "stcp"
+# secretKey = "your-secret-key"
+# localIP = "127.0.0.1"
+# localPort = 3306
+
+# --- Static File Server Example ---
+# Serve files from a local directory
+# [[proxies]]
+# name = "files"
+# type = "tcp"
+# remotePort = 6080
+# [proxies.plugin]
+# type = "static_file"
+# localPath = "/home/user/files"
+# stripPrefix = "files"
+# httpUser = "user"
+# httpPassword = "password"
+
+# --- With Health Check ---
+# [[proxies]]
+# name = "web-with-health"
+# type = "http"
+# localIP = "127.0.0.1"
+# localPort = 8088
+# subdomain = "healthapp"
+# healthCheck.type = "http"
+# healthCheck.path = "/health"
+# healthCheck.intervalSeconds = 10
+# healthCheck.timeoutSeconds = 3
+# healthCheck.maxFailed = 3
+
+# --- With Bandwidth Limit ---
+# [[proxies]]
+# name = "limited-app"
+# type = "http"
+# localIP = "127.0.0.1"
+# localPort = 8088
+# subdomain = "limited"
+# transport.bandwidthLimit = "5MB"
+# transport.bandwidthLimitMode = "client"
+
+# --- Load Balanced (Multiple Clients) ---
+# [[proxies]]
+# name = "web-lb-1"
+# type = "http"
+# localIP = "127.0.0.1"
+# localPort = 8088
+# subdomain = "lb-app"
+# loadBalancer.group = "web-cluster"
+# loadBalancer.groupKey = "shared-secret-123"

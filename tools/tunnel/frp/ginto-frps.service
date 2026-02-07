@@ -1,0 +1,28 @@
+[Unit]
+Description=Ginto FRP Server (frps)
+Documentation=https://github.com/fatedier/frp
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/opt/frp
+EnvironmentFile=/etc/frp/frps.env
+ExecStart=/opt/frp/frps -c /etc/frp/frps.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+LimitNOFILE=1048576
+StandardOutput=append:/var/log/frp/frps.log
+StandardError=append:/var/log/frp/frps.log
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/log/frp /opt/frp
+
+[Install]
+WantedBy=multi-user.target

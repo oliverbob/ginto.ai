@@ -1,0 +1,131 @@
+# Ginto AI Caddyfile for Docker
+# Routes requests to PHP-FPM container
+
+{
+    # Global options
+    admin off
+    
+    # Email for ACME (Let's Encrypt)
+    # Uncomment and set for production with HTTPS
+    # email {$TLS_EMAIL:admin@example.com}
+}
+
+# Development: localhost on port 80
+:80 {
+    # Document root
+    root * /var/www/html/public
+    
+    # Enable file server
+    file_server
+    
+    # Health check endpoint
+    respond /health 200
+    
+    # WebSocket proxy for Ratchet streaming
+    @websocket {
+        header Connection *Upgrade*
+        header Upgrade websocket
+        path /ws/*
+    }
+    reverse_proxy @websocket php:8080
+    
+    # WebSocket proxy for messenger (Ratchet on port 31827)
+    handle /messenger-ws/* {
+        uri path_regexp .* /messenger
+        reverse_proxy php:31827 {
+            header_up Host localhost
+        }
+    }
+    
+    # WebSocket proxy for terminal server
+    @terminal {
+        header Connection *Upgrade*
+        header Upgrade websocket
+        path /terminal/*
+    }
+    reverse_proxy @terminal terminal-server:3001
+    
+    # Sandbox proxy
+    @sandbox {
+        path /sandbox/*
+    }
+    reverse_proxy @sandbox sandbox-proxy:3000
+    
+    # PHP-FPM handler
+    php_fastcgi php:9000 {
+        root /var/www/html/public
+        index index.php
+        resolve_root_symlink
+    }
+    
+    # Compression
+    encode gzip zstd
+    
+    # Security headers
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+    
+    # Logging
+    log {
+        output stdout
+        format console
+    }
+}
+
+# Production: HTTPS with domain
+# Uncomment and replace YOUR_DOMAIN with your actual domain
+# {$CADDY_DOMAIN:localhost} {
+#     root * /srv/public
+#     file_server
+#     
+#     # TLS with automatic HTTPS
+#     tls {$TLS_EMAIL:admin@example.com}
+#     
+#     respond /health 200
+#     
+#     @websocket {
+#         header Connection *Upgrade*
+#         header Upgrade websocket
+#         path /ws/*
+#     }
+#     reverse_proxy @websocket php:8080
+#     
+#     @terminal {
+#         header Connection *Upgrade*
+#         header Upgrade websocket
+#         path /terminal/*
+#     }
+#     reverse_proxy @terminal terminal-server:3001
+#     
+#     @sandbox {
+#         path /sandbox/*
+#     }
+#     reverse_proxy @sandbox sandbox-proxy:3000
+#     
+#     php_fastcgi php:9000 {
+#         root /var/www/html/public
+#         index index.php
+#         resolve_root_symlink
+#     }
+#     
+#     encode gzip zstd
+#     
+#     header {
+#         X-Content-Type-Options nosniff
+#         X-Frame-Options SAMEORIGIN
+#         X-XSS-Protection "1; mode=block"
+#         Referrer-Policy strict-origin-when-cross-origin
+#         Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+#         -Server
+#     }
+#     
+#     log {
+#         output stdout
+#         format console
+#     }
+# }

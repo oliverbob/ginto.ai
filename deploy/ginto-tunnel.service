@@ -1,0 +1,20 @@
+[Unit]
+Description=Ginto Tunnel Server - WebSocket Reverse Tunnel Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+WorkingDirectory=/home/INSTALL_USER/ginto.ai
+ExecStart=/usr/bin/php /home/INSTALL_USER/ginto.ai/tools/tunnel/tunnel_server.php
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/ginto-tunnel.log
+StandardError=append:/var/log/ginto-tunnel.log
+
+# Environment
+Environment="TUNNEL_PORT=8765"
+
+[Install]
+WantedBy=multi-user.target

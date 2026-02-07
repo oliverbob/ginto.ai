@@ -1,0 +1,148 @@
+/******************************************************************************
+ * Full-height page, vertically justified content
+ */
+
+html {
+  background-color: #ccc;
+  border: none;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+body {
+  background-color: #fff;
+  border-left: 1px solid #aaa;
+  border-right: 1px solid #aaa;
+  box-shadow: 0 1px 10px #888;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 51em;
+  padding: 0 20px;
+}
+
+/* ensure a 3:1 ratio until the component is loaded */
+x-keyboard p {
+  margin: 0;
+  padding: 0 0 calc(33% - 10px);
+}
+
+
+/******************************************************************************
+ * Header & Footer
+ */
+
+header, footer {
+  color: brown;
+}
+
+h1 {
+  border-bottom: 1px inset brown;
+  color: brown;
+  font-size: 1.5em;
+  margin-bottom: 0;
+}
+
+h1 small {
+  font-size: 0.6em;
+  font-style: italic;
+}
+
+h1 + p {
+  font-size: smaller;
+  margin-top: .4em;
+}
+
+footer {
+  border-top: 1px outset brown;
+  font-size: smaller;
+  padding: .5em 0;
+  text-align: right;
+  width: 100%;
+}
+
+
+/******************************************************************************
+ * Keyboard & Lesson selection
+ */
+
+#metrics {
+  float: right;
+  margin-top: 6px;
+}
+
+form * {
+  margin: 0 6px 6px 0;
+  vertical-align: middle;
+}
+
+label[for] {
+  display: inline-block;
+  margin-left: -6px;
+  -moz-user-select: none;
+  user-select: none;
+}
+
+
+/******************************************************************************
+ * Text prompt & input
+ */
+
+textarea {
+  box-sizing: border-box;
+  height: 42px;
+  margin-bottom: 2px;
+  padding: 0;
+  resize: none;
+  width: 100%;
+}
+
+.hints textarea {
+  width: calc(100% - 160px);
+}
+
+#txtInput.active { background-color: #dfd; }
+#txtInput.error  { background-color: #f00; }
+
+
+/******************************************************************************
+ * Visual hints
+ */
+
+#hands {
+  float: right;
+  position: relative;
+  width: 150px;
+  height: 90px;
+  overflow: hidden;
+  display: none;
+}
+
+.hints #hands {
+  display: block;
+}
+
+#hands span {
+  background-position: left top;
+  background-repeat: no-repeat;
+  height: 90px;
+  position: absolute;
+  top: 0;
+}
+
+#leftHand   { left:  0px; width: 52px; background-image: url(hints/leftHand.png);   }
+#leftThumb  { left: 52px; width: 23px; background-image: url(hints/leftThumb.png);  }
+#rightThumb { left: 75px; width: 23px; background-image: url(hints/rightThumb.png); }
+#rightHand  { left: 97px; width: 52px; background-image: url(hints/rightHand.png);  }
+
+.l5 #leftHand, .r5 #rightHand { background-position-y:  -90px; }
+.l4 #leftHand, .r4 #rightHand { background-position-y: -180px; }
+.l3 #leftHand, .r3 #rightHand { background-position-y: -270px; }
+.l2 #leftHand, .r2 #rightHand { background-position-y: -360px; }
+
+.m1 #leftThumb, .m1 #rightThumb,
+.l1 #leftThumb, .r1 #rightThumb { background-position-y: -90px; }

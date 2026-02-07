@@ -1,0 +1,57 @@
+/* Minimal custom select styles for theme compatibility */
+.custom-select {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+.selected-value {
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  user-select: none;
+}
+.custom-options {
+  display: none;
+  position: absolute;
+  left: 0; right: 0;
+  background: #fff;
+  color: #111827;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  z-index: 100;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.custom-options.open {
+  display: block;
+}
+.custom-option {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.custom-option:hover {
+  background: #f3f4f6;
+}
+.custom-option.selected {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+/* Dark mode */
+html.dark .selected-value,
+html.dark .custom-options {
+  background: #1f2937;
+  color: #f9fafb;
+  border-color: #374151;
+}
+html.dark .custom-option.selected {
+  background: #334155;
+  color: #60a5fa;
+}
+html.dark .custom-option:hover {
+  background: #374151;
+}

@@ -1,0 +1,150 @@
+# Ginto AI Docker Compose - Sandbox Only
+# 
+# This compose file is for Docker-based user sandboxes ONLY.
+# The main application stack (PHP, MariaDB, Caddy, Redis) runs on the host.
+#
+# Architecture:
+#   Host/LXC/LXD:
+#     - PHP 8.3 + FPM (serves the Ginto.ai application)
+#     - MariaDB (database)
+#     - Caddy (web server with auto-SSL)
+#     - Redis (caching)
+#     - PowerDNS (DNS management - optional)
+#
+#   Docker (this file):
+#     - User sandboxes (isolated code execution)
+#     - Sandbox proxy (routes traffic to user sandboxes)
+#     - Terminal server (WebSocket PTY for sandbox terminals)
+#
+# Usage:
+#   docker compose up -d              # Start sandbox services
+#   docker compose down               # Stop sandbox services
+#   docker compose logs -f            # Follow logs
+#
+# The sandbox containers are created dynamically by the application
+# when users request sandbox environments.
+
+services:
+  # ==========================================================================
+  # Sandbox Proxy (Node.js)
+  # Routes HTTP traffic to the appropriate user sandbox container
+  # ==========================================================================
+  sandbox-proxy:
+    build:
+      context: .
+      dockerfile: docker/node/Dockerfile
+    container_name: ginto-sandbox-proxy
+    restart: unless-stopped
+    environment:
+      - SERVICE=sandbox-proxy
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    ports:
+      - "${SANDBOX_PROXY_PORT:-3000}:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - sandbox-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================================================
+  # Terminal Server (Node.js WebSocket PTY)
+  # Provides WebSocket-based terminal access to user sandboxes
+  # ==========================================================================
+  terminal-server:
+    build:
+      context: .
+      dockerfile: docker/node/Dockerfile
+    container_name: ginto-terminal-server
+    restart: unless-stopped
+    user: root  # Needs root to access Docker socket for sandbox exec
+    pid: host  # Required for nsenter to access host namespace (admin OS terminal)
+    privileged: true  # Required for nsenter
+    environment:
+      - SERVICE=terminal-server
+      - SANDBOX_MODE=docker
+      - GINTO_TERMINAL_PORT=3001
+      - GINTO_TERMINAL_ALLOW_REMOTE=1
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+    ports:
+      - "${TERMINAL_SERVER_PORT:-3001}:3001"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - sandbox-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # ==========================================================================
+  # Sandbox Manager (PHP daemon)
+  # Manages lifecycle of user sandbox containers
+  # ==========================================================================
+  sandbox-manager:
+    build:
+      context: .
+      dockerfile: docker/sandbox/manager.Dockerfile
+    container_name: ginto-sandbox-manager
+    restart: unless-stopped
+    command: ["php", "bin/sandbox_manager.php", "--daemon"]
+    environment:
+      - DB_HOST=${DB_HOST:-127.0.0.1}
+      - DB_PORT=${DB_PORT:-3306}
+      - DB_NAME=${DB_NAME:-ginto}
+      - DB_USER=${DB_USER:-ginto}
+      - DB_PASS=${DB_PASS:-}
+      - REDIS_HOST=${REDIS_HOST:-127.0.0.1}
+      - REDIS_PORT=${REDIS_PORT:-6379}
+      - SANDBOX_NETWORK=sandbox-network
+      - SANDBOX_IMAGE=${SANDBOX_IMAGE:-ginto-sandbox:latest}
+      - SANDBOX_TIMEOUT=${SANDBOX_TIMEOUT:-3600}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - .:/var/www/html:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - sandbox-storage:/var/www/storage
+    networks:
+      - sandbox-network
+    depends_on:
+      - sandbox-proxy
+      - terminal-server
+
+  # ==========================================================================
+  # Sandbox Base Image Builder (optional)
+  # Use profile `build` to build the sandbox base image used by sandbox-manager
+  # Run: `docker compose --profile build up --build sandbox-builder`
+  # ==========================================================================
+  sandbox-builder:
+    build:
+      context: docker/sandbox
+      dockerfile: Dockerfile
+    image: ginto-sandbox:latest
+    container_name: ginto-sandbox-builder
+    command: ["echo", "Sandbox base image built successfully"]
+    profiles:
+      - build
+
+# ==========================================================================
+# Networks
+# ==========================================================================
+networks:
+  sandbox-network:
+    external: true
+    name: ginto-sandbox
+
+# ==========================================================================
+# Volumes
+# ==========================================================================
+volumes:
+  sandbox-storage:
+    driver: local

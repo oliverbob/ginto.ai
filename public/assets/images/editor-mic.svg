@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Lightweight professional microphone SVG (inspired by modern assistant UIs) -->
+<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="micGrad" x1="0" x2="1">
+      <stop offset="0" stop-color="#6366F1" />
+      <stop offset="1" stop-color="#7C3AED" />
+    </linearGradient>
+  </defs>
+  <g stroke="none" fill="none" fill-rule="evenodd">
+    <rect width="24" height="24" rx="12" fill="url(#micGrad)" opacity="0.08"></rect>
+    <path d="M12 15a3 3 0 0 0 3-3V7a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" fill="#C7C9FF"></path>
+    <path d="M19 11a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.92V21a1 1 0 1 0 2 0v-3.08A7 7 0 0 0 19 11z" fill="#A9ACFF" opacity="0.95"></path>
+    <path d="M9.5 15.5h5" stroke="#fff" stroke-opacity="0.18" stroke-linecap="round" stroke-width="0.9"/>
+  </g>
+</svg>

@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunnel Not Found - Ginto.ai</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 48px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 72px;
+            color: #667eea;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 16px;
+            font-weight: 600;
+        }
+        p {
+            font-size: 18px;
+            color: #666;
+            line-height: 1.6;
+            margin-bottom: 12px;
+        }
+        .error-code {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: #666;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 20px 0;
+        }
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            padding: 14px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin-top: 24px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        .suggestions {
+            text-align: left;
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .suggestions h3 {
+            color: #667eea;
+            margin-bottom: 12px;
+            font-size: 18px;
+        }
+        .suggestions ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .suggestions li {
+            padding: 8px 0;
+            color: #555;
+            font-size: 15px;
+        }
+        .suggestions li:before {
+            content: "→ ";
+            color: #667eea;
+            font-weight: bold;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">Ginto.ai</div>
+        <h1>404</h1>
+        <h2>Tunnel Not Found</h2>
+        <p>The subdomain you're trying to access doesn't have an active tunnel.</p>
+        <div class="error-code">No active FRP tunnel for this subdomain</div>
+        
+        <div class="suggestions">
+            <h3>💡 Possible reasons:</h3>
+            <ul>
+                <li>The tunnel has expired (free tunnels last 10 minutes)</li>
+                <li>The tunnel was stopped or disconnected</li>
+                <li>The subdomain doesn't exist</li>
+                <li>You may have a typo in the URL</li>
+            </ul>
+        </div>
+        
+        <a href="https://ginto.ai" class="btn">Go to Ginto.ai</a>
+    </div>
+</body>
+</html>
