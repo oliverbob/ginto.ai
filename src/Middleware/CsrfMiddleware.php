@@ -90,21 +90,29 @@ class CsrfMiddleware
                 return;
             }
             // Accept common token names used across the app: '_csrf' (admin), 'csrf_token' (public forms)
-            // Also parse JSON body if Content-Type is application/json
+            // Also parse JSON body if Content-Type is application/json. Make parsing idempotent
+            // because middleware may be invoked more than once during dispatch.
             $token = $_POST['_csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
-            
-            // If no token found in POST, check JSON body
+
+            // Reuse previously-parsed raw/json body if available (avoid re-consuming php://input)
+            $rawBody = $GLOBALS['_RAW_BODY'] ?? null;
+            $jsonData = $GLOBALS['_JSON_BODY'] ?? null;
+
             if (!$token) {
                 $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
                 if (stripos($contentType, 'application/json') !== false) {
-                    $rawBody = file_get_contents('php://input');
-                    // Store raw body for controllers to use (php://input can only be read once)
-                    $GLOBALS['_RAW_BODY'] = $rawBody;
-                    $jsonData = json_decode($rawBody, true);
                     if (is_array($jsonData)) {
-                        // Store parsed JSON for controllers
-                        $GLOBALS['_JSON_BODY'] = $jsonData;
+                        // Use cached parsed JSON
                         $token = $jsonData['_csrf'] ?? $jsonData['csrf_token'] ?? null;
+                    } else {
+                        // First time parsing this request body: read and cache it
+                        $rawBody = @file_get_contents('php://input');
+                        $GLOBALS['_RAW_BODY'] = $rawBody;
+                        $jsonData = json_decode($rawBody, true);
+                        if (is_array($jsonData)) {
+                            $GLOBALS['_JSON_BODY'] = $jsonData;
+                            $token = $jsonData['_csrf'] ?? $jsonData['csrf_token'] ?? null;
+                        }
                     }
                 }
             }
@@ -118,12 +126,8 @@ class CsrfMiddleware
             if (!$token || !validateCsrfToken($token)) {
                 // Extra debug: capture request headers and raw body to /tmp for live troubleshooting
                 try {
-                    $rawBodyDebug = '';
-                    if (empty($rawBody)) {
-                        $rawBodyDebug = @file_get_contents('php://input');
-                    } else {
-                        $rawBodyDebug = $rawBody;
-                    }
+                    // Prefer cached raw body when available
+                    $rawBodyDebug = $rawBody ?? ($GLOBALS['_RAW_BODY'] ?? @file_get_contents('php://input'));
                     $allHeaders = [];
                     if (function_exists('getallheaders')) {
                         $allHeaders = getallheaders();
