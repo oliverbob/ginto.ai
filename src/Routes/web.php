@@ -47,7 +47,7 @@ $router->get('/social', 'SocialController@index');
 
 // Social feature routes copied from saicms and exposed under /social to avoid root conflicts
 $router->post('/post', 'SocialController@post');
-$router->req('/social/post', 'SocialController@post', ['POST']);
+$router->post('/social/post', 'SocialController@post');
 $router->req('/social/feed', 'SocialController@feed');
 $router->req('/social/post/{id}', 'SocialController@getPostById');
 // Backwards-compatible single-post endpoints: support both singular and plural variants used by clients
