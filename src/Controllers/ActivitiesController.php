@@ -785,8 +785,23 @@ class ActivitiesController extends Controller {
         
         $newContent = trim($newContent);
 
+        // Ensure DB is available before performing operations
+        if ($this->db === null) {
+            error_log("editCommentById: DB instance is not available. CommentID={$commentId}");
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Internal server error. Database unavailable.']);
+            exit;
+        }
+
         // Fetch the comment details including its user_id and post_id
-        $comment = $this->db->get("comments", ["id", "post_id", "user_id"], ["id" => $commentId]);
+        try {
+            $comment = $this->db->get("comments", ["id", "post_id", "user_id"], ["id" => $commentId]);
+        } catch (\Throwable $e) {
+            error_log("editCommentById: Exception when fetching comment {$commentId}: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Internal server error while retrieving comment.']);
+            exit;
+        }
 
         if (!$comment) {
             http_response_code(404);
@@ -829,8 +844,15 @@ class ActivitiesController extends Controller {
             "content" => $newContent,
             "updated_at" => date('Y-m-d H:i:s')
         ];
-        
-        $updateResult = $this->db->update("comments", $updateData, ["id" => $commentId]);
+
+        try {
+            $updateResult = $this->db->update("comments", $updateData, ["id" => $commentId]);
+        } catch (\Throwable $e) {
+            error_log("editCommentById: Exception when updating comment {$commentId}: " . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Internal server error while updating comment.']);
+            exit;
+        }
 
         if ($updateResult instanceof \PDOStatement && $updateResult->rowCount() > 0) {
             // Just return the updated comment data without joins
