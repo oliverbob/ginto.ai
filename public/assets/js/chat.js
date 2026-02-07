@@ -5459,14 +5459,15 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       }
 
       return `<div class="p-4 ${style.bg} border ${style.border} rounded-lg">
-        <div class="flex items-center justify-between gap-3 mb-2">
-          <div class="flex items-center gap-3 ${style.text}">
-            <span class="text-2xl">${style.icon}</span>
-            <div>
-              <div class="font-semibold text-base max-w-[12rem] truncate">${escapeHtml(filename)}</div>
-              <div class="text-sm opacity-75">${escapeHtml(format)}${bytes > 0 ? ` • ${formatSize(bytes)}` : ''}</div>
-            </div>
+        <div class="flex items-center gap-3 mb-2">
+          <span class="text-2xl">${style.icon}</span>
+          <div class="${style.text}">
+            <div class="font-semibold text-base max-w-[12rem] truncate">${escapeHtml(filename)}</div>
+            <div class="text-sm opacity-75">${escapeHtml(format)}${bytes > 0 ? ` • ${formatSize(bytes)}` : ''}</div>
           </div>
+        </div>
+
+        <div class="mt-3 flex justify-end">
           <a href="${escapeHtml(url)}" target="_blank" download="${escapeHtml(filename)}" class="flex items-center gap-2 px-4 py-2 ${style.btn} rounded-lg text-sm font-semibold transition-colors ${style.text}">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -5474,6 +5475,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             Download
           </a>
         </div>
+
         ${openHint ? `<div class="text-xs ${style.text} opacity-60 mt-2">💡 ${escapeHtml(openHint)}</div>` : ''}
       </div>`;
     }
