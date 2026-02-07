@@ -67,6 +67,8 @@ $router->post('/post/like', 'ActivitiesController@toggleLike');
 $router->get('/post/like', 'ActivitiesController@toggleLike');
 // Delete a post (owner only) - used by feed manager when a user deletes their own post
 $router->post('/post/{id:\d+}/delete', 'ActivitiesController@deletePost');
+// Edit/update a post (owner only) — used by feed manager when saving edits
+$router->post('/post/{id:\d+}/update', 'ActivitiesController@editPostById');
 // Create post with media ( Backwards-compatible endpoint used by mediamanager )
 $router->post('/post/create_with_media', 'UploadController@createPostWithMedia');
 // Legacy stories create endpoint (clients expect this path)
