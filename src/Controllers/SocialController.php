@@ -45,7 +45,24 @@ class SocialController extends \Core\Controller
             exit;
         }
 
-        $input = json_decode(file_get_contents('php://input'), true);
+        // Prefer JSON already parsed by middleware (CsrfMiddleware) to avoid
+        // re-reading php://input which may have been consumed earlier.
+        if (!empty($GLOBALS['_JSON_BODY']) && is_array($GLOBALS['_JSON_BODY'])) {
+            $input = $GLOBALS['_JSON_BODY'];
+        } else {
+            $raw = @file_get_contents('php://input');
+            $input = json_decode((string)$raw, true);
+            // Fallback: if middleware stored the raw body, try decoding that too
+            if ((empty($input) || !is_array($input)) && !empty($GLOBALS['_RAW_BODY'])) {
+                $maybe = $GLOBALS['_RAW_BODY'];
+                if (is_array($maybe)) {
+                    $input = $maybe;
+                } else {
+                    $input = json_decode((string)$maybe, true);
+                }
+            }
+        }
+
         if (!$input || !isset($input['visibility'])) {
             http_response_code(400);
             echo json_encode(['success' => false, 'message' => 'Missing required visibility parameter.']);
