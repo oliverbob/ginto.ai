@@ -239,6 +239,19 @@ class UploadController extends Controller
         // Diagnostic log: mark entry and current session/files to help debug 500s
         try {
             error_log("ENTER createPostWithMedia: session_user=" . ($_SESSION['user_id'] ?? 'null') . " REQUEST_METHOD=" . ($_SERVER['REQUEST_METHOD'] ?? 'N/A') . " FILE_KEYS=" . json_encode(array_keys($_FILES)));
+            // Additional debug info useful when uploads show no files (UPLOAD_ERR_NO_FILE)
+            try {
+                $contentLength = isset($_SERVER['CONTENT_LENGTH']) ? (int) $_SERVER['CONTENT_LENGTH'] : '(none)';
+                $rawBodyLen = isset($GLOBALS['_RAW_BODY']) ? strlen($GLOBALS['_RAW_BODY']) : null;
+                $uploadTmp = ini_get('upload_tmp_dir') ?: sys_get_temp_dir();
+                $free = @disk_free_space($uploadTmp) ?: '(unknown)';
+                $uploadMax = ini_get('upload_max_filesize');
+                $postMax = ini_get('post_max_size');
+                $maxFiles = ini_get('max_file_uploads');
+                error_log("createPostWithMedia DEBUG: CONTENT_LENGTH=" . $contentLength . " RAW_BODY_LEN=" . ($rawBodyLen === null ? '(na)' : $rawBodyLen) . " upload_tmp_dir=" . $uploadTmp . " free_space=" . $free . " upload_max_filesize=" . $uploadMax . " post_max_size=" . $postMax . " max_file_uploads=" . $maxFiles);
+            } catch (\Throwable $e) {
+                error_log('createPostWithMedia: additional debug logging failed: ' . $e->getMessage());
+            }
         } catch (Exception $e) {
             // If logging fails for some reason, swallow to avoid breaking response
             error_log("createPostWithMedia: diagnostic log failed: " . $e->getMessage());
