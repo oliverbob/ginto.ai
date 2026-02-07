@@ -937,9 +937,12 @@ class LiveStreamUploader {
 
         try {
             this._updateModalStreamStatus('Creating stream post...', 'info');
+            const headers = { 'X-CSRF-Token': csrfToken };
             const response = await fetch('/post/create_with_stream', { 
                 method: 'POST',
                 body: formData,
+                headers: headers,
+                credentials: 'same-origin'
             });
 
             const result = await response.json();
@@ -1067,7 +1070,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const endpoint = file ? '/post/create_with_media' : '/post';
                 try {
-                    const response = await fetch(endpoint, { method: 'POST', body: formData });
+                    const headers = { 'X-CSRF-Token': csrfToken };
+                    const response = await fetch(endpoint, { method: 'POST', body: formData, headers: headers, credentials: 'same-origin' });
                     const result = await response.json();
                     if (response.ok && result.success && result.post) {
                         if (typeof this.prependNewPost === 'function') {
