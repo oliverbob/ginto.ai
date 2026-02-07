@@ -197,5 +197,30 @@
   </script>
   
   <?php include __DIR__ . '/styles.php'; ?>
-</head>
+  <script>
+    // Auto-attach X-CSRF-Token header for JSON fetch requests when token available
+    (function(){
+      function getCsrf() {
+        return (window.GINTO_AUTH && window.GINTO_AUTH.csrfToken) || window.CSRF_TOKEN || (document.querySelector('meta[name="csrf-token"]')?.content) || '';
+      }
+      const origFetch = window.fetch.bind(window);
+      window.fetch = function(resource, init){
+        try {
+          init = init || {};
+          const method = (init.method || 'GET').toUpperCase();
+          const token = getCsrf();
+          if (token && method !== 'GET') {
+            // Normalize headers into a Headers object so we can set values safely
+            const headers = new Headers(init.headers || {});
+            // Always set X-CSRF-Token for mutating requests
+            headers.set('X-CSRF-Token', token);
+            init.headers = headers;
+          }
+        } catch (e) {
+          // Fail silently - do not block network calls
+        }
+        return origFetch(resource, init);
+      };
+    })();
   </script>
+</head>
