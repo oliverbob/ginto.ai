@@ -68,6 +68,17 @@ class SocialController extends \Core\Controller
             exit;
         }
 
+            // CSRF validation (match ChatStreamHandler pattern)
+            $providedToken = $_POST['csrf_token'] ?? $_POST['_csrf'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+            if (!$providedToken && !empty($GLOBALS['_JSON_BODY']) && is_array($GLOBALS['_JSON_BODY'])) {
+                $providedToken = $GLOBALS['_JSON_BODY']['csrf_token'] ?? $GLOBALS['_JSON_BODY']['_csrf'] ?? $providedToken;
+            }
+            if (!function_exists('validateCsrfToken') || empty($providedToken) || !validateCsrfToken($providedToken)) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+                exit;
+            }
+
         // Prefer JSON already parsed by middleware (CsrfMiddleware) to avoid
         // re-reading php://input which may have been consumed earlier.
         if (!empty($GLOBALS['_JSON_BODY']) && is_array($GLOBALS['_JSON_BODY'])) {

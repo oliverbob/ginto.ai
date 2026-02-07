@@ -11,7 +11,6 @@ class CsrfMiddleware
         '/mcp/call',
         '/mcp/chat',
         '/mcp/discover',
-        '/social/post', // Social posting endpoint - called from client with session cookie, but has its own internal validation
         '/audio/tts',
         '/audio/stt',
         '/websearch', // Isolated test page for GPT-OSS browser_search
