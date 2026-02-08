@@ -6,7 +6,15 @@
 ?>
 <!-- Mobile Header with Hamburger -->
 <header id="mobile-header" class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 py-2">
-  <div class="flex items-center gap-2 flex-1 min-w-0">
+  <style>
+    /* Very tiny screens: show only brand text to avoid layout collisions */
+    @media (max-width: 340px) {
+      #mobile-header { justify-content: center; }
+      #mobile-header .mobile-hide-on-tiny { display: none !important; }
+      #mobile-brand-tiny { display: block !important; }
+    }
+  </style>
+  <div class="flex items-center gap-2 flex-1 min-w-0 mobile-hide-on-tiny">
     <button id="mobile-menu-toggle" class="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-300 flex-shrink-0" aria-label="Toggle menu">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
@@ -40,8 +48,9 @@
       </div>
     </div>
   </div>
+  <div id="mobile-brand-tiny" class="hidden w-full text-center font-semibold text-lg" aria-hidden="false">Ginto AI</div>
   <?php if (empty($isLoggedIn)): ?>
-  <div class="flex items-center gap-1">
+  <div class="flex items-center gap-1 mobile-hide-on-tiny">
     <button onclick="showLoginRequiredModal()" class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xs font-medium" title="Login">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
@@ -67,7 +76,7 @@
     </button>
   </div>
   <?php else: ?>
-  <div class="flex items-center gap-1">
+  <div class="flex items-center gap-1 mobile-hide-on-tiny">
     <a href="/dashboard" class="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors" title="Dashboard">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
