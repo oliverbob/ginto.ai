@@ -904,14 +904,11 @@ class ApiController extends Controller
                 continue;
             }
 
-            if ($userHasAnyKey) {
-                // User has their own keys: show providers they can actually use
-                // (either they own a DB key for it or an env key exists)
-                $visible = $hasEnvKey || $hasDbUserKey;
+            // For non-admin users, only show providers they explicitly own (have DB keys for).
+            // Admins still see everything.
+            if ($isAdmin) {
+                $visible = true;
             } else {
-                // User has no keys: do NOT surface admin-provided DB keys or global env keys
-                // unless the user explicitly owns a key. This prevents non-admin users
-                // from appearing to have access to models they cannot use.
                 $visible = $hasDbUserKey;
             }
 
