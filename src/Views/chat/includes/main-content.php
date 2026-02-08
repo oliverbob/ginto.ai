@@ -31,9 +31,9 @@
         <?php if (!empty($isAdmin)): ?>
         <!-- Admin model selector dropdown -->
         <div class="relative" id="model-selector-wrapper">
-          <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer">
-            <div class="w-2 h-2 rounded-full bg-green-500" id="model-status-dot"></div>
-            <span class="text-sm text-gray-700 dark:text-gray-200" id="model-name">ginto-default</span>
+          <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer max-w-[350px] min-w-0 overflow-hidden">
+            <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="model-status-dot"></div>
+            <span class="text-sm text-gray-700 dark:text-gray-200 truncate min-w-0" id="model-name">ginto-default</span>
             <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
             </svg>
