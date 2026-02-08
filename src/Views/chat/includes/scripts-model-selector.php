@@ -60,8 +60,14 @@
   
   // Toggle dropdown for each button separately (desktop and mobile)
   function hideAllDropdowns() {
-    if (dropdownDesktop) dropdownDesktop.classList.add('hidden');
-    if (dropdownMobile) dropdownMobile.classList.add('hidden');
+    if (dropdownDesktop) {
+      dropdownDesktop.classList.add('hidden');
+      dropdownDesktop.style.width = '';
+    }
+    if (dropdownMobile) {
+      dropdownMobile.classList.add('hidden');
+      dropdownMobile.style.width = '';
+    }
   }
 
   btnEls.forEach(btn => {
@@ -75,6 +81,13 @@
       hideAllDropdowns();
       if (wasHidden) {
         targetDropdown.classList.remove('hidden');
+        // Size dropdown to match the selector button width when possible
+        try {
+          const btnWidth = Math.round(Math.min(350, btn.getBoundingClientRect().width));
+          targetDropdown.style.width = `${btnWidth}px`;
+        } catch (e) {
+          // ignore
+        }
         // Lazy-load models
         if (!modelsData) loadModels();
         // Focus appropriate search input
