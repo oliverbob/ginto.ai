@@ -324,14 +324,19 @@
     // Create minimized tab element
     const div = document.createElement('div');
     div.id = 'admin-minimized-tab';
-    div.className = 'minimized-tab admin-minimized-tab flex items-center justify-center cursor-pointer shadow-lg';
+    div.className = 'minimized-tab admin-minimized-tab flex items-center bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg cursor-pointer';
     div.title = 'Admin Console (toggle)';
     // Inner content: match minimized-tab layout (icon + title inline) so it behaves like other minimized items
     // Make the button fill the minimized-tab container so its content is perfectly centered
     div.innerHTML = `
-      <button class="w-full h-full flex items-center justify-center gap-2 p-3" title="Admin Console (toggle)">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold">A</div>
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="Admin Console (toggle)">
+        <div class="w-5 h-5 flex-shrink-0">A</div>
         <span class="tab-title text-sm font-medium whitespace-nowrap">Admin Console</span>
+      </button>
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0" title="Close">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
       </button>
     `;
 
