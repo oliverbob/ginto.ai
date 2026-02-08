@@ -361,6 +361,41 @@
 </script>
 <?php endif; ?>
 
+<?php if (empty($isAdmin) && !empty($_SESSION['user_id'])): ?>
+<script>
+(function() {
+  try {
+    const container = document.getElementById('iframe-minimized-container');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.id = 'user-minimized-tab';
+    div.className = 'minimized-tab user-minimized-tab flex items-center bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg cursor-pointer';
+    div.title = 'User Console (toggle)';
+    div.innerHTML = `
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="User Console (toggle)">
+        <div class="w-5 h-5 flex-shrink-0">U</div>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">User Console</span>
+      </button>
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0" title="Close">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    `;
+    container.insertBefore(div, container.firstChild);
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.getElementById('user-console-overlay');
+      if (!overlay) return;
+      overlay.classList.toggle('hidden');
+    });
+  } catch (e) {
+    console.warn('Failed to inject user minimized tab', e);
+  }
+})();
+</script>
+<?php endif; ?>
+
 <!-- Ginto Setup Config for chat.js -->
 <script>
 <?php

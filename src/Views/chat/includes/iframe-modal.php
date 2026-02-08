@@ -136,6 +136,11 @@
   background: linear-gradient(135deg, #10B981 0%, #0EA5A4 100%); /* emerald -> teal */
   color: white;
 }
+/* User minimized tab (matches user initial gradient) */
+.user-minimized-tab {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* indigo -> purple */
+  color: white;
+}
 .admin-minimized-tab .tab-title { font-weight: 600; }
 
 .iframe-modal-normal {
