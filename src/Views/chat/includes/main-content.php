@@ -49,7 +49,12 @@
               </svg>
             </button>
             <!-- Dropdown menu -->
-            <div id="model-dropdown" class="hidden absolute left-0 mt-2 w-[350px] min-w-[350px] max-w-[350px] max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col">
+            <!--
+              Responsive behavior:
+              - On small screens make dropdown fixed to viewport with 5px left/right padding
+              - On large screens (lg and up) keep original absolute positioning and fixed width
+            -->
+            <div id="model-dropdown" class="hidden fixed top-14 left-1 right-1 mx-0 lg:absolute lg:left-0 lg:mt-2 lg:top-auto lg:right-auto w-auto lg:w-[350px] lg:min-w-[350px] lg:max-w-[350px] max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col" style="max-width: calc(100vw - 10px);">
               <!-- Search bar and Add Provider button (Add Key visible only to admins) -->
               <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
                 <div class="relative flex-1">
