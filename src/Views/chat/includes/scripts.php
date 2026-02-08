@@ -329,8 +329,8 @@
     // Inner content: match minimized-tab layout (icon + title inline) so it behaves like other minimized items
     // Make the button fill the minimized-tab container so its content is perfectly centered
     div.innerHTML = `
-      <button class="w-full h-full flex items-center justify-center gap-2 p-0" title="Admin Console (toggle)">
-        <div class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</div>
+      <button class="w-full h-full flex items-center justify-center gap-2 p-3" title="Admin Console (toggle)">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold">A</div>
         <span class="tab-title text-sm font-medium whitespace-nowrap">Admin Console</span>
       </button>
     `;
