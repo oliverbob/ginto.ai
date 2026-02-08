@@ -249,6 +249,14 @@
   document.getElementById('tab-mcp')?.addEventListener('click', () => switchTab('mcp'));
   document.getElementById('tab-admin')?.addEventListener('click', () => switchTab('admin'));
 
+  // Inline mobile Add Key handler: open settings admin tab for logged-in users
+  document.addEventListener('click', function(e) {
+    if (e.target && (e.target.id === 'add-provider-inline-mobile' || e.target.closest('#add-provider-inline-mobile'))) {
+      e.preventDefault(); e.stopPropagation();
+      try { openSettings('admin'); } catch (_) { window.location.href = '/settings'; }
+    }
+  });
+
   // ============= Toast Notification System =============
   function showToast(message, type = 'success', duration = 4000) {
     const container = document.getElementById('toast-container');
