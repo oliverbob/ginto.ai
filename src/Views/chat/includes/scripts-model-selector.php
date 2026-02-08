@@ -63,10 +63,14 @@
     if (dropdownDesktop) {
       dropdownDesktop.classList.add('hidden');
       dropdownDesktop.style.width = '';
+      dropdownDesktop.style.left = '';
+      dropdownDesktop.style.top = '';
     }
     if (dropdownMobile) {
       dropdownMobile.classList.add('hidden');
       dropdownMobile.style.width = '';
+      dropdownMobile.style.left = '';
+      dropdownMobile.style.top = '';
     }
   }
 
@@ -83,8 +87,16 @@
         targetDropdown.classList.remove('hidden');
         // Size dropdown to match the selector button width when possible
         try {
-          const btnWidth = Math.round(Math.min(350, btn.getBoundingClientRect().width));
+          const rect = btn.getBoundingClientRect();
+          const btnWidth = Math.round(Math.min(350, rect.width));
           targetDropdown.style.width = `${btnWidth}px`;
+          // For mobile dropdown (fixed), align left origin to the button's left edge and position top under the button
+          if (isMobileBtn && targetDropdown) {
+            // left in viewport coordinates
+            targetDropdown.style.left = `${Math.max(8, Math.round(rect.left))}px`;
+            // top should be just below the button
+            targetDropdown.style.top = `${Math.round(rect.bottom + 6)}px`;
+          }
         } catch (e) {
           // ignore
         }
