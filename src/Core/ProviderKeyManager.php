@@ -231,6 +231,7 @@ class ProviderKeyManager
             'tier',
             'is_default',
             'is_active',
+            'user_id',
             'last_used_at',
             'last_error_at',
             'error_count',
@@ -255,6 +256,7 @@ class ProviderKeyManager
             'tier',
             'is_default',
             'is_active',
+            'user_id',
             'last_used_at',
             'last_error_at',
             'error_count',
@@ -278,6 +280,7 @@ class ProviderKeyManager
             'tier',
             'is_default',
             'is_active',
+            'user_id',
         ], ['id' => $id]) ?: null;
     }
 
@@ -292,15 +295,19 @@ class ProviderKeyManager
                 'is_default' => 0,
             ], ['provider' => $data['provider']]);
         }
-        
-        $this->db->insert('provider_keys', [
+        $insert = [
             'provider' => $data['provider'],
             'api_key' => $data['api_key'],
             'key_name' => $data['key_name'] ?? null,
             'tier' => $data['tier'] ?? 'basic',
             'is_default' => !empty($data['is_default']) ? 1 : 0,
             'is_active' => isset($data['is_active']) ? ($data['is_active'] ? 1 : 0) : 1,
-        ]);
+        ];
+        if (isset($data['user_id']) && $data['user_id'] !== null) {
+            $insert['user_id'] = $data['user_id'];
+        }
+
+        $this->db->insert('provider_keys', $insert);
         
         return (int) $this->db->id();
     }
