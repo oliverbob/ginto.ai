@@ -131,9 +131,9 @@
   padding-right: 0.75rem;
 }
 
-/* Admin minimized tab - distinct color and sits at top of minimized stack by default */
 .admin-minimized-tab {
-  background: linear-gradient(135deg,#6b21a8,#b91c1c); /* purple -> red blend */
+  /* Use same purple -> indigo gradient as user initials so the 'A' matches other letters */
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* indigo -> purple */
   color: white;
 }
 .admin-minimized-tab .tab-title { font-weight: 600; }
