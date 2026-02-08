@@ -925,6 +925,9 @@ $router->req('/api/models/set', 'ApiController@modelsSet');
 $router->req('/debug/session-set', 'DebugController@setSession', ['POST']);
 $router->req('/api/provider-keys', 'ApiController@providerKeys');
 
+// User console API
+$router->req('/api/console/logs', 'ApiController@consoleLogs', ['GET']);
+
 // Audio routes
 $router->req('/audio/tts', 'AudioController@tts', ['POST']);
 $router->req('/audio/stt', 'AudioController@stt', ['POST']);
