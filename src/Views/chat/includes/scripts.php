@@ -427,6 +427,17 @@ function renderUserConsole(data) {
     html += '<div class="text-xs text-gray-400">No recent usage.</div>';
   }
 
+  // Show per-key recent usage (local snapshots) if present
+  if (data.key_recent && data.key_recent.length) {
+    html += '<div class="text-xs text-gray-500 mt-2 mb-1">Recent per-key usage (local):</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.key_recent.forEach(k => {
+      const when = k.minute_bucket || k.date || '';
+      html += '<li>' + when + ' — key: ' + (k.key_id || '-') + ', reqs: ' + (k.requests_count||0) + ', tokens: ' + (k.tokens_used||0) + '</li>';
+    });
+    html += '</ul>';
+  }
+
   usageEl.innerHTML = html;
 }
 

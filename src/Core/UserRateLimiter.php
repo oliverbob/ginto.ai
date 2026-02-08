@@ -292,7 +292,7 @@ class UserRateLimiter
      * @param string|null $visitorIp IP address for visitors
      * @param int $tokensUsed Tokens used in this request
      */
-    public function recordUsage(?int $userId, ?string $visitorIp, int $tokensUsed): void
+    public function recordUsage(?int $userId, ?string $visitorIp, int $tokensUsed, ?int $keyId = null): void
     {
         $today = date('Y-m-d');
         $currentMinute = date('Y-m-d H:i:00');
@@ -302,6 +302,11 @@ class UserRateLimiter
         
         // Upsert minute record
         $this->upsertUsage($userId, $visitorIp, $today, $currentMinute, 1, $tokensUsed);
+
+        // Additionally record per-key usage snapshot to separate table (local copy only)
+        if ($keyId !== null) {
+            $this->upsertKeyUsage($keyId, $userId, $this->provider, $today, $currentMinute, 1, $tokensUsed);
+        }
     }
 
     /**
@@ -350,6 +355,47 @@ class UserRateLimiter
                 'tokens_used' => $tokens,
             ];
             $this->db->insert('user_rate_limits', $insertData);
+        }
+    }
+
+    /**
+     * Upsert a per-key usage record in provider_key_usage table.
+     * This is a local copy of usage attributed to a specific provider key.
+     */
+    private function upsertKeyUsage(int $keyId, ?int $userId, string $provider, string $date, ?string $minuteBucket, int $requests, int $tokens): void
+    {
+        try {
+            $where = [
+                'key_id' => $keyId,
+                'provider' => $provider,
+                'date' => $date,
+            ];
+            if ($minuteBucket !== null) {
+                $where['minute_bucket'] = $minuteBucket;
+            } else {
+                $where['minute_bucket'] = null;
+            }
+
+            $existing = $this->db->get('provider_key_usage', ['id','requests_count','tokens_used'], $where);
+            if ($existing) {
+                $this->db->update('provider_key_usage', [
+                    'requests_count[+]' => $requests,
+                    'tokens_used[+]' => $tokens,
+                ], ['id' => $existing['id']]);
+            } else {
+                $insert = [
+                    'key_id' => $keyId,
+                    'provider' => $provider,
+                    'user_id' => $userId,
+                    'date' => $date,
+                    'minute_bucket' => $minuteBucket,
+                    'requests_count' => $requests,
+                    'tokens_used' => $tokens,
+                ];
+                $this->db->insert('provider_key_usage', $insert);
+            }
+        } catch (\Throwable $_) {
+            // Do not make usage recording fatal; ignore DB errors here
         }
     }
 

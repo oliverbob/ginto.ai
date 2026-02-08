@@ -1282,7 +1282,8 @@ class ChatStreamHandler
             $userRateLimiter->recordUsage(
                 $userIdSession ? (int)$userIdSession : null,
                 $visitorIp,
-                $tokensEstimate
+                $tokensEstimate,
+                $currentKeyId ?? null
             );
 
             $rateLimitService->logRequest([

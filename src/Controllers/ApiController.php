@@ -985,12 +985,25 @@ class ApiController extends Controller
             $limits = $rateLimiter->getUserLimits('user');
             $tokens_left = isset($limits['tpd']) ? max(0, $limits['tpd'] - ($usage['tpd'] ?? 0)) : null;
 
-            // Get recent usage rows for display
-            $recent = $db->select('user_rate_limits', ['date','minute_bucket','requests_count','tokens_used','provider'], [
-                'user_id' => (int)$userId,
-                'ORDER' => ['id' => 'DESC'],
-                'LIMIT' => 20,
-            ]);
+                    // Get recent usage rows for display (per-user aggregated counters)
+                    $recent = [];
+                    try {
+                        $recent = $db->select('user_rate_limits', ['date','minute_bucket','requests_count','tokens_used','provider'], [
+                            'user_id' => (int)$userId,
+                            'ORDER' => ['id' => 'DESC'],
+                            'LIMIT' => 20,
+                        ]);
+                    } catch (\Throwable $_) { $recent = []; }
+
+                    // Also fetch recent per-key usage snapshots (local copy)
+                    $keyRecent = [];
+                    try {
+                        $keyRecent = $db->select('provider_key_usage', ['key_id','date','minute_bucket','requests_count','tokens_used','provider'], [
+                            'user_id' => (int)$userId,
+                            'ORDER' => ['id' => 'DESC'],
+                            'LIMIT' => 20,
+                        ]);
+                    } catch (\Throwable $_) { $keyRecent = []; }
 
             echo json_encode([
                 'success' => true,
@@ -999,7 +1012,8 @@ class ApiController extends Controller
                 'masked_key' => $masked_key,
                 'tokens_left' => $tokens_left,
                 'usage' => $usage,
-                'recent' => $recent,
+                        'recent' => $recent,
+                        'key_recent' => $keyRecent,
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             exit;
         } catch (\Throwable $e) {
