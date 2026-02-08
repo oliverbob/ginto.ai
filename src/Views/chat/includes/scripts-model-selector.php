@@ -8,17 +8,20 @@
 <!-- Admin Model Selector Script -->
 <script>
 (function() {
-  const btn = document.getElementById('model-selector-btn');
-  const dropdown = document.getElementById('model-dropdown');
+  // Support both desktop and mobile model selector elements.
+  const btnEls = Array.from(document.querySelectorAll('#model-selector-btn, #model-selector-btn-mobile'));
+  const dropdownDesktop = document.getElementById('model-dropdown');
+  const dropdownMobile = document.getElementById('model-dropdown-mobile');
   const modelList = document.getElementById('model-list');
+  const modelListMobile = document.getElementById('model-list-mobile');
   const modelName = document.getElementById('model-name');
   const statusDot = document.getElementById('model-status-dot');
   const mobileModelName = document.getElementById('mobile-model-name');
   const mobileStatusDot = document.getElementById('mobile-model-status-dot');
-  const searchInput = document.getElementById('model-search');
-  const addProviderBtn = document.getElementById('add-provider-btn');
+  const searchInput = document.getElementById('model-search') || document.getElementById('model-search-mobile');
+  const addProviderBtn = document.getElementById('add-provider-btn') || document.getElementById('add-provider-btn-mobile');
   
-  if (!btn || !dropdown) return;
+  if (btnEls.length === 0) return;
   
   // Provider priority order (groq and cerebras first)
   const PROVIDER_PRIORITY = ['local', 'ollama', 'cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks'];
@@ -33,25 +36,56 @@
   
   let modelsData = null;
   let isOpen = false;
+
+  const searchInputDesktop = document.getElementById('model-search');
+  const searchInputMobile = document.getElementById('model-search-mobile');
+
+  function getActiveDropdown() {
+    const dDesktop = document.getElementById('model-dropdown');
+    const dMobile = document.getElementById('model-dropdown-mobile');
+    // Prefer the dropdown that is currently visible in the layout (offsetParent != null)
+    if (dMobile && dMobile.offsetParent !== null) return dMobile;
+    if (dDesktop && dDesktop.offsetParent !== null) return dDesktop;
+    // Fallback to mobile then desktop if neither visible
+    return dMobile || dDesktop;
+  }
   
-  // Toggle dropdown
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    isOpen = !isOpen;
-    dropdown.classList.toggle('hidden', !isOpen);
-    if (isOpen && !modelsData) {
-      loadModels();
-    }
-    if (isOpen && searchInput) {
-      setTimeout(() => searchInput.focus(), 100);
-    }
+  // Toggle dropdown for each button separately (desktop and mobile)
+  function hideAllDropdowns() {
+    if (dropdownDesktop) dropdownDesktop.classList.add('hidden');
+    if (dropdownMobile) dropdownMobile.classList.add('hidden');
+  }
+
+  btnEls.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isMobileBtn = btn.id && btn.id.includes('mobile');
+      const targetDropdown = isMobileBtn ? dropdownMobile : dropdownDesktop;
+      if (!targetDropdown) return;
+
+      const wasHidden = targetDropdown.classList.contains('hidden');
+      hideAllDropdowns();
+      if (wasHidden) {
+        targetDropdown.classList.remove('hidden');
+        // Lazy-load models
+        if (!modelsData) loadModels();
+        // Focus appropriate search input
+        setTimeout(() => {
+          const toFocus = isMobileBtn ? searchInputMobile : searchInputDesktop;
+          if (toFocus) toFocus.focus();
+        }, 100);
+      }
+    });
   });
   
   // Close on outside click
   document.addEventListener('click', (e) => {
-    if (!dropdown.contains(e.target) && e.target !== btn) {
-      isOpen = false;
-      dropdown.classList.add('hidden');
+    // If click is outside both dropdowns and not on any selector button, hide both
+    const clickedOnBtn = btnEls.some(b => b.contains(e.target));
+    const clickedInsideDesktop = dropdownDesktop && dropdownDesktop.contains(e.target);
+    const clickedInsideMobile = dropdownMobile && dropdownMobile.contains(e.target);
+    if (!clickedOnBtn && !clickedInsideDesktop && !clickedInsideMobile) {
+      hideAllDropdowns();
     }
   });
   
@@ -64,21 +98,27 @@
   }
   
   function filterModels(query) {
-    const buttons = modelList.querySelectorAll('button[data-model]');
-    const headers = modelList.querySelectorAll('div[data-provider-header]');
-    
-    buttons.forEach(btn => {
-      const model = btn.dataset.model.toLowerCase();
-      const provider = btn.dataset.provider.toLowerCase();
-      const matches = model.includes(query) || provider.includes(query);
-      btn.style.display = matches ? '' : 'none';
-    });
-    
-    // Hide provider headers if all their models are hidden
-    headers.forEach(header => {
-      const providerName = header.dataset.providerHeader;
-      const visibleModels = modelList.querySelectorAll(`button[data-provider="${providerName}"]:not([style*="display: none"])`);
-      header.style.display = visibleModels.length > 0 ? '' : 'none';
+    const lists = [];
+    if (modelList) lists.push(modelList);
+    if (modelListMobile) lists.push(modelListMobile);
+
+    lists.forEach(listEl => {
+      const buttons = listEl.querySelectorAll('button[data-model]');
+      const headers = listEl.querySelectorAll('div[data-provider-header]');
+
+      buttons.forEach(btn => {
+        const model = (btn.dataset.model || '').toLowerCase();
+        const provider = (btn.dataset.provider || '').toLowerCase();
+        const matches = model.includes(query) || provider.includes(query);
+        btn.style.display = matches ? '' : 'none';
+      });
+
+      // Hide provider headers if all their models are hidden
+      headers.forEach(header => {
+        const providerName = header.dataset.providerHeader;
+        const visibleModels = listEl.querySelectorAll(`button[data-provider="${providerName}"]:not([style*="display: none"])`);
+        header.style.display = visibleModels.length > 0 ? '' : 'none';
+      });
     });
   }
   
@@ -88,7 +128,7 @@
       e.stopPropagation();
       // Close the model dropdown
       isOpen = false;
-      dropdown.classList.add('hidden');
+      const ad = getActiveDropdown(); if (ad) ad.classList.add('hidden');
       // Open settings with admin (API Keys) tab
       openSettings('admin');
     });
@@ -96,9 +136,9 @@
   
   // Load models from API (exposed globally for use by key management)
   async function loadModels() {
-    if (modelList) {
-      modelList.innerHTML = '<div class="px-4 py-3 text-sm text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading models...</div>';
-    }
+    const loadingHtml = '<div class="px-4 py-3 text-sm text-gray-500"><i class="fas fa-spinner fa-spin mr-2"></i>Loading models...</div>';
+    if (modelList) modelList.innerHTML = loadingHtml;
+    if (modelListMobile) modelListMobile.innerHTML = loadingHtml;
     
     try {
       const res = await fetch('/api/models', { credentials: 'same-origin' });
@@ -143,7 +183,7 @@
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
     
-    if (sortedProviders.length === 0) {
+      if (sortedProviders.length === 0) {
       html = '<div class="px-4 py-3 text-sm text-gray-500">No providers configured</div>';
     } else {
       for (const providerName of sortedProviders) {
@@ -205,11 +245,18 @@
       }
     }
     
-    modelList.innerHTML = html;
-    
-    // Add click handlers
-    modelList.querySelectorAll('button[data-provider]').forEach(btn => {
-      btn.addEventListener('click', () => selectModel(btn.dataset.provider, btn.dataset.model));
+    // Populate desktop and mobile lists where present
+    if (modelList) modelList.innerHTML = html;
+    if (modelListMobile) modelListMobile.innerHTML = html;
+
+    // Add click handlers for both lists
+    const listsToBind = [];
+    if (modelList) listsToBind.push(modelList);
+    if (modelListMobile) listsToBind.push(modelListMobile);
+    listsToBind.forEach(listEl => {
+      listEl.querySelectorAll('button[data-provider]').forEach(btn => {
+        btn.addEventListener('click', () => selectModel(btn.dataset.provider, btn.dataset.model));
+      });
     });
   }
   
@@ -288,7 +335,7 @@
         
         // Close dropdown
         isOpen = false;
-        dropdown.classList.add('hidden');
+        const ad = getActiveDropdown(); if (ad) ad.classList.add('hidden');
         
         // Show toast notification
         let toastMsg = `Switched to ${provider} / ${model}`;
