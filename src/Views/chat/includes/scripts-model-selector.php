@@ -207,9 +207,28 @@
   function renderModels(data) {
     let html = '';
     const providers = data.providers || {};
+    const isAdmin = !!data.is_admin;
+    const currentUserId = data.current_user_id || null;
     
+    // Convert providers object to array and optionally filter unavailable providers for non-admin users
+    const providerEntries = Object.keys(providers).map(k => ({ key: k, val: providers[k] }));
+    const availableProviders = providerEntries.filter(entry => {
+      if (isAdmin) return true;
+      const p = entry.val || {};
+      // Show provider only if an env key exists or the current user has a key for it
+      if (p.env_key) return true;
+      if (p.has_user_key) return true;
+      // Also allow if any db_key belongs to current user
+      if (Array.isArray(p.db_keys)) {
+        for (const k of p.db_keys) {
+          if (k.user_id && String(k.user_id) === String(currentUserId)) return true;
+        }
+      }
+      return false;
+    });
+
     // Sort providers by priority
-    const sortedProviders = Object.keys(providers).sort((a, b) => {
+    const sortedProviders = availableProviders.map(e => e.key).sort((a, b) => {
       const aIdx = PROVIDER_PRIORITY.indexOf(a);
       const bIdx = PROVIDER_PRIORITY.indexOf(b);
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
@@ -220,6 +239,11 @@
     } else {
       for (const providerName of sortedProviders) {
         const providerData = providers[providerName];
+        // If not admin and provider wasn't included in availableProviders, skip
+        if (!isAdmin) {
+          const isIncluded = availableProviders.some(en => en.key === providerName);
+          if (!isIncluded) continue;
+        }
         const displayName = providerData.display_name || providerName;
         const isLocalProvider = providerName === 'local' || providerName === 'ollama';
         

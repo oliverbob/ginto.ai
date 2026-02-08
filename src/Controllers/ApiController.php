@@ -726,7 +726,12 @@ class ApiController extends Controller
                             'key_name' => $r['key_name'] ?? null,
                             'api_key_masked' => self::maskKey($r['api_key'] ?? ''),
                             'tier' => $r['tier'] ?? 'basic',
+                            'user_id' => $r['user_id'] ?? null,
                         ];
+                        // Mark whether current session user has at least one key for this provider
+                        if (!empty($_SESSION['user_id']) && ($r['user_id'] ?? null) == ($_SESSION['user_id'] ?? null)) {
+                            $providers[$p]['has_user_key'] = true;
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -833,10 +838,20 @@ class ApiController extends Controller
             }
         } catch (\Throwable $_) { /* ignore */ }
 
+        // Flag whether current user is admin (if UserController available)
+        $isAdmin = false;
+        try {
+            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                $isAdmin = true;
+            }
+        } catch (\Throwable $_) { /* ignore */ }
+
         $response = [
             'success' => true,
             // Return associative providers keyed by provider name (frontend expects an object)
             'providers' => $providers,
+            'is_admin' => $isAdmin,
+            'current_user_id' => $_SESSION['user_id'] ?? null,
             'current_provider' => $_SESSION['current_provider'] ?? null,
             'current_model' => $_SESSION['current_model'] ?? null,
             'global_selection' => $globalSelection,
