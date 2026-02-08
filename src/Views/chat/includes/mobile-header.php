@@ -6,15 +6,15 @@
 ?>
 <!-- Mobile Header with Hamburger -->
 <header id="mobile-header" class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 py-2">
-  <div class="flex items-center gap-2">
-    <button id="mobile-menu-toggle" class="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-300" aria-label="Toggle menu">
+  <div class="flex items-center gap-2 flex-1 min-w-0">
+    <button id="mobile-menu-toggle" class="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-300 flex-shrink-0" aria-label="Toggle menu">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
-    <button id="model-selector-btn-mobile" class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex" aria-haspopup="true" aria-expanded="false">
+    <button id="model-selector-btn-mobile" class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex flex-1 min-w-0 justify-start overflow-hidden" aria-haspopup="true" aria-expanded="false">
       <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="mobile-model-status-dot" aria-hidden="true"></div>
-      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate max-w-[160px] whitespace-nowrap overflow-hidden" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
+      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
       <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
       </svg>
