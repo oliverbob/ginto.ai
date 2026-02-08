@@ -132,8 +132,8 @@
 }
 
 .admin-minimized-tab {
-  /* Use same purple -> indigo gradient as user initials so the 'A' matches other letters */
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); /* indigo -> purple */
+    /* Use a green -> teal gradient for the Admin Console to distinguish it */
+  background: linear-gradient(135deg, #10B981 0%, #0EA5A4 100%); /* emerald -> teal */
   color: white;
 }
 .admin-minimized-tab .tab-title { font-weight: 600; }
