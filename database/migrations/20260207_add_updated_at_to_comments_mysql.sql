@@ -8,8 +8,23 @@ SET @prev_time_zone := @@time_zone;
 -- Use a deterministic timezone for migration operations
 SET time_zone = '+00:00';
 
-ALTER TABLE `comments`
-  ADD COLUMN `updated_at` DATETIME NULL DEFAULT NULL AFTER `created_at`;
+-- Only add column if table exists and column missing
+SET @table_exists = (
+  SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comments'
+);
+
+IF @table_exists = 1 THEN
+  SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'comments' AND COLUMN_NAME = 'updated_at'
+  );
+
+  IF @col_exists = 0 THEN
+    ALTER TABLE `comments`
+      ADD COLUMN `updated_at` DATETIME NULL DEFAULT NULL AFTER `created_at`;
+  END IF;
+END IF;
 
 -- Restore session settings
 SET sql_mode = @prev_sql_mode;
