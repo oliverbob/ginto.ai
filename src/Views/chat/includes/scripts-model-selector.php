@@ -28,8 +28,16 @@
   
   // Helper to update both desktop and mobile displays
   function updateModelDisplay(model, dotClass) {
-    if (modelName) modelName.textContent = model;
-    if (mobileModelName) mobileModelName.textContent = model;
+    if (modelName) {
+      modelName.textContent = model;
+      modelName.title = model;
+      modelName.setAttribute('aria-label', model);
+    }
+    if (mobileModelName) {
+      mobileModelName.textContent = model;
+      mobileModelName.title = model;
+      mobileModelName.setAttribute('aria-label', model);
+    }
     if (statusDot) statusDot.className = dotClass;
     if (mobileStatusDot) mobileStatusDot.className = dotClass.replace('w-2 h-2', 'w-2 h-2') + ' hidden min-[350px]:block';
   }
