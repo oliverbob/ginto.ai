@@ -28,7 +28,7 @@
       </svg>
     </button>
     <!-- Mobile dropdown (hidden by default) -->
-    <div id="model-dropdown-mobile" class="hidden fixed top-12 left-0 right-0 mx-3 bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[70vh] overflow-hidden flex flex-col">
+    <div id="model-dropdown-mobile" class="hidden fixed top-12 left-1/2 transform -translate-x-1/2 w-[92%] max-w-sm bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[50vh] overflow-hidden flex flex-col">
       <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
         <div class="relative flex-1">
           <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
