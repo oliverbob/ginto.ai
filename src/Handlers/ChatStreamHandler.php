@@ -510,6 +510,26 @@ class ChatStreamHandler
             $keyManager = new \App\Core\ProviderKeyManager($db);
             $currentKeyId = null;
 
+            // If the session belongs to a logged-in user and they have a personal API key,
+            // prefer using that key (and lift per-user limits handled in UserRateLimiter).
+            $userProvidedKey = null;
+            if (!empty($userIdSession)) {
+                // If user selected a provider explicitly, prefer their key for that provider
+                if (!empty($sessionCloudProvider)) {
+                    $userProvidedKey = $keyManager->getUserKey($sessionCloudProvider, (int)$userIdSession);
+                }
+                // Otherwise try any user-owned key
+                if (!$userProvidedKey) {
+                    $userProvidedKey = $keyManager->getUserFirstKey((int)$userIdSession);
+                }
+                if ($userProvidedKey) {
+                    $apiKey = $userProvidedKey['api_key'];
+                    $currentKeyId = $userProvidedKey['id'];
+                    $selectedProvider = $userProvidedKey['provider'];
+                    error_log(sprintf('[ChatStream] Using user-owned API key id=%d provider=%s for user=%s', $currentKeyId, $selectedProvider, $userIdSession));
+                }
+            }
+
             // Detect web search needs
             $needsWebSearch = $this->detectWebSearchNeed($prompt);
 

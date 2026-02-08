@@ -176,6 +176,33 @@ class UserRateLimiter
      */
     public function checkLimit(?int $userId, ?string $visitorIp, string $tier, int $estimatedTokens = 0): array
     {
+        // If this user has configured their own API key for this provider, lift limits.
+        if ($userId !== null) {
+            try {
+                $row = $this->db->get('provider_keys', ['id'], [
+                    'provider' => $this->provider,
+                    'user_id' => $userId,
+                    'is_active' => 1,
+                ]);
+                if (!empty($row)) {
+                    $usage = $this->getCurrentUsage($userId, $visitorIp);
+                    return [
+                        'allowed' => true,
+                        'reason' => 'user_api_key',
+                        'message' => 'User has a personal API key for this provider; per-user limits are lifted.',
+                        'usage' => $usage,
+                        'limits' => [
+                            'rpm' => PHP_INT_MAX,
+                            'rpd' => PHP_INT_MAX,
+                            'tpm' => PHP_INT_MAX,
+                            'tpd' => PHP_INT_MAX,
+                        ],
+                    ];
+                }
+            } catch (\Throwable $_) {
+                // ignore DB errors and continue with normal limits
+            }
+        }
         $limits = $this->getUserLimits($tier);
         $usage = $this->getCurrentUsage($userId, $visitorIp);
         

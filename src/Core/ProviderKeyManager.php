@@ -285,6 +285,62 @@ class ProviderKeyManager
     }
 
     /**
+     * Get the first available API key that belongs to a specific user for a provider.
+     *
+     * @param string $provider
+     * @param int $userId
+     * @return array|null
+     */
+    public function getUserKey(string $provider, int $userId): ?array
+    {
+        $now = date('Y-m-d H:i:s');
+
+        $keys = $this->db->select('provider_keys', '*', [
+            'provider' => $provider,
+            'user_id' => $userId,
+            'is_active' => 1,
+            'ORDER' => ['id' => 'ASC'],
+        ]);
+
+        if (empty($keys)) return null;
+
+        foreach ($keys as $key) {
+            if ($key['rate_limit_reset_at'] === null || $key['rate_limit_reset_at'] <= $now) {
+                return $this->formatKeyResult($key);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the first available API key that belongs to a specific user across any provider.
+     *
+     * @param int $userId
+     * @return array|null
+     */
+    public function getUserFirstKey(int $userId): ?array
+    {
+        $now = date('Y-m-d H:i:s');
+
+        $keys = $this->db->select('provider_keys', '*', [
+            'user_id' => $userId,
+            'is_active' => 1,
+            'ORDER' => ['provider' => 'ASC', 'id' => 'ASC'],
+        ]);
+
+        if (empty($keys)) return null;
+
+        foreach ($keys as $key) {
+            if ($key['rate_limit_reset_at'] === null || $key['rate_limit_reset_at'] <= $now) {
+                return $this->formatKeyResult($key);
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Add a new API key.
      */
     public function addKey(array $data): int
