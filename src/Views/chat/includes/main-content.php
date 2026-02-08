@@ -28,8 +28,7 @@
     <div class="flex items-center justify-between px-4 h-14">
       <!-- Model selector -->
       <div class="flex items-center gap-2">
-        <?php if (!empty($isAdmin)): ?>
-        <!-- Admin model selector dropdown -->
+        <!-- Model selector (available to admins and non-admins). Add Key button shown only to admins. -->
         <div class="relative" id="model-selector-wrapper">
           <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer max-w-[350px] min-w-0 overflow-hidden">
             <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="model-status-dot"></div>
@@ -40,7 +39,7 @@
           </button>
           <!-- Dropdown menu -->
           <div id="model-dropdown" class="hidden absolute left-0 mt-2 w-[350px] min-w-[350px] max-w-[350px] max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col">
-            <!-- Search bar and Add Provider button -->
+            <!-- Search bar and Add Provider button (Add Key visible only to admins) -->
             <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
               <div class="relative flex-1">
                 <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,25 +47,20 @@
                 </svg>
                 <input type="text" id="model-search" placeholder="Search models..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
               </div>
+              <?php if (!empty($isAdmin)): ?>
               <button id="add-provider-btn" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors whitespace-nowrap">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                 </svg>
                 <span>Add Key</span>
               </button>
+              <?php endif; ?>
             </div>
             <div id="model-list" class="py-2 overflow-y-auto flex-1">
               <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
             </div>
           </div>
         </div>
-        <?php else: ?>
-        <!-- Non-admin static display -->
-        <div class="flex items-center gap-2">
-          <div class="w-2 h-2 rounded-full bg-green-500"></div>
-          <span class="text-sm text-gray-500 dark:text-gray-400" id="model-name">Ginto AI</span>
-        </div>
-        <?php endif; ?>
       </div>
       
       <!-- Dashboard + Star on GitHub + Theme toggle -->

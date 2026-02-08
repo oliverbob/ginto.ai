@@ -4,8 +4,7 @@
  * For admin users to select and configure AI models
  */
 ?>
-<?php if (!empty($isAdmin)): ?>
-<!-- Admin Model Selector Script -->
+<!-- Model Selector Script (available to admin and non-admin users) -->
 <script>
 (function() {
   // Support both desktop and mobile model selector elements.
@@ -399,4 +398,3 @@
   loadModels();
 })();
 </script>
-<?php endif; ?>
