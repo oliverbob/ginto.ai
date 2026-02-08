@@ -387,12 +387,71 @@
       e.stopPropagation();
       const overlay = document.getElementById('user-console-overlay');
       if (!overlay) return;
+      const wasHidden = overlay.classList.contains('hidden');
       overlay.classList.toggle('hidden');
+      if (wasHidden) loadUserConsole();
     });
   } catch (e) {
     console.warn('Failed to inject user minimized tab', e);
   }
 })();
+</script>
+<?php endif; ?>
+
+<?php if (!empty($_SESSION['user_id'])): ?>
+<script>
+function renderUserConsole(data) {
+  const providerEl = document.getElementById('user-console-provider');
+  const modelEl = document.getElementById('user-console-model');
+  const tokensEl = document.getElementById('user-console-tokens');
+  const usageEl = document.getElementById('user-console-usage');
+  if (!providerEl || !modelEl || !tokensEl || !usageEl) return;
+
+  providerEl.textContent = data.provider || '-';
+  modelEl.textContent = data.model || '-';
+  tokensEl.textContent = (typeof data.tokens_left !== 'undefined' && data.tokens_left !== null) ? data.tokens_left : '-';
+
+  let html = '';
+  if (data.masked_key) {
+    html += '<div class="mb-2 text-xs text-gray-500">Key: ' + data.masked_key + '</div>';
+  }
+  if (data.recent && data.recent.length) {
+    html += '<div class="text-xs text-gray-500 mb-1">Recent usage:</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.recent.forEach(r => {
+      const when = r.minute_bucket || r.date || '';
+      html += '<li>' + when + ' — reqs: ' + (r.requests_count||0) + ', tokens: ' + (r.tokens_used||0) + '</li>';
+    });
+    html += '</ul>';
+  } else {
+    html += '<div class="text-xs text-gray-400">No recent usage.</div>';
+  }
+
+  usageEl.innerHTML = html;
+}
+
+async function loadUserConsole() {
+  try {
+    const res = await fetch('/api/console/logs');
+    if (!res.ok) throw new Error('Failed to load');
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'No data');
+    renderUserConsole(data);
+  } catch (e) {
+    const usageEl = document.getElementById('user-console-usage');
+    if (usageEl) usageEl.textContent = 'Error loading console: ' + e.message;
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'user-console-refresh') {
+    loadUserConsole();
+  }
+  if (e.target && e.target.id === 'user-console-close') {
+    const overlay = document.getElementById('user-console-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+});
 </script>
 <?php endif; ?>
 
