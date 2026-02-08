@@ -854,6 +854,23 @@ class ApiController extends Controller
         // - if the requesting user has no user-scoped keys, preserve existing behavior
         //   (allow models provided by env keys or any DB-backed keys)
         $currentUserId = $_SESSION['user_id'] ?? null;
+        // If the requester is not logged in and not admin, do not expose any providers
+        if (!$isAdmin && $currentUserId === null) {
+            $response = [
+                'success' => true,
+                'providers' => new \stdClass(),
+                'is_admin' => false,
+                'current_user_id' => null,
+                'user_has_keys' => false,
+                'current_provider' => null,
+                'current_model' => null,
+                'global_selection' => $globalSelection,
+                'running_models' => [],
+                'current_capabilities' => null
+            ];
+            echo json_encode($response);
+            exit();
+        }
         $userHasAnyKey = false;
         // First pass: detect whether user has any DB key at all
         foreach ($providers as $pdata) {
@@ -960,6 +977,13 @@ class ApiController extends Controller
                 }
             } catch (\Throwable $_) { /* ignore */ }
 
+            // If the user is not logged in and not admin, they cannot set a provider
+            if ($currentUserId === null && !$isAdmin) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Authentication required to set provider']);
+                exit();
+            }
+
             if ($userHasAnyKey) {
                 // Check provider-specific access: env key OR a DB key owned by user
                 $hasEnv = false;
@@ -1054,6 +1078,21 @@ class ApiController extends Controller
                 if (empty($provider) || empty($api_key)) {
                     http_response_code(400);
                     echo json_encode(['success' => false, 'error' => 'Missing provider or api_key']);
+                    exit();
+                }
+
+                // Disallow visitors from adding keys; require login or admin
+                $currentUserId = $_SESSION['user_id'] ?? null;
+                $isAdmin = false;
+                try {
+                    if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                        $isAdmin = true;
+                    }
+                } catch (\Throwable $_) { /* ignore */ }
+
+                if (!$isAdmin && $currentUserId === null) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Authentication required to add key']);
                     exit();
                 }
 
@@ -1161,6 +1200,12 @@ class ApiController extends Controller
             }
         } catch (\Throwable $_) { /* ignore */ }
 
+        // If requester is a visitor (not logged in) and not admin, do not return any keys
+        if (!$isAdmin && $currentUserId === null) {
+            echo json_encode(['success' => true, 'keys' => []]);
+            exit();
+        }
+
         // 1) DB-backed keys
         if ($db) {
             try {
@@ -1174,8 +1219,11 @@ class ApiController extends Controller
 
                 if (is_array($rows)) {
                     foreach ($rows as $r) {
-                        // If caller is not admin, only show keys owned by them
-                        if (!$isAdmin && $currentUserId !== null) {
+                        // If caller is not admin, require they be logged in and only show keys owned by them
+                        if (!$isAdmin) {
+                            if ($currentUserId === null) {
+                                continue;
+                            }
                             $owner = $r['user_id'] ?? null;
                             if ($owner === null || $owner != $currentUserId) {
                                 continue;
