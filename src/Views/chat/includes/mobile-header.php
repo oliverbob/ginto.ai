@@ -17,21 +17,21 @@ try {
 <!-- Mobile Header with Hamburger -->
 <header id="mobile-header" class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 py-2">
   <style>
-    /* Very tiny screens: show only brand text to avoid layout collisions */
+    /* Very tiny screens: replace the model selector with a simple brand label
+       but keep the hamburger and other header icons visible. */
     @media (max-width: 340px) {
-      #mobile-header { justify-content: center; }
-      #mobile-header .mobile-hide-on-tiny { display: none !important; }
+      #mobile-header .model-replace-on-tiny { display: none !important; }
       #mobile-brand-tiny { display: block !important; }
     }
   </style>
-  <div class="flex items-center gap-2 flex-1 min-w-0 mobile-hide-on-tiny">
+  <div class="flex items-center gap-2 flex-1 min-w-0">
     <button id="mobile-menu-toggle" class="p-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-gray-600 dark:text-gray-300 hover:text-indigo-700 dark:hover:text-indigo-300 flex-shrink-0" aria-label="Toggle menu">
       <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
     <?php if ($isLoggedIn || $isAdmin): ?>
-    <button id="model-selector-btn-mobile" class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex flex-1 min-w-0 justify-start overflow-hidden max-w-[350px]" aria-haspopup="true" aria-expanded="false">
+    <button id="model-selector-btn-mobile" class="model-replace-on-tiny flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex flex-1 min-w-0 justify-start overflow-hidden max-w-[350px]" aria-haspopup="true" aria-expanded="false">
       <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="mobile-model-status-dot" aria-hidden="true"></div>
       <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
       <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,9 +73,9 @@ try {
     <?php endif; ?>
   </div>
   </div>
-  <div id="mobile-brand-tiny" class="hidden w-full text-center font-semibold text-lg" aria-hidden="false">Ginto AI</div>
+  <div id="mobile-brand-tiny" class="hidden flex-1 text-center font-semibold text-lg" aria-hidden="false">Ginto AI</div>
   <?php if (empty($isLoggedIn)): ?>
-  <div class="flex items-center gap-1 mobile-hide-on-tiny">
+  <div class="flex items-center gap-1">
     <button onclick="showLoginRequiredModal()" class="flex items-center gap-1 px-2 py-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-xs font-medium" title="Login">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
@@ -101,7 +101,7 @@ try {
     </button>
   </div>
   <?php else: ?>
-  <div class="flex items-center gap-1 mobile-hide-on-tiny">
+  <div class="flex items-center gap-1">
     <a href="/dashboard" class="p-1.5 rounded-lg text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-white transition-colors" title="Dashboard">
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
