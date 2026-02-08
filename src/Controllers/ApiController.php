@@ -1114,6 +1114,12 @@ class ApiController extends Controller
                             ];
                             if ($currentUserId !== null) $payload['user_id'] = $currentUserId;
                             $id = $manager->addKey($payload);
+                            // Ensure owner recorded (fallback in case manager didn't persist user_id)
+                            try {
+                                if ($currentUserId !== null && $this->db && $id) {
+                                    $this->db->update('provider_keys', ['user_id' => $currentUserId], ['id' => $id]);
+                                }
+                            } catch (\Throwable $_) { /* ignore */ }
                             echo json_encode(['success' => true, 'id' => $id]);
                             exit();
                         }
@@ -1132,6 +1138,12 @@ class ApiController extends Controller
 
                         $res = $db->insert('provider_keys', $insert);
                         $id = $db->id() ?? null;
+                        // Fallback: ensure user_id is set on the inserted row
+                        try {
+                            if (isset($_SESSION['user_id']) && $_SESSION['user_id'] !== null && $id) {
+                                $db->update('provider_keys', ['user_id' => $_SESSION['user_id']], ['id' => $id]);
+                            }
+                        } catch (\Throwable $_) { /* ignore */ }
                         echo json_encode(['success' => true, 'id' => $id]);
                         exit();
                     }
