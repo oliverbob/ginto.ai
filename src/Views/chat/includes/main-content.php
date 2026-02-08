@@ -32,20 +32,7 @@
     </div>
   </div>
   <?php endif; ?>
-  <!-- Mobile-only floating Add Key button (visible when header is hidden) -->
-  <?php if (!empty($_SESSION['user_id'])): ?>
-  <button id="add-provider-mobile" class="lg:hidden fixed top-3 right-3 z-50 flex items-center gap-2 px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full shadow-md" title="Add Key">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-    </svg>
-    <span class="text-sm font-semibold">Add Key</span>
-  </button>
-  <?php else: ?>
-  <a id="add-provider-mobile-register" href="/register" class="lg:hidden fixed top-3 right-3 z-50 flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-full shadow-md" title="Create account to add key">
-    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-    <span class="text-sm font-semibold">Create account</span>
-  </a>
-  <?php endif; ?>
+  <!-- (mobile floating Add Key removed - moved beside mobile model search) -->
   
   <!-- Header - hidden on mobile since we have fixed mobile header -->
   <header id="main-header" class="hidden lg:block sticky top-0 z-50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
