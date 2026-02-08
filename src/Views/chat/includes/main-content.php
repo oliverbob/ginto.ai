@@ -269,6 +269,5 @@
   </div>
 </div>
 
-<!-- Admin overlay toggle button -->
-<button id="admin-console-toggle" class="hidden fixed bottom-6 right-6 z-50 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full w-12 h-12 flex items-center justify-center shadow-lg">A</button>
+<!-- Admin overlay toggle: moved into minimized tabs container for stacking order -->
 <?php endif; ?>

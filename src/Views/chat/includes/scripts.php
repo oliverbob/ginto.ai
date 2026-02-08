@@ -314,6 +314,42 @@
 <?php include __DIR__ . '/scripts-model-selector.php'; ?>
 <?php include __DIR__ . '/scripts-openwebui.php'; ?>
 
+<?php if (!empty($isAdmin)): ?>
+<script>
+// Create admin minimized tab inside shared minimized container so it participates in stacking order
+(function() {
+  try {
+    const container = document.getElementById('iframe-minimized-container');
+    if (!container) return;
+    // Create minimized tab element
+    const div = document.createElement('div');
+    div.id = 'admin-minimized-tab';
+    div.className = 'minimized-tab admin-minimized-tab flex items-center justify-center cursor-pointer shadow-lg';
+    div.title = 'Admin Console (toggle)';
+    // Inner content: circle with letter A and expandable title on hover
+    div.innerHTML = `<div class="flex items-center gap-2 px-3 py-2"><span class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</span><span class="tab-title ml-2 text-sm">Admin Console</span></div>`;
+
+    // Insert as first child so it is the base of the stack
+    container.insertBefore(div, container.firstChild);
+
+    // Click handler toggles admin console overlay
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.getElementById('admin-console-overlay');
+      if (!overlay) return;
+      if (overlay.classList.contains('hidden')) {
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to inject admin minimized tab', e);
+  }
+})();
+</script>
+<?php endif; ?>
+
 <!-- Ginto Setup Config for chat.js -->
 <script>
 <?php

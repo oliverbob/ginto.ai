@@ -131,6 +131,13 @@
   padding-right: 0.75rem;
 }
 
+/* Admin minimized tab - distinct color and sits at top of minimized stack by default */
+.admin-minimized-tab {
+  background: linear-gradient(135deg,#6b21a8,#b91c1c); /* purple -> red blend */
+  color: white;
+}
+.admin-minimized-tab .tab-title { font-weight: 600; }
+
 .iframe-modal-normal {
   width: calc(100vw - 80px);
   height: calc(100vh - 80px);
