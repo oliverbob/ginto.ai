@@ -30,20 +30,42 @@ try {
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
+    <?php if ($isLoggedIn || $isAdmin): ?>
     <button id="model-selector-btn-mobile" class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex flex-1 min-w-0 justify-start overflow-hidden max-w-[350px]" aria-haspopup="true" aria-expanded="false">
-      <?php if ($isLoggedIn || $isAdmin): ?>
       <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="mobile-model-status-dot" aria-hidden="true"></div>
       <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
       <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
       </svg>
-      <?php else: ?>
-      <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" aria-hidden="true"></div>
-      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0">Ginto AI</span>
-      <?php endif; ?>
     </button>
     <!-- Mobile dropdown (hidden by default) -->
     <div id="model-dropdown-mobile" class="hidden fixed top-12 left-0 w-[350px] min-w-[350px] max-w-[350px] bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[50vh] overflow-hidden flex flex-col">
+      <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+        <div class="relative flex-1">
+          <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="model-search-mobile" placeholder="Search models..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
+        </div>
+        <?php if ($isAdmin): ?>
+        <button id="add-provider-btn-mobile" class="flex items-center gap-1 px-2 py-1.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors whitespace-nowrap">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          <span>Add Key</span>
+        </button>
+        <?php endif; ?>
+      </div>
+      <div id="model-list-mobile" class="py-2 overflow-y-auto flex-1">
+        <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
+      </div>
+    </div>
+    <?php else: ?>
+    <div class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 rounded-lg min-w-0">
+      <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" aria-hidden="true"></div>
+      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">Ginto AI</span>
+    </div>
+    <?php endif; ?>
       <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
         <div class="relative flex-1">
           <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
