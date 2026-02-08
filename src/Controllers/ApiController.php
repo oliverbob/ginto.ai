@@ -846,12 +846,67 @@ class ApiController extends Controller
             }
         } catch (\Throwable $_) { /* ignore */ }
 
+        // Determine per-provider visibility server-side.
+        // Behavior:
+        // - admins see everything
+        // - if the requesting user has at least one user-scoped key, show only providers
+        //   where they have a key or an env key (do NOT surface admin DB keys)
+        // - if the requesting user has no user-scoped keys, preserve existing behavior
+        //   (allow models provided by env keys or any DB-backed keys)
+        $currentUserId = $_SESSION['user_id'] ?? null;
+        $userHasAnyKey = false;
+        // First pass: detect whether user has any DB key at all
+        foreach ($providers as $pdata) {
+            if (!empty($pdata['db_keys']) && is_array($pdata['db_keys'])) {
+                foreach ($pdata['db_keys'] as $k) {
+                    if (isset($k['user_id']) && $k['user_id'] !== null && $currentUserId !== null && ($k['user_id'] == $currentUserId)) {
+                        $userHasAnyKey = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+
+        // Second pass: filter providers according to policy
+        foreach ($providers as $pname => $pdata) {
+            $hasDbUserKey = false;
+            if (!empty($pdata['db_keys']) && is_array($pdata['db_keys'])) {
+                foreach ($pdata['db_keys'] as $k) {
+                    if (isset($k['user_id']) && $k['user_id'] !== null && $currentUserId !== null && ($k['user_id'] == $currentUserId)) {
+                        $hasDbUserKey = true;
+                        break;
+                    }
+                }
+            }
+            $providers[$pname]['has_user_key'] = $hasDbUserKey;
+
+            $hasEnvKey = !empty($pdata['env_key']);
+
+            if ($isAdmin) {
+                // Admin sees everything
+                continue;
+            }
+
+            if ($userHasAnyKey) {
+                // User has their own keys: only show providers they can actually use
+                $visible = $hasEnvKey || $hasDbUserKey;
+            } else {
+                // User has no keys: preserve prior behavior (allow env or any DB keys)
+                $visible = $hasEnvKey || (!empty($pdata['db_keys']));
+            }
+
+            if (!$visible) {
+                unset($providers[$pname]);
+            }
+        }
+
         $response = [
             'success' => true,
             // Return associative providers keyed by provider name (frontend expects an object)
             'providers' => $providers,
             'is_admin' => $isAdmin,
             'current_user_id' => $_SESSION['user_id'] ?? null,
+            'user_has_keys' => isset($userHasAnyKey) ? (bool)$userHasAnyKey : false,
             'current_provider' => $_SESSION['current_provider'] ?? null,
             'current_model' => $_SESSION['current_model'] ?? null,
             'global_selection' => $globalSelection,
@@ -882,6 +937,63 @@ class ApiController extends Controller
 
         $provider = $input['provider'] ?? null;
         $model = $input['model'] ?? null;
+
+        // Validate that the requesting user may select this provider.
+        // If the user is an admin, allow any provider.
+        // If the user has at least one user-scoped key, only allow providers
+        // where they have a key or where an env key exists. If they have no
+        // user keys, preserve prior behavior (allow env or any DB keys).
+        $currentUserId = $_SESSION['user_id'] ?? null;
+        $isAdmin = false;
+        try {
+            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                $isAdmin = true;
+            }
+        } catch (\Throwable $_) { /* ignore */ }
+
+        if (!$isAdmin && $provider) {
+            $db = $this->db;
+            $userHasAnyKey = false;
+            try {
+                if ($db && $currentUserId !== null) {
+                    $userHasAnyKey = (bool)($db->count('provider_keys', ['user_id' => $currentUserId]) > 0);
+                }
+            } catch (\Throwable $_) { /* ignore */ }
+
+            if ($userHasAnyKey) {
+                // Check provider-specific access: env key OR a DB key owned by user
+                $hasEnv = false;
+                $envCandidates = [
+                    'GROQ_API_KEY' => 'groq',
+                    'CEREBRAS_API_KEY' => 'cerebras',
+                    'OPENAI_API_KEY' => 'openai',
+                    'ANTHROPIC_API_KEY' => 'anthropic',
+                    'TOGETHER_API_KEY' => 'together',
+                    'FIREWORKS_API_KEY' => 'fireworks',
+                    'OLLAMA_API_KEY' => 'ollama',
+                    'NOVITA_API_KEY' => 'novita'
+                ];
+                foreach ($envCandidates as $envKey => $pname) {
+                    if ($pname === $provider) {
+                        $val = $this->getEnvVar($envKey);
+                        if (!empty($val)) { $hasEnv = true; break; }
+                    }
+                }
+
+                $hasUserDbKey = false;
+                try {
+                    if ($db && $currentUserId !== null) {
+                        $hasUserDbKey = (bool)($db->count('provider_keys', ['provider' => $provider, 'user_id' => $currentUserId]) > 0);
+                    }
+                } catch (\Throwable $_) { /* ignore */ }
+
+                if (!($hasEnv || $hasUserDbKey)) {
+                    http_response_code(403);
+                    echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Provider not available for your account']);
+                    exit();
+                }
+            }
+        }
 
         if ($provider) {
             $_SESSION['current_provider'] = $provider;
@@ -947,28 +1059,36 @@ class ApiController extends Controller
 
                 try {
                     if ($db) {
+                        $currentUserId = $_SESSION['user_id'] ?? null;
                         // Prefer ProviderKeyManager if available (handles defaults/rotation)
                         if (class_exists('App\\Core\\ProviderKeyManager')) {
                             $manager = new \App\Core\ProviderKeyManager($db);
-                            $id = $manager->addKey([
+                            $payload = [
                                 'provider' => $provider,
                                 'api_key' => $api_key,
                                 'key_name' => $key_name,
                                 'tier' => $tier,
                                 'is_default' => $is_default,
-                            ]);
+                            ];
+                            if ($currentUserId !== null) $payload['user_id'] = $currentUserId;
+                            $id = $manager->addKey($payload);
                             echo json_encode(['success' => true, 'id' => $id]);
                             exit();
                         }
 
-                        $res = $db->insert('provider_keys', [
+                        $insert = [
                             'provider' => $provider,
                             'api_key' => $api_key,
                             'key_name' => $key_name,
                             'tier' => $tier,
                             'is_default' => $is_default,
                             'is_active' => 1,
-                        ]);
+                        ];
+                        if (isset($_SESSION['user_id']) && $_SESSION['user_id'] !== null) {
+                            $insert['user_id'] = $_SESSION['user_id'];
+                        }
+
+                        $res = $db->insert('provider_keys', $insert);
                         $id = $db->id() ?? null;
                         echo json_encode(['success' => true, 'id' => $id]);
                         exit();
@@ -995,6 +1115,25 @@ class ApiController extends Controller
 
                 try {
                     if ($db) {
+                        $currentUserId = $_SESSION['user_id'] ?? null;
+                        $isAdmin = false;
+                        try {
+                            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                                $isAdmin = true;
+                            }
+                        } catch (\Throwable $_) { /* ignore */ }
+
+                        // Ensure non-admin users can only delete their own keys
+                        $row = $db->get('provider_keys', '*', ['id' => $id]);
+                        if (!$isAdmin) {
+                            $ownerId = $row['user_id'] ?? null;
+                            if ($ownerId === null || $currentUserId === null || ($ownerId != $currentUserId)) {
+                                http_response_code(403);
+                                echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Not allowed to delete this key']);
+                                exit();
+                            }
+                        }
+
                         $db->delete('provider_keys', ['id' => $id]);
                         echo json_encode(['success' => true]);
                         exit();
@@ -1014,6 +1153,14 @@ class ApiController extends Controller
         // GET: list keys (both .env keys and DB keys)
         $keys = [];
 
+        $currentUserId = $_SESSION['user_id'] ?? null;
+        $isAdmin = false;
+        try {
+            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                $isAdmin = true;
+            }
+        } catch (\Throwable $_) { /* ignore */ }
+
         // 1) DB-backed keys
         if ($db) {
             try {
@@ -1027,6 +1174,14 @@ class ApiController extends Controller
 
                 if (is_array($rows)) {
                     foreach ($rows as $r) {
+                        // If caller is not admin, only show keys owned by them
+                        if (!$isAdmin && $currentUserId !== null) {
+                            $owner = $r['user_id'] ?? null;
+                            if ($owner === null || $owner != $currentUserId) {
+                                continue;
+                            }
+                        }
+
                         $keys[] = [
                             'id' => $r['id'],
                             'provider' => $r['provider'],
