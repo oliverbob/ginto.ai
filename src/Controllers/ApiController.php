@@ -835,82 +835,6 @@ class ApiController extends Controller
                         $globalSelection = $decoded;
                     }
                 }
-
-                exit;
-            }
-
-            /**
-             * Return per-user console logs and usage for the current logged-in user.
-             * GET /api/console/logs
-             */
-            public function consoleLogs()
-            {
-                header('Content-Type: application/json');
-                $userId = $_SESSION['user_id'] ?? null;
-                if (empty($userId)) {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'Not authenticated']);
-                    exit;
-                }
-
-                $db = $this->db;
-                $provider = null;
-                $model = null;
-                $masked_key = null;
-                $tokens_left = null;
-
-                try {
-                    $keyManager = new \App\Core\ProviderKeyManager($db);
-                    // Prefer session-selected provider if set
-                    $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
-                    $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
-
-                    $userKey = null;
-                    if (!empty($sessionProvider)) {
-                        $userKey = $keyManager->getUserKey($sessionProvider, (int)$userId);
-                    }
-                    if (!$userKey) {
-                        $userKey = $keyManager->getUserFirstKey((int)$userId);
-                    }
-
-                    if ($userKey) {
-                        $provider = $userKey['provider'];
-                        $masked_key = \App\Core\ProviderKeyManager::maskKey($userKey['api_key']);
-                    } else {
-                        // Fallback to session provider or default
-                        $provider = $sessionProvider ?? strtolower(getenv('DEFAULT_PROVIDER') ?: ($_ENV['DEFAULT_PROVIDER'] ?? 'cerebras'));
-                    }
-
-                    $model = $sessionModel ?? null;
-
-                    // Compute usage and remaining tokens using UserRateLimiter
-                    $rateLimiter = new \App\Core\UserRateLimiter($db, $provider);
-                    $usage = $rateLimiter->getCurrentUsage((int)$userId, null);
-                    $limits = $rateLimiter->getUserLimits('user');
-                    $tokens_left = isset($limits['tpd']) ? max(0, $limits['tpd'] - ($usage['tpd'] ?? 0)) : null;
-
-                    // Get recent usage rows for display
-                    $recent = $db->select('user_rate_limits', ['date','minute_bucket','requests_count','tokens_used','provider'], [
-                        'user_id' => (int)$userId,
-                        'ORDER' => ['id' => 'DESC'],
-                        'LIMIT' => 20,
-                    ]);
-
-                    echo json_encode([
-                        'success' => true,
-                        'provider' => $provider,
-                        'model' => $model,
-                        'masked_key' => $masked_key,
-                        'tokens_left' => $tokens_left,
-                        'usage' => $usage,
-                        'recent' => $recent,
-                    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-                    exit;
-                } catch (\Throwable $e) {
-                    http_response_code(500);
-                    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
-                    exit;
-                }
             }
         } catch (\Throwable $_) { /* ignore */ }
 
@@ -1009,6 +933,80 @@ class ApiController extends Controller
 
         echo json_encode($response);
         exit();
+    }
+
+    /**
+     * Return per-user console logs and usage for the current logged-in user.
+     * GET /api/console/logs
+     */
+    public function consoleLogs()
+    {
+        header('Content-Type: application/json');
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+            exit;
+        }
+
+        $db = $this->db;
+        $provider = null;
+        $model = null;
+        $masked_key = null;
+        $tokens_left = null;
+
+        try {
+            $keyManager = new \App\Core\ProviderKeyManager($db);
+            // Prefer session-selected provider if set
+            $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
+            $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+
+            $userKey = null;
+            if (!empty($sessionProvider)) {
+                $userKey = $keyManager->getUserKey($sessionProvider, (int)$userId);
+            }
+            if (!$userKey) {
+                $userKey = $keyManager->getUserFirstKey((int)$userId);
+            }
+
+            if ($userKey) {
+                $provider = $userKey['provider'];
+                $masked_key = \App\Core\ProviderKeyManager::maskKey($userKey['api_key']);
+            } else {
+                // Fallback to session provider or default
+                $provider = $sessionProvider ?? strtolower(getenv('DEFAULT_PROVIDER') ?: ($_ENV['DEFAULT_PROVIDER'] ?? 'cerebras'));
+            }
+
+            $model = $sessionModel ?? null;
+
+            // Compute usage and remaining tokens using UserRateLimiter
+            $rateLimiter = new \App\Core\UserRateLimiter($db, $provider);
+            $usage = $rateLimiter->getCurrentUsage((int)$userId, null);
+            $limits = $rateLimiter->getUserLimits('user');
+            $tokens_left = isset($limits['tpd']) ? max(0, $limits['tpd'] - ($usage['tpd'] ?? 0)) : null;
+
+            // Get recent usage rows for display
+            $recent = $db->select('user_rate_limits', ['date','minute_bucket','requests_count','tokens_used','provider'], [
+                'user_id' => (int)$userId,
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => 20,
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'provider' => $provider,
+                'model' => $model,
+                'masked_key' => $masked_key,
+                'tokens_left' => $tokens_left,
+                'usage' => $usage,
+                'recent' => $recent,
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+            exit;
+        }
     }
 
     /**
