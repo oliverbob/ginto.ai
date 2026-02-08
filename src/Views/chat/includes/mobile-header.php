@@ -20,9 +20,10 @@ try {
     /* Very tiny screens: replace the model selector with a simple brand label
        but keep the hamburger and other header icons visible. */
     @media (max-width: 340px) {
-      #mobile-header .model-replace-on-tiny { display: none !important; }
+      /* Show the model selector at very small widths and hide the brand label */
+      #mobile-header .model-replace-on-tiny { display: inline-flex !important; }
       #mobile-header .hide-on-tiny { display: none !important; }
-      #mobile-brand-tiny { display: block !important; }
+      #mobile-brand-tiny { display: none !important; }
     }
   </style>
   <div class="flex items-center gap-2 flex-1 min-w-0">
