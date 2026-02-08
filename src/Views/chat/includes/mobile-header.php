@@ -4,6 +4,16 @@
  * Fixed header with hamburger menu for mobile devices
  */
 ?>
+<?php
+// Determine login/admin state for mobile view
+$isLoggedIn = !empty($_SESSION['user_id']);
+$isAdmin = false;
+try {
+  if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+    $isAdmin = true;
+  }
+} catch (\Throwable $_) { /* ignore */ }
+?>
 <!-- Mobile Header with Hamburger -->
 <header id="mobile-header" class="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 flex items-center justify-between px-4 py-2">
   <style>
@@ -20,6 +30,7 @@
         <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
       </svg>
     </button>
+    <?php if ($isLoggedIn || $isAdmin): ?>
     <button id="model-selector-btn-mobile" class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer hidden min-[350px]:inline-flex flex-1 min-w-0 justify-start overflow-hidden max-w-[350px]" aria-haspopup="true" aria-expanded="false">
       <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="mobile-model-status-dot" aria-hidden="true"></div>
       <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
@@ -47,6 +58,7 @@
         <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
       </div>
     </div>
+    <?php endif; ?>
   </div>
   <div id="mobile-brand-tiny" class="hidden w-full text-center font-semibold text-lg" aria-hidden="false">Ginto AI</div>
   <?php if (empty($isLoggedIn)): ?>

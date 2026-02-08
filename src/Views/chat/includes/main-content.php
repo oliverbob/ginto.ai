@@ -6,6 +6,16 @@
 ?>
 <!-- Main Content - offset by sidebar width on large screens -->
 <main id="main-content" class="flex-1 flex flex-col min-h-screen pt-14 lg:pt-0 lg:ml-64">
+  <?php
+  // Determine login/admin state for view logic
+  $isLoggedIn = !empty($_SESSION['user_id']);
+  $isAdmin = false;
+  try {
+      if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+          $isAdmin = true;
+      }
+  } catch (\Throwable $_) { /* ignore */ }
+  ?>
   <?php if (($paymentStatus ?? null) === 'pending'): ?>
   <!-- Premium Account Pending Banner -->
   <div class="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-4 py-3 text-center">
@@ -28,8 +38,9 @@
     <div class="flex items-center justify-between px-4 h-14">
       <!-- Model selector -->
       <div class="flex items-center gap-2">
-        <!-- Model selector (available to admins and non-admins). Add Key button shown only to admins. -->
-        <div class="relative" id="model-selector-wrapper">
+        <!-- Model selector (only shown to logged-in users or admins). Add Key button shown only to admins. -->
+          <?php if ($isLoggedIn || $isAdmin): ?>
+          <div class="relative" id="model-selector-wrapper">
           <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer max-w-[350px] min-w-0 overflow-hidden">
             <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="model-status-dot"></div>
             <span class="text-sm text-gray-700 dark:text-gray-200 truncate min-w-0" id="model-name">ginto-default</span>
@@ -60,6 +71,7 @@
               <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
             </div>
           </div>
+        <?php endif; ?>
         </div>
       </div>
       
