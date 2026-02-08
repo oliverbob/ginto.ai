@@ -326,8 +326,8 @@
     div.id = 'admin-minimized-tab';
     div.className = 'minimized-tab admin-minimized-tab flex items-center justify-center cursor-pointer shadow-lg';
     div.title = 'Admin Console (toggle)';
-    // Inner content: circle with letter A and expandable title on hover
-    div.innerHTML = `<div class="flex items-center gap-2 px-3 py-2"><span class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</span><span class="tab-title ml-2 text-sm">Admin Console</span></div>`;
+    // Inner content: stacked circle with centered letter and label underneath
+    div.innerHTML = `<div class="flex flex-col items-center gap-1 px-3 py-2"><span class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</span><span class="tab-title text-xs">Admin Console</span></div>`;
 
     // Insert as first child so it is the base of the stack
     container.insertBefore(div, container.firstChild);
