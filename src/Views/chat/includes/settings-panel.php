@@ -3,6 +3,15 @@
  * Settings Panel (Slide-over)
  * Contains Settings, MCP Tools, and API Keys tabs
  */
+
+// Determine login/admin state for settings panel
+$isLoggedIn = !empty($_SESSION['user_id']);
+$isAdmin = false;
+try {
+  if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+    $isAdmin = true;
+  }
+} catch (\Throwable $_) { /* ignore */ }
 ?>
 <!-- Settings Panel (Slide-over) -->
 <div id="settings-panel" class="fixed inset-y-0 right-0 w-96 bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-800 transform translate-x-full transition-transform duration-300 z-[60] flex flex-col shadow-2xl">
@@ -25,8 +34,8 @@
     <button id="tab-mcp" class="flex-1 px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors <?= empty($isAdmin) ? 'hidden' : '' ?>" data-tab="mcp">
       MCP Tools
     </button>
-    <!-- Admin tab for API keys, hidden by default -->
-    <button id="tab-admin" class="flex-1 px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors <?= empty($isAdmin) ? 'hidden' : '' ?>" data-tab="admin">
+    <!-- API Keys tab (visible to logged-in users; admin sees full admin view) -->
+    <button id="tab-admin" class="flex-1 px-4 py-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 border-b-2 border-transparent transition-colors <?= empty($isLoggedIn) ? 'hidden' : '' ?>" data-tab="admin">
       API Keys
     </button>
   </div>
@@ -150,8 +159,8 @@
     </div>
   </div>
   
-  <!-- Tab Content: Admin API Keys (admin only) -->
-  <div id="panel-admin" class="flex-1 overflow-y-auto sidebar-scroll p-4 hidden" data-admin-only="true">
+  <!-- Tab Content: API Keys (visible to logged-in users; some sections admin-only) -->
+  <div id="panel-admin" class="flex-1 overflow-y-auto sidebar-scroll p-4 hidden" <?= empty($isLoggedIn) ? 'data-admin-only="true"' : '' ?> >
     <!-- Add New Key Form -->
     <div class="mb-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
       <h4 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Add New API Key</h4>
