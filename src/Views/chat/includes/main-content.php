@@ -76,16 +76,16 @@
                   <input type="text" id="model-search" placeholder="Search models..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <?php if ($isLoggedIn): ?>
-                <button id="add-provider-btn" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors whitespace-nowrap">
+                <button id="add-provider-btn" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                   </svg>
-                  <span class="ml-1">Add Key</span>
+                  <span class="ml-2">Add Key</span>
                 </button>
                 <?php else: ?>
-                <a href="/register" id="add-provider-register" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 py-2 text-sm font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-lg transition-colors whitespace-nowrap">
+                <a href="/register" id="add-provider-register" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                  <span class="ml-1">Create account</span>
+                  <span class="ml-2">Create account</span>
                 </a>
                 <?php endif; ?>
               </div>
