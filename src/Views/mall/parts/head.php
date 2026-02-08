@@ -507,7 +507,8 @@ $title = $title ?? 'ePower Mall — Premium Demo';
             display: flex;
             align-items: center;
             flex: 1 1 0%;
-            background: #fff;
+            /* Respect theme variables for correct contrast */
+            background: var(--bg-surface);
             border-radius: 24px;
             box-shadow: 0 2px 8px rgba(0,0,0,0.06);
             padding: 4px 12px 4px 12px;
@@ -518,13 +519,15 @@ $title = $title ?? 'ePower Mall — Premium Demo';
         .shopee-search input {
             border: none;
             background: transparent;
-            color: #222;
+            color: var(--text-main);
             font-size: 1rem;
             flex: 1;
             outline: none;
             padding: 8px;
             box-shadow: none;
         }
+        /* Placeholder color should be muted but visible on both themes */
+        .shopee-search input::placeholder { color: var(--text-muted); }
         .shopee-search input:focus {
             outline: none !important;
             box-shadow: none !important;
