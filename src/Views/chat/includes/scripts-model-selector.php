@@ -91,10 +91,13 @@
           targetDropdown.style.width = `${btnWidth}px`;
           // For mobile dropdown (fixed), align left origin to the button's left edge and position top under the button
           if (isMobileBtn && targetDropdown) {
-            // left in viewport coordinates
-            targetDropdown.style.left = `${Math.max(8, Math.round(rect.left))}px`;
+            // Keep mobile dropdown pinned with 5px margins from left/right
+            targetDropdown.style.left = '5px';
+            targetDropdown.style.right = '5px';
             // top should be just below the button
             targetDropdown.style.top = `${Math.round(rect.bottom + 6)}px`;
+            // unset width so CSS max-width controls sizing
+            targetDropdown.style.width = '';
           }
         } catch (e) {
           // ignore
