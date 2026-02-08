@@ -39,7 +39,7 @@
             </svg>
           </button>
           <!-- Dropdown menu -->
-          <div id="model-dropdown" class="hidden absolute left-0 mt-2 w-auto min-w-full max-w-md max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col">
+          <div id="model-dropdown" class="hidden absolute left-0 mt-2 w-[350px] min-w-[350px] max-w-[350px] max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col">
             <!-- Search bar and Add Provider button -->
             <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
               <div class="relative flex-1">
