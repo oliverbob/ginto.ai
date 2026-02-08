@@ -432,8 +432,13 @@ function renderUserConsole(data) {
 
 async function loadUserConsole() {
   try {
-    const res = await fetch('/api/console/logs');
-    if (!res.ok) throw new Error('Failed to load');
+    const res = await fetch('/api/console/logs', { credentials: 'same-origin', cache: 'no-cache' });
+    if (!res.ok) {
+      let msg = 'Failed to load';
+      try { const t = await res.text(); msg = t || msg; } catch(_) {}
+      if (res.status === 403) throw new Error('Not authenticated (session missing)');
+      throw new Error(msg);
+    }
     const data = await res.json();
     if (!data.success) throw new Error(data.error || 'No data');
     renderUserConsole(data);
