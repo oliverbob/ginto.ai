@@ -271,3 +271,29 @@
 
 <!-- Admin overlay toggle: moved into minimized tabs container for stacking order -->
 <?php endif; ?>
+
+<?php if (!empty($_SESSION['user_id'])): ?>
+<!-- User console overlay (logged-in users) -->
+<div id="user-console-overlay" class="hidden fixed inset-0 z-50 flex items-end justify-end p-6 pointer-events-none">
+  <div class="w-full max-w-xl bg-white/90 dark:bg-black/80 backdrop-blur-md rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-4 pointer-events-auto">
+    <div class="flex items-start gap-3">
+      <div class="flex-1">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-sm font-semibold">User Console</div>
+          <div class="text-xs text-gray-500">Usage & API key logs</div>
+        </div>
+        <div class="text-xs text-gray-600 dark:text-gray-300 mb-2">
+          Provider: <span id="user-console-provider" class="font-medium">-</span>
+          · Model: <span id="user-console-model" class="font-medium">-</span>
+          · Tokens left: <span id="user-console-tokens" class="font-medium">-</span>
+        </div>
+        <div id="user-console-usage" class="text-sm text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900/40 rounded p-2 max-h-48 overflow-auto whitespace-pre-wrap break-words"></div>
+      </div>
+      <div class="flex-shrink-0">
+        <button id="user-console-refresh" class="px-3 py-1 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded mb-2">Refresh</button>
+        <button id="user-console-close" class="px-3 py-1 text-sm bg-red-500 hover:bg-red-600 text-white rounded">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+<?php endif; ?>
