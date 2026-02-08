@@ -326,8 +326,13 @@
     div.id = 'admin-minimized-tab';
     div.className = 'minimized-tab admin-minimized-tab flex items-center justify-center cursor-pointer shadow-lg';
     div.title = 'Admin Console (toggle)';
-    // Inner content: stacked circle with centered letter and label underneath
-    div.innerHTML = `<div class="flex flex-col items-center gap-1 px-3 py-2"><span class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</span><span class="tab-title text-xs">Admin Console</span></div>`;
+    // Inner content: match minimized-tab layout (icon + title inline) so it behaves like other minimized items
+    div.innerHTML = `
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="Admin Console (toggle)">
+        <div class="w-8 h-8 rounded-full flex items-center justify-center bg-white/10 text-white font-bold">A</div>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">Admin Console</span>
+      </button>
+    `;
 
     // Insert as first child so it is the base of the stack
     container.insertBefore(div, container.firstChild);
