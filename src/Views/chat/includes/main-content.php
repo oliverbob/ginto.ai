@@ -58,6 +58,14 @@
                   </svg>
                   <input type="text" id="model-search" placeholder="Search models..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
+                <?php if ($isLoggedIn): ?>
+                <button id="add-provider-btn" class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors whitespace-nowrap">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                  </svg>
+                  <span class="ml-1">Add Key</span>
+                </button>
+                <?php endif; ?>
               </div>
               <div id="model-list" class="py-2 overflow-y-auto flex-1">
                 <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
