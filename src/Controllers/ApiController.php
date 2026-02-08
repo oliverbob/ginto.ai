@@ -1255,6 +1255,9 @@ class ApiController extends Controller
         }
 
         // 2) .env keys (primary in environment variables)
+        // Only surface environment (.env) keys to admin users. Non-admin users
+        // should not see global keys stored in environment variables to avoid
+        // exposing keys they do not own.
         $envCandidates = [
             'GROQ_API_KEY' => 'groq',
             'CEREBRAS_API_KEY' => 'cerebras',
@@ -1265,22 +1268,24 @@ class ApiController extends Controller
             'OLLAMA_API_KEY' => 'ollama',
             'NOVITA_API_KEY' => 'novita'
         ];
-
-        foreach ($envCandidates as $envKey => $providerName) {
-            $val = $this->getEnvVar($envKey);
-            if (!empty($val)) {
-                $keys[] = [
-                    'id' => 'env:' . $envKey,
-                    'provider' => $providerName,
-                    'key_name' => $envKey,
-                    'api_key_masked' => self::maskKey($val),
-                    'tier' => 'production',
-                    'is_default' => true,
-                    'is_active' => true,
-                    'last_used_at' => null,
-                    'error_count' => 0,
-                    'rate_limit_reset_at' => null,
-                ];
+        // Only include env keys in the response for admin users.
+        if ($isAdmin) {
+            foreach ($envCandidates as $envKey => $providerName) {
+                $val = $this->getEnvVar($envKey);
+                if (!empty($val)) {
+                    $keys[] = [
+                        'id' => 'env:' . $envKey,
+                        'provider' => $providerName,
+                        'key_name' => $envKey,
+                        'api_key_masked' => self::maskKey($val),
+                        'tier' => 'production',
+                        'is_default' => true,
+                        'is_active' => true,
+                        'last_used_at' => null,
+                        'error_count' => 0,
+                        'rate_limit_reset_at' => null,
+                    ];
+                }
             }
         }
 
