@@ -446,6 +446,16 @@ function renderUserConsole(data) {
     html += '</ul>';
   }
 
+  // Show per-key totals if available
+  if (data.key_totals && data.key_totals.length) {
+    html += '<div class="text-xs text-gray-500 mt-2 mb-1">Per-key totals (local):</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.key_totals.forEach(t => {
+      html += '<li>Key ID: ' + (t.key_id || '-') + ' — total reqs: ' + (t.requests_total||0) + ', total tokens: ' + (t.tokens_total||0) + '</li>';
+    });
+    html += '</ul>';
+  }
+
   usageEl.innerHTML = html;
 }
 

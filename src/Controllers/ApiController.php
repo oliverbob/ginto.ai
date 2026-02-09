@@ -1005,6 +1005,30 @@ class ApiController extends Controller
                         ]);
                     } catch (\Throwable $_) { $keyRecent = []; }
 
+                    // Compute per-key totals (sum of requests/tokens) for this user
+                    $keyTotals = [];
+                    try {
+                        $rows = $db->select('provider_key_usage', [
+                            'key_id',
+                            'SUM(requests_count) as requests_total',
+                            'SUM(tokens_used) as tokens_total',
+                        ], [
+                            'user_id' => (int)$userId,
+                            'GROUP' => ['key_id'],
+                        ]);
+                        if (!empty($rows)) {
+                            foreach ($rows as $r) {
+                                $kid = $r['key_id'] ?? null;
+                                if ($kid === null) continue;
+                                $keyTotals[] = [
+                                    'key_id' => (int)$kid,
+                                    'requests_total' => (int)($r['requests_total'] ?? 0),
+                                    'tokens_total' => (int)($r['tokens_total'] ?? 0),
+                                ];
+                            }
+                        }
+                    } catch (\Throwable $_) { $keyTotals = []; }
+
             echo json_encode([
                 'success' => true,
                 'provider' => $provider,
@@ -1012,8 +1036,9 @@ class ApiController extends Controller
                 'masked_key' => $masked_key,
                 'tokens_left' => $tokens_left,
                 'usage' => $usage,
-                        'recent' => $recent,
-                        'key_recent' => $keyRecent,
+                'recent' => $recent,
+                'key_recent' => $keyRecent,
+                'key_totals' => $keyTotals,
             ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             exit;
         } catch (\Throwable $e) {
