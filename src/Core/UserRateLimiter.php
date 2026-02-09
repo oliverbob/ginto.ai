@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use Medoo\Medoo;
+use App\Core\ProviderKeyManager;
 
 /**
  * User-level rate limiter to protect against hitting provider limits.
@@ -176,20 +177,40 @@ class UserRateLimiter
      */
     public function checkLimit(?int $userId, ?string $visitorIp, string $tier, int $estimatedTokens = 0): array
     {
-        // If this user has configured their own API key for this provider, lift limits.
+        // If this user has configured their own API key, lift limits.
+        // Exempt when the user has either:
+        //  - an active personal key for the current provider, or
+        //  - any active personal key (user-provided) for any provider.
         if ($userId !== null) {
             try {
-                $row = $this->db->get('provider_keys', ['id'], [
-                    'provider' => $this->provider,
-                    'user_id' => $userId,
-                    'is_active' => 1,
-                ]);
-                if (!empty($row)) {
+                $pkm = new ProviderKeyManager($this->db);
+
+                // Provider-specific key first (same behavior as before)
+                $userProviderKey = $pkm->getUserKey($this->provider, $userId);
+                if ($userProviderKey !== null) {
                     $usage = $this->getCurrentUsage($userId, $visitorIp);
                     return [
                         'allowed' => true,
                         'reason' => 'user_api_key',
                         'message' => 'User has a personal API key for this provider; per-user limits are lifted.',
+                        'usage' => $usage,
+                        'limits' => [
+                            'rpm' => PHP_INT_MAX,
+                            'rpd' => PHP_INT_MAX,
+                            'tpm' => PHP_INT_MAX,
+                            'tpd' => PHP_INT_MAX,
+                        ],
+                    ];
+                }
+
+                // If user has any active personal key at all, also lift limits.
+                $anyUserKey = $pkm->getUserFirstKey($userId);
+                if ($anyUserKey !== null) {
+                    $usage = $this->getCurrentUsage($userId, $visitorIp);
+                    return [
+                        'allowed' => true,
+                        'reason' => 'user_api_key_any',
+                        'message' => 'User has a personal API key; per-user limits are lifted.',
                         'usage' => $usage,
                         'limits' => [
                             'rpm' => PHP_INT_MAX,
