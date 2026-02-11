@@ -1,5 +1,5 @@
 ﻿<?php 
-define ('PATHSPAGE', TRUE);
+if (!defined('PATHSPAGE')) define('PATHSPAGE', TRUE);
 include 'verse.php';
 // include '../root_path.php';
 ?>

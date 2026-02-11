@@ -12,7 +12,6 @@ define('ROOT_PATH', dirname(__DIR__));
 if (!defined('STORAGE_PATH')) {
     define('STORAGE_PATH', dirname(ROOT_PATH) . '/storage');
 }
-define('STORAGE_PATH', dirname(__DIR__, 2) . '/storage');
 
 // Ensure storage directories exist with proper structure
 if (!is_dir(STORAGE_PATH)) {
