@@ -2379,6 +2379,39 @@ try {
                 
                 window.currentFile = data.file;
                 window.currentEncoded = data.encoded;
+
+                // If binary, show preview overlay instead of loading into editor
+                var isBinary = data.is_binary || (data.encoding === 'base64');
+                var ext = (data.file || '').split('.').pop().toLowerCase();
+                if (isBinary) {
+                    try {
+                        const overlay = document.getElementById('editor-views-overlay');
+                        if (overlay) {
+                            overlay.style.display = 'block';
+                            const f = overlay.querySelector('iframe');
+                            if (f) {
+                                const sandboxId = window.editorConfig?.sandboxId;
+                                if (sandboxId && data.file) {
+                                    f.src = '/sandbox-preview/' + sandboxId + '/' + data.file.replace(/^\//, '');
+                                } else {
+                                    const previewMime = {
+                                        'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml', 'pdf': 'application/pdf'
+                                    }[ext] || null;
+                                    if (previewMime && data.content) {
+                                        f.src = 'data:' + previewMime + ';base64,' + data.content;
+                                    } else {
+                                        const clientUrl = (window.editorConfig?.sandboxId) ? ('/clients/' + window.editorConfig.sandboxId + '/' + data.file.replace(/^\//, '')) : ('/clients/' + data.file.replace(/^\//, ''));
+                                        f.srcdoc = '<div style="font-family:system-ui;padding:20px;"><h3>' + escapeHtml(data.file.split('/').pop()) + '</h3>' +
+                                            '<p>Binary file preview not available. <a href="' + clientUrl + '" target="_blank">Open / Download</a></p>' +
+                                            '<p><a href="https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(window.location.origin + clientUrl) + '" target="_blank">View in Office Online</a></p></div>';
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) { console.warn('binary preview failed', e); }
+                    editorStatus.textContent = 'Preview';
+                    return;
+                }
                 
                 filePath.textContent = data.file || 'No file selected';
                 document.getElementById('save-file').value = data.encoded;

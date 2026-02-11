@@ -5331,6 +5331,47 @@
           
           window.currentFile = data.path;
           window.currentEncoded = data.encoded;
+
+          // If this is a binary file, do not load into the code editor - show preview/download instead
+          var isBinaryFile = data.is_binary || (data.encoding === 'base64');
+          var ext = (data.path || '').split('.').pop().toLowerCase();
+          if (isBinaryFile) {
+            if (editorStatus) editorStatus.textContent = 'Preview';
+            // Show views overlay if exists
+            var overlay = document.getElementById('editor-views-overlay');
+            if (overlay) {
+              overlay.style.display = 'block';
+              var iframe = overlay.querySelector('iframe');
+              if (iframe) {
+                // If we have a sandbox preview route available, prefer it (keeps same-origin)
+                var sandboxId = window.editorConfig?.sandboxId;
+                if (sandboxId && data.path) {
+                  iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\//, '');
+                } else {
+                  // Build data URL for common previewable types
+                  var previewMime = {
+                    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml',
+                    'pdf': 'application/pdf'
+                  }[ext] || null;
+                  if (previewMime && data.content) {
+                    iframe.src = 'data:' + previewMime + ';base64,' + data.content;
+                  } else {
+                    // Fallback: show an HTML page with download/open links
+                    var clientUrl = (window.editorConfig?.sandboxId) ? ('/clients/' + window.editorConfig.sandboxId + '/' + data.path.replace(/^\//, '')) : ('/clients/' + data.path.replace(/^\//, ''));
+                    iframe.srcdoc = '<div style="font-family:system-ui;padding:20px;"><h3>' + escapeHtml(data.path.split('/').pop()) + '</h3>' +
+                      '<p>Binary file preview not available. <a href="' + clientUrl + '" target="_blank">Open / Download</a></p>' +
+                      '<p><a href="https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(window.location.origin + clientUrl) + '" target="_blank">View in Office Online</a></p></div>';
+                  }
+                }
+              }
+            }
+            // Update active state in tree
+            document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
+            var activeFile = document.querySelector('.file-item[data-path="' + data.path + '"]');
+            if (activeFile) activeFile.classList.add('active');
+            if (editorStatus) editorStatus.textContent = 'Preview';
+            return;
+          }
           
           // Update save button text (Save vs Save as)
           if (typeof window.updateSaveButtonText === 'function') {
