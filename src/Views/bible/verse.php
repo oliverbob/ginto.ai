@@ -13,11 +13,11 @@ if (!defined('PATHSPAGE')) {
 }
 
 // Attempt to include MysqliDb from a few likely locations (silently ignore if missing)
-$mysqliCandidates = [
-    __DIR__ . '/../../controller/includes/MysqliDb/MysqliDb.php', // from src/Views/bible
-    ROOT_PATH . '/controller/includes/MysqliDb/MysqliDb.php',     // absolute path if ROOT_PATH defined
-    __DIR__ . '/../controller/includes/MysqliDb/MysqliDb.php',    // fallback relative
-];
+// $mysqliCandidates = [
+//     __DIR__ . '/../../Controller/includes/MysqliDb/MysqliDb.php', // from src/Views/bible
+//     ROOT_PATH . '/Controller/includes/MysqliDb/MysqliDb.php',     // absolute path if ROOT_PATH defined
+//     __DIR__ . '/../Controller/includes/MysqliDb/MysqliDb.php',    // fallback relative
+// ];
 foreach ($mysqliCandidates as $mp) {
     if ($mp && file_exists($mp)) {
         include_once $mp;

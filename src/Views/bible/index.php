@@ -1,5 +1,5 @@
 <?php 
-// define ('PATHSPAGE', TRUE);
+define ('PATHSPAGE', TRUE);
 include 'verse.php';
 ?>
 <!doctype html>
