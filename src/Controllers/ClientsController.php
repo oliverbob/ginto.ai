@@ -221,8 +221,9 @@ class ClientsController
             if (strpos($line, ':') !== false) {
                 list($name, $value) = explode(':', $line, 2);
                 $name = trim($name);
-                // Skip headers that shouldn't be forwarded
-                if (!in_array(strtolower($name), ['transfer-encoding', 'connection'], true)) {
+                // Skip headers that shouldn't be forwarded from the container
+                // Also skip Content-Disposition so we can force attachment when desired
+                if (!in_array(strtolower($name), ['transfer-encoding', 'connection', 'content-disposition'], true)) {
                     header("$name: " . trim($value));
                 }
             }
@@ -251,9 +252,34 @@ class ClientsController
             header("Content-Disposition: attachment; filename=\"{$safeFilename}\"", true);
             // Ensure correct Content-Type for the extension (replace existing header)
             header("Content-Type: " . $attachmentMimes[$ext], true);
+            // Ensure correct Content-Length to avoid truncation or browser confusion
+            if (is_string($body)) {
+                header('Content-Length: ' . strlen($body), true);
+            }
             // Helpful cache headers for downloads
             header('Pragma: public', true);
             header('Cache-Control: private, max-age=60', true);
+        }
+
+        // Debug logging for download/preview troubleshooting: record header and body length
+        try {
+            $debugDir = __DIR__ . '/../../storage/logs';
+            if (!is_dir($debugDir)) {
+                @mkdir($debugDir, 0755, true);
+            }
+            $logFile = $debugDir . '/clients_proxy_debug.log';
+            $entry = [
+                'ts' => date('c'),
+                'sandbox_id' => $sandboxId,
+                'requested_path' => $requestedPath,
+                'http_code' => $httpCode,
+                'headers_preview' => substr($headerText, 0, 2000),
+                'body_length' => is_string($body) ? strlen($body) : null,
+                'body_md5' => is_string($body) ? md5($body) : null,
+            ];
+            @file_put_contents($logFile, json_encode($entry) . "\n", FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // don't let logging interfere with proxy response
         }
 
         echo $body;
