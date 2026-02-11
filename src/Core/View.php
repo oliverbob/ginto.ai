@@ -22,10 +22,18 @@ class View
         // Always include BASE_URL helper for all views
         require_once ROOT_PATH . '/src/Core/UrlHelper.php';
         $viewFile = $this->viewsPath . $view . '.php';
-        if (file_exists($viewFile)) {
-            require $viewFile;
-        } else {
-            echo "Error: View file not found: " . htmlspecialchars($view);
+        try {
+            if (file_exists($viewFile)) {
+                require $viewFile;
+            } else {
+                echo "Error: View file not found: " . htmlspecialchars($view);
+            }
+        } catch (\Throwable $e) {
+            $logDir = ROOT_PATH . '/storage/logs';
+            if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
+            $msg = "[" . date('Y-m-d H:i:s') . "] View render error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n" . $e->getTraceAsString() . "\n";
+            @file_put_contents($logDir . '/view-errors.log', $msg, FILE_APPEND);
+            echo "An error occurred while rendering the page.";
         }
         $content = ob_get_clean();
         echo $content;
