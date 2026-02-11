@@ -14,10 +14,10 @@ include 'verse.php';
 <!-- <link rel="shortcut icon" href="favicon.ico?v=2" type="image/x-icon" /> -->
 <link href="apple-touch-icon.png" rel="apple-touch-icon" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" type="text/css" href="_assets/css/css.css" />
-<link rel="stylesheet" type="text/css" href="_assets/css/_darkmode.css" />
-<link rel="stylesheet" type="text/css" href="_assets/css/style.css" />
-<link rel="stylesheet" type="text/css" href="_assets/css/bar-ui.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/css.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/_darkmode.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/style.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/bar-ui.css" />
 
 <style>
     #textBody > 
@@ -289,7 +289,7 @@ if(isset($_GET['passage'])){
 <div class="playerTwo">
 <div>
 
-<button class="btn-toggle btn-toggle_black" title="Dark/Night Mode"><img src="_assets/img/night.gif" class="imageatt" alt="arrowright" /></button>
+<button class="btn-toggle btn-toggle_black" title="Dark/Night Mode"><img src="/assets/bible/img/night.gif" class="imageatt" alt="arrowright" /></button>
 </div>
 </div>
 </div>
@@ -355,8 +355,8 @@ if($ch == $bc){
 <div class="ym-wbox">
 <div class="shareright ym-noprint">
 <!--next chapter start/Top-->
-<a class="ym-button" title="Page TOP" href="#m" target="_top">&nbsp;<img src="_assets/img/arrow_up.png" class="imageatt" alt="arrowup"/>&nbsp;</a>
-<a class="ym-button" title="<?php echo !$chapter ? 'Next chapter' : 'Back to Genesis'?>" href="?passage=<?php echo $next ?>">&nbsp;<img src="_assets/img/arrow_right.png" class="imageatt" alt="arrowright"/>&nbsp;</a></p>
+<a class="ym-button" title="Page TOP" href="#m" target="_top">&nbsp;<img src="/assets/bible/img/arrow_up.png" class="imageatt" alt="arrowup"/>&nbsp;</a>
+<a class="ym-button" title="<?php echo !$chapter ? 'Next chapter' : 'Back to Genesis'?>" href="?passage=<?php echo $next ?>">&nbsp;<img src="/assets/bible/img/arrow_right.png" class="imageatt" alt="arrowright"/>&nbsp;</a></p>
 <!--next chapter end-->
 </div>
 </div>
@@ -368,13 +368,13 @@ if($ch == $bc){
 </div>
 </footer>
 </body>
-<script src="_assets/js/jquery-1.8.0.min.js"></script>
-<script src="_assets/js/soundmanager2.js"></script>
-<script src="_assets/js/script.js"></script>
-<script src="_assets/js/jquery.waypoints.js"></script>
-<script src="_assets/js/sticky.js"></script>
-<script src="_assets/js/bar-ui.js"></script>
-<!-- <script src="_assets/js/script.js"></script> -->
+<script src="/assets/bible/js/jquery-1.8.0.min.js"></script>
+<script src="/assets/bible/js/soundmanager2.js"></script>
+<script src="/assets/bible/js/script.js"></script>
+<script src="/assets/bible/js/jquery.waypoints.js"></script>
+<script src="/assets/bible/js/sticky.js"></script>
+<script src="/assets/bible/js/bar-ui.js"></script>
+<!-- <script src="/assets/bible/js/script.js"></script> -->
 
 
 <script>
@@ -428,12 +428,12 @@ soundManager.setup({
 </script>
 
 
-<script src="_assets/js/jquery.dropotron.min.js"></script>
-<script src="_assets/js/skel.min.js"></script>
-<script src="_assets/js/skel-viewport.min.js"></script>
-<script src="_assets/js/util.js"></script>
-<script src="_assets/js/main.js"></script>
-<script src="_assets/js/_darkmode.js"></script>
+<script src="/assets/bible/js/jquery.dropotron.min.js"></script>
+<script src="/assets/bible/js/skel.min.js"></script>
+<script src="/assets/bible/js/skel-viewport.min.js"></script>
+<script src="/assets/bible/js/util.js"></script>
+<script src="/assets/bible/js/main.js"></script>
+<script src="/assets/bible/js/_darkmode.js"></script>
 
 <script>
 // (function makeDiv(){
