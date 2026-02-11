@@ -40,6 +40,18 @@ $router->req('/transcribe', 'AudioController@transcribe');
 // Home page serves chat directly (messenger works on both / and /chat)
 $router->get('/', 'ChatController@index');
 $router->post('/', 'ChatController@stream');
+
+// Bible static view - serve files from src/Views/bible
+$router->req('/bible', function() use ($db) {
+    try {
+        \Ginto\Core\View::view('bible/index', ['title' => 'Bible']);
+        return;
+    } catch (\Throwable $e) {
+        $viewPath = ROOT_PATH . '/src/Views/bible/index.php';
+        if (file_exists($viewPath)) { include $viewPath; return; }
+        http_response_code(404); echo 'Bible page not found'; return;
+    }
+});
 $router->req('/user/network-tree', 'UserController@networkTree');
 
 // Social page (renders the feed UI)
