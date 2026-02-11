@@ -36,17 +36,23 @@ class BibleController
 
         // Include the data portion of the legacy view to populate $Book
         $bookFile = __DIR__ . '/../Views/bible/verse.php';
-        if (file_exists($bookFile)) {
-            // include in local scope so it defines $Book
-            include $bookFile;
+        try {
+            if (file_exists($bookFile)) {
+                // include in local scope so it defines $Book
+                include $bookFile;
+            }
+
+            // Ensure $Book variable exists
+            $bookData = $Book ?? [];
+            View::view('bible/index', ['title' => 'Bible', 'Book' => $bookData]);
+        } catch (\Throwable $e) {
+            // Log to a dedicated bible error log then rethrow to preserve existing error handling
+            $this->logError('index render failed', $e);
+            throw $e;
+        } finally {
+            // restore GET
+            $_GET = $backupGet;
         }
-
-        // restore GET
-        $_GET = $backupGet;
-
-        // Ensure $Book variable exists
-        $bookData = $Book ?? [];
-        View::view('bible/index', ['title' => 'Bible', 'Book' => $bookData]);
     }
 
     // JSON search endpoint used by AJAX
@@ -82,8 +88,9 @@ class BibleController
                     session_id() ?: '-',
                     $_SESSION['user_id'] ?? ($_SESSION['public_id'] ?? '-')
                 ));
-            } catch (\Throwable $_) {
-                // ignore and return empty
+            } catch (\Throwable $e) {
+                // Log to dedicated bible error log, then return empty results
+                $this->logError('search failed', $e);
                 $results = [];
             }
         }
@@ -104,6 +111,31 @@ class BibleController
             $logFile = $logDir . '/ginto.log';
             $ts = date('Y-m-d H:i:s');
             @file_put_contents($logFile, "[$ts] " . $message . "\n", FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $_) {
+            // best-effort only
+        }
+    }
+
+    /**
+     * Write errors specific to bible features to a separate log file.
+     */
+    protected function logError(string $message, ?\Throwable $e = null): void
+    {
+        try {
+            $logDir = defined('STORAGE_PATH') ? STORAGE_PATH . '/logs' : dirname(__DIR__, 3) . '/storage/logs';
+            if (!is_dir($logDir)) {
+                @mkdir($logDir, 0755, true);
+            }
+            $logFile = $logDir . '/bible.error.log';
+            $ts = date('Y-m-d H:i:s');
+            $entry = "[$ts] " . $message;
+            if ($e) {
+                $entry .= ' | exception: ' . get_class($e) . ' ' . $e->getMessage();
+                $entry .= ' in ' . $e->getFile() . ':' . $e->getLine();
+                $entry .= "\n" . $e->getTraceAsString();
+            }
+            $entry .= "\n";
+            @file_put_contents($logFile, $entry, FILE_APPEND | LOCK_EX);
         } catch (\Throwable $_) {
             // best-effort only
         }
