@@ -45,6 +45,86 @@ $router->post('/', 'ChatController@stream');
 $router->get('/bible', 'BibleController@index');
 $router->get('/bible/search', 'BibleController@search');
 $router->get('/bible/verses', 'BibleController@verses');
+// Grouped legacy bible endpoints under /bible/* for organization
+$router->req('/bible/book', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    $bookFile = defined('ROOT_PATH') ? ROOT_PATH . '/src/Views/bible/book.php' : __DIR__ . '/../Views/bible/book.php';
+    if (file_exists($bookFile)) {
+        try {
+            if (class_exists('\Ginto\\Core\\Database')) {
+                $db = \Ginto\Core\Database::getInstance();
+            }
+        } catch (\Throwable $_) {
+            // ignore
+        }
+        $GLOBALS['db'] = $db ?? null;
+        if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+        require $bookFile;
+        return;
+    }
+    http_response_code(404);
+    echo "Page Not Found: /bible/book not available.";
+});
+
+// Ensure GET requests also match the legacy book endpoint
+$router->get('/bible/book', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    $bookFile = defined('ROOT_PATH') ? ROOT_PATH . '/src/Views/bible/book.php' : __DIR__ . '/../Views/bible/book.php';
+    if (file_exists($bookFile)) {
+        try {
+            if (class_exists('\Ginto\\Core\\Database')) {
+                $db = \Ginto\Core\Database::getInstance();
+            }
+        } catch (\Throwable $_) {
+            // ignore
+        }
+        $GLOBALS['db'] = $db ?? null;
+        if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+        require $bookFile;
+        return;
+    }
+    http_response_code(404);
+    echo "Page Not Found: /bible/book not available.";
+});
+// Legacy bible endpoints (support old flat PHP URLs)
+$router->req('/book.php', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    $bookFile = defined('ROOT_PATH') ? ROOT_PATH . '/src/Views/bible/book.php' : __DIR__ . '/../Views/bible/book.php';
+    if (file_exists($bookFile)) {
+        // make app DB available to legacy view
+        try {
+            if (class_exists('\Ginto\\Core\\Database')) {
+                $db = \Ginto\Core\Database::getInstance();
+            }
+        } catch (\Throwable $_) {
+            // ignore
+        }
+        $GLOBALS['db'] = $db ?? null;
+        if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+        require $bookFile;
+        return;
+    }
+    http_response_code(404);
+    echo "Page Not Found: book.php not available.";
+});
+
+$router->req('/index_en.php', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    $file = defined('ROOT_PATH') ? ROOT_PATH . '/src/Views/bible/index_en.php' : __DIR__ . '/../Views/bible/index_en.php';
+    if (file_exists($file)) {
+        try {
+            if (class_exists('\Ginto\\Core\\Database')) {
+                $db = \Ginto\Core\Database::getInstance();
+            }
+        } catch (\Throwable $_) {}
+        $GLOBALS['db'] = $db ?? null;
+        if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+        require $file;
+        return;
+    }
+    http_response_code(404);
+    echo "Page Not Found: index_en.php not available.";
+});
 $router->req('/user/network-tree', 'UserController@networkTree');
 
 // Social page (renders the feed UI)
