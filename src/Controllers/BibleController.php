@@ -24,6 +24,12 @@ class BibleController
     // Render the Bible index view, providing $Book data to the view
     public function index(): void
     {
+        // Log access to /bible
+        $this->logEvent(sprintf("/bible index accessed by session=%s user_id=%s ip=%s",
+            session_id() ?: '-',
+            $_SESSION['user_id'] ?? ($_SESSION['public_id'] ?? '-'),
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        ));
         // Protect view include from accidentally handling AJAX verse requests
         $backupGet = $_GET;
         unset($_GET['verse'], $_GET['q']);
@@ -48,6 +54,12 @@ class BibleController
     {
         header('Content-Type: application/json; charset=utf-8');
         $q = trim((string)($_GET['q'] ?? $_GET['verse'] ?? ''));
+        $this->logEvent(sprintf("/bible search q=%s session=%s user_id=%s ip=%s",
+            $q === '' ? '<empty>' : str_replace("\n", ' ', substr($q,0,200)),
+            session_id() ?: '-',
+            $_SESSION['user_id'] ?? ($_SESSION['public_id'] ?? '-'),
+            $_SERVER['REMOTE_ADDR'] ?? 'unknown'
+        ));
         if ($q === '') { echo json_encode([]); exit; }
 
         $results = [];
@@ -63,6 +75,13 @@ class BibleController
                         'passage' => $r['CHAPTER'] . ':' . $r['VERSE'] . ']: ' . $r['TEXT']
                     ];
                 }
+                // Log number of matches
+                $this->logEvent(sprintf("/bible search results=%d q=%s session=%s user_id=%s",
+                    count($rows),
+                    str_replace("\n", ' ', substr($q,0,200)),
+                    session_id() ?: '-',
+                    $_SESSION['user_id'] ?? ($_SESSION['public_id'] ?? '-')
+                ));
             } catch (\Throwable $_) {
                 // ignore and return empty
                 $results = [];
@@ -72,21 +91,22 @@ class BibleController
         echo json_encode($results);
         exit;
     }
-
-    // Check presence of legacy `Bible_Kjv` table and return SQL error JSON if missing
-    public function checkTable(): void
+    /**
+     * Append a message to the ginto log file in storage/logs/ginto.log if available.
+     */
+    protected function logEvent(string $message): void
     {
-        header('Content-Type: application/json; charset=utf-8');
         try {
-            if (!$this->db) throw new \Exception('Database connection not available');
-            // Try a simple select to reproduce SQLSTATE table-not-found when absent
-            $this->db->query('SELECT 1 FROM Bible_Kjv LIMIT 1')->fetchAll();
-            echo json_encode(['success' => true, 'message' => 'Table exists']);
-            exit;
-        } catch (\Throwable $e) {
-            http_response_code(500);
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-            exit;
+            $logDir = defined('STORAGE_PATH') ? STORAGE_PATH . '/logs' : dirname(__DIR__, 3) . '/storage/logs';
+            if (!is_dir($logDir)) {
+                @mkdir($logDir, 0755, true);
+            }
+            $logFile = $logDir . '/ginto.log';
+            $ts = date('Y-m-d H:i:s');
+            @file_put_contents($logFile, "[$ts] " . $message . "\n", FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $_) {
+            // best-effort only
         }
     }
+
 }
