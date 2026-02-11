@@ -1,7 +1,7 @@
 ﻿<?php 
 define ('PATHSPAGE', TRUE);
 include 'verse.php';
-include '../root_path.php';
+// include '../root_path.php';
 ?>
 <!doctype html>
 <html lang="en">
