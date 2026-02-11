@@ -99,12 +99,15 @@ class MigrationController
                 'pending' => $result['pending'],
                 'already_executed' => $result['already_executed']
             ]);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
             http_response_code(500);
+            // Ensure we return a clean JSON error body and terminate immediately.
+            $msg = $e->getMessage();
             echo json_encode([
                 'success' => false,
-                'message' => $e->getMessage()
+                'message' => $msg
             ]);
+            exit;
         }
     }
 
