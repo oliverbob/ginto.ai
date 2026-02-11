@@ -407,6 +407,69 @@ class ChatStreamHandler
     }
 
     /**
+     * Log outgoing payloads to storage/logs for debugging oversized requests.
+     * Masks common secret-looking keys and writes a timestamped full payload file
+     * plus a short summary to the main log.
+     */
+    private function logOutgoingPayload(array $payload, string $providerName): void
+    {
+        try {
+            $logsDir = dirname(__DIR__, 2) . '/../storage/logs';
+            if (!is_dir($logsDir)) @mkdir($logsDir, 0755, true);
+
+            // Mask sensitive-looking keys in a copy for the summary
+            $masked = $this->maskSensitiveData($payload);
+
+            $jsonFull = @json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $jsonMasked = @json_encode($masked, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+            $ts = date('Ymd_His') . '_' . str_pad((string)round(microtime(true) * 1000) % 1000, 3, '0', STR_PAD_LEFT);
+            $shortPath = $logsDir . "/groq_payload_summary.log";
+            $fullPath = $logsDir . "/groq_payload_full_{$ts}.json";
+
+            // Write full payload to its own file (may be large)
+            if ($jsonFull !== false) {
+                // Limit the maximum size to avoid filling disk accidentally (500KB)
+                if (strlen($jsonFull) > 512000) {
+                    // Truncate but still save a useful portion
+                    $trunc = substr($jsonFull, 0, 512000) . "\n...[TRUNCATED - payload too large]";
+                    @file_put_contents($fullPath, $trunc, LOCK_EX);
+                } else {
+                    @file_put_contents($fullPath, $jsonFull, LOCK_EX);
+                }
+            }
+
+            $summaryEntry = date('c') . " provider={$providerName} size=" . (is_string($jsonFull) ? strlen($jsonFull) : 0) . " bytes file=" . basename($fullPath) . " payload_preview=" . substr($jsonMasked, 0, 2000) . "\n";
+            @file_put_contents($shortPath, $summaryEntry, FILE_APPEND | LOCK_EX);
+            error_log('[ChatStream] Outgoing payload logged to ' . $fullPath . ' (summary appended)');
+        } catch (\Throwable $_) {
+            // Never let logging failures interrupt chat flow
+            error_log('[ChatStream] Failed to write outgoing payload log: ' . $_->getMessage());
+        }
+    }
+
+    private function maskSensitiveData($data)
+    {
+        if (is_array($data)) {
+            $out = [];
+            foreach ($data as $k => $v) {
+                $lower = strtolower((string)$k);
+                if (strpos($lower, 'key') !== false || strpos($lower, 'token') !== false || strpos($lower, 'secret') !== false || strpos($lower, 'authorization') !== false || strpos($lower, 'api') !== false) {
+                    $out[$k] = '[MASKED]';
+                    continue;
+                }
+                $out[$k] = $this->maskSensitiveData($v);
+            }
+            return $out;
+        }
+        // For strings, truncate very long values for the summary
+        if (is_string($data) && strlen($data) > 2000) {
+            return substr($data, 0, 2000) . '...[TRUNC]';
+        }
+        return $data;
+    }
+
+    /**
      * Handle Ollama provider requests
      */
     private function handleOllamaRequest(string $prompt, string $model, bool $isAdminUser): bool
@@ -1129,6 +1192,15 @@ class ChatStreamHandler
                 $previewJson = @json_encode($previewPayload) ?: '';
                 $previewSize = strlen($previewJson);
                 error_log("[ChatStream] Prepared payload size for {$providerNameForLimit}: {$previewSize} bytes");
+
+                // Log the actual outgoing payload to storage/logs for post-mortem
+                try {
+                    if (strtolower($providerNameForLimit) === 'groq') {
+                        $this->logOutgoingPayload($previewPayload, 'groq');
+                    }
+                } catch (\Throwable $_) {
+                    error_log('[ChatStream] Failed to log outgoing payload: ' . $_->getMessage());
+                }
 
                 // If Groq and payload is large, truncate messages conservatively
                 if (strtolower($providerNameForLimit) === 'groq' && $previewSize > 200000) {
