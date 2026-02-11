@@ -12,18 +12,8 @@ if (!defined('PATHSPAGE')) {
     if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
 }
 
-// Attempt to include MysqliDb from a few likely locations (silently ignore if missing)
-// $mysqliCandidates = [
-//     __DIR__ . '/../../Controller/includes/MysqliDb/MysqliDb.php', // from src/Views/bible
-//     ROOT_PATH . '/Controller/includes/MysqliDb/MysqliDb.php',     // absolute path if ROOT_PATH defined
-//     __DIR__ . '/../Controller/includes/MysqliDb/MysqliDb.php',    // fallback relative
-// ];
-foreach ($mysqliCandidates as $mp) {
-    if ($mp && file_exists($mp)) {
-        include_once $mp;
-        break;
-    }
-}
+// No direct DB includes here; the controller provides the application's DB
+// instance (via `$db`) and views must not attempt to include DB libraries.
 
 ini_set('display_errors', 1);
 // Avoid using deprecated E_STRICT constant; use E_ALL instead
