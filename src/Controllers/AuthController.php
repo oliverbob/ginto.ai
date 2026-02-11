@@ -67,12 +67,19 @@ class AuthController
         // Delete session cookie
         if (ini_get('session.use_cookies')) {
             $params = session_get_cookie_params();
-            setcookie(session_name(), '', time() - 42000,
-                $params['path'] ?? '/',
-                $params['domain'] ?? '',
-                $params['secure'] ?? false,
-                $params['httponly'] ?? true
-            );
+            if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+                setcookie(session_name(), '', [
+                    'expires' => time() - 42000,
+                    'path' => $params['path'] ?? '/',
+                    'domain' => $params['domain'] ?? '',
+                    'secure' => $params['secure'] ?? false,
+                    'httponly' => $params['httponly'] ?? true,
+                    'samesite' => 'Lax'
+                ]);
+            } else {
+                $cookieHeader = session_name() . '=; Path=' . ($params['path'] ?? '/') . '; Expires=' . gmdate('D, d-M-Y H:i:s T', time() - 42000) . (($params['secure'] ?? false) ? '; Secure' : '') . '; HttpOnly; SameSite=Lax';
+                header('Set-Cookie: ' . $cookieHeader, false);
+            }
         }
         
         // Destroy the session

@@ -1142,8 +1142,38 @@ class ApiController extends Controller
         // Also persist selection to a cookie so it remains available across requests
         // even if PHP session isn't being preserved by the client for any reason.
         if (!headers_sent()) {
-            if ($provider) setcookie('current_provider', $provider, 0, '/');
-            if ($model) setcookie('current_model', $model, 0, '/');
+            $cookieSecureFlag = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'));
+            if ($provider) {
+                if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+                    setcookie('current_provider', $provider, [
+                        'expires' => 0,
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => $cookieSecureFlag,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]);
+                } else {
+                    // Fallback for older PHP versions: emit Set-Cookie header with SameSite
+                    $cookieStr = 'current_provider=' . rawurlencode((string)$provider) . '; Path=/; HttpOnly; SameSite=Lax' . ($cookieSecureFlag ? '; Secure' : '');
+                    header('Set-Cookie: ' . $cookieStr, false);
+                }
+            }
+            if ($model) {
+                if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+                    setcookie('current_model', $model, [
+                        'expires' => 0,
+                        'path' => '/',
+                        'domain' => '',
+                        'secure' => $cookieSecureFlag,
+                        'httponly' => true,
+                        'samesite' => 'Lax'
+                    ]);
+                } else {
+                    $cookieStr = 'current_model=' . rawurlencode((string)$model) . '; Path=/; HttpOnly; SameSite=Lax' . ($cookieSecureFlag ? '; Secure' : '');
+                    header('Set-Cookie: ' . $cookieStr, false);
+                }
+            }
         }
 
         // If caller is an admin, persist the selection globally in settings

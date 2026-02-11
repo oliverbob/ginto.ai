@@ -152,7 +152,20 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 if (session_status() === PHP_SESSION_ACTIVE) {
-    setcookie(session_name(), session_id(), time() + $longLifetime, '/', '', $cookieSecure, true);
+    if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+        setcookie(session_name(), session_id(), [
+            'expires' => time() + $longLifetime,
+            'path' => '/',
+            'domain' => '',
+            'secure' => $cookieSecure,
+            'httponly' => true,
+            'samesite' => 'Lax'
+        ]);
+    } else {
+        // Older PHP: send explicit header with SameSite and HttpOnly
+        $cookieHeader = session_name() . '=' . rawurlencode(session_id()) . '; Path=/; Expires=' . gmdate('D, d-M-Y H:i:s T', time() + $longLifetime) . ($cookieSecure ? '; Secure' : '') . '; HttpOnly; SameSite=Lax';
+        header('Set-Cookie: ' . $cookieHeader, false);
+    }
     // Generate a public_id for visitors (used for sandbox mapping)
     if (empty($_SESSION['public_id']) && empty($_SESSION['user_id'])) {
         $_SESSION['public_id'] = bin2hex(random_bytes(16));
