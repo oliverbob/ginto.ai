@@ -1,6 +1,6 @@
 <?php 
-define ('PATHSPAGE', TRUE);
-include 'verse.php';
+if (!defined('PATHSPAGE')) define('PATHSPAGE', TRUE);
+include_once 'verse.php';
 ?>
 <!doctype html>
 <html lang="en">
