@@ -72,4 +72,21 @@ class BibleController
         echo json_encode($results);
         exit;
     }
+
+    // Check presence of legacy `Bible_Kjv` table and return SQL error JSON if missing
+    public function checkTable(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        try {
+            if (!$this->db) throw new \Exception('Database connection not available');
+            // Try a simple select to reproduce SQLSTATE table-not-found when absent
+            $this->db->query('SELECT 1 FROM Bible_Kjv LIMIT 1')->fetchAll();
+            echo json_encode(['success' => true, 'message' => 'Table exists']);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            exit;
+        }
+    }
 }

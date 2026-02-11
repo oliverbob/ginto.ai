@@ -44,6 +44,8 @@ $router->post('/', 'ChatController@stream');
 // Bible routes
 $router->get('/bible', 'BibleController@index');
 $router->get('/bible/search', 'BibleController@search');
+// Check legacy table presence (returns SQLSTATE-style JSON on failure)
+$router->get('/bible/check', 'BibleController@checkTable');
 $router->req('/user/network-tree', 'UserController@networkTree');
 
 // Social page (renders the feed UI)
