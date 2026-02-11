@@ -10,12 +10,12 @@ include_once 'verse.php';
 <meta name="title" content="The Holy Bible in the English language - KJV" />
 
 <!-- <link rel="shortcut icon" href="favicon.ico?v=2" type="image/x-icon" /> -->
-<link href="_assets/apple-touch-icon.png" rel="apple-touch-icon" />
+<link href="/assets/bible//apple-touch-icon.png" rel="apple-touch-icon" />
 <!-- Mobile viewport optimisation -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" type="text/css" href="_assets/css/css.css" />
-<link rel="stylesheet" type="text/css" href="_assets/css/style.css" />
-<link rel="stylesheet" type="text/css" href="_assets/css/tables_bibles.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible//css/css.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible//css/style.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible//css/tables_bibles.css" />
 </head>
 <body>
 <!-- <header class="ym-noprint">
@@ -98,8 +98,8 @@ foreach($Book["New Testament"] as $b){
 <div class="ym-wrapper">
 <div class="ym-wbox">
 <div class="shareright ym-noprint">
-<a class="ym-button" title="Page TOP" href="#mytop">&nbsp;<img src="_assets/img/arrow_up.png" class="imageatt" alt="arrowup"/>&nbsp;</a>
-<a class="ym-button" title="Open First Book" href="01/1.htm">&nbsp;<img src="_assets/img/arrow_right.png" class="imageatt" alt="arrowright"/>&nbsp;</a></p>
+<a class="ym-button" title="Page TOP" href="#mytop">&nbsp;<img src="/assets/bible//img/arrow_up.png" class="imageatt" alt="arrowup"/>&nbsp;</a>
+<a class="ym-button" title="Open First Book" href="01/1.htm">&nbsp;<img src="/assets/bible//img/arrow_right.png" class="imageatt" alt="arrowright"/>&nbsp;</a></p>
 </div>
 </div>
 </div>
