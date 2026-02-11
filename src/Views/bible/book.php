@@ -46,7 +46,7 @@ include 'verse.php';
 <div class="ym-wrapper">
 <div class="ym-hlist">
 <ul>
-<li><a title="Other languages" href="<?php echo PATH ?>" target="_self">FaceGod</a></li>
+<li><a title="Other languages" href="/" target="_self">FaceGod</a></li>
 <li><a title="Other languages" href="https://www.wordproject.org/bibles/index.htm" target="_self">More Bibles</a></li>
 <li><a title="Audio Bibles in different languages" href="https://www.wordproject.org/bibles/audio/index.htm" target="_top">Audio Bibles</a></li>
 <!--li><a title="Search this Bible" href="search.html" target="_top">Search</a></li-->
