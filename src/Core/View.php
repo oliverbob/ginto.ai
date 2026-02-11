@@ -33,11 +33,7 @@ class View
             if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
             $msg = "[" . date('Y-m-d H:i:s') . "] View render error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n" . $e->getTraceAsString() . "\n";
             @file_put_contents($logDir . '/view-errors.log', $msg, FILE_APPEND);
-            // Temporary: display the exception message inline to aid debugging.
-            // Remove this before deploying to production.
-            echo "An error occurred while rendering the page: ";
-            echo htmlspecialchars($e->getMessage()) . " in " . htmlspecialchars($e->getFile()) . ":" . $e->getLine();
-            echo "\n<pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
+                echo "An error occurred while rendering the page.";
         }
         $content = ob_get_clean();
         echo $content;
