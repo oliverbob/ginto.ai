@@ -1,7 +1,18 @@
 <?php
 defined('PATHSPAGE') ? : die('Direct access not permitted');
 
-include '../controller/includes/MysqliDb/MysqliDb.php';
+// Attempt to include MysqliDb from a few likely locations (silently ignore if missing)
+$mysqliCandidates = [
+    __DIR__ . '/../../controller/includes/MysqliDb/MysqliDb.php', // from src/Views/bible
+    ROOT_PATH . '/controller/includes/MysqliDb/MysqliDb.php',     // absolute path if ROOT_PATH defined
+    __DIR__ . '/../controller/includes/MysqliDb/MysqliDb.php',    // fallback relative
+];
+foreach ($mysqliCandidates as $mp) {
+    if ($mp && file_exists($mp)) {
+        include_once $mp;
+        break;
+    }
+}
 
 ini_set('display_errors', 1);
 // Avoid using deprecated E_STRICT constant; use E_ALL instead
