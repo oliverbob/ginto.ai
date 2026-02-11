@@ -430,13 +430,32 @@ class ClientsController
             if (strpos($line, ':') !== false) {
                 list($name, $value) = explode(':', $line, 2);
                 $name = trim($name);
-                // Skip headers that shouldn't be forwarded
-                if (!in_array(strtolower($name), ['transfer-encoding', 'connection'], true)) {
+                // Skip headers that shouldn't be forwarded from the container
+                // Also skip Content-Disposition so we can control inline vs attachment for previews
+                if (!in_array(strtolower($name), ['transfer-encoding', 'connection', 'content-disposition'], true)) {
                     header("$name: " . trim($value));
                 }
             }
         }
-        
+
+        // For sandbox preview we prefer inline display for common previewable types
+        $previewInlineMimes = [
+            'pdf' => 'application/pdf',
+            'png' => 'image/png',
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml'
+        ];
+
+        $requestedExt = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        if ($requestedExt && array_key_exists($requestedExt, $previewInlineMimes)) {
+            // Force inline Content-Disposition so browsers will render in iframe
+            header('Content-Disposition: inline; filename="' . basename($path) . '"', true);
+            header('Content-Type: ' . $previewInlineMimes[$requestedExt], true);
+        }
+
         echo $body;
         exit;
     }
