@@ -63,15 +63,20 @@ class LegacyDbAdapter {
         return false;
     }
 
-    public function rawQuery($sql) {
-        return $this->query($sql);
+    public function rawQuery($sql, $params = null) {
+        return $this->query($sql, $params);
     }
 
-    public function rawQueryOne($sql) {
-        $stmt = $this->query($sql);
+    public function rawQueryOne($sql, $params = null) {
+        $stmt = $this->query($sql, $params);
         if ($stmt) {
-            $row = $stmt->fetch(PDO::FETCH_ASSOC);
-            return $row ?: null;
+            try {
+                $row = $stmt->fetch(PDO::FETCH_ASSOC);
+                $this->lastCount = $row ? 1 : 0;
+                return $row ?: null;
+            } catch (\Throwable $_) {
+                return null;
+            }
         }
         return null;
     }
