@@ -37,18 +37,9 @@ $whitelist = array(
     '192.168.43.1',
     '192.168.43.84'
 );
-
-if(!in_array($_SERVER['REMOTE_ADDR'], $whitelist)){
-	define("DB_HOST", "localhost");
-	define("DB_NAME", "ugnayan_fgc");
-	define("DB_USER", "ugnayan_fgc");
-	define("DB_PASS", "m4U.Net.@64!");
-} else {
-	define("DB_HOST", "localhost");
-	define("DB_NAME", "ugnayan_fgc");
-	define("DB_USER", "root");
-	define("DB_PASS", "@mysq|inx!2021_A");
-}
+// Database credentials should come from the application's configuration (.env)
+// or be provided by the controller. This view must not define DB constants
+// or contain environment-specific credentials.
 
 /* 
     FGBible Alorithm version 1
