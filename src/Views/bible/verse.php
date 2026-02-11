@@ -15,6 +15,121 @@ if (!defined('PATHSPAGE')) {
 // No direct DB includes here; the controller provides the application's DB
 // instance (via `$db`) and views must not attempt to include DB libraries.
 
+// Backwards-compatibility adapter: legacy views expect a MysqliDb-like
+// API (`rawQueryOne`, `rawQuery`, `count`, `quote`, etc.). Wrap the
+// application's DB instance when it doesn't already provide those.
+class LegacyDbAdapter {
+    private $inner;
+    private $lastCount = 0;
+
+    public function __construct($inner = null) {
+        $this->inner = $inner;
+    }
+
+    public function query($sql, $params = null) {
+        try {
+            if ($this->inner) {
+                // If inner exposes prepare, use it for parameterized queries
+                if (!is_null($params) && method_exists($this->inner, 'prepare')) {
+                    $stmt = $this->inner->prepare($sql);
+                    $stmt->execute($params);
+                    $this->lastCount = $stmt->rowCount();
+                    return $stmt;
+                }
+
+                // If inner is a PDO or exposes query(), delegate
+                if (method_exists($this->inner, 'query')) {
+                    $stmt = $this->inner->query($sql);
+                    $this->lastCount = $stmt ? $stmt->rowCount() : 0;
+                    return $stmt;
+                }
+            }
+
+            // Fallback: if inner is a PDO instance
+            if ($this->inner instanceof PDO) {
+                if (is_null($params)) {
+                    $stmt = $this->inner->query($sql);
+                    $this->lastCount = $stmt ? $stmt->rowCount() : 0;
+                    return $stmt;
+                }
+                $stmt = $this->inner->prepare($sql);
+                $stmt->execute($params);
+                $this->lastCount = $stmt->rowCount();
+                return $stmt;
+            }
+        } catch (\Throwable $_) {
+            // don't break legacy views on adapter errors
+        }
+        return false;
+    }
+
+    public function rawQuery($sql) {
+        return $this->query($sql);
+    }
+
+    public function rawQueryOne($sql) {
+        $stmt = $this->query($sql);
+        if ($stmt) {
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        }
+        return null;
+    }
+
+    public function prepare($sql) {
+        if ($this->inner && method_exists($this->inner, 'prepare')) {
+            return $this->inner->prepare($sql);
+        }
+        if ($this->inner instanceof PDO) {
+            return $this->inner->prepare($sql);
+        }
+        throw new \RuntimeException('No underlying DB available for prepare()');
+    }
+
+    public function get($table, $cols = '*', $where = null) {
+        $colsStr = is_array($cols) ? implode(',', $cols) : $cols;
+        $sql = "SELECT $colsStr FROM $table";
+        $params = null;
+        if ($where) {
+            if (is_array($where)) {
+                $parts = [];
+                $params = [];
+                foreach ($where as $k => $v) {
+                    $parts[] = "$k = :$k";
+                    $params[":$k"] = $v;
+                }
+                $sql .= ' WHERE ' . implode(' AND ', $parts);
+            } else {
+                $sql .= ' WHERE ' . $where;
+            }
+        }
+        $stmt = $this->query($sql, $params);
+        if ($stmt) return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return [];
+    }
+
+    public function quote($value) {
+        if ($this->inner && method_exists($this->inner, 'quote')) {
+            return $this->inner->quote($value);
+        }
+        if ($this->inner instanceof PDO) {
+            return $this->inner->quote($value);
+        }
+        return "'" . addslashes($value) . "'";
+    }
+
+    public function __get($name) {
+        if ($name === 'count') return $this->lastCount;
+        return null;
+    }
+}
+
+// If a controller provided `$db` but it lacks legacy methods, wrap it.
+if (isset($db) && !method_exists($db, 'rawQueryOne')) {
+    $db = new LegacyDbAdapter($db);
+    $GLOBALS['db'] = $db;
+}
+
 ini_set('display_errors', 1);
 // Avoid using deprecated E_STRICT constant; use E_ALL instead
 error_reporting(E_ALL);
