@@ -37,6 +37,10 @@ class BibleController
         // Include the data portion of the legacy view to populate $Book
         $bookFile = __DIR__ . '/../Views/bible/verse.php';
         try {
+            // Ensure the legacy view knows it's being included from the app
+            if (!defined('PATHSPAGE')) {
+                define('PATHSPAGE', true);
+            }
             if (file_exists($bookFile)) {
                 // include in local scope so it defines $Book
                 include $bookFile;
