@@ -42,13 +42,18 @@ class BibleController
                 define('PATHSPAGE', true);
             }
             if (file_exists($bookFile)) {
+                // Make the controller's DB available to the included legacy view
+                $db = $this->db;
+                $GLOBALS['db'] = $this->db;
                 // include in local scope so it defines $Book
                 include $bookFile;
             }
 
             // Ensure $Book variable exists
             $bookData = $Book ?? [];
-            View::view('bible/index', ['title' => 'Bible', 'Book' => $bookData]);
+            $this->logEvent('/bible about to render view');
+            View::view('bible/index', ['title' => 'Bible', 'Book' => $bookData, 'db' => $this->db]);
+            $this->logEvent('/bible render completed');
         } catch (\Throwable $e) {
             // Log to a dedicated bible error log then rethrow to preserve existing error handling
             $this->logError('index render failed', $e);
