@@ -29,3 +29,9 @@ if ($isLocal && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
 } else {
     define('BASE_URL', $scheme . '://' . $host);
 }
+
+// Backwards compatibility: some legacy views expect a `PATH` constant.
+// Define `PATH` as the application's base URL if not already defined.
+if (!defined('PATH')) {
+    define('PATH', BASE_URL);
+}
