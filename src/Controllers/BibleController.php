@@ -78,6 +78,17 @@ class BibleController
         if ($q === '') { echo json_encode([]); exit; }
 
         $results = [];
+        // Ensure Book mapping is available for friendly book names
+        if (empty($GLOBALS['Book'])) {
+            $bookFile = __DIR__ . '/../Views/bible/verse.php';
+            if (file_exists($bookFile)) {
+                if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+                $db = $this->db;
+                $GLOBALS['db'] = $this->db;
+                include_once $bookFile;
+            }
+        }
+
         if ($this->db) {
             try {
                 // Use Medoo-style select with LIKE operator to follow app DB conventions
