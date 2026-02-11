@@ -5280,7 +5280,17 @@
           
           window.currentFile = data.path;
           window.currentEncoded = data.encoded;
-
+          // If switching from a previous binary preview to a text file, revoke any blob URL left behind
+          if (!data.is_binary) {
+            try {
+              var ws = document.querySelector('.editor-workspace') || document.body;
+              var prev = ws.querySelector('.repo-preview');
+              if (prev && prev.dataset && prev.dataset.blobUrl) {
+                try { URL.revokeObjectURL(prev.dataset.blobUrl); } catch(e) {}
+                prev.dataset.blobUrl = '';
+              }
+            } catch(e) {}
+          }
           // If server marked this as binary, render a preview instead of loading into code editor
           if (data.is_binary) {
             try {
@@ -5292,6 +5302,13 @@
                 // Insert at top so it doesn't get hidden behind editor
                 workspace.insertBefore(preview, workspace.firstElementChild || null);
               }
+              // clean previous preview and revoke any previous blob URL
+              try {
+                if (preview.dataset && preview.dataset.blobUrl) {
+                  try { URL.revokeObjectURL(preview.dataset.blobUrl); } catch(e) {}
+                  preview.dataset.blobUrl = '';
+                }
+              } catch(e) {}
               preview.innerHTML = '';
               preview.style.display = '';
 
@@ -5326,6 +5343,9 @@
                   var blob = new Blob([u8], { type: 'application/pdf' });
                   var url = URL.createObjectURL(blob);
                   iframe.src = url;
+                  // remember and revoke previous blob URL if any
+                  try { if (preview.dataset && preview.dataset.blobUrl) { try { URL.revokeObjectURL(preview.dataset.blobUrl); } catch(e) {} } } catch(e) {}
+                  preview.dataset.blobUrl = url;
                 } catch(e) {
                   iframe.src = 'data:application/pdf;base64,' + (data.b64 || '');
                 }
