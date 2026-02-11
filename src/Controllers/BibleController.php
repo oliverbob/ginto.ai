@@ -71,9 +71,12 @@ class BibleController
         $results = [];
         if ($this->db) {
             try {
-                $sql = "SELECT BOOK, CHAPTER, VERSE, TEXT FROM fgbibledb_kjv WHERE TEXT LIKE :t LIMIT 100";
-                $stmt = $this->db->query($sql, [':t' => '%' . $q . '%']);
-                $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+                // Use Medoo-style select with LIKE operator to follow app DB conventions
+                $rows = $this->db->select('fgbibledb_kjv', ['BOOK', 'CHAPTER', 'VERSE', 'TEXT'], [
+                    'TEXT[~]' => $q,
+                    'LIMIT' => 100
+                ]);
+
                 foreach ($rows as $r) {
                     $bookName = ($GLOBALS['Book']['All'][$r['BOOK']] ?? $r['BOOK']);
                     $results[] = [
