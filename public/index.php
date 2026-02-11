@@ -5,6 +5,13 @@
  */
 
 define('ROOT_PATH', dirname(__DIR__));
+// Define STORAGE_PATH for use across the app. Defaults to the parent directory's
+// storage folder (e.g. ~/ginto.ai/../storage) which matches how some services
+// place persistent data outside the repository. Can be overridden in a server
+// bootstrap before including `public/index.php`.
+if (!defined('STORAGE_PATH')) {
+    define('STORAGE_PATH', dirname(ROOT_PATH) . '/storage');
+}
 define('STORAGE_PATH', dirname(__DIR__, 2) . '/storage');
 
 // Ensure storage directories exist with proper structure

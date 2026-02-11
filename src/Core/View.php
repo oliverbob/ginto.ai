@@ -29,11 +29,15 @@ class View
                 echo "Error: View file not found: " . htmlspecialchars($view);
             }
         } catch (\Throwable $e) {
-            $logDir = ROOT_PATH . '/storage/logs';
+            $logDir = defined('STORAGE_PATH') ? STORAGE_PATH . '/logs' : dirname(__DIR__, 3) . '/storage/logs';
             if (!is_dir($logDir)) @mkdir($logDir, 0777, true);
             $msg = "[" . date('Y-m-d H:i:s') . "] View render error: " . $e->getMessage() . " in " . $e->getFile() . " on line " . $e->getLine() . "\n" . $e->getTraceAsString() . "\n";
             @file_put_contents($logDir . '/view-errors.log', $msg, FILE_APPEND);
-            echo "An error occurred while rendering the page.";
+            // Temporary: display the exception message inline to aid debugging.
+            // Remove this before deploying to production.
+            echo "An error occurred while rendering the page: ";
+            echo htmlspecialchars($e->getMessage()) . " in " . htmlspecialchars($e->getFile()) . ":" . $e->getLine();
+            echo "\n<pre>" . htmlspecialchars($e->getTraceAsString()) . "</pre>";
         }
         $content = ob_get_clean();
         echo $content;
