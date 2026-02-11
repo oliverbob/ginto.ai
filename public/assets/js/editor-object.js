@@ -2613,13 +2613,64 @@
       return html;
     }
     
-    // sandbox_read_file - show file content
+    // sandbox_read_file - show file content (support text, images, PDF, and binary previews)
     if (toolName === 'sandbox_read_file' && data?.content !== undefined) {
       var path = data.path || 'file';
       var content = data.content || '';
+      var encoding = data.encoding || '';
+      var isBinary = data.is_binary || (encoding === 'base64');
+      var ext = (path.split('.').pop() || '').toLowerCase();
+
+      // Helper to map extension -> mime
+      function extToMime(e) {
+        var m = {
+          'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml',
+          'pdf': 'application/pdf', 'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'doc': 'application/msword', 'odt': 'application/vnd.oasis.opendocument.text'
+        };
+        return m[e] || 'application/octet-stream';
+      }
+
+      // If binary/base64 and image/pdf
+      if (isBinary && ['png','jpg','jpeg','gif','webp','svg','pdf'].includes(ext)) {
+        var mime = extToMime(ext);
+        var dataUrl = 'data:' + mime + ';base64,' + content;
+        if (ext === 'pdf') {
+          return '<div class="tool-result" style="margin:8px 0;">' +
+            '<p style="color:#d1d5db;margin-bottom:8px;">Preview of <code style="background:#374151;padding:2px 6px;border-radius:4px;">' + escapeHtml(path) + '</code>:</p>' +
+            '<div style="border-radius:8px;overflow:hidden;border:1px solid rgba(148,163,184,0.12)">' +
+              '<iframe src="' + dataUrl + '" style="width:100%;height:500px;border:0;" title="PDF preview"></iframe>' +
+            '</div>' +
+            '</div>';
+        }
+
+        // image
+        return '<div class="tool-result" style="margin:8px 0;">' +
+          '<p style="color:#d1d5db;margin-bottom:8px;">Preview of <code style="background:#374151;padding:2px 6px;border-radius:4px;">' + escapeHtml(path) + '</code>:</p>' +
+          '<div style="border:1px solid rgba(148,163,184,0.08);padding:8px;border-radius:8px;text-align:center;">' +
+            '<img src="' + dataUrl + '" alt="' + escapeHtml(path) + '" style="max-width:100%;max-height:480px;border-radius:6px;" />' +
+          '</div>' +
+        '</div>';
+      }
+
+      // For other binary container types (docx/doc/odt) show a download and Office viewer link
+      if (isBinary && ['docx','doc','odt','rtf'].includes(ext)) {
+        var sandboxId = window.editorConfig && window.editorConfig.sandboxId ? window.editorConfig.sandboxId : '';
+        var clientUrl = sandboxId ? ('/clients/' + sandboxId + '/' + path.replace(/^\//, '')) : ('/clients/' + path.replace(/^\//, ''));
+        var officeViewer = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(window.location.origin + clientUrl);
+        return '<div class="tool-result" style="margin:8px 0;">' +
+          '<p style="color:#d1d5db;margin-bottom:8px;">File: <code style="background:#374151;padding:2px 6px;border-radius:4px;">' + escapeHtml(path) + '</code></p>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+            '<a href="' + clientUrl + '" target="_blank" rel="noopener" style="padding:8px 12px;background:#1f2937;color:#fff;border-radius:6px;text-decoration:none;">Open / Download</a>' +
+            '<a href="' + officeViewer + '" target="_blank" rel="noopener" style="padding:8px 12px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;">View in Office Online</a>' +
+          '</div>' +
+        '</div>';
+      }
+
+      // Fallback: show as text (assume utf-8)
+      var safeContent = encoding === 'base64' ? '(binary file - use Open/Download button)' : content;
       return '<div class="tool-result" style="margin:8px 0;">' +
         '<p style="color:#d1d5db;margin-bottom:8px;">Contents of <code style="background:#374151;padding:2px 6px;border-radius:4px;">' + escapeHtml(path) + '</code>:</p>' +
-        '<pre style="background:rgba(31,41,55,0.5);border-radius:8px;padding:12px;font-size:13px;overflow-x:auto;max-height:300px;margin:0;"><code>' + escapeHtml(content) + '</code></pre>' +
+        '<pre style="background:rgba(31,41,55,0.5);border-radius:8px;padding:12px;font-size:13px;overflow-x:auto;max-height:300px;margin:0;"><code>' + escapeHtml(safeContent) + '</code></pre>' +
         '</div>';
     }
     

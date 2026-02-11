@@ -820,11 +820,14 @@ class EditorController
         if ($sandboxId) {
             $readResult = \Ginto\Helpers\UnifiedSandbox::readFile($sandboxId, $path);
             if ($readResult['success']) {
+                $isBinary = $readResult['is_binary'] ?? false;
                 echo json_encode([
                     'success' => true,
                     'content' => $readResult['content'],
                     'path' => $path,
-                    'encoded' => $encoded
+                    'encoded' => $encoded,
+                    'encoding' => $isBinary ? 'base64' : 'utf-8',
+                    'is_binary' => $isBinary
                 ]);
             } else {
                 echo json_encode(['success' => false, 'error' => $readResult['error'] ?? 'Failed to read file']);
@@ -841,12 +844,23 @@ class EditorController
         }
         
         $content = file_get_contents($fullPath);
-        
+        // detect binary for local files too
+        $isBinary = (strpos($content, "\0") !== false) || (function_exists('mb_check_encoding') && !mb_check_encoding($content, 'UTF-8'));
+        if ($isBinary) {
+            $outContent = base64_encode($content);
+            $encoding = 'base64';
+        } else {
+            $outContent = $content;
+            $encoding = 'utf-8';
+        }
+
         echo json_encode([
             'success' => true,
-            'content' => $content,
+            'content' => $outContent,
             'path' => $path,
-            'encoded' => $encoded
+            'encoded' => $encoded,
+            'encoding' => $encoding,
+            'is_binary' => $isBinary
         ]);
         exit;
     }

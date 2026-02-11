@@ -349,17 +349,39 @@ class UnifiedSandbox
         
         // LXD read file
         [$code, $stdout, $stderr] = LxdSandboxManager::execInSandbox($sandboxId, 'cat ' . escapeshellarg($filePath));
-        
+
         if ($code !== 0) {
             return [
                 'success' => false,
                 'error' => $stderr ?: 'Failed to read file'
             ];
         }
-        
+
+        // Detect binary data (NUL byte or non-UTF8) and return base64 when binary
+        $isBinary = false;
+        if (strpos($stdout, "\0") !== false) {
+            $isBinary = true;
+        } else {
+            // Use mb_check_encoding if available to determine UTF-8 validity
+            if (function_exists('mb_check_encoding')) {
+                if (!mb_check_encoding($stdout, 'UTF-8')) {
+                    $isBinary = true;
+                }
+            }
+        }
+
+        if ($isBinary) {
+            return [
+                'success' => true,
+                'content' => base64_encode($stdout),
+                'is_binary' => true
+            ];
+        }
+
         return [
             'success' => true,
-            'content' => $stdout
+            'content' => $stdout,
+            'is_binary' => false
         ];
     }
     

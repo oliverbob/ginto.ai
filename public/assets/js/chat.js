@@ -5376,15 +5376,52 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       return html;
     }
     
-    // sandbox_read_file - show file content
+    // sandbox_read_file - show file content (support images, PDFs, and binary previews)
     if (toolName === 'sandbox_read_file' && data?.content !== undefined) {
       const path = data.path || 'file';
       const content = data.content || '';
+      const encoding = data.encoding || '';
+      const isBinary = data.is_binary || encoding === 'base64';
       const ext = path.split('.').pop()?.toLowerCase() || '';
-      
+
+      const extToMime = (e) => ({
+        png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+        pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword', odt: 'application/vnd.oasis.opendocument.text'
+      }[e] || 'application/octet-stream');
+
+      if (isBinary && ['png','jpg','jpeg','gif','webp','svg','pdf'].includes(ext)) {
+        const mime = extToMime(ext);
+        const dataUrl = `data:${mime};base64,${content}`;
+        if (ext === 'pdf') {
+          return `<div class="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+            <p class="text-gray-700 dark:text-gray-300">Preview: <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></p>
+            <iframe src="${dataUrl}" class="w-full h-96 border rounded mt-2"></iframe>
+          </div>`;
+        }
+        return `<div class="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+          <p class="text-gray-700 dark:text-gray-300">Preview: <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></p>
+          <div class="mt-2 text-center"><img src="${dataUrl}" alt="${escapeHtml(path)}" class="max-w-full max-h-96 rounded"/></div>
+        </div>`;
+      }
+
+      if (isBinary && ['docx','doc','odt','rtf'].includes(ext)) {
+        const sandboxId = data.sandbox_id || window.editorConfig?.sandboxId || '';
+        const clientUrl = sandboxId ? ('/clients/' + sandboxId + '/' + path.replace(/^\//, '')) : ('/clients/' + path.replace(/^\//, ''));
+        const officeViewer = 'https://view.officeapps.live.com/op/view.aspx?src=' + encodeURIComponent(window.location.origin + clientUrl);
+        return `<div class="p-3 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+          <p class="text-gray-700 dark:text-gray-300">File: <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code></p>
+          <div class="mt-2 flex gap-2">
+            <a href="${clientUrl}" target="_blank" rel="noopener" class="px-3 py-2 bg-blue-600 text-white rounded">Open / Download</a>
+            <a href="${officeViewer}" target="_blank" rel="noopener" class="px-3 py-2 bg-indigo-600 text-white rounded">View in Office Online</a>
+          </div>
+        </div>`;
+      }
+
+      // fallback: text
+      const safeContent = encoding === 'base64' ? '(binary file — open to download)' : content;
       return `<div class="space-y-2">
         <p class="text-gray-700 dark:text-gray-300">Contents of <code class="bg-gray-200 dark:bg-gray-700 px-1 rounded">${escapeHtml(path)}</code>:</p>
-        <pre class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-96 text-gray-800 dark:text-gray-200"><code>${escapeHtml(content)}</code></pre>
+        <pre class="bg-gray-100 dark:bg-gray-800/50 rounded-lg p-3 text-sm overflow-x-auto max-h-96 text-gray-800 dark:text-gray-200"><code>${escapeHtml(safeContent)}</code></pre>
       </div>`;
     }
     

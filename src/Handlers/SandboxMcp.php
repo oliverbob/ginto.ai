@@ -161,16 +161,21 @@ final class SandboxMcp
         }
         
         $result = UnifiedSandbox::readFile($sandboxId, $path);
-        
+
         if (!$result['success']) {
             return ['success' => false, 'error' => $result['error'] ?? 'Failed to read file'];
         }
-        
+
+        $isBinary = $result['is_binary'] ?? false;
+        $content = $result['content'] ?? '';
+
         return [
             'success' => true,
             'path' => $path,
-            'content' => $result['content'],
-            'size' => strlen($result['content'] ?? ''),
+            'content' => $content,
+            'encoding' => $isBinary ? 'base64' : 'utf-8',
+            'is_binary' => $isBinary,
+            'size' => $isBinary ? (int) (strlen($content) * 3 / 4) : strlen($content),
             'sandbox_id' => $sandboxId
         ];
     }
