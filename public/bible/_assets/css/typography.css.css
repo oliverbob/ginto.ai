@@ -1,0 +1,655 @@
+@media all {
+
+	html * { font-size:1em; }
+
+
+	textarea,
+	pre,
+	code,
+	kbd,
+	samp,
+	var,
+	tt {
+		font-family: -apple-system, BlinkMacSystemFont, 
+    "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", 
+    "Fira Sans", "Droid Sans", "Helvetica Neue", 
+    sans-serif;
+	}
+
+	/* (en) base layout gets standard font size 14px */
+	/* (de) Basis-Layout erhält Standardschriftgröße von 14 Pixeln */
+	body {
+	font-family: -apple-system, BlinkMacSystemFont, 
+    "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", 
+    "Fira Sans", "Droid Sans", "Helvetica Neue", 
+    sans-serif;
+	/*font-size: 200 120%/2.0;*/
+	font-size:100%;
+	background-color: #FEFEFC;
+	text-align:left; /* LTR */
+	color:#000;
+	/* Changes all text here -(en) Prevent auto-scaling of text in mobile webkit browsers */
+		/* (de) Automatische Schriftvergrößerung in mobilen Webkit-Browsern vermeiden */
+		-webkit-text-size-adjust:100%;
+	}
+	
+	body {
+	/* (en) Fix for rounding errors when scaling font sizes in older versions of Opera browser */
+		/* (de) Beseitigung von Rundungsfehler beim Skalieren von Schriftgrößen in älteren Opera Versionen */
+	font-size:100%;
+	color:#000;
+	text-align:left; /* LTR */
+	background-color: #FEFEFC;
+	}
+
+	/*--- Headings | Überschriften ------------------------------------------------------------------------*/
+
+	h1x, /*change for uppercase h1*/
+	h2x,
+	h3,
+	h4,
+	h5,
+	h6,
+
+	/*h1 {
+	font-weight: bold;
+	font-size:1.3em;
+	line-height: 140%;
+	margin: 0.2em 0 0;
+	text-shadow: 0px 2px 2px rgba(0,0,0,.5);
+		} old formating*/
+		
+	h1 {/*book names after 2019*/
+	font-size:1.2em;
+	font-weight: bold;
+	/*line-height: 100%;*/
+	text-shadow: 0 1px 2px rgba(0,0,0,.5);
+	/* [disabled]margin-top: 0.8em; */
+	/*margin-top: 1em;
+	margin-right: 0;
+	margin-bottom: 0.4em;
+	margin-left: 0;*/
+	margin: 0.2em 0 0;
+	line-height:140%; /*Change this for space between lines */
+	text-transform: uppercase;
+	}	
+
+h1.main {
+  padding:5px;
+  text-transform: uppercase;
+}
+
+h2 {/*main page titles with shadow*/
+    display: block;
+    font-size: 0.9em;
+    margin-block-start: 0.83em;
+    margin-block-end: 0.83em;
+    margin-inline-start: 0px;
+    margin-inline-end: 0px;
+    font-weight: bold;
+	text-shadow: 0 1px 2px rgba(0,0,0,.5);
+	text-transform: uppercase;
+	line-height:140%; /*Change this for space between lines */
+}
+
+
+
+	/*transferred to h1 - h2 {
+	font-size:1.2em;
+	font-weight: bold;
+	/*line-height: 100%;*/
+	/*text-shadow: 0 1px 2px rgba(0,0,0,.5);
+	/* [disabled]margin-top: 0.8em; */
+	/*margin-top: 1em;
+	margin-right: 0;
+	margin-bottom: 0.4em;
+	margin-left: 0;*/
+	/*margin: 0.2em 0 0;
+	line-height:140%; /*Change this for space between lines */
+	/*text-transform: uppercase;
+	}*/
+
+	h6 {
+	font-size:1.0em;
+	/*line-height: 100%;*/
+	text-shadow: 0 1px 1px rgba(0,0,0,.2);
+	margin-top: 1em;
+	margin-right: 0;
+	margin-bottom: 0.5em;
+	margin-left: 0;
+	font-weight: normal;
+	font-variant: normal;
+	line-height:140%; /*Change this for space between lines */
+	}
+
+	h4 {/*main page titles with shadow*/
+		font-weight: bold;
+		font-size:0.8em;
+		line-height: 1.125em;
+		margin:1.125em 0 0 0;
+		margin-bottom: 0.8em;
+		text-transform: uppercase;
+	}
+	.h4center {/*other*/
+		font-weight: bold;
+		font-size:0.9em;
+		line-height: 1.125em;
+		margin:1.125em 0 0 0;
+		margin-bottom: 0.8em;
+		text-transform: uppercase;
+		text-align: center;
+	}
+
+	h5 {
+	font-weight: bold;
+	font-size:0.9em;
+	line-height: 100%;
+	/*font-style: italic;*/
+	font-weight: bold;
+	margin-top: 0.8em;
+	margin-right: 0;
+	margin-bottom: 0.8em;
+	margin-left: 0;
+	}
+	h3 {/*reserved for chapter numbers*/
+	color: #A6A6A6; /*#FFA500;*/
+	text-shadow: 1px 1px 2px #777 rgba(0,0,0,.2);
+	/*text-transform: uppercase;*/
+	font-weight: normal;
+	font-size:1.0em;
+	line-height:140%; /*Change this for space between lines */
+	margin-left: 13px;
+	/*padding-left: 1em;*/
+		}
+	
+	
+	/* --- Lists | Listen  -------------------------------------------------------------------------------- */
+
+	ul,
+	ol,
+	dl {
+	font-size:1em;
+	line-height:1.5em;
+	margin: 0em 0 0 1em;
+	}
+
+	ul {
+	list-style-type:disc;
+	}
+
+	ol {
+		list-style-type:decimal;
+	}
+
+	ul ul {
+		list-style-type:circle;
+		margin-top:0;
+	}
+
+	ol ol {
+		list-style-type:lower-latin;
+		margin-top:0;
+	}
+
+	ol ul {
+		list-style-type:circle;
+		margin-top:0;
+	}
+
+	li {
+	line-height:1.5em;
+	margin-left:0.8em;
+	text-indent: 10px;
+	}
+
+	dt { font-weight:bold; }
+
+	dd { margin:0 0 1.5em 0.8em; }
+
+	/* --- general text formatting | Allgemeine Textauszeichnung ------------------------------------------ */
+
+	p {
+	font-size:120%;
+	line-height: 1.2em; /*Change text size here add: font-size:120%;*/
+	padding-top: .5em;
+	padding-bottom: 0.5em;
+	line-height:150%; /*Change this for space between lines in paragraphs*/
+	color:#000;
+	}
+
+	blockquote, cite, q {
+		font-style:italic;
+	}
+
+	blockquote {
+	margin:1.5em 0 0 1.5em;
+	color:#555;
+	}
+
+	strong, b { font-weight:bold; }
+
+	em, i { font-style:italic; }
+
+	big {
+		font-size:116.667%;
+	}
+
+	small {
+		font-size:85.71%;
+	}
+
+	pre,
+	code,
+	kbd,
+	tt,
+	samp,
+	var {
+		font-size:100%;
+	}
+
+	pre {
+		line-height:1.5em;
+		margin: 1.5em 0 0 0;
+		white-space: pre;
+		white-space: pre-wrap;
+		word-wrap: break-word;
+	}
+	pre, code { color:#800; }
+
+	kbd, samp, var, tt {
+		color:#666;
+		font-weight:bold;
+	}
+
+	var, dfn { font-style:italic; }
+
+	acronym, abbr {
+		border-bottom:1px #aaa dotted;
+		font-variant:small-caps;
+		letter-spacing:.07em;
+		cursor:help;
+	}
+
+	sub,
+	sup {
+		font-size: 75%;
+		line-height: 0;
+		position: relative;
+		vertical-align: baseline;
+	}
+
+	sup { top: -0.5em; }
+	sub { bottom: -0.25em; }
+
+	mark {
+		background: #ff0;
+		color: #000;
+	}
+
+	hr { /*in use as space separator*/
+	color:transparent;
+	background:transparent;
+	margin-top: 0.5em;
+	padding-top: 0.5em;
+	border-top-width: 0;
+	border-right-width: 0;
+	border-bottom-width: 1px;
+	border-left-width: 0;/*
+	border-bottom-stylex: dotted;
+	border-bottom-color: white;*/
+	}
+
+	/*--- Links ----------------------------------------------------------------------------------------- */
+
+	a {
+	color: #1f1b05;/*#E8E8E8;*//*#AA2023;*/
+	background:transparent;
+	text-decoration:none;
+	/*a:hover {text-decoration:none;background-color:#9D261D;color:#FEFEFC}*/
+	}
+
+	a:active { outline: none; }
+
+	/* (en) maximum constrast for tab focus - change with great care */
+	/* (en) Maximaler Kontrast für Tab Focus - Ändern Sie diese Regel mit Bedacht */
+	a:hover, /*.nav>li>a:hover{text-decoration:none;background-color:#x9D261D;color:#FEFEFC}*/
+	a:focus {
+	color:#AA2023;
+	/*text-decoration:underline;*/
+	text-shadow: 1px 1px 1px rgba(0,0,0,.1);
+	/*text-decoration:none;background-color:#9D261D;color:#FEFEFC;*/ /*take out this if no white on red hover*/
+	}
+
+	/* --- images ------------------ */
+
+	img,
+	figure {
+		margin: 0;
+	}
+
+	.flexible {
+		margin-top: 1.5em;
+		max-width: 100%;
+		height: auto;
+	}
+
+	* html .flexible {	/* IE6 support */
+		width: 98%;		/* 2% space for borders */
+	}
+
+	.bordered {
+		margin-top: 1.5em;
+		border: 2px #eee solid;
+		border: 2px rgba(255,255,255,1) solid;
+		-webkit-box-shadow: 0 0 3px rgba(0,0,0,.25);
+		-moz-box-shadow: 0 0 3px rgba(0,0,0,.25);
+		box-shadow: 0 0 3px rgba(0,0,0,.25);
+	}
+	.word {
+	color: #AA2023;
+}
+
+	/**
+	* ----------------------------------------------------------------------- #
+	*
+	* Generic Content Classes
+	*
+	* (en) standard classes for positioning and highlighting
+	* (de) Standardklassen zur Positionierung und Hervorhebung
+	*
+	* @section content-generic-classes
+	*/
+	.highlight {
+		color: #c30;
+		
+	}
+	.highlight2 {
+		color: #B45F04 /* #FB8C00; #c30;*/
+		font-size: 110%;
+		text-shadow: 1px 1px 2px #000000;
+	}
+	.topdate {
+   	color:#c30;
+    font-size: 11pt;
+    font-style: italic;
+    font-family: none;
+    letter-spacing: -0.1px;
+    padding: 0 0 0 8px;
+    display: inline-block;
+    position: relative;
+   	background:#f4f4f4;
+	}
+	.dimmed {
+	color:#888;
+	font-size: 90%;
+	text-transform: capitalize;
+	font-style: italic;
+	font-variant: normal;
+	}
+	.dimver {
+	color:#888;
+	font-size: 90%;
+	text-transform: none;
+	font-style: italic;
+	font-variant: normal;
+	padding-top: 0.1em;
+	padding-left: 2.1em;
+	}
+	.faded {
+	color:#888;
+	font-size: 90%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	}
+	.fadepar {
+	color:#888;
+	font-size: 90%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	margin-left: 80px;
+	}
+	.engdim {
+	color:#889;
+	font-size: 80%;
+	text-transform: none;
+	font-style: italic;
+	font-variant: normal;
+	/*font-family: monospace;*/
+	}
+	.pygb {
+    color: #777777;
+	/*font-family: monospace;*/
+}
+	.faded2 {
+	color:#888;
+	font-size: 60%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	text-transform: none;
+	margin-top: 0.1em;
+	padding-top: 0.1em;
+	}
+	.faded3 {
+	color:#5e5e5e; /*#9E9E9E;*/
+	/*padding-top: 5px;*/
+	/*padding-bottom: 0.1em;*/
+  font-size: 80%;
+  /*border-bottom: 1px solid #AA2023;*/
+  margin-left: 15px;
+  display:block
+	}
+	.faded4 {
+	color:#888;
+	font-size: 80%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	}
+	.hid {
+	color:#F3F1EB;
+	font-size: 80%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	padding-top: 0.1em;
+	padding-bottom: 0.5px;
+	}
+	.hidfaded { /*votd*/
+	color: #d2d1ce;
+	font-size: 80%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	padding-top: 0.1em;
+	padding-bottom: 0.5px;
+	}
+.fadedtab {
+	color: #5e5e5e;/*#B9B9B9;*/
+	font-size: 90%;
+	text-transform: none;
+	font-style: normal;
+	font-variant: normal;
+	margin-left: 30px;
+	/*padding-left: 2em;*/
+	display:block
+	}
+
+	.box {
+		border-radius: 0.3em;
+		border-width: 1px;
+		border-style: solid;
+		border-color: #888;
+		border-color: rgba(0,0,0,.3);
+		-webkit-box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2) inset;
+		-moz-box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2) inset;
+		box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.2) inset;
+		color: #444;
+		color: rgba(0,0,0,.8);
+		padding: 1.4286em;
+		margin: 1.5em 0 0 0;
+	}
+
+	.box > *:first-child {
+		margin-top: 0;
+	}
+
+	.label {
+	padding: 2px 4px 3px 4px;
+	display: inline-block;
+	vertical-align:central;
+	letter-spacing: normal;
+	white-space:nowrap;
+	-webkit-border-radius: 3px;
+	-moz-border-radius: 3px;
+	border-radius: 3px;
+	background: #AA2023;
+	color: #FEFEFC;
+	/* [disabled]font-size: 90%; */
+	text-transform: uppercase;
+	font-size: .7em;
+	line-height: 1em;
+	font-weight: bold;
+	}
+	.wp {
+	background: transparent; /*transparent;*/
+	color: #FEFEFC; /*#FEFEFC; - wp white*/
+	font-weight: normal; /*normal*/
+	}
+	.info {
+		background:#f4f4f4;
+	}
+
+	.success {
+		background:#8c8;
+	}
+
+	.warning {
+		background:#cc8;
+	}
+
+	.error {
+		background:#c88;
+	}
+
+	.float-left {
+		float:left;
+		display:inline;
+		margin: 1.5em 1em 0 0;
+	}
+
+	.float-right {
+	float:right;
+	display:inline;
+	margin: 0;
+	}
+
+	.alignCenter {
+		display:block;
+		text-align:center;
+		margin: 1.5em auto 0 auto;
+	}
+.alignRight {
+	display:block;
+	text-align:right;
+	margin: 0;
+}
+
+
+	/**
+	* ------------------------------------------------------------------------------------------------- #
+	*
+	* Tables | Tabellen
+	*
+	* (en) Generic classes for table-width and design definition
+	* (de) Generische Klassen für die Tabellenbreite und Gestaltungsvorschriften für Tabellen
+	*
+	* @section content-tables
+	*/
+
+	table {
+	/* [disabled]width:100%; */
+	/* [disabled]border-collapse:collapse; */
+	/* [disabled]margin: 1.3571em 0 0 0; */
+	/* [disabled]color:#333; */
+	/* [disabled]border-top: 1px #ccc solid; */
+	/* [disabled]border-bottom: 1px #ccc solid; */
+	}
+
+	table.narrow {
+	/* [disabled]margin:  1.4286em 0 0 0; */
+	}
+
+	table.narrow th,
+	table.narrow td {
+		padding: 0 0.5em;
+		line-height: 1.4286em;
+	}
+
+	table.bordertable {
+		border:1px #ccc solid;
+	}
+
+	table caption {
+		font-variant:small-caps;
+	}
+
+	th, td {
+	/* [disabled]line-height: 1.5em; */
+	/* [disabled]vertical-align: top; */
+	/* [disabled]padding: 0.7143em 0.5em; */
+	}
+
+	th *:first-child,
+	td *:first-child {
+		margin-top: 0;
+	}
+
+	th.nowrap,
+	td.nowrap {
+		white-space: nowrap;
+	}
+
+	thead th {
+		text-align: left;
+		color:#000;
+		border-bottom:2px #000 solid;
+	}
+
+	.bordertable thead th {
+		background:#e0e0e0;
+		border-right:1px #ccc solid;
+		border-bottom:1px #ccc solid;
+	}
+
+	.bordertable tbody th[scope="row"] {
+		background:#f0f0f0;
+	}
+
+	tbody th {
+	text-align: left;
+	/* [disabled]border-top:1px solid #ccc; */
+	/* [disabled]text-align:left; */
+	}
+
+	.bordertable tbody th {
+		border-right:1px solid #ccc;
+	}
+
+	tbody td {
+	/* [disabled]text-align: left; */
+	/* [disabled]border-top:1px solid #ccc; */
+	}
+
+	.bordertable tbody td {
+		border-right:1px solid #ccc;
+	}
+
+	/* highlight row on mouse over */
+	tbody tr:hover th,
+	tbody tr:hover td {
+		background:#f8f8f8;
+	}
+}
