@@ -1,5 +1,16 @@
 <?php
-defined('PATHSPAGE') ? : die('Direct access not permitted');
+// If this file is accessed directly (not via the app bootstrap),
+// allow it only for authenticated sessions. Previously this would
+// terminate with a plain message; now we redirect unauthenticated
+// visitors to the app login so MVC session handling is used.
+if (!defined('PATHSPAGE')) {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+    if (empty($_SESSION['user_id']) && empty($_SESSION['public_id'])) {
+        header('Location: /login');
+        exit;
+    }
+    if (!defined('PATHSPAGE')) define('PATHSPAGE', true);
+}
 
 // Attempt to include MysqliDb from a few likely locations (silently ignore if missing)
 $mysqliCandidates = [
