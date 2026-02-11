@@ -70,7 +70,7 @@ include_once 'verse.php';
 $count = 0;
 foreach($Book["Old Testament"] as $b){
 	$count++;
-	echo "<li><a title='[$count]' href='book.php?passage=$b 1'> $b </a></li>\n";
+	echo "<li><a title='[$count]' href='/bible/book?passage=$b 1'> $b </a></li>\n";
 }
 ?>
 </ul>
@@ -82,7 +82,7 @@ foreach($Book["Old Testament"] as $b){
 $count = 0;
 foreach($Book["New Testament"] as $b){
 	$count++;
-	echo "<li><a title='[$count]' href='book.php?passage=$b 1'> $b </a></li>\n";
+	echo "<li><a title='[$count]' href='/bible/book?passage=$b 1'> $b </a></li>\n";
 }
 ?>
 </ul>
