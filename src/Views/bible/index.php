@@ -10,12 +10,12 @@ include_once 'verse.php';
 <meta name="title" content="The Holy Bible in the English language - KJV" />
 
 <!-- <link rel="shortcut icon" href="favicon.ico?v=2" type="image/x-icon" /> -->
-<link href="/assets/bible//apple-touch-icon.png" rel="apple-touch-icon" />
+<link href="/assets/bible/apple-touch-icon.png" rel="apple-touch-icon" />
 <!-- Mobile viewport optimisation -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="stylesheet" type="text/css" href="/assets/bible//css/css.css" />
-<link rel="stylesheet" type="text/css" href="/assets/bible//css/style.css" />
-<link rel="stylesheet" type="text/css" href="/assets/bible//css/tables_bibles.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/css.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/style.css" />
+<link rel="stylesheet" type="text/css" href="/assets/bible/css/tables_bibles.css" />
 </head>
 <body>
 <!-- <header class="ym-noprint">
