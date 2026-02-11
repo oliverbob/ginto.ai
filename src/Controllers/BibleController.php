@@ -121,6 +121,38 @@ class BibleController
         echo json_encode($results);
         exit;
     }
+
+    // Return verses for a specific book and chapter as JSON
+    public function verses(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $book = isset($_GET['book']) ? (int)$_GET['book'] : null;
+        $chapter = isset($_GET['chapter']) ? (int)$_GET['chapter'] : null;
+        if ($book === null || $chapter === null) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing book or chapter']);
+            return;
+        }
+
+        $rows = [];
+        if ($this->db) {
+            try {
+                $rows = $this->db->select('fgbibledb_kjv', ['VERSE', 'TEXT'], [
+                    'BOOK' => $book,
+                    'CHAPTER' => $chapter,
+                    'ORDER' => ['VERSE ASC']
+                ]);
+            } catch (\Throwable $e) {
+                $this->logError('verses failed', $e);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'DB query failed']);
+                return;
+            }
+        }
+
+        echo json_encode(['success' => true, 'verses' => $rows]);
+        return;
+    }
     /**
      * Append a message to the ginto log file in storage/logs/ginto.log if available.
      */

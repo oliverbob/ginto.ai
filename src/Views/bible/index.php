@@ -113,11 +113,11 @@ foreach($Book["New Testament"] as $b){
 </div>
 </footer>
 </body>
-<script src="_assets/js/jquery-1.8.0.min.js"></script>
-<script src="_assets/js/script.js"></script>
-<script src="_assets/js/jquery.dropotron.min.js"></script>
-<script src="_assets/js/skel.min.js"></script>
-<script src="_assets/js/skel-viewport.min.js"></script>
-<script src="_assets/js/util.js"></script>
-<script src="_assets/js/main.js"></script>
+<script src="/assets/bible/js/jquery-1.8.0.min.js"></script>
+<script src="/assets/bible/js/script.js"></script>
+<script src="/assets/bible/js/jquery.dropotron.min.js"></script>
+<script src="/assets/bible/js/skel.min.js"></script>
+<script src="/assets/bible/js/skel-viewport.min.js"></script>
+<script src="/assets/bible/js/util.js"></script>
+<script src="/assets/bible/js/main.js"></script>
 </html>

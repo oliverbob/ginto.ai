@@ -44,6 +44,7 @@ $router->post('/', 'ChatController@stream');
 // Bible routes
 $router->get('/bible', 'BibleController@index');
 $router->get('/bible/search', 'BibleController@search');
+$router->get('/bible/verses', 'BibleController@verses');
 $router->req('/user/network-tree', 'UserController@networkTree');
 
 // Social page (renders the feed UI)
