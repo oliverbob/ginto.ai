@@ -5280,6 +5280,102 @@
           
           window.currentFile = data.path;
           window.currentEncoded = data.encoded;
+
+          // If server marked this as binary, render a preview instead of loading into code editor
+          if (data.is_binary) {
+            try {
+              var workspace = document.querySelector('.editor-workspace') || document.body;
+              var preview = workspace.querySelector('.repo-preview');
+              if (!preview) {
+                preview = document.createElement('div');
+                preview.className = 'repo-preview';
+                // Insert at top so it doesn't get hidden behind editor
+                workspace.insertBefore(preview, workspace.firstElementChild || null);
+              }
+              preview.innerHTML = '';
+              preview.style.display = '';
+
+              var mime = data.mime || '';
+              var html = '<div class="path">' + (data.path ? escapeHtml(data.path) : '') + '</div>';
+
+              // Images
+              if (mime.indexOf('image/') === 0) {
+                var img = document.createElement('img');
+                img.src = 'data:' + (mime || 'image/*') + ';base64,' + (data.b64 || '');
+                img.style.maxWidth = '100%';
+                img.style.borderRadius = '8px';
+                img.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+                img.alt = data.path || 'Image';
+                preview.appendChild(img);
+                // make image clickable to open in new tab
+                img.style.cursor = 'pointer';
+                img.addEventListener('click', function(){ window.open(img.src, '_blank'); });
+              }
+              // PDFs
+              else if (mime === 'application/pdf' || (data.path && data.path.toLowerCase().endsWith('.pdf'))) {
+                var iframe = document.createElement('iframe');
+                iframe.style.width = '100%';
+                iframe.style.height = '640px';
+                iframe.style.border = 'none';
+                // Use blob URL for better compatibility on mobile
+                try {
+                  var bin = atob(data.b64 || '');
+                  var len = bin.length;
+                  var u8 = new Uint8Array(len);
+                  for (var i = 0; i < len; i++) u8[i] = bin.charCodeAt(i);
+                  var blob = new Blob([u8], { type: 'application/pdf' });
+                  var url = URL.createObjectURL(blob);
+                  iframe.src = url;
+                } catch(e) {
+                  iframe.src = 'data:application/pdf;base64,' + (data.b64 || '');
+                }
+                preview.appendChild(iframe);
+              }
+              // Other binary types (docx, doc, odt, etc) — provide download link and basic info
+              else {
+                var info = document.createElement('div');
+                info.className = 'file-preview-info';
+                info.style.padding = '12px';
+                info.style.background = 'var(--bg-secondary, #fff)';
+                info.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">' + escapeHtml(data.path || 'File') + '</div>' +
+                  '<div style="margin-bottom:8px;color:var(--muted,#666);">Preview not available for this file type.</div>';
+                var dl = document.createElement('a');
+                dl.className = 'px-3 py-1 bg-blue-600 text-white rounded text-sm';
+                dl.style.display = 'inline-block';
+                dl.style.textDecoration = 'none';
+                dl.style.marginRight = '8px';
+                dl.textContent = 'Download';
+                // If server provided direct download URL (sandbox mode), use it
+                if (data.download_url) {
+                  dl.href = data.download_url;
+                  dl.target = '_blank';
+                } else if (data.b64) {
+                  dl.href = 'data:' + (data.mime || 'application/octet-stream') + ';base64,' + data.b64;
+                  dl.download = (data.path || 'download');
+                } else {
+                  dl.href = '#';
+                  dl.onclick = function(e){ e.preventDefault(); };
+                }
+                info.appendChild(dl);
+                preview.appendChild(info);
+              }
+
+              // Clear editor content to avoid visual overlap
+              try {
+                if (window.GintoEditor && window.GintoEditor.getEditor) {
+                  var ed = window.GintoEditor.getEditor(); if (ed && ed.setValue) ed.setValue('');
+                }
+                if (window.monaco && editor && editor.setValue) editor.setValue('');
+              } catch(e){}
+
+              if (editorStatus) editorStatus.textContent = 'Ready (preview)';
+            } catch(e) {
+              console.error('Preview render failed', e);
+            }
+
+            // Don't continue to load text editor content
+            return;
+          }
           
           // Update save button text (Save vs Save as)
           if (typeof window.updateSaveButtonText === 'function') {

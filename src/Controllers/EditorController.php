@@ -820,12 +820,33 @@ class EditorController
         if ($sandboxId) {
             $readResult = \Ginto\Helpers\UnifiedSandbox::readFile($sandboxId, $path);
             if ($readResult['success']) {
-                echo json_encode([
-                    'success' => true,
-                    'content' => $readResult['content'],
-                    'path' => $path,
-                    'encoded' => $encoded
-                ]);
+                $content = $readResult['content'];
+                // Detect binary vs text
+                $isBinary = strpos($content, "\0") !== false;
+                $mime = null;
+                // Try to detect mime by extension if available
+                $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                $map = [
+                    'pdf' => 'application/pdf',
+                    'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'svg' => 'image/svg+xml',
+                    'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                    'doc' => 'application/msword', 'odt' => 'application/vnd.oasis.opendocument.text'
+                ];
+                if (isset($map[$ext])) $mime = $map[$ext];
+
+                $resp = [ 'success' => true, 'path' => $path, 'encoded' => $encoded ];
+                if ($isBinary) {
+                    $resp['is_binary'] = true;
+                    $resp['b64'] = base64_encode($content);
+                    if ($mime) $resp['mime'] = $mime;
+                    // Provide direct clients URL for sandbox files so frontend can link to it
+                    $resp['download_url'] = '/clients/' . $sandboxId . '/' . ltrim($path, '/');
+                } else {
+                    $resp['is_binary'] = false;
+                    $resp['content'] = $content;
+                }
+
+                echo json_encode($resp);
             } else {
                 echo json_encode(['success' => false, 'error' => $readResult['error'] ?? 'Failed to read file']);
             }
@@ -841,13 +862,28 @@ class EditorController
         }
         
         $content = file_get_contents($fullPath);
-        
-        echo json_encode([
-            'success' => true,
-            'content' => $content,
-            'path' => $path,
-            'encoded' => $encoded
-        ]);
+
+        // Detect binary
+        $isBinary = strpos($content, "\0") !== false;
+        $resp = [ 'success' => true, 'path' => $path, 'encoded' => $encoded ];
+        if ($isBinary) {
+            // Try to determine mime from extension
+            $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $map = [
+                'pdf' => 'application/pdf',
+                'png' => 'image/png', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'gif' => 'image/gif', 'svg' => 'image/svg+xml',
+                'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                'doc' => 'application/msword', 'odt' => 'application/vnd.oasis.opendocument.text'
+            ];
+            if (isset($map[$ext])) $resp['mime'] = $map[$ext];
+            $resp['is_binary'] = true;
+            $resp['b64'] = base64_encode($content);
+        } else {
+            $resp['is_binary'] = false;
+            $resp['content'] = $content;
+        }
+
+        echo json_encode($resp);
         exit;
     }
 }
