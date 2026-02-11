@@ -4,8 +4,8 @@ defined('PATHSPAGE') ? : die('Direct access not permitted');
 include '../controller/includes/MysqliDb/MysqliDb.php';
 
 ini_set('display_errors', 1);
-// Use E_STRICT when available (older PHP); fall back to E_ALL to avoid deprecation on newer PHP
-error_reporting(defined('E_STRICT') ? E_STRICT : E_ALL);
+// Avoid using deprecated E_STRICT constant; use E_ALL instead
+error_reporting(E_ALL);
 ini_set('display_errors', 0);
 error_reporting(0);
 
