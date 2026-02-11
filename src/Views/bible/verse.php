@@ -321,36 +321,41 @@ function books($books, $term) {
 }
 
 
-$db = new MysqliDb(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if($_GET['verse']){
-    $prefetch = $dbc->rawQuery(
-    	"SELECT * FROM `fgbibledb_kjv` WHERE TEXT like ? LIMIT 100", 
-    	Array ('%'.$_GET['verse'].'%')
-    );
-
-    $fetched = array();
-    if ($dbc->count > 0)
-        foreach ($prefetch as $pref) {
-            $fetched[]=array(
-            	'verse'=>'['.$Book["All"][$pref['BOOK']] . ' ' . 
-            		$pref['CHAPTER'] . ':' . $pref['VERSE'] . ']: ' . $pref['TEXT'],
-                'passage' => $pref['CHAPTER'] . ':' . $pref['VERSE'] . ']: ' . $pref['TEXT']
-            );
+// Use the application's $db (PDO/Database wrapper) when available.
+// If a controller provided `$db`, prefer that. Otherwise, gracefully no-op DB operations.
+// Verse search endpoint (AJAX) — respond using $db if present.
+if (!empty($_GET['verse'])) {
+    $fetched = [];
+    if (isset($db)) {
+        try {
+            $sql = "SELECT * FROM fgbibledb_kjv WHERE TEXT LIKE :t LIMIT 100";
+            $rows = $db->query($sql, [':t' => '%' . $_GET['verse'] . '%'])->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $pref) {
+                $fetched[] = [
+                    'verse' => '[' . ($Book['All'][$pref['BOOK']] ?? $pref['BOOK']) . ' ' . $pref['CHAPTER'] . ':' . $pref['VERSE'] . ']: ' . $pref['TEXT'],
+                    'passage' => $pref['CHAPTER'] . ':' . $pref['VERSE'] . ']: ' . $pref['TEXT']
+                ];
+            }
+        } catch (\Throwable $_) {
+            // DB not available or query failed — return empty result
+            $fetched = [];
         }
+    }
     echo json_encode($fetched);
+    exit;
 }
 
-############### VERSE SEARCH ALGORITHM ################
-
-$dbc = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-
-mysqli_select_db ($dbc, DB_NAME) OR die ('Could not select the database: ' . mysqli_error() );
-function escape_data ($data) {
-    global $dbc;
+// Database helper: use app DB if available, otherwise provide safe fallbacks
+function escape_data($data) {
+    if (isset($GLOBALS['db']) && method_exists($GLOBALS['db'], 'quote')) {
+        // PDO::quote includes surrounding quotes, strip them
+        $q = $GLOBALS['db']->quote($data);
+        return substr($q, 1, -1);
+    }
     if (ini_get('magic_quotes_gpc')) {
         $data = stripslashes($data);
     }
-    return mysqli_real_escape_string($dbc, $data);
+    return addslashes($data);
 }
 
 // split citation to array
@@ -537,17 +542,22 @@ function getVerse($book, $chapter, $start, $end){
         //$mysqli = mysqli_connect("localhost", "root", "@mysq|inx!2021_A", "ugnayan_fgc");
 
         //echo $query . "<br />";
-        $result = $dbc->query($query);
-        //$row = mysqli_fetch_array($result, MYSQLI_BOTH);
-    
-        while($row = $result->fetch_array()){
-            $book=$row['BOOK'];
-            $chapter=$row['CHAPTER'];
-            $verse=$row['VERSE'];
-            $verse_text = $row['TEXT'];
-
-            if($verse == 1) $verse = '';
-            $verse_result .= "<span class='verse' id='$verse'>$verse</span> $verse_text \n<br />";
+        // Execute query using app DB if available
+        if (isset($GLOBALS['db'])) {
+            try {
+                $stmt = $GLOBALS['db']->query($query);
+                $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                foreach ($rows as $row) {
+                    $book = $row['BOOK'];
+                    $chapter = $row['CHAPTER'];
+                    $verse = $row['VERSE'];
+                    $verse_text = $row['TEXT'];
+                    if ($verse == 1) $verse = '';
+                    $verse_result .= "<span class='verse' id='$verse'>$verse</span> $verse_text \n<br />";
+                }
+            } catch (\Throwable $_) {
+                // query failed — leave $verse_result unchanged
+            }
         }
         
         $search_result = "$book_name $chapter:$verse";
