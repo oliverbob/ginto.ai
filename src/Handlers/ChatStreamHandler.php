@@ -362,6 +362,51 @@ class ChatStreamHandler
     }
 
     /**
+     * Truncate message array to keep outgoing payload under a byte limit for
+     * specific providers (Groq is sensitive to oversized requests).
+     *
+     * Strategy: drop oldest non-system messages until payload fits.
+     */
+    private function truncateMessagesForProvider(array $messages, string $provider, int $limitBytes = null): array
+    {
+        if (strtolower($provider) !== 'groq') {
+            return $messages;
+        }
+
+        $limit = $limitBytes ?? 180000; // default ~180KB target
+
+        $payload = ['model' => $messages[0]['model'] ?? null, 'messages' => $messages];
+        $json = @json_encode($payload);
+        if ($json === false) return $messages;
+
+        // Remove oldest non-system messages until under limit
+        while (strlen($json) > $limit) {
+            $removed = false;
+            for ($i = 1; $i < count($messages); $i++) {
+                if (($messages[$i]['role'] ?? '') !== 'system') {
+                    array_splice($messages, $i, 1);
+                    $removed = true;
+                    break;
+                }
+            }
+            if (!$removed) break; // nothing left to remove
+            $payload['messages'] = $messages;
+            $json = @json_encode($payload);
+            if ($json === false) break;
+        }
+
+        if ($json !== false) {
+            if (strlen($json) > $limit) {
+                error_log('[ChatStream] Truncation incomplete: payload ' . strlen($json) . " bytes (limit {$limit})");
+            } else {
+                error_log('[ChatStream] Truncated messages for Groq to ' . strlen($json) . " bytes");
+            }
+        }
+
+        return $messages;
+    }
+
+    /**
      * Handle Ollama provider requests
      */
     private function handleOllamaRequest(string $prompt, string $model, bool $isAdminUser): bool
@@ -1076,6 +1121,43 @@ class ChatStreamHandler
             $accumulatedReasoning = '';
 
             try {
+            // Before entering the agent loop, measure payload size and apply
+            // provider-specific truncation (Groq requires smaller payloads).
+            try {
+                $providerNameForLimit = method_exists($provider, 'getName') ? $provider->getName() : ($selectedProvider ?? 'groq');
+                $previewPayload = ['model' => $modelName, 'messages' => $messages, 'tools' => $tools];
+                $previewJson = @json_encode($previewPayload) ?: '';
+                $previewSize = strlen($previewJson);
+                error_log("[ChatStream] Prepared payload size for {$providerNameForLimit}: {$previewSize} bytes");
+
+                // If Groq and payload is large, truncate messages conservatively
+                if (strtolower($providerNameForLimit) === 'groq' && $previewSize > 200000) {
+                    $messages = $this->truncateMessagesForProvider($messages, 'groq', 180000);
+                    $afterJson = @json_encode(['model' => $modelName, 'messages' => $messages, 'tools' => $tools]) ?: '';
+                    error_log('[ChatStream] Payload truncated for Groq; new size: ' . strlen($afterJson) . ' bytes');
+
+                    // If still too large, take more aggressive steps: shorten system prompt and remove tools
+                    $limitAggressive = 170000;
+                    if (strlen($afterJson) > $limitAggressive) {
+                        // Shorten system prompt (first message expected to be system)
+                        if (!empty($messages) && isset($messages[0]['role']) && $messages[0]['role'] === 'system' && isset($messages[0]['content'])) {
+                            $orig = (string)$messages[0]['content'];
+                            $short = mb_substr($orig, 0, 3000); // keep ~3k chars
+                            $short .= "\n\n[TRUNCATED SYSTEM PROMPT FOR GROQ DUE TO SIZE LIMITS]";
+                            $messages[0]['content'] = $short;
+                        }
+
+                        // Drop tools to reduce token usage
+                        $tools = [];
+
+                        $afterJson = @json_encode(['model' => $modelName, 'messages' => $messages, 'tools' => $tools]) ?: '';
+                        error_log('[ChatStream] Aggressively reduced payload for Groq; new size: ' . strlen($afterJson) . ' bytes (tools dropped, system prompt shortened)');
+                    }
+                }
+            } catch (\Throwable $e) {
+                error_log('[ChatStream] Payload sizing error: ' . $e->getMessage());
+            }
+
             while ($iteration < $maxIterations) {
                 $iteration++;
                 
