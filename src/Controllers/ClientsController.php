@@ -227,7 +227,35 @@ class ClientsController
                 }
             }
         }
-        
+
+        // If the proxied path looks like a downloadable document (pdf/docx/doc/odt/rtf/etc),
+        // force a Content-Disposition: attachment and ensure a sane Content-Type so browsers
+        // (especially mobile Safari/Chrome and iOS/Android clients) will download the file
+        // instead of trying to render it inline or ignoring the `download` attribute.
+        $requestedPath = $actualPath;
+        $basename = basename($requestedPath);
+        $ext = strtolower(pathinfo($basename, PATHINFO_EXTENSION));
+        $attachmentMimes = [
+            'pdf' => 'application/pdf',
+            'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'doc' => 'application/msword',
+            'odt' => 'application/vnd.oasis.opendocument.text',
+            'rtf' => 'application/rtf',
+            'txt' => 'text/plain'
+        ];
+
+        if ($ext && array_key_exists($ext, $attachmentMimes)) {
+            // sanitize filename
+            $safeFilename = preg_replace('/[^A-Za-z0-9._-]/', '_', $basename) ?: $basename;
+            // Override or set Content-Disposition as attachment (replace existing header)
+            header("Content-Disposition: attachment; filename=\"{$safeFilename}\"", true);
+            // Ensure correct Content-Type for the extension (replace existing header)
+            header("Content-Type: " . $attachmentMimes[$ext], true);
+            // Helpful cache headers for downloads
+            header('Pragma: public', true);
+            header('Cache-Control: private, max-age=60', true);
+        }
+
         echo $body;
         exit;
     }
