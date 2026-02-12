@@ -5346,7 +5346,7 @@
             if (activeFile) activeFile.classList.add('active');
             return;
           }
-          if (isBinaryFile) {
+          if (isBinaryFile && ext !== 'pdf') {
             if (editorStatus) editorStatus.textContent = 'Preview';
             // Show views overlay if exists
             var overlay = document.getElementById('editor-views-overlay');
@@ -5359,10 +5359,9 @@
                 if (sandboxId && data.path) {
                   iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\/, '');
                 } else {
-                  // Build data URL for common previewable types
+                  // Build data URL for common previewable types (excluding PDF)
                   var previewMime = {
-                    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml',
-                    'pdf': 'application/pdf'
+                    'png': 'image/png', 'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'gif': 'image/gif', 'webp': 'image/webp', 'svg': 'image/svg+xml'
                   }[ext] || null;
                   if (previewMime && data.content) {
                     iframe.src = 'data:' + previewMime + ';base64,' + data.content;
