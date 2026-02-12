@@ -3211,7 +3211,7 @@ html, body {
             async function updatePreviewIframe(iframe) {
                 const sandboxId = window.editorConfig?.sandboxId;
                 const currentFile = window.currentFile || '';
-                
+
                 // For sandbox files: always use proxy (let the browser/server handle rendering)
                 if (sandboxId && currentFile) {
                     if (window.GintoEditor && window.GintoEditor.save) {
@@ -3219,11 +3219,22 @@ html, body {
                     }
                     const previewUrl = getSandboxPreviewUrl();
                     if (previewUrl) {
-                        iframe.src = previewUrl;
+                        // If PDF, set iframe src directly to file URL for browser PDF rendering
+                        if (currentFile.toLowerCase().endsWith('.pdf')) {
+                            iframe.src = `/clients/${sandboxId}/${currentFile.replace(/^\//, '')}`;
+                            // Optionally, add fallback message for browsers that can't render PDF
+                            iframe.onload = function() {
+                                if (iframe.contentDocument && iframe.contentDocument.body && iframe.contentDocument.body.childElementCount === 0) {
+                                    iframe.contentDocument.body.innerHTML = '<div style="text-align:center;padding:2em;">Unable to preview PDF. <a href="' + iframe.src + '" target="_blank">Open PDF in new tab</a>.</div>';
+                                }
+                            };
+                        } else {
+                            iframe.src = previewUrl;
+                        }
                         return;
                     }
                 }
-                
+
                 // Fallback: render editor content directly
                 iframe.srcdoc = getEditorContent();
             }
