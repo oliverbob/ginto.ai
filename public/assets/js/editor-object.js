@@ -5341,18 +5341,16 @@
             // Hide Monaco/code editor if visible
             var codeEditor = document.getElementById('editor-monaco');
             if (codeEditor) codeEditor.style.display = 'none';
-            // Show or create a PDF iframe in the code view area
+            // Show or create a PDF iframe inside the code editor area
             var pdfContainer = document.getElementById('editor-pdf-viewer');
             if (!pdfContainer) {
               pdfContainer = document.createElement('div');
               pdfContainer.id = 'editor-pdf-viewer';
               pdfContainer.style.width = '100%';
               pdfContainer.style.height = '100%';
-              pdfContainer.style.position = 'absolute';
-              pdfContainer.style.top = '0';
-              pdfContainer.style.left = '0';
               pdfContainer.style.background = '#222';
-              pdfContainer.style.zIndex = '10';
+              pdfContainer.style.position = 'relative';
+              pdfContainer.style.overflow = 'auto';
               var parent = document.getElementById('editor-main') || document.body;
               parent.appendChild(pdfContainer);
             }
@@ -5379,9 +5377,12 @@
             if (activeFile) activeFile.classList.add('active');
             return;
           }
-                    // Hide PDF viewer if present for non-PDF files
-                    var pdfContainer = document.getElementById('editor-pdf-viewer');
-                    if (pdfContainer) pdfContainer.style.display = 'none';
+          // Hide PDF viewer if present for non-PDF files
+          var pdfContainer = document.getElementById('editor-pdf-viewer');
+          if (pdfContainer) pdfContainer.style.display = 'none';
+          // Show Monaco/code editor for non-PDF files
+          var codeEditor = document.getElementById('editor-monaco');
+          if (codeEditor) codeEditor.style.display = '';
           if (isBinaryFile && ext !== 'pdf') {
             if (editorStatus) editorStatus.textContent = 'Preview';
             // Show views overlay if exists
