@@ -32,7 +32,11 @@
       // `data-sticky-max-lines="N"` on the element. When stuck, the helper
       // will set a max-height equal to N * computed line-height and enable
       // scrolling within the sticky element.
-      var maxLines = parseInt(el.dataset.stickyMaxLines || el.getAttribute('data-sticky-max-lines') || 0, 10) || 0;
+      var rawMax = el.dataset.stickyMaxLines || el.getAttribute('data-sticky-max-lines');
+      var maxLines = 5; // default to 5 lines when not specified
+      if (rawMax !== null && rawMax !== undefined && rawMax !== '') {
+        maxLines = parseInt(rawMax, 10) || 5;
+      }
       var maxHeightPx = 0;
       if (maxLines > 0) {
         var cs = getComputedStyle(el);
