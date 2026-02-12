@@ -5336,7 +5336,8 @@
           var isBinaryFile = data.is_binary || (data.encoding === 'base64');
           var ext = (data.path || '').split('.').pop().toLowerCase();
           // If PDF, always show a PDF viewer in both code and preview views
-          if (ext === 'pdf') {
+          var isPDF = (ext === 'pdf');
+          if (isPDF) {
             if (editorStatus) editorStatus.textContent = 'PDF Viewer';
             // Hide Monaco/code editor if visible
             var codeEditor = document.getElementById('editor-monaco');
@@ -5375,14 +5376,18 @@
             document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
             var activeFile = document.querySelector('.file-item[data-path="' + data.path + '"]');
             if (activeFile) activeFile.classList.add('active');
-            return;
+            // Hide error message if present
+            var errorMsg = document.querySelector('.editor-error, .editor-error-message, .error-message, .error');
+            if (errorMsg) errorMsg.style.display = 'none';
           }
           // Hide PDF viewer if present for non-PDF files
-          var pdfContainer = document.getElementById('editor-pdf-viewer');
-          if (pdfContainer) pdfContainer.style.display = 'none';
-          // Show Monaco/code editor for non-PDF files
-          var codeEditor = document.getElementById('editor-monaco');
-          if (codeEditor) codeEditor.style.display = '';
+          if (!isPDF) {
+            var pdfContainer = document.getElementById('editor-pdf-viewer');
+            if (pdfContainer) pdfContainer.style.display = 'none';
+            // Show Monaco/code editor for non-PDF files
+            var codeEditor = document.getElementById('editor-monaco');
+            if (codeEditor) codeEditor.style.display = '';
+          }
           if (isBinaryFile && ext !== 'pdf') {
             if (editorStatus) editorStatus.textContent = 'Preview';
             // Show views overlay if exists
@@ -5443,7 +5448,7 @@
             editor = window.playgroundEditor.getEditor();
           }
           
-          if (editor) {
+          if (editor && !isPDF) {
             if (isMobile && window.GintoEditor && window.GintoEditor.setContent) {
               // CodeMirror via mobile editor
               window.GintoEditor.setContent(data.content || '');
