@@ -52,21 +52,35 @@ $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
 // Special handling for PDF files: always serve with correct headers and streaming
 if ($ext === 'pdf') {
+    // Ensure no previous output
+    if (ob_get_level()) {
+        ob_end_clean();
+    }
+    // Disable compression if enabled
+    if (function_exists('apache_setenv')) {
+        @apache_setenv('no-gzip', 1);
+    }
+    @ini_set('zlib.output_compression', 'Off');
     // Set headers for PDF viewing
     header('Content-Type: application/pdf');
     header('Content-Disposition: inline; filename="' . basename($filePath) . '"');
     header('Content-Length: ' . filesize($filePath));
     header('Accept-Ranges: bytes');
-    // Stream the file
-    $fp = fopen($filePath, 'rb');
-    if ($fp) {
-        while (!feof($fp)) {
-            echo fread($fp, 8192);
+    // Stream the file if readable
+    if (is_readable($filePath)) {
+        $fp = fopen($filePath, 'rb');
+        if ($fp) {
+            while (!feof($fp)) {
+                echo fread($fp, 8192);
+            }
+            fclose($fp);
+        } else {
+            http_response_code(500);
+            echo 'Failed to open PDF file.';
         }
-        fclose($fp);
     } else {
-        http_response_code(500);
-        echo 'Failed to open PDF file.';
+        http_response_code(404);
+        echo 'PDF file not found or not readable.';
     }
     exit;
 }
