@@ -5326,14 +5326,16 @@
           var data = null;
           // Determine file extension from requested path param early so we can
           // fallback to PDF rendering when the server returns non-JSON (e.g.,
-          // proxy HTML or empty body). Do not blindly call res.json().
+          // proxy HTML or empty body). We'll read the response as text first
+          // and only attempt JSON.parse when the payload looks like JSON. This
+          // avoids noisy SyntaxError stack traces from `res.json()` in normal
+          // flow when the server responds with HTML or an empty body.
           var ext = (path || '').split('.').pop().toLowerCase();
           var contentType = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
-          if (contentType.indexOf('application/json') !== -1) {
-            data = await res.json();
-          } else if (contentType.indexOf('application/pdf') !== -1 || ext === 'pdf') {
-            // Server returned a PDF or the requested path is a PDF — render directly
-            // into the code-view PDF iframe and return early.
+
+          if (contentType.indexOf('application/pdf') !== -1 || ext === 'pdf') {
+            // If server explicitly returned a PDF or the requested path is a PDF,
+            // render directly into the code-view PDF iframe and return early.
             var codeViewPdfId = 'editor-pdf-viewer-codeview';
             var pdfContainer = document.getElementById(codeViewPdfId);
             if (!pdfContainer) {
@@ -5373,13 +5375,27 @@
             var activeFile = document.querySelector('.file-item[data-path="' + path + '"]');
             if (activeFile) activeFile.classList.add('active');
             return;
-          } else {
-            // Try to parse JSON safely; if parsing fails, let the outer catch handle
+          }
+
+          // Read as text and try to detect/parse JSON safely
+          var txt = '';
+          try {
+            txt = await res.text();
+          } catch(e) {
+            txt = '';
+          }
+
+          var likelyJson = contentType.indexOf('application/json') !== -1 || (txt && (txt.trim().startsWith('{') || txt.trim().startsWith('[')));
+          if (likelyJson) {
             try {
-              data = await res.json();
+              data = JSON.parse(txt || '{}');
             } catch(e) {
-              throw e;
+              // Parsing failed — do not rethrow the raw parse error (avoid noisy logs);
+              // treat as non-JSON response and fall through to fallback handling.
+              data = null;
             }
+          } else {
+            data = null;
           }
           
           if (!data.success) {
