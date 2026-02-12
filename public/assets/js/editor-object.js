@@ -5323,7 +5323,64 @@
           if (editorStatus) editorStatus.textContent = 'Loading...';
           var fileUrl = getApiBaseUrl() + '/file?file=' + encodeURIComponent(encoded);
           var res = await fetch(fileUrl, { credentials: 'same-origin' });
-          var data = await res.json();
+          var data = null;
+          // Determine file extension from requested path param early so we can
+          // fallback to PDF rendering when the server returns non-JSON (e.g.,
+          // proxy HTML or empty body). Do not blindly call res.json().
+          var ext = (path || '').split('.').pop().toLowerCase();
+          var contentType = (res.headers && res.headers.get) ? (res.headers.get('content-type') || '') : '';
+          if (contentType.indexOf('application/json') !== -1) {
+            data = await res.json();
+          } else if (contentType.indexOf('application/pdf') !== -1 || ext === 'pdf') {
+            // Server returned a PDF or the requested path is a PDF — render directly
+            // into the code-view PDF iframe and return early.
+            var codeViewPdfId = 'editor-pdf-viewer-codeview';
+            var pdfContainer = document.getElementById(codeViewPdfId);
+            if (!pdfContainer) {
+              pdfContainer = document.createElement('div');
+              pdfContainer.id = codeViewPdfId;
+              pdfContainer.style.width = '100%';
+              pdfContainer.style.height = '100%';
+              pdfContainer.style.background = '#222';
+              var parent = document.getElementById('monaco-editor') || document.querySelector('.editor-workspace') || document.body;
+              if (parent && getComputedStyle(parent).position === 'static') parent.style.position = 'relative';
+              pdfContainer.style.position = 'absolute';
+              pdfContainer.style.top = '0';
+              pdfContainer.style.left = '0';
+              pdfContainer.style.right = '0';
+              pdfContainer.style.bottom = '0';
+              pdfContainer.style.overflow = 'auto';
+              pdfContainer.style.zIndex = '20';
+              parent.appendChild(pdfContainer);
+            }
+            pdfContainer.innerHTML = '';
+            var iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            var sandboxId = window.editorConfig?.sandboxId;
+            if (sandboxId && path) {
+              iframe.src = '/sandbox-preview/' + sandboxId + '/' + path.replace(/^\//, '');
+            } else {
+              var clientUrl = (window.editorConfig?.sandboxId) ? ('/clients/' + window.editorConfig.sandboxId + '/' + path.replace(/^\//, '')) : ('/clients/' + path.replace(/^\//, ''));
+              iframe.src = clientUrl;
+            }
+            pdfContainer.appendChild(iframe);
+            pdfContainer.style.display = 'block';
+            if (editorStatus) editorStatus.textContent = 'PDF Viewer';
+            // Update active file highlight
+            document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
+            var activeFile = document.querySelector('.file-item[data-path="' + path + '"]');
+            if (activeFile) activeFile.classList.add('active');
+            return;
+          } else {
+            // Try to parse JSON safely; if parsing fails, let the outer catch handle
+            try {
+              data = await res.json();
+            } catch(e) {
+              throw e;
+            }
+          }
           
           if (!data.success) {
             throw new Error(data.error || 'Failed to load file');
