@@ -5335,17 +5335,53 @@
           // If this is a binary file, do not load into the code editor - show preview/download instead
           var isBinaryFile = data.is_binary || (data.encoding === 'base64');
           var ext = (data.path || '').split('.').pop().toLowerCase();
-          // If PDF, always show preview and do not load into code editor
+          // If PDF, always show a PDF viewer in both code and preview views
           if (ext === 'pdf') {
-            if (editorStatus) editorStatus.textContent = 'Preview';
-            var previewBtn = document.getElementById('views-btn');
-            if (previewBtn) previewBtn.click();
+            if (editorStatus) editorStatus.textContent = 'PDF Viewer';
+            // Hide Monaco/code editor if visible
+            var codeEditor = document.getElementById('editor-monaco');
+            if (codeEditor) codeEditor.style.display = 'none';
+            // Show or create a PDF iframe in the code view area
+            var pdfContainer = document.getElementById('editor-pdf-viewer');
+            if (!pdfContainer) {
+              pdfContainer = document.createElement('div');
+              pdfContainer.id = 'editor-pdf-viewer';
+              pdfContainer.style.width = '100%';
+              pdfContainer.style.height = '100%';
+              pdfContainer.style.position = 'absolute';
+              pdfContainer.style.top = '0';
+              pdfContainer.style.left = '0';
+              pdfContainer.style.background = '#222';
+              pdfContainer.style.zIndex = '10';
+              var parent = document.getElementById('editor-main') || document.body;
+              parent.appendChild(pdfContainer);
+            }
+            pdfContainer.innerHTML = '';
+            var iframe = document.createElement('iframe');
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            var sandboxId = window.editorConfig?.sandboxId;
+            if (sandboxId && data.path) {
+              iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\//, '');
+            } else {
+              var clientUrl = (window.editorConfig?.sandboxId) ? ('/clients/' + window.editorConfig.sandboxId + '/' + data.path.replace(/^\//, '')) : ('/clients/' + data.path.replace(/^\//, ''));
+              iframe.src = clientUrl;
+            }
+            pdfContainer.appendChild(iframe);
+            pdfContainer.style.display = 'block';
+            // Hide preview overlay if open
+            var overlay = document.getElementById('editor-views-overlay');
+            if (overlay) overlay.style.display = 'none';
             // Update active state in tree
             document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
             var activeFile = document.querySelector('.file-item[data-path="' + data.path + '"]');
             if (activeFile) activeFile.classList.add('active');
             return;
           }
+                    // Hide PDF viewer if present for non-PDF files
+                    var pdfContainer = document.getElementById('editor-pdf-viewer');
+                    if (pdfContainer) pdfContainer.style.display = 'none';
           if (isBinaryFile && ext !== 'pdf') {
             if (editorStatus) editorStatus.textContent = 'Preview';
             // Show views overlay if exists
