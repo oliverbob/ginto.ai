@@ -47,9 +47,31 @@ if ($basename[0] === '.' || $basename === '.htaccess') {
     exit;
 }
 
+
 $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
-// For static files, let PHP's built-in server handle them
+// Special handling for PDF files: always serve with correct headers and streaming
+if ($ext === 'pdf') {
+    // Set headers for PDF viewing
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . basename($filePath) . '"');
+    header('Content-Length: ' . filesize($filePath));
+    header('Accept-Ranges: bytes');
+    // Stream the file
+    $fp = fopen($filePath, 'rb');
+    if ($fp) {
+        while (!feof($fp)) {
+            echo fread($fp, 8192);
+        }
+        fclose($fp);
+    } else {
+        http_response_code(500);
+        echo 'Failed to open PDF file.';
+    }
+    exit;
+}
+
+// For other static files, let PHP's built-in server handle them
 if ($ext !== 'php') {
     return false; // Let built-in server serve static files
 }
