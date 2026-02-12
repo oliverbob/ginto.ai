@@ -1,0 +1,19 @@
+/* Styles for the editor sticky helper
+   Apply to elements that should stick: add `data-sticky` or class `sticky-target`.
+   Use `data-sticky-offset` to change the top offset in pixels.
+*/
+.sticky-target {
+  position: -webkit-sticky;
+  position: sticky;
+  top: var(--sticky-offset, 0px);
+  z-index: 30;
+  transition: box-shadow 0.12s ease, background-color 0.12s ease;
+}
+
+.sticky-target.stuck {
+  /* subtle elevation so it's visible above editor content */
+  box-shadow: 0 6px 18px rgba(2,6,23,0.35);
+  background: rgba(0,0,0,0.02);
+}
+
+.sticky-sentinel { display:block; }
