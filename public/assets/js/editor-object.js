@@ -5353,11 +5353,19 @@
               pdfContainer.style.width = '100%';
               pdfContainer.style.height = '100%';
               pdfContainer.style.background = '#222';
-              pdfContainer.style.position = 'relative';
-              pdfContainer.style.overflow = 'auto';
-              // Prefer to insert into the Monaco/editor workspace area so the PDF
-              // appears inside the code view. Fallback to document.body if needed.
+              // Ensure the parent is positioned so absolute children fill it
               var parent = document.getElementById('monaco-editor') || document.querySelector('.editor-workspace') || document.body;
+              if (parent && getComputedStyle(parent).position === 'static') {
+                parent.style.position = 'relative';
+              }
+              // Position absolutely so the PDF fills the editor area and isn't hidden
+              pdfContainer.style.position = 'absolute';
+              pdfContainer.style.top = '0';
+              pdfContainer.style.left = '0';
+              pdfContainer.style.right = '0';
+              pdfContainer.style.bottom = '0';
+              pdfContainer.style.overflow = 'auto';
+              pdfContainer.style.zIndex = '20';
               parent.appendChild(pdfContainer);
             }
             // Recreate iframe contents each time to avoid stale frames or duplicates
@@ -5512,9 +5520,17 @@
                 pdfContainer.style.width = '100%';
                 pdfContainer.style.height = '100%';
                 pdfContainer.style.background = '#222';
-                pdfContainer.style.position = 'relative';
-                pdfContainer.style.overflow = 'auto';
                 var parent = document.getElementById('monaco-editor') || document.querySelector('.editor-workspace') || document.body;
+                if (parent && getComputedStyle(parent).position === 'static') {
+                  parent.style.position = 'relative';
+                }
+                pdfContainer.style.position = 'absolute';
+                pdfContainer.style.top = '0';
+                pdfContainer.style.left = '0';
+                pdfContainer.style.right = '0';
+                pdfContainer.style.bottom = '0';
+                pdfContainer.style.overflow = 'auto';
+                pdfContainer.style.zIndex = '20';
                 parent.appendChild(pdfContainer);
               }
               pdfContainer.innerHTML = '';
