@@ -184,6 +184,12 @@
           var parentPath = parentLi ? parentLi.getAttribute('data-path') : null;
           if (parentPath) populateFileSelectForDir(parentPath, item.encoded || item.path || fullPath);
         } catch(e){}
+        // If PDF, open preview immediately
+        var ext = (item.path || '').split('.').pop().toLowerCase();
+        if (ext === 'pdf' && typeof document !== 'undefined') {
+          var previewBtn = document.getElementById('views-btn');
+          if (previewBtn) previewBtn.click();
+        }
       });
       itemEl.addEventListener('dblclick', function(){
         if (item.encoded) {
