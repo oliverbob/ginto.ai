@@ -5499,6 +5499,47 @@
           
         } catch(e) {
           console.error('Load failed:', e);
+          // If the fetch failed but we have a path and it's a PDF, attempt a best-effort code-view-only PDF render
+          try {
+            var extFallback = (path || '').split('.').pop().toLowerCase();
+            if (extFallback === 'pdf') {
+              var codeViewPdfId = 'editor-pdf-viewer-codeview';
+              var pdfContainer = document.getElementById(codeViewPdfId);
+              if (!pdfContainer) {
+                pdfContainer = document.createElement('div');
+                pdfContainer.id = codeViewPdfId;
+                pdfContainer.style.width = '100%';
+                pdfContainer.style.height = '100%';
+                pdfContainer.style.background = '#222';
+                pdfContainer.style.position = 'relative';
+                pdfContainer.style.overflow = 'auto';
+                var parent = document.getElementById('editor-main') || document.body;
+                parent.appendChild(pdfContainer);
+              }
+              pdfContainer.innerHTML = '';
+              var iframe = document.createElement('iframe');
+              iframe.style.width = '100%';
+              iframe.style.height = '100%';
+              iframe.style.border = 'none';
+              var sandboxId = window.editorConfig?.sandboxId;
+              if (sandboxId && path) {
+                iframe.src = '/sandbox-preview/' + sandboxId + '/' + path.replace(/^\//, '');
+              } else {
+                var clientUrl = (window.editorConfig?.sandboxId) ? ('/clients/' + window.editorConfig.sandboxId + '/' + path.replace(/^\//, '')) : ('/clients/' + path.replace(/^\//, ''));
+                iframe.src = clientUrl;
+              }
+              pdfContainer.appendChild(iframe);
+              pdfContainer.style.display = 'block';
+              if (editorStatus) editorStatus.textContent = 'PDF Viewer';
+              // Update active state in tree (code view only)
+              document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
+              var activeFile = document.querySelector('.file-item[data-path="' + path + '"]');
+              if (activeFile) activeFile.classList.add('active');
+              return;
+            }
+          } catch(err) {
+            console.error('PDF fallback failed:', err);
+          }
           showToast('Failed to load file', true);
           if (editorStatus) editorStatus.textContent = 'Error';
         }
