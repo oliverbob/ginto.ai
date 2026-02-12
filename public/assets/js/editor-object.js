@@ -5335,6 +5335,17 @@
           // If this is a binary file, do not load into the code editor - show preview/download instead
           var isBinaryFile = data.is_binary || (data.encoding === 'base64');
           var ext = (data.path || '').split('.').pop().toLowerCase();
+          // If PDF, always show preview and do not load into code editor
+          if (ext === 'pdf') {
+            if (editorStatus) editorStatus.textContent = 'Preview';
+            var previewBtn = document.getElementById('views-btn');
+            if (previewBtn) previewBtn.click();
+            // Update active state in tree
+            document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
+            var activeFile = document.querySelector('.file-item[data-path="' + data.path + '"]');
+            if (activeFile) activeFile.classList.add('active');
+            return;
+          }
           if (isBinaryFile) {
             if (editorStatus) editorStatus.textContent = 'Preview';
             // Show views overlay if exists
@@ -5346,7 +5357,7 @@
                 // If we have a sandbox preview route available, prefer it (keeps same-origin)
                 var sandboxId = window.editorConfig?.sandboxId;
                 if (sandboxId && data.path) {
-                  iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\//, '');
+                  iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\/, '');
                 } else {
                   // Build data URL for common previewable types
                   var previewMime = {
