@@ -5357,7 +5357,7 @@
                 // If we have a sandbox preview route available, prefer it (keeps same-origin)
                 var sandboxId = window.editorConfig?.sandboxId;
                 if (sandboxId && data.path) {
-                  iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\/, '');
+                  iframe.src = '/sandbox-preview/' + sandboxId + '/' + data.path.replace(/^\//, '');
                 } else {
                   // Build data URL for common previewable types (excluding PDF)
                   var previewMime = {
