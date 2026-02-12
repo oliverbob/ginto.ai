@@ -5355,8 +5355,9 @@
               pdfContainer.style.background = '#222';
               pdfContainer.style.position = 'relative';
               pdfContainer.style.overflow = 'auto';
-              // Prefer to insert next to the code editor area if available
-              var parent = document.getElementById('editor-main') || document.body;
+              // Prefer to insert into the Monaco/editor workspace area so the PDF
+              // appears inside the code view. Fallback to document.body if needed.
+              var parent = document.getElementById('monaco-editor') || document.querySelector('.editor-workspace') || document.body;
               parent.appendChild(pdfContainer);
             }
             // Recreate iframe contents each time to avoid stale frames or duplicates
@@ -5513,7 +5514,7 @@
                 pdfContainer.style.background = '#222';
                 pdfContainer.style.position = 'relative';
                 pdfContainer.style.overflow = 'auto';
-                var parent = document.getElementById('editor-main') || document.body;
+                var parent = document.getElementById('monaco-editor') || document.querySelector('.editor-workspace') || document.body;
                 parent.appendChild(pdfContainer);
               }
               pdfContainer.innerHTML = '';
