@@ -492,7 +492,22 @@ const GintoUI = {
     }
 };
 
-// Global shortcuts
-const showToast = (msg, type, duration) => GintoUI.toast(msg, type, duration);
-const showAlert = (msg, title, type) => GintoUI.alert(msg, title, type);
-const showConfirm = (msg, title) => GintoUI.confirm(msg, title);
+// Global shortcuts: attach to `window` only if not already defined to avoid
+// duplicate-declaration errors when multiple UI bundles are loaded.
+if (typeof window !== 'undefined') {
+    if (typeof window.showToast !== 'function') {
+        window.showToast = function(msg, type = 'info', duration) {
+            return GintoUI.toast(msg, type, duration);
+        };
+    }
+    if (typeof window.showAlert !== 'function') {
+        window.showAlert = function(msg, title, type) {
+            return GintoUI.alert(msg, title, type);
+        };
+    }
+    if (typeof window.showConfirm !== 'function') {
+        window.showConfirm = function(msg, title) {
+            return GintoUI.confirm(msg, title);
+        };
+    }
+}
