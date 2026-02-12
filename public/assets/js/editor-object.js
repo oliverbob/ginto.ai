@@ -5335,26 +5335,31 @@
           // If this is a binary file, do not load into the code editor - show preview/download instead
           var isBinaryFile = data.is_binary || (data.encoding === 'base64');
           var ext = (data.path || '').split('.').pop().toLowerCase();
-          // If PDF, always show a PDF viewer in both code and preview views
+          // If PDF, show a single PDF viewer inside the code view only.
+          // Use a code-view-specific id to avoid interfering with the preview overlay.
           var isPDF = (ext === 'pdf');
+          var codeViewPdfId = 'editor-pdf-viewer-codeview';
           if (isPDF) {
             if (editorStatus) editorStatus.textContent = 'PDF Viewer';
             // Hide Monaco/code editor if visible
             var codeEditor = document.getElementById('editor-monaco');
             if (codeEditor) codeEditor.style.display = 'none';
-            // Show or create a PDF iframe inside the code editor area
-            var pdfContainer = document.getElementById('editor-pdf-viewer');
+
+            // Ensure a single, unique PDF container exists for the code view
+            var pdfContainer = document.getElementById(codeViewPdfId);
             if (!pdfContainer) {
               pdfContainer = document.createElement('div');
-              pdfContainer.id = 'editor-pdf-viewer';
+              pdfContainer.id = codeViewPdfId;
               pdfContainer.style.width = '100%';
               pdfContainer.style.height = '100%';
               pdfContainer.style.background = '#222';
               pdfContainer.style.position = 'relative';
               pdfContainer.style.overflow = 'auto';
+              // Prefer to insert next to the code editor area if available
               var parent = document.getElementById('editor-main') || document.body;
               parent.appendChild(pdfContainer);
             }
+            // Recreate iframe contents each time to avoid stale frames or duplicates
             pdfContainer.innerHTML = '';
             var iframe = document.createElement('iframe');
             iframe.style.width = '100%';
@@ -5369,21 +5374,20 @@
             }
             pdfContainer.appendChild(iframe);
             pdfContainer.style.display = 'block';
-            // Hide preview overlay if open
-            var overlay = document.getElementById('editor-views-overlay');
-            if (overlay) overlay.style.display = 'none';
-            // Update active state in tree
+
+            // Update active state in tree (code view only)
             document.querySelectorAll('.file-item').forEach(function(el) { el.classList.remove('active'); });
             var activeFile = document.querySelector('.file-item[data-path="' + data.path + '"]');
             if (activeFile) activeFile.classList.add('active');
             // Hide error message if present
             var errorMsg = document.querySelector('.editor-error, .editor-error-message, .error-message, .error');
             if (errorMsg) errorMsg.style.display = 'none';
-          }
-          // Hide PDF viewer if present for non-PDF files
-          if (!isPDF) {
-            var pdfContainer = document.getElementById('editor-pdf-viewer');
-            if (pdfContainer) pdfContainer.style.display = 'none';
+          } else {
+            // Non-PDF: remove any code-view PDF container entirely and show Monaco
+            var pdfContainer = document.getElementById('editor-pdf-viewer-codeview');
+            if (pdfContainer) {
+              try { pdfContainer.remove(); } catch(e) { pdfContainer.style.display = 'none'; }
+            }
             // Show Monaco/code editor for non-PDF files
             var codeEditor = document.getElementById('editor-monaco');
             if (codeEditor) codeEditor.style.display = '';
