@@ -4,6 +4,29 @@
 (function(){
   'use strict';
 
+  // Suppress expected cancellation promise rejections from Monaco's
+  // StickyModelProvider which surface as unhandled promise rejections
+  // (message: "Canceled"). These are benign and spam the console; only
+  // preventDefault when the rejection is clearly from Monaco's sticky code.
+  window.addEventListener('unhandledrejection', function(ev) {
+    try {
+      var reason = ev && ev.reason;
+      var msg = '';
+      var stack = '';
+      if (!reason) return;
+      if (typeof reason === 'string') msg = reason;
+      else if (reason && reason.message) msg = reason.message;
+      if (reason && reason.stack) stack = reason.stack;
+      var isCanceled = msg && msg.indexOf && msg.indexOf('Canceled') !== -1;
+      var isSticky = stack && stack.indexOf && (stack.indexOf('StickyModelProvider') !== -1 || stack.indexOf('StickyLineCandidateProvider') !== -1 || stack.indexOf('Sticky') !== -1);
+      if (isCanceled && isSticky) {
+        ev.preventDefault();
+      }
+    } catch(e) {
+      // swallow
+    }
+  });
+
   // ============ CONVERSATION PERSISTENCE ============
   var STORAGE_KEY = 'playground-editor-chat-tabs';
   
