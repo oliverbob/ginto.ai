@@ -942,10 +942,9 @@ class ChatStreamHandler
                 $visionMessages = [];
                 $visionSystem = $this->buildSystemPrompt(true, $hadImageInHistory, false, $isAdminUser, false);
                 $visionMessages[] = ['role' => 'system', 'content' => $visionSystem];
-                // Attach history so Groq sees prior context
-                foreach ($history as $hmsg) {
-                    $visionMessages[] = ['role' => $hmsg['role'], 'content' => $hmsg['content']];
-                }
+                // Do NOT attach full conversation history to the vision model.
+                // Vision model should only receive the image + prompt so it focuses
+                // on visual analysis and does not consume large context windows.
 
                 // Add the user's current prompt and image reference
                 $imageRef = is_string($imageDataUrl) && (str_starts_with($imageDataUrl, 'http') || str_starts_with($imageDataUrl, '/'))
@@ -1142,20 +1141,19 @@ class ChatStreamHandler
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $hm) {
                 if (!empty($hm['role']) && isset($hm['content'])) {
+                    // Exclude image markers from history sent to the chat model
+                    if (is_string($hm['content']) && strpos($hm['content'], '[User shared an image]') === 0) {
+                        continue;
+                    }
                     $messages[] = ['role' => $hm['role'], 'content' => $hm['content']];
                 }
             }
 
             // Add user message
-            if ($hasImage && $imageDataUrl) {
-                $userContent = [
-                    ['type' => 'text', 'text' => $prompt],
-                    ['type' => 'image_url', 'image_url' => ['url' => $imageDataUrl]]
-                ];
-                $messages[] = ['role' => 'user', 'content' => $userContent];
-            } else {
-                $messages[] = ['role' => 'user', 'content' => $prompt];
-            }
+            // Do NOT include raw image or image_url in the main chat model prompt.
+            // The vision analysis (if any) has already been attached to history as
+            // a system message above, so the chat model can reason using that.
+            $messages[] = ['role' => 'user', 'content' => $prompt];
 
             // Calculate max tokens (pass provider for provider-specific limits)
             $maxTokens = $this->calculateMaxTokens($userRole, $hasImage, $imageDataUrl, $useLocalVision, $localLlmConfig ?? null, $selectedProvider);
