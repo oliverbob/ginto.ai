@@ -243,6 +243,93 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }, $messages);
     }
 
+    /**
+     * Ensure the outgoing payload does not exceed provider limits.
+     * Trims message content and prunes old messages when necessary.
+     */
+    protected function ensurePayloadWithinLimit(array &$payload): void
+    {
+        // Default payload byte limit (can be overridden via env)
+        $defaultLimit = 512000; // 512KB
+        $envKey = strtoupper($this->providerName) . '_PAYLOAD_MAX_BYTES';
+        $limit = intval(getenv($envKey) ?: ($_ENV[$envKey] ?? 0)) ?: intval(getenv('LLM_PAYLOAD_MAX_BYTES') ?: ($_ENV['LLM_PAYLOAD_MAX_BYTES'] ?? $defaultLimit));
+
+        if ($limit <= 0) {
+            $limit = $defaultLimit;
+        }
+
+        // Quick check
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json !== false && strlen($json) <= $limit) {
+            return;
+        }
+
+        // If messages not present, nothing to trim
+        if (empty($payload['messages']) || !is_array($payload['messages'])) {
+            return;
+        }
+
+        // Per-message truncation thresholds
+        $maxUserChars = 4000;
+        $maxToolChars = 2000;
+        $maxAssistantChars = 5000;
+
+        // First pass: truncate large message contents in-place (older messages first)
+        foreach ($payload['messages'] as $i => $msg) {
+            if (!isset($msg['content']) || !is_string($msg['content'])) continue;
+            $len = mb_strlen($msg['content']);
+            if ($len > $maxUserChars) {
+                $role = $msg['role'] ?? '';
+                $limitChars = match ($role) {
+                    'tool' => $maxToolChars,
+                    'assistant' => $maxAssistantChars,
+                    default => $maxUserChars,
+                };
+                $payload['messages'][$i]['content'] = mb_substr($msg['content'], -$limitChars); // keep tail (recent context)
+                $payload['messages'][$i]['__truncated'] = true;
+            }
+        }
+
+        // Check size again
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json !== false && strlen($json) <= $limit) {
+            return;
+        }
+
+        // Second pass: prune older non-system messages until under limit
+        // Keep all system messages and the last N messages
+        $keepLast = 20;
+        $messages = $payload['messages'];
+        // Preserve system messages at the front
+        $systemMessages = array_values(array_filter($messages, fn($m) => ($m['role'] ?? '') === 'system'));
+        $otherMessages = array_values(array_filter($messages, fn($m) => ($m['role'] ?? '') !== 'system'));
+
+        // Truncate otherMessages to keep only the last $keepLast
+        if (count($otherMessages) > $keepLast) {
+            $otherMessages = array_slice($otherMessages, -$keepLast);
+        }
+
+        $payload['messages'] = array_merge($systemMessages, $otherMessages);
+
+        // Add a short system note that history was truncated (prepend to system messages)
+        if (!empty($payload['messages'])) {
+            array_unshift($payload['messages'], [
+                'role' => 'system',
+                'content' => "[System] Conversation history truncated to reduce request size. Please re-run if more context is needed."
+            ]);
+        }
+
+        // Final check - if still too big, aggressively truncate content to minimal lengths
+        $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json !== false && strlen($json) > $limit) {
+            foreach ($payload['messages'] as $i => $msg) {
+                if (isset($msg['content']) && is_string($msg['content'])) {
+                    $payload['messages'][$i]['content'] = mb_substr($msg['content'], -500); // keep last 500 chars
+                }
+            }
+        }
+    }
+
     public function chat(array $messages, array $tools = [], array $options = []): LLMResponse
     {
         $payload = [
@@ -275,6 +362,9 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
             $payload['max_completion_tokens'] = $options['max_completion_tokens'] ?? 65536;
             unset($payload['max_tokens']); // Use max_completion_tokens instead
         }
+
+        // Ensure payload is within acceptable size limits for provider API
+        $this->ensurePayloadWithinLimit($payload);
 
         try {
             $response = $this->post('chat/completions', $payload);
@@ -322,6 +412,9 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         $toolCalls = [];
         $finishReason = LLMResponse::FINISH_STOP;
         $model = null;
+
+        // Ensure streaming payload is within provider limits before opening a stream
+        $this->ensurePayloadWithinLimit($payload);
 
         try {
             $this->postStream('chat/completions', $payload, function ($chunk) use (&$content, &$toolCalls, &$finishReason, &$model, $onChunk) {
