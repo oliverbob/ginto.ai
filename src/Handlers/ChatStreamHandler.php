@@ -924,12 +924,64 @@ class ChatStreamHandler
                     'base_url' => $config['base_url'],
                 ]);
             } elseif ($hasImage && $imageDataUrl && !$useLocalVision) {
-                // Cloud vision - use the determined vision provider and model
-                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($visionProvider, [
-                    'api_key' => $visionApiKey,
+                // Cloud vision - call the vision-capable provider (Groq) FIRST,
+                // attaching the current conversation history so the vision model
+                // can use context when analyzing the image. Then continue the
+                // main chat on the originally selected non-vision provider.
+
+                // Save main provider/model/key so we can continue the chat there
+                $mainProviderName = $selectedProvider;
+                $mainApiKey = $apiKey;
+                $mainModelName = ($sessionCloudModel ?? $defaultModel ?? ($selectedProvider === 'cerebras' ? 'gpt-oss-120b' : ($selectedProvider === 'groq' ? 'llama-3.3-70b-versatile' : 'llama-3.3-70b-versatile')));
+
+                // Vision model (already computed into $modelName) and Groq key
+                $visionModelName = $modelName;
+                $visionProviderName = $visionProvider;
+
+                // Build messages for vision call: include a system prompt and the full history
+                $visionMessages = [];
+                $visionSystem = $this->buildSystemPrompt(true, $hadImageInHistory, false, $isAdminUser, false);
+                $visionMessages[] = ['role' => 'system', 'content' => $visionSystem];
+                // Attach history so Groq sees prior context
+                foreach ($history as $hmsg) {
+                    $visionMessages[] = ['role' => $hmsg['role'], 'content' => $hmsg['content']];
+                }
+
+                // Add the user's current prompt and image reference
+                $imageRef = is_string($imageDataUrl) && (str_starts_with($imageDataUrl, 'http') || str_starts_with($imageDataUrl, '/'))
+                    ? $imageDataUrl
+                    : '[inline image omitted for brevity]';
+                $visionMessages[] = ['role' => 'user', 'content' => $prompt . "\n\n[Image]: " . $imageRef];
+
+                try {
+                    $visionProviderInstance = new \App\Core\LLM\Providers\OpenAICompatibleProvider('groq', [
+                        'api_key' => $visionApiKey,
+                        'model' => $visionModelName,
+                    ]);
+
+                    // Request a concise analysis from the vision model
+                    $visionResp = $visionProviderInstance->chat($visionMessages, [], ['max_tokens' => 1024, 'model' => $visionModelName]);
+                    $visionAnalysis = trim((string)$visionResp->getContent());
+                    if (!empty($visionAnalysis)) {
+                        // Prepend analysis as a system message so the main model can use it
+                        $analysisMsg = ['role' => 'system', 'content' => "[Image analysis from {$visionProviderName} - model {$visionModelName}]:\n" . $visionAnalysis];
+                        array_unshift($history, $analysisMsg);
+                        error_log("[ChatStream] Vision analysis attached to history ({$visionProviderName}): " . substr($visionAnalysis, 0, 200));
+                    } else {
+                        error_log('[ChatStream] Vision analysis returned empty content');
+                    }
+                } catch (\Throwable $ve) {
+                    error_log('[ChatStream] Vision analysis failed: ' . $ve->getMessage());
+                }
+
+                // Continue with the main (non-vision) provider using the original selection
+                $selectedProvider = $mainProviderName;
+                $apiKey = $mainApiKey;
+                $modelName = $mainModelName;
+                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
+                    'api_key' => $apiKey,
                     'model' => $modelName,
                 ]);
-                error_log("[ChatStream] Using $visionProvider for cloud vision with model: $modelName");
             } else {
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
                     'api_key' => $apiKey,
