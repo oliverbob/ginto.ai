@@ -841,7 +841,7 @@ try {
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Motivational Dashboard</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Entry level AI tools</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Weekly PowerBuilder Tech Support</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>10x profissional take-off</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i>10x professional take-off</li>
               </ul>
               <button type="button" class="w-full font-semibold py-2 px-4 rounded-lg transition-colors select-tier" style="background-color: var(--bg-secondary); color: var(--primary-500); border: 1px solid var(--primary-500);">
                 Select Plan
