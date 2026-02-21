@@ -882,6 +882,29 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             </button>
                             <input type="hidden" name="openwebui_enabled" id="openwebui-enabled-input" value="<?= $owEnabled ? '1' : '0' ?>">
                         </div>
+
+                        <!-- SDCPU Active Toggle -->
+                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z"/>
+                                    </svg>
+                                </div>
+                                <div>
+                                    <label class="font-medium text-gray-900 dark:text-white">Image Generation (SDCPU)</label>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Enable image generation in /chat for all users without a subscription requirement</p>
+                                </div>
+                            </div>
+                            <?php $sdcpuActive = ($envValues['SDCPU_ACTIVE'] ?? 'false') === 'true'; ?>
+                            <button type="button" id="sdcpu-toggle"
+                                    onclick="toggleSdcpu(this)"
+                                    data-enabled="<?= $sdcpuActive ? 'true' : 'false' ?>"
+                                    style="width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background-color 0.2s; background-color: <?= $sdcpuActive ? '#7c3aed' : '#d1d5db' ?>;">
+                                <span id="sdcpu-knob" style="position: absolute; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: left 0.2s; left: <?= $sdcpuActive ? '28px' : '4px' ?>;"></span>
+                            </button>
+                            <input type="hidden" name="sdcpu_active" id="sdcpu-active-input" value="<?= $sdcpuActive ? '1' : '0' ?>">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1034,16 +1057,21 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             const isEnabled = btn.dataset.enabled === 'true';
             const newState = !isEnabled;
             const knob = document.getElementById('openwebui-knob');
-            
-            // Update button state
             btn.dataset.enabled = newState ? 'true' : 'false';
-            
-            // Update visual with inline styles
             btn.style.backgroundColor = newState ? '#f97316' : '#d1d5db';
             knob.style.left = newState ? '28px' : '4px';
-            
-            // Update hidden input
             document.getElementById('openwebui-enabled-input').value = newState ? '1' : '0';
+        }
+
+        // Toggle SDCPU image generation active/inactive
+        function toggleSdcpu(btn) {
+            const isEnabled = btn.dataset.enabled === 'true';
+            const newState = !isEnabled;
+            const knob = document.getElementById('sdcpu-knob');
+            btn.dataset.enabled = newState ? 'true' : 'false';
+            btn.style.backgroundColor = newState ? '#7c3aed' : '#d1d5db';
+            knob.style.left = newState ? '28px' : '4px';
+            document.getElementById('sdcpu-active-input').value = newState ? '1' : '0';
         }
 
         document.querySelectorAll('.tab-btn').forEach(btn => {

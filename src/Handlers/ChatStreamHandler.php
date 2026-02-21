@@ -2157,11 +2157,14 @@ class ChatStreamHandler
         if (empty(trim($prompt))) {
             return ['success' => false, 'error' => 'Prompt is required'];
         }
-        
+
+        // SDCPU_ACTIVE=true bypasses the subscription gate entirely
+        $sdcpuActive = strtolower(trim($_ENV['SDCPU_ACTIVE'] ?? getenv('SDCPU_ACTIVE') ?? 'false')) === 'true';
+
         // Check if user has ImageGen subscription
         $userId = $_SESSION['user_id'] ?? null;
         $hasImageGenSubscription = false;
-        
+
         if ($userId && $this->db) {
             $addon = $this->db->get('user_addons', ['status'], [
                 'user_id' => $userId,
@@ -2170,11 +2173,11 @@ class ChatStreamHandler
             ]);
             $hasImageGenSubscription = !empty($addon);
         }
-        
-        if (!$hasImageGenSubscription) {
+
+        if (!$hasImageGenSubscription && !$sdcpuActive) {
             // Return upgrade required response
             return [
-                'success' => false, 
+                'success' => false,
                 'error' => 'Image generation requires an ImageGen Pro subscription.',
                 'upgrade_required' => true,
                 'addon_type' => 'imagegen',
@@ -2191,17 +2194,18 @@ class ChatStreamHandler
                 ]
             ];
         }
-        
-        // User has subscription - but we're transferring to GPU server
-        return [
-            'success' => false,
-            'error' => 'processing imagegen request for your purchase',
-            'subscription_active' => true,
-            'pending_setup' => true
-        ];
-        
-        /* Original streaming code - commented out until GPU server is ready
-        // Helper to emit progress
+
+        if (!$sdcpuActive) {
+            // Subscription active but GPU server not yet configured
+            return [
+                'success' => false,
+                'error' => 'processing imagegen request for your purchase',
+                'subscription_active' => true,
+                'pending_setup' => true
+            ];
+        }
+
+        // SDCPU is active — proceed with generation
         $emitProgress = function($progress, $message, $step = null, $totalSteps = null) {
             $data = [
                 'image_progress' => true,
@@ -2213,17 +2217,16 @@ class ChatStreamHandler
             echo "data: " . json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
             flush();
         };
-        
-        $emitProgress(0, 'Connecting to FastSD CPU...');
-        
+
+        $emitProgress(0, 'Connecting to FastSD CPU server...');
+
         // Check health
         $healthCheck = @file_get_contents($sdcpuBaseUrl . '/api/health');
         if ($healthCheck === false) {
             return ['success' => false, 'error' => 'Image generation server is not available'];
         }
-        
+
         $emitProgress(5, 'Server ready, starting generation...');
-        */
         
         $requestData = [
             'prompt' => $prompt,
