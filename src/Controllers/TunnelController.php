@@ -21,32 +21,22 @@ class TunnelController
     private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const APPROVAL_SERVER = 'https://ginto.ai';
-    
+
     public function __construct(?\Medoo\Medoo $db = null)
     {
         $this->db = $db;
     }
 
-    /**
-     * Relay endpoint for ginto.ai/tunnel (pinned to vision.ginto.ai)
-     */
     public function relayVision(): void
     {
         $this->proxyVisionRequest('/');
     }
 
-    /**
-     * Relay endpoint for ginto.ai/tunnel/* (pinned to vision.ginto.ai)
-     */
     public function relayVisionPath(string $path = ''): void
     {
         $this->proxyVisionRequest('/' . ltrim($path, '/'));
     }
 
-    /**
-     * Public approval endpoint used by local /tunnel relay checks
-     * GET /api/tunnel/relay/approval?subdomain=vision
-     */
     public function relayApproval(): void
     {
         header('Content-Type: application/json');
@@ -86,6 +76,15 @@ class TunnelController
             $localRelayPort = 18080;
         }
 
+        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $requestHost = preg_replace('/:\\d+$/', '', $requestHost);
+        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
+
+        if ($isLocalRequest) {
+            $this->proxyToTargetHost('127.0.0.1:' . $localRelayPort, $path, '/tunnel', true);
+            return;
+        }
+
         if (!$this->isVisionRelayApprovedRemote()) {
             http_response_code(403);
             header('Content-Type: text/html; charset=utf-8');
@@ -93,12 +92,17 @@ class TunnelController
             return;
         }
 
+        $this->proxyToTargetHost(self::VISION_RELAY_SUBDOMAIN . '.ginto.ai', $path, '/tunnel', false);
+    }
+
+    private function proxyToTargetHost(string $targetHost, string $path, string $locationPrefix, bool $isHttpTarget): void
+    {
         $normalizedPath = '/' . ltrim($path, '/');
         $queryString = $_SERVER['QUERY_STRING'] ?? '';
-        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
-        $targetHost = self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
-        $targetUrl = 'https://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+        $targetScheme = $isHttpTarget ? 'http' : 'https';
+        $targetUrl = $targetScheme . '://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
 
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $relayBody = null;
         if (!in_array($method, ['GET', 'HEAD'], true)) {
             $relayBody = file_get_contents('php://input');
@@ -111,7 +115,6 @@ class TunnelController
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-
         if ($relayBody !== null) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $relayBody);
         }
@@ -127,8 +130,8 @@ class TunnelController
         $headers[] = 'Host: ' . $targetHost;
         $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
         $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
-        $headers[] = 'X-Forwarded-Proto: https';
-        $headers[] = 'X-Ginto-Tunnel-Relay: ' . $targetHost;
+        $headers[] = 'X-Forwarded-Proto: ' . ($isHttpTarget ? 'http' : 'https');
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
@@ -140,7 +143,9 @@ class TunnelController
         if ($response === false) {
             http_response_code(502);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach vision relay endpoint</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Relay target: <code>https://' . htmlspecialchars($targetHost, ENT_QUOTES, 'UTF-8') . '</code></p></body></html>';
+            $title = $isHttpTarget ? 'Failed to reach local relay target' : 'Failed to reach vision relay endpoint';
+            $displayTarget = ($isHttpTarget ? 'http://' : 'https://') . $targetHost;
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Relay target: <code>' . htmlspecialchars($displayTarget, ENT_QUOTES, 'UTF-8') . '</code></p></body></html>';
             return;
         }
 
@@ -149,7 +154,6 @@ class TunnelController
 
         http_response_code($status > 0 ? $status : 200);
         header('X-Ginto-Tunnel-Relay: ' . $targetHost);
-        header('X-Ginto-Tunnel-Local-Port: ' . $localRelayPort);
 
         $headerLines = preg_split('/\r\n|\n|\r/', $rawHeaders) ?: [];
         foreach ($headerLines as $line) {
@@ -167,12 +171,10 @@ class TunnelController
                 continue;
             }
             if ($lower === 'location') {
-                $value = str_replace('http://' . $targetHost, '/tunnel', $value);
-                $value = str_replace('https://' . $targetHost, '/tunnel', $value);
-                $value = str_replace('http://localhost:' . $localRelayPort, '/tunnel', $value);
-                $value = str_replace('https://localhost:' . $localRelayPort, '/tunnel', $value);
-                if (str_starts_with($value, '/')) {
-                    $value = '/tunnel' . $value;
+                $value = str_replace('http://' . $targetHost, $locationPrefix, $value);
+                $value = str_replace('https://' . $targetHost, $locationPrefix, $value);
+                if (str_starts_with($value, '/') && !str_starts_with($value, $locationPrefix . '/') && $value !== $locationPrefix) {
+                    $value = $locationPrefix . $value;
                 }
             }
             header($name . ': ' . $value, false);
