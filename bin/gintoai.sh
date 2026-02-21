@@ -541,7 +541,7 @@ install_utilities() {
                 python3-websocket cmake build-essential git pkg-config libcurl4-openssl-dev \
                 poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-fil tesseract-ocr-chi-sim \
                 ghostscript imagemagick antiword catdoc wkhtmltopdf \
-                pandoc fonts-noto ttf-dejavu
+                pandoc fonts-noto fonts-dejavu-core
             
             # Install websocat (not in apt, download binary)
             if ! command -v websocat &>/dev/null; then
