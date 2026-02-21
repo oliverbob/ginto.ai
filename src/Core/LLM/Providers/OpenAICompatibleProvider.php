@@ -330,6 +330,55 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }
     }
 
+    private function logActualOutgoingRequest(string $endpoint, array $payload, bool $stream): void
+    {
+        if ($this->providerName !== 'groq') {
+            return;
+        }
+
+        try {
+            $repoRoot = dirname(__DIR__, 4);
+            $logsDir = $repoRoot . '/../storage/logs';
+            if (!is_dir($logsDir)) {
+                @mkdir($logsDir, 0755, true);
+            }
+
+            $json = @json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($json === false) {
+                return;
+            }
+
+            $ts = date('Ymd_His') . '_' . str_pad((string)(round(microtime(true) * 1000) % 1000), 3, '0', STR_PAD_LEFT);
+            $mode = $stream ? 'stream' : 'chat';
+            $fileName = "groq_actual_request_{$mode}_{$ts}.json";
+            $filePath = $logsDir . '/' . $fileName;
+
+            // Cap file size to avoid runaway logs while still keeping useful evidence.
+            if (strlen($json) > 5 * 1024 * 1024) {
+                $json = substr($json, 0, 5 * 1024 * 1024) . "\n...[TRUNCATED: payload exceeded 5MB]";
+            }
+
+            @file_put_contents($filePath, $json, LOCK_EX);
+
+            $summary = [
+                'timestamp' => date('c'),
+                'provider' => $this->providerName,
+                'model' => $payload['model'] ?? null,
+                'endpoint' => $endpoint,
+                'stream' => $stream,
+                'bytes' => strlen($json),
+                'file' => $fileName,
+            ];
+            @file_put_contents(
+                $logsDir . '/groq_actual_request_summary.log',
+                json_encode($summary, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n",
+                FILE_APPEND | LOCK_EX
+            );
+        } catch (\Throwable $_) {
+            // Debug logging should never break requests.
+        }
+    }
+
     public function chat(array $messages, array $tools = [], array $options = []): LLMResponse
     {
         $payload = [
@@ -365,6 +414,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
 
         // Ensure payload is within acceptable size limits for provider API
         $this->ensurePayloadWithinLimit($payload);
+        $this->logActualOutgoingRequest('chat/completions', $payload, false);
 
         try {
             $response = $this->post('chat/completions', $payload);
@@ -415,6 +465,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
 
         // Ensure streaming payload is within provider limits before opening a stream
         $this->ensurePayloadWithinLimit($payload);
+        $this->logActualOutgoingRequest('chat/completions', $payload, true);
 
         try {
             $this->postStream('chat/completions', $payload, function ($chunk) use (&$content, &$toolCalls, &$finishReason, &$model, $onChunk) {
