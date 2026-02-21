@@ -1420,10 +1420,26 @@ configure_ollama_for_docker() {
     esac
 }
 
+# Stop and mask web servers that would conflict with Caddy on ports 80/443
+mask_competing_servers() {
+    local competing=("nginx" "apache2" "apache" "httpd" "lighttpd")
+    for svc in "${competing[@]}"; do
+        if systemctl list-units --all --no-legend "${svc}.service" 2>/dev/null | grep -q "${svc}"; then
+            log_info "Masking competing web server: ${svc}"
+            sudo systemctl stop    "${svc}" 2>/dev/null || true
+            sudo systemctl disable "${svc}" 2>/dev/null || true
+            sudo systemctl mask    "${svc}" 2>/dev/null || true
+        fi
+    done
+}
+
 # Install Caddy web server
 install_caddy() {
     log_step "Installing Caddy web server..."
-    
+
+    # Always silence competing servers before Caddy claims ports 80/443
+    mask_competing_servers
+
     if command -v caddy &>/dev/null; then
         log_info "Caddy already installed: $(caddy version)"
         # Still ensure data directories exist with proper ownership
@@ -1432,7 +1448,7 @@ install_caddy() {
         sudo chown -R caddy:caddy /var/lib/caddy
         return
     fi
-    
+
     case $OS in
         ubuntu|debian)
             sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https
