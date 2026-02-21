@@ -13,10 +13,170 @@ namespace Ginto\Controllers;
 class TunnelController
 {
     protected ?\Medoo\Medoo $db;
+    private const VISION_RELAY_SUBDOMAIN = 'vision';
+    private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
+    private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
     
     public function __construct(?\Medoo\Medoo $db = null)
     {
         $this->db = $db;
+    }
+
+    /**
+     * Relay endpoint for ginto.ai/tunnel (pinned to vision.ginto.ai)
+     */
+    public function relayVision(): void
+    {
+        $this->proxyVisionRequest('/');
+    }
+
+    /**
+     * Relay endpoint for ginto.ai/tunnel/* (pinned to vision.ginto.ai)
+     */
+    public function relayVisionPath(string $path = ''): void
+    {
+        $this->proxyVisionRequest('/' . ltrim($path, '/'));
+    }
+
+    private function proxyVisionRequest(string $path): void
+    {
+        $localRelayPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
+        if ($localRelayPort < 1024 || $localRelayPort > 65535) {
+            $localRelayPort = 18080;
+        }
+
+        if (!$this->isVisionRelayApproved()) {
+            http_response_code(403);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.ginto.ai relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            return;
+        }
+
+        $targetHost = self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
+        $normalizedPath = '/' . ltrim($path, '/');
+        $queryString = $_SERVER['QUERY_STRING'] ?? '';
+        $targetUrl = 'https://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $ch = curl_init($targetUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+
+        if (!in_array($method, ['GET', 'HEAD'], true)) {
+            $body = file_get_contents('php://input');
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+        }
+
+        $headers = [];
+        foreach ($this->getIncomingHeaders() as $name => $value) {
+            $lower = strtolower((string)$name);
+            if (in_array($lower, ['host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer'], true)) {
+                continue;
+            }
+            $headers[] = $name . ': ' . $value;
+        }
+        $headers[] = 'Host: ' . $targetHost;
+        $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
+        $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
+        $headers[] = 'X-Forwarded-Proto: https';
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . $targetHost;
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        if ($response === false) {
+            http_response_code(502);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach vision.ginto.ai relay</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            return;
+        }
+
+        $rawHeaders = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+
+        http_response_code($status > 0 ? $status : 200);
+        header('X-Ginto-Tunnel-Relay: ' . $targetHost);
+        header('X-Ginto-Tunnel-Local-Port: ' . $localRelayPort);
+
+        $headerLines = preg_split('/\r\n|\n|\r/', $rawHeaders) ?: [];
+        foreach ($headerLines as $line) {
+            if ($line === '' || stripos($line, 'HTTP/') === 0) {
+                continue;
+            }
+            $pos = strpos($line, ':');
+            if ($pos === false) {
+                continue;
+            }
+            $name = trim(substr($line, 0, $pos));
+            $value = trim(substr($line, $pos + 1));
+            $lower = strtolower($name);
+            if (in_array($lower, ['content-length', 'transfer-encoding', 'connection', 'strict-transport-security'], true)) {
+                continue;
+            }
+            if ($lower === 'location') {
+                $value = str_replace('https://' . $targetHost, '/tunnel', $value);
+                if (str_starts_with($value, '/')) {
+                    $value = '/tunnel' . $value;
+                }
+            }
+            header($name . ': ' . $value, false);
+        }
+
+        echo $body;
+    }
+
+    private function isVisionRelayApproved(): bool
+    {
+        $subdomain = self::VISION_RELAY_SUBDOMAIN;
+
+        if (file_exists(self::TUNNEL_BLOCKLIST_FILE)) {
+            $blocklist = json_decode((string)file_get_contents(self::TUNNEL_BLOCKLIST_FILE), true);
+            if (is_array($blocklist) && in_array($subdomain, $blocklist, true)) {
+                return false;
+            }
+        }
+
+        if (!file_exists(self::TUNNEL_REGISTRY_FILE)) {
+            return false;
+        }
+
+        $registry = json_decode((string)file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
+        if (!is_array($registry) || !isset($registry[$subdomain])) {
+            return false;
+        }
+
+        $expiresAt = (int)($registry[$subdomain]['expires_at'] ?? 0);
+        if ($expiresAt <= time()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function getIncomingHeaders(): array
+    {
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            return is_array($headers) ? $headers : [];
+        }
+
+        $headers = [];
+        foreach ($_SERVER as $key => $value) {
+            if (!str_starts_with($key, 'HTTP_')) {
+                continue;
+            }
+            $header = str_replace('_', '-', ucwords(strtolower(substr($key, 5)), '_'));
+            $headers[$header] = $value;
+        }
+        return $headers;
     }
     
     /**

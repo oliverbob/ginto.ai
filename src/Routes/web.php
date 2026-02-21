@@ -7,6 +7,10 @@ $router->req('/cloud-proxy', 'CloudProxyController@proxy');
 // Cloud subdomain route check - returns target IP for Caddy
 $router->req('/api/cloud/route', 'CloudProxyController@getRoute');
 
+// Unified tunnel relay endpoint (pinned to vision.ginto.ai)
+$router->req('/tunnel', 'TunnelController@relayVision');
+$router->req('/tunnel/{path:.*}', 'TunnelController@relayVisionPath');
+
 $router->req('/test', 'TestController@test');
 $router->req('/chat/prompts/', 'PromptsController@getPrompts');
 $router->req('/chat/disabled-tools', 'ChatController@disabledTools', ['POST']);
