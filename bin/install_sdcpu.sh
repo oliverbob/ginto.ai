@@ -2,11 +2,83 @@
 # Manual SDCPU (FastSD CPU Image Generation) install script
 # Extracted from bin/gintoai.sh install_sdcpu() and configure_sdcpu_service()
 #
-# Usage: sudo bash bin/install_sdcpu.sh
+# Usage: sudo bash bin/install_sdcpu.sh [--cpu | --gpu[=cu118|cu121|cu124]]
+#
+#   --cpu          Force CPU-only PyTorch wheels (default if no GPU detected)
+#   --gpu          Auto-detect CUDA version and use matching GPU wheels
+#   --gpu=cu118    Force CUDA 11.8 wheels
+#   --gpu=cu121    Force CUDA 12.1 wheels
+#   --gpu=cu124    Force CUDA 12.4 wheels
 #
 # Assumes the project is already cloned and tools/sdcpu/ contains source files.
 
 set -e
+
+# --- Argument parsing ---------------------------------------------------
+MODE="auto"   # auto | cpu | gpu
+CUDA_TAG=""   # e.g. cu124
+
+for arg in "$@"; do
+    case "$arg" in
+        --cpu)
+            MODE="cpu" ;;
+        --gpu)
+            MODE="gpu" ;;
+        --gpu=*)
+            MODE="gpu"
+            CUDA_TAG="${arg#--gpu=}" ;;
+        *)
+            echo "Unknown option: $arg"
+            echo "Usage: $0 [--cpu | --gpu[=cu118|cu121|cu124]]"
+            exit 1 ;;
+    esac
+done
+
+# --- Resolve CUDA tag ---------------------------------------------------
+detect_cuda_tag() {
+    # Try nvidia-smi first
+    if command -v nvidia-smi &>/dev/null; then
+        local cuda_ver
+        cuda_ver=$(nvidia-smi 2>/dev/null | grep -oP 'CUDA Version: \K[0-9]+\.[0-9]+')
+        local major minor
+        major=$(echo "$cuda_ver" | cut -d. -f1)
+        minor=$(echo "$cuda_ver" | cut -d. -f2)
+        if [[ "$major" -ge 12 && "$minor" -ge 4 ]]; then echo "cu124"
+        elif [[ "$major" -ge 12 && "$minor" -ge 1 ]]; then echo "cu121"
+        elif [[ "$major" -ge 11 && "$minor" -ge 8 ]]; then echo "cu118"
+        else echo "cu118"   # oldest supported
+        fi
+    else
+        echo ""
+    fi
+}
+
+if [[ "$MODE" == "auto" ]]; then
+    DETECTED=$(detect_cuda_tag)
+    if [[ -n "$DETECTED" ]]; then
+        MODE="gpu"
+        CUDA_TAG="$DETECTED"
+        echo "==> GPU detected — will use CUDA wheels ($CUDA_TAG)"
+    else
+        MODE="cpu"
+        echo "==> No GPU detected — will use CPU-only wheels"
+    fi
+elif [[ "$MODE" == "gpu" && -z "$CUDA_TAG" ]]; then
+    CUDA_TAG=$(detect_cuda_tag)
+    if [[ -z "$CUDA_TAG" ]]; then
+        echo "WARN: --gpu specified but could not detect CUDA version; defaulting to cu124"
+        CUDA_TAG="cu124"
+    fi
+    echo "==> GPU mode — detected CUDA tag: $CUDA_TAG"
+fi
+
+if [[ "$MODE" == "cpu" ]]; then
+    TORCH_INDEX="https://download.pytorch.org/whl/cpu"
+    echo "==> PyTorch index: CPU-only ($TORCH_INDEX)"
+else
+    TORCH_INDEX="https://download.pytorch.org/whl/$CUDA_TAG"
+    echo "==> PyTorch index: GPU/$CUDA_TAG ($TORCH_INDEX)"
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
@@ -63,10 +135,10 @@ else
     source venv/bin/activate
     pip install --upgrade pip
 
-    # Pin PyTorch 2.8.0 (CPU-only) — 2.9.0 breaks optimum-intel
-    echo "==> Installing PyTorch 2.8.0 (CPU-only wheels)..."
+    # Pin PyTorch 2.8.0 — 2.9.0 breaks optimum-intel
+    echo "==> Installing PyTorch 2.8.0 wheels from $TORCH_INDEX..."
     pip install torch==2.8.0 torchvision==0.23.0 \
-        --index-url https://download.pytorch.org/whl/cpu
+        --index-url "$TORCH_INDEX"
 
     echo "==> Installing remaining requirements from requirements.txt..."
     pip install -r requirements.txt
