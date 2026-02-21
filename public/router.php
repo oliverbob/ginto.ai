@@ -13,15 +13,6 @@ $hostNoPort = preg_replace('/:\\d+$/', '', $host);
 // Check if this is a subdomain request (*.ginto.ai but not ginto.ai itself)
 if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $subdomain = $matches[1];
-
-    // Unified relay subdomain should render the same proxied site as /tunnel
-    if ($subdomain === 'vision') {
-        $relayPath = $uri === '/' ? '/tunnel' : '/tunnel' . $uri;
-        $query = $_SERVER['QUERY_STRING'] ?? '';
-        $_SERVER['REQUEST_URI'] = $relayPath . ($query !== '' ? ('?' . $query) : '');
-        require_once __DIR__ . '/index.php';
-        return true;
-    }
     
     // Skip if it's oi.ginto.ai (handled by Caddy directly)
     if ($subdomain === 'oi') {

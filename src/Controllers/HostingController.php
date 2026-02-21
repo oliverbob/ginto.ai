@@ -1279,6 +1279,10 @@ class HostingController
             $localRelayPort = 18080;
         }
 
+        // Clear any stale locally-provisioned relay process.
+        // Unified relay must reflect a real active tunnel endpoint.
+        $this->stopRelayProxyProcess($subdomain);
+
         $relayDomain = $subdomain . '.ginto.ai';
         $caddyProvision = $this->provisionRelayDomainConfig($relayDomain);
         if (empty($caddyProvision['success'])) {

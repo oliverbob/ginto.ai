@@ -96,66 +96,51 @@ class TunnelController
         $normalizedPath = '/' . ltrim($path, '/');
         $queryString = $_SERVER['QUERY_STRING'] ?? '';
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $targetHost = self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
+        $targetUrl = 'https://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+
         $relayBody = null;
         if (!in_array($method, ['GET', 'HEAD'], true)) {
             $relayBody = file_get_contents('php://input');
         }
 
-        $targetCandidates = $this->getRelayUpstreamCandidates($localRelayPort);
-        $targetHost = '';
-        $response = false;
-        $curlError = '';
-        $status = 0;
-        $headerSize = 0;
-        $attemptErrors = [];
+        $ch = curl_init($targetUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 
-        foreach ($targetCandidates as $candidateHost) {
-            $targetUrl = 'http://' . $candidateHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
-            $ch = curl_init($targetUrl);
-            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-            curl_setopt($ch, CURLOPT_HEADER, true);
-            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-            curl_setopt($ch, CURLOPT_TIMEOUT, 60);
-            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 4);
-
-            if ($relayBody !== null) {
-                curl_setopt($ch, CURLOPT_POSTFIELDS, $relayBody);
-            }
-
-            $headers = [];
-            foreach ($this->getIncomingHeaders() as $name => $value) {
-                $lower = strtolower((string)$name);
-                if (in_array($lower, ['host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer'], true)) {
-                    continue;
-                }
-                $headers[] = $name . ': ' . $value;
-            }
-            $headers[] = 'Host: ' . $candidateHost;
-            $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
-            $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
-            $headers[] = 'X-Forwarded-Proto: ' . ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
-            $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
-            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-
-            $response = curl_exec($ch);
-            $curlError = curl_error($ch);
-            $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-            curl_close($ch);
-
-            if ($response !== false) {
-                $targetHost = $candidateHost;
-                break;
-            }
-
-            $attemptErrors[] = $candidateHost . ': ' . ($curlError !== '' ? $curlError : 'unknown error');
+        if ($relayBody !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $relayBody);
         }
+
+        $headers = [];
+        foreach ($this->getIncomingHeaders() as $name => $value) {
+            $lower = strtolower((string)$name);
+            if (in_array($lower, ['host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer'], true)) {
+                continue;
+            }
+            $headers[] = $name . ': ' . $value;
+        }
+        $headers[] = 'Host: ' . $targetHost;
+        $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
+        $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
+        $headers[] = 'X-Forwarded-Proto: https';
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . $targetHost;
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
 
         if ($response === false) {
             http_response_code(502);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach local relay target</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Tried upstreams: <code>' . htmlspecialchars(implode(', ', $targetCandidates), ENT_QUOTES, 'UTF-8') . '</code></p><p>Attempt errors: <code>' . htmlspecialchars(implode(' | ', $attemptErrors), ENT_QUOTES, 'UTF-8') . '</code></p></body></html>';
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach vision relay endpoint</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Relay target: <code>https://' . htmlspecialchars($targetHost, ENT_QUOTES, 'UTF-8') . '</code></p></body></html>';
             return;
         }
 
@@ -186,10 +171,6 @@ class TunnelController
                 $value = str_replace('https://' . $targetHost, '/tunnel', $value);
                 $value = str_replace('http://localhost:' . $localRelayPort, '/tunnel', $value);
                 $value = str_replace('https://localhost:' . $localRelayPort, '/tunnel', $value);
-                foreach ($targetCandidates as $candidateHost) {
-                    $value = str_replace('http://' . $candidateHost, '/tunnel', $value);
-                    $value = str_replace('https://' . $candidateHost, '/tunnel', $value);
-                }
                 if (str_starts_with($value, '/')) {
                     $value = '/tunnel' . $value;
                 }
@@ -198,40 +179,6 @@ class TunnelController
         }
 
         echo $body;
-    }
-
-    private function getRelayUpstreamCandidates(int $localRelayPort): array
-    {
-        $raw = trim((string)(getenv('TUNNEL_RELAY_UPSTREAMS') ?: ($_ENV['TUNNEL_RELAY_UPSTREAMS'] ?? '')));
-        $candidates = [];
-
-        if ($raw !== '') {
-            foreach (explode(',', $raw) as $entry) {
-                $entry = trim($entry);
-                if ($entry === '') {
-                    continue;
-                }
-                if (!str_contains($entry, ':')) {
-                    $entry .= ':' . $localRelayPort;
-                }
-                $candidates[] = $entry;
-            }
-        }
-
-        $defaultCandidates = [
-            '127.0.0.1:' . $localRelayPort,
-            'localhost:' . $localRelayPort,
-            'host.docker.internal:' . $localRelayPort,
-            '172.17.0.1:' . $localRelayPort,
-        ];
-
-        foreach ($defaultCandidates as $candidate) {
-            if (!in_array($candidate, $candidates, true)) {
-                $candidates[] = $candidate;
-            }
-        }
-
-        return $candidates;
     }
 
     private function isVisionRelayApprovedRemote(): bool
