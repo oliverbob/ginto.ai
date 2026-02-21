@@ -946,11 +946,31 @@ class ChatStreamHandler
                 // Vision model should only receive the image + prompt so it focuses
                 // on visual analysis and does not consume large context windows.
 
-                // Add the user's current prompt and image reference
-                $imageRef = is_string($imageDataUrl) && (str_starts_with($imageDataUrl, 'http') || str_starts_with($imageDataUrl, '/'))
-                    ? $imageDataUrl
-                    : '[inline image omitted for brevity]';
-                $visionMessages[] = ['role' => 'user', 'content' => $prompt . "\n\n[Image]: " . $imageRef];
+                // Add the user's current prompt and actual image payload (multimodal)
+                // IMPORTANT: Vision models must receive image_url content, not just a text placeholder.
+                $visionUserContent = [
+                    ['type' => 'text', 'text' => $prompt]
+                ];
+
+                if (is_string($imageDataUrl) && $imageDataUrl !== '') {
+                    $resolvedImageUrl = $imageDataUrl;
+
+                    // Convert site-relative URL to absolute URL for provider APIs
+                    if (str_starts_with($resolvedImageUrl, '/')) {
+                        $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
+                            ? 'https'
+                            : 'http';
+                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                        $resolvedImageUrl = $scheme . '://' . $host . $resolvedImageUrl;
+                    }
+
+                    $visionUserContent[] = [
+                        'type' => 'image_url',
+                        'image_url' => ['url' => $resolvedImageUrl],
+                    ];
+                }
+
+                $visionMessages[] = ['role' => 'user', 'content' => $visionUserContent];
 
                 try {
                     $visionProviderInstance = new \App\Core\LLM\Providers\OpenAICompatibleProvider('groq', [
