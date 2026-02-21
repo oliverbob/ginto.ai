@@ -2623,6 +2623,12 @@ setup_docker_env() {
     chmod -R a+w "$PROJECT_DIR"
     
     log_success "Docker environment configured in .env"
+
+    # Pre-create the external Docker network that docker-compose.yml declares as external
+    if ! docker network inspect ginto-sandbox &>/dev/null 2>&1; then
+        log_info "Creating Docker network: ginto-sandbox"
+        docker network create ginto-sandbox
+    fi
 }
 
 # Build Docker images
@@ -2834,13 +2840,19 @@ start_sandbox_services() {
         COMPOSE_CMD="docker-compose"
     fi
     
+    # Ensure the external Docker network exists before compose tries to attach to it
+    if ! docker network inspect ginto-sandbox &>/dev/null 2>&1; then
+        log_info "Creating Docker network: ginto-sandbox"
+        docker network create ginto-sandbox
+    fi
+
     # Stop and remove any existing containers to avoid port conflicts
     log_info "Cleaning up any existing sandbox containers..."
     $COMPOSE_CMD down --remove-orphans 2>/dev/null || true
-    
+
     # Also remove any old containers that might be using our ports
     docker rm -f ginto-sandbox-proxy ginto-terminal-server ginto-sandbox-manager 2>/dev/null || true
-    
+
     # Start sandbox services
     log_info "Starting sandbox proxy and terminal server..."
     $COMPOSE_CMD up -d
