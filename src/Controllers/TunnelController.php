@@ -195,8 +195,9 @@ class TunnelController
         curl_close($ch);
 
         if ($response === false || $httpCode < 200 || $httpCode >= 300) {
-            $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' error=' . ($curlError !== '' ? $curlError : 'none');
-            return false;
+            $localApproved = $this->isSubdomainApprovedLocally($subdomain);
+            $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' error=' . ($curlError !== '' ? $curlError : 'none') . ' fallback_local=' . ($localApproved ? 'true' : 'false');
+            return $localApproved;
         }
 
         $decoded = json_decode((string)$response, true);

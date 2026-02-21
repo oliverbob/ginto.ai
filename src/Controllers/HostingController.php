@@ -903,13 +903,14 @@ class HostingController
         $availableFile = $availableDir . '/' . $safeDomain . '.caddy';
         $enabledFile = $enabledDir . '/' . $safeDomain . '.caddy';
 
-        $redirectTarget = trim((string)(getenv('TUNNEL_RELAY_REDIRECT_TARGET') ?: ($_ENV['TUNNEL_RELAY_REDIRECT_TARGET'] ?? 'https://ginto.ai/tunnel')));
-        if ($redirectTarget === '') {
-            $redirectTarget = 'https://ginto.ai/tunnel';
+        $relayAppPort = (int)(getenv('APP_PORT') ?: ($_ENV['APP_PORT'] ?? 8000));
+        if ($relayAppPort < 1 || $relayAppPort > 65535) {
+            $relayAppPort = 8000;
         }
 
         $config = $safeDomain . " {\n"
-            . "    redir {$redirectTarget}{uri} 302\n"
+            . "    rewrite * /tunnel{uri}\n"
+            . "    reverse_proxy 127.0.0.1:{$relayAppPort}\n"
             . "    encode gzip\n"
             . "}\n";
 
@@ -933,7 +934,7 @@ class HostingController
             'success' => true,
             'available' => $availableFile,
             'enabled' => $enabledFile,
-            'redirect_target' => $redirectTarget,
+            'proxy_target' => '127.0.0.1:' . $relayAppPort,
         ];
     }
 
@@ -1326,7 +1327,7 @@ class HostingController
             'caddy' => [
                 'available' => $caddyProvision['available'] ?? '/etc/caddy/sites-available/' . $relayDomain . '.caddy',
                 'enabled' => $caddyProvision['enabled'] ?? '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy',
-                'redirect_target' => $caddyProvision['redirect_target'] ?? null,
+                'proxy_target' => $caddyProvision['proxy_target'] ?? null,
             ],
             'dns' => $dnsProvision,
             'message' => 'Relay approved and provisioned (Caddy + DNS)'
