@@ -152,10 +152,17 @@ else
 fi
 
 # --- systemd service ----------------------------------------------------
-echo "==> Writing /etc/systemd/system/sdcpu.service..."
+# Pass --device cuda when running in GPU mode so diffusers fp16 path is used
+if [[ "$MODE" == "gpu" ]]; then
+    SDCPU_DEVICE_FLAG="--device cuda"
+else
+    SDCPU_DEVICE_FLAG="--device cpu"
+fi
+
+echo "==> Writing /etc/systemd/system/sdcpu.service (device: ${MODE})..."
 sudo tee /etc/systemd/system/sdcpu.service > /dev/null << EOF
 [Unit]
-Description=FastSD CPU Image Generation Server
+Description=FastSD Image Generation Server (${MODE})
 After=network.target
 
 [Service]
@@ -163,7 +170,7 @@ Type=simple
 User=$INSTALL_USER
 Group=$INSTALL_USER
 WorkingDirectory=$SDCPU_DIR
-ExecStart=$SDCPU_DIR/venv/bin/python src/api_server.py --port 8888
+ExecStart=$SDCPU_DIR/venv/bin/python src/api_server.py --port 8888 ${SDCPU_DEVICE_FLAG}
 Restart=always
 RestartSec=5
 Environment=HOME=$INSTALL_USER_HOME

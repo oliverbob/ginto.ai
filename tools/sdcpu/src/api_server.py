@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-Minimal FastSD CPU API Server
-Supports OpenVINO text-to-image and image-to-image generation for maximum performance on CPU
+Minimal FastSD CPU/GPU API Server
+CPU mode  : OpenVINO via optimum-intel (rupeshs/sd-turbo-openvino)
+CUDA mode : diffusers AutoPipeline with torch.float16 (stabilityai/sd-turbo)
+
+Usage:
+  python src/api_server.py --port 8888              # auto-detect
+  python src/api_server.py --port 8888 --device cpu
+  python src/api_server.py --port 8888 --device cuda
 """
 
 import base64
@@ -12,19 +18,20 @@ import time
 from argparse import ArgumentParser
 from typing import Optional
 
+import torch
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# Set device to CPU before imports
-os.environ.setdefault("DEVICE", "cpu")
+# ---------------------------------------------------------------------------
+# Device selection — resolved once at startup via --device arg
+# ---------------------------------------------------------------------------
+DEVICE: str = "cpu"  # overwritten in main() before any pipeline is loaded
 
-from optimum.intel.openvino import OVDiffusionPipeline
-from optimum.intel.openvino.modeling_diffusion import OVStableDiffusionImg2ImgPipeline
-
-# Default model for ultra-fast generation
-DEFAULT_MODEL = "rupeshs/sd-turbo-openvino"
+DEFAULT_MODEL_CPU  = "rupeshs/sd-turbo-openvino"
+DEFAULT_MODEL_CUDA = "stabilityai/sd-turbo"
+DEFAULT_MODEL      = DEFAULT_MODEL_CPU  # updated in main()
 
 app = FastAPI(
     title="FastSD CPU API",
@@ -73,50 +80,68 @@ class GenerateResponse(BaseModel):
     mode: str = Field("txt2img", description="Generation mode: txt2img or img2img")
 
 
+def _is_cuda() -> bool:
+    return DEVICE == "cuda"
+
+
 def load_txt2img_pipeline(model_id: str, use_local: bool = False):
-    """Load the OpenVINO txt2img pipeline for the specified model"""
+    """Load txt2img pipeline — OpenVINO for CPU, diffusers AutoPipeline for CUDA"""
     global _txt2img_pipeline, _current_model
-    
+
     if _txt2img_pipeline is not None and _current_model == model_id:
         return _txt2img_pipeline
-    
-    print(f"Loading OpenVINO txt2img model: {model_id}...")
+
+    print(f"[{DEVICE.upper()}] Loading txt2img model: {model_id}...")
     start = time.time()
-    
-    _txt2img_pipeline = OVDiffusionPipeline.from_pretrained(
-        model_id,
-        local_files_only=use_local,
-        ov_config={"CACHE_DIR": ""},
-        device="CPU",
-    )
+
+    if _is_cuda():
+        from diffusers import AutoPipelineForText2Image
+        _txt2img_pipeline = AutoPipelineForText2Image.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        ).to("cuda")
+    else:
+        from optimum.intel.openvino import OVDiffusionPipeline
+        _txt2img_pipeline = OVDiffusionPipeline.from_pretrained(
+            model_id,
+            local_files_only=use_local,
+            ov_config={"CACHE_DIR": ""},
+            device="CPU",
+        )
+
     _current_model = model_id
-    
-    elapsed = time.time() - start
-    print(f"txt2img model loaded in {elapsed:.2f}s")
-    
+    print(f"txt2img model loaded in {time.time() - start:.2f}s")
     return _txt2img_pipeline
 
 
 def load_img2img_pipeline(model_id: str, use_local: bool = False):
-    """Load the OpenVINO img2img pipeline for the specified model"""
+    """Load img2img pipeline — OpenVINO for CPU, diffusers AutoPipeline for CUDA"""
     global _img2img_pipeline, _current_model
-    
+
     if _img2img_pipeline is not None and _current_model == model_id:
         return _img2img_pipeline
-    
-    print(f"Loading OpenVINO img2img model: {model_id}...")
+
+    print(f"[{DEVICE.upper()}] Loading img2img model: {model_id}...")
     start = time.time()
-    
-    _img2img_pipeline = OVStableDiffusionImg2ImgPipeline.from_pretrained(
-        model_id,
-        local_files_only=use_local,
-        ov_config={"CACHE_DIR": ""},
-        device="CPU",
-    )
-    
-    elapsed = time.time() - start
-    print(f"img2img model loaded in {elapsed:.2f}s")
-    
+
+    if _is_cuda():
+        from diffusers import AutoPipelineForImage2Image
+        _img2img_pipeline = AutoPipelineForImage2Image.from_pretrained(
+            model_id,
+            torch_dtype=torch.float16,
+            variant="fp16",
+        ).to("cuda")
+    else:
+        from optimum.intel.openvino.modeling_diffusion import OVStableDiffusionImg2ImgPipeline
+        _img2img_pipeline = OVStableDiffusionImg2ImgPipeline.from_pretrained(
+            model_id,
+            local_files_only=use_local,
+            ov_config={"CACHE_DIR": ""},
+            device="CPU",
+        )
+
+    print(f"img2img model loaded in {time.time() - start:.2f}s")
     return _img2img_pipeline
 
 
@@ -145,7 +170,7 @@ async def generate(request: GenerateRequest):
     try:
         # Set seed
         seed = request.seed if request.seed is not None else int(time.time() * 1000) % (2**32)
-        generator = torch.Generator().manual_seed(seed)
+        generator = torch.Generator("cuda" if _is_cuda() else "cpu").manual_seed(seed)
         
         # Check if this is img2img mode
         mode = "txt2img"
@@ -245,7 +270,7 @@ async def generate_stream(request: GenerateRequest):
         try:
             # Set seed
             seed = request.seed if request.seed is not None else int(time.time() * 1000) % (2**32)
-            generator = torch.Generator().manual_seed(seed)
+            generator = torch.Generator("cuda" if _is_cuda() else "cpu").manual_seed(seed)
             
             # Prepare init_image for img2img mode
             init_image = None
@@ -397,20 +422,44 @@ async def generate_stream(request: GenerateRequest):
 
 
 def main():
-    parser = ArgumentParser(description="FastSD CPU Minimal API Server")
+    global DEVICE, DEFAULT_MODEL
+
+    parser = ArgumentParser(description="FastSD CPU/GPU Minimal API Server")
     parser.add_argument("--host", default="0.0.0.0", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8888, help="Port to bind to")
     parser.add_argument("--preload", action="store_true", help="Preload the default model on startup")
-    parser.add_argument("--model", default=DEFAULT_MODEL, help="Model to use/preload")
+    parser.add_argument(
+        "--device",
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Device to use: auto (detect), cpu (OpenVINO), cuda (diffusers fp16)",
+    )
+    parser.add_argument("--model", default=None, help="Override model to use/preload")
     args = parser.parse_args()
-    
+
+    # Resolve device
+    if args.device == "auto":
+        DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+    else:
+        DEVICE = args.device
+
+    if DEVICE == "cuda" and not torch.cuda.is_available():
+        print("WARNING: --device cuda requested but CUDA is not available; falling back to cpu")
+        DEVICE = "cpu"
+
+    DEFAULT_MODEL = DEFAULT_MODEL_CUDA if DEVICE == "cuda" else DEFAULT_MODEL_CPU
+    model = args.model or DEFAULT_MODEL
+
+    print(f"Device : {DEVICE.upper()}")
+    print(f"Model  : {model}")
+
     if args.preload:
-        print("Preloading model...")
-        load_pipeline(args.model)
-    
-    print(f"Starting FastSD CPU API on http://{args.host}:{args.port}")
+        print("Preloading txt2img model...")
+        load_txt2img_pipeline(model)
+
+    print(f"Starting FastSD API on http://{args.host}:{args.port}")
     print(f"API docs: http://{args.host}:{args.port}/api/docs")
-    
+
     uvicorn.run(app, host=args.host, port=args.port)
 
 
