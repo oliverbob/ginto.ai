@@ -145,6 +145,22 @@ $currentPage = 'tunnels';
             <div><span class="text-gray-500">Last Approval Check:</span> <span id="relay-last-check" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Check Source:</span> <span id="relay-last-check-ip" class="ml-2 font-mono">-</span></div>
           </div>
+          <div class="mt-4 flex flex-wrap items-center gap-2">
+            <label for="relay-approve-minutes" class="text-xs text-gray-500">Approval Duration</label>
+            <select id="relay-approve-minutes" class="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+              <option value="60">1 hour</option>
+              <option value="360">6 hours</option>
+              <option value="1440" selected>24 hours</option>
+              <option value="10080">7 days</option>
+              <option value="43200">30 days</option>
+            </select>
+            <button id="relay-approve-btn" onclick="approveRelay()" class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors">
+              <i class="fas fa-check mr-1"></i>Approve
+            </button>
+            <button id="relay-revoke-btn" onclick="revokeRelay()" class="px-3 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded transition-colors">
+              <i class="fas fa-ban mr-1"></i>Revoke
+            </button>
+          </div>
         </div>
       </div>
     </main>
@@ -152,6 +168,7 @@ $currentPage = 'tunnels';
 
   <script>
     const csrfToken = '<?= $csrfToken ?>';
+    let relayApi = { approveUrl: '/admin/hosting/tunnels/relay/approve', revokeUrl: '/admin/hosting/tunnels/relay/revoke', subdomain: 'vision' };
 
     async function loadTunnels() {
       try {
@@ -180,6 +197,11 @@ $currentPage = 'tunnels';
         document.getElementById('relay-endpoint').textContent = `https://ginto.ai${relayEndpoint}`;
         document.getElementById('relay-approval-url').textContent = relay.approval_url || '-';
         document.getElementById('relay-local-port').textContent = relay.local_port ? `127.0.0.1:${relay.local_port}` : '-';
+        relayApi = {
+          approveUrl: relay.approve_url || '/admin/hosting/tunnels/relay/approve',
+          revokeUrl: relay.revoke_url || '/admin/hosting/tunnels/relay/revoke',
+          subdomain: relay.subdomain || 'vision'
+        };
 
         const relayStatusEl = document.getElementById('relay-status');
         if (relayBlocked) {
@@ -207,6 +229,13 @@ $currentPage = 'tunnels';
           : '-';
         const relayLastCheckIpEl = document.getElementById('relay-last-check-ip');
         relayLastCheckIpEl.textContent = relay.last_check_ip || '-';
+
+        const approveBtn = document.getElementById('relay-approve-btn');
+        const revokeBtn = document.getElementById('relay-revoke-btn');
+        approveBtn.disabled = relayApproved && !relayBlocked;
+        revokeBtn.disabled = !relayApproved && !relayBlocked;
+        approveBtn.classList.toggle('opacity-50', approveBtn.disabled);
+        revokeBtn.classList.toggle('opacity-50', revokeBtn.disabled);
         
         const tbody = document.getElementById('tunnels-list');
         
@@ -348,6 +377,45 @@ $currentPage = 'tunnels';
         } else {
           alert('Failed: ' + (data.error || 'Unknown error'));
         }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function approveRelay() {
+      const minutesEl = document.getElementById('relay-approve-minutes');
+      const minutes = parseInt(minutesEl.value || '1440', 10);
+      try {
+        const res = await fetch(relayApi.approveUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subdomain: relayApi.subdomain, minutes, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadTunnels();
+          return;
+        }
+        alert('Failed: ' + (data.error || 'Unknown error'));
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function revokeRelay() {
+      if (!confirm('Revoke relay approval and block it?')) return;
+      try {
+        const res = await fetch(relayApi.revokeUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subdomain: relayApi.subdomain, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadTunnels();
+          return;
+        }
+        alert('Failed: ' + (data.error || 'Unknown error'));
       } catch (e) {
         alert('Error: ' + e.message);
       }

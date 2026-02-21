@@ -817,6 +817,8 @@ class HostingController
                 'domain' => $relayDomain,
                 'endpoint' => $relayEndpoint,
                 'approval_url' => '/api/tunnel/relay/approval?subdomain=' . $relaySubdomain,
+                'approve_url' => '/admin/hosting/tunnels/relay/approve',
+                'revoke_url' => '/admin/hosting/tunnels/relay/revoke',
                 'approved' => $relayApproved,
                 'blocked' => $relayBlocked,
                 'expires_at' => $relayExpiresAt,
@@ -923,6 +925,96 @@ class HostingController
         $this->saveTunnelBlocklist($blocklist);
         
         echo json_encode(['success' => true, 'subdomain' => $subdomain, 'message' => 'Tunnel unblocked']);
+        exit;
+    }
+
+    /**
+     * Approve unified relay subdomain
+     * POST /admin/hosting/tunnels/relay/approve
+     */
+    public function tunnelsRelayApprove(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $subdomainInput = (string)($input['subdomain'] ?? 'vision');
+        $subdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput);
+
+        if ($subdomain === '') {
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            exit;
+        }
+
+        $minutes = (int)($input['minutes'] ?? 1440);
+        if ($minutes < 1) {
+            $minutes = 1;
+        }
+        if ($minutes > 43200) {
+            $minutes = 43200;
+        }
+
+        $expiresIn = $minutes * 60;
+        $clientIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'admin');
+
+        $registry = $this->getTunnelRegistry();
+        $registry[$subdomain] = [
+            'subdomain' => $subdomain,
+            'started_at' => time(),
+            'expires_at' => time() + $expiresIn,
+            'client_ip' => $clientIp,
+            'registered_at' => date('Y-m-d H:i:s')
+        ];
+        $this->saveTunnelRegistry($registry);
+
+        $blocklist = $this->getTunnelBlocklist();
+        $blocklist = array_values(array_diff($blocklist, [$subdomain]));
+        $this->saveTunnelBlocklist($blocklist);
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'expires_at' => $registry[$subdomain]['expires_at'],
+            'message' => 'Relay approved'
+        ]);
+        exit;
+    }
+
+    /**
+     * Revoke unified relay subdomain
+     * POST /admin/hosting/tunnels/relay/revoke
+     */
+    public function tunnelsRelayRevoke(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $subdomainInput = (string)($input['subdomain'] ?? 'vision');
+        $subdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput);
+
+        if ($subdomain === '') {
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            exit;
+        }
+
+        $registry = $this->getTunnelRegistry();
+        unset($registry[$subdomain]);
+        $this->saveTunnelRegistry($registry);
+
+        $blocklist = $this->getTunnelBlocklist();
+        if (!in_array($subdomain, $blocklist, true)) {
+            $blocklist[] = $subdomain;
+            $this->saveTunnelBlocklist($blocklist);
+        }
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'message' => 'Relay revoked and blocked'
+        ]);
         exit;
     }
 

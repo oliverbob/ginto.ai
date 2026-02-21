@@ -162,6 +162,8 @@ $req('/hosting/tunnels/api', 'HostingController@tunnelsApi');
 $req('/hosting/tunnels/register', 'HostingController@tunnelsRegister', ['POST']);
 $req('/hosting/tunnels/disconnect', 'HostingController@tunnelsDisconnect', ['POST']);
 $req('/hosting/tunnels/unblock', 'HostingController@tunnelsUnblock', ['POST']);
+$req('/hosting/tunnels/relay/approve', 'HostingController@tunnelsRelayApprove', ['POST']);
+$req('/hosting/tunnels/relay/revoke', 'HostingController@tunnelsRelayRevoke', ['POST']);
 $req('/hosting/tunnels/clear-offline', 'HostingController@tunnelsClearOffline', ['POST']);
 $req('/hosting/tunnels/cleanup', 'HostingController@tunnelsCleanup', ['GET']);
 
