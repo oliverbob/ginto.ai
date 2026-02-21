@@ -903,14 +903,13 @@ class HostingController
         $availableFile = $availableDir . '/' . $safeDomain . '.caddy';
         $enabledFile = $enabledDir . '/' . $safeDomain . '.caddy';
 
-        $relayAppPort = (int)(getenv('APP_PORT') ?: ($_ENV['APP_PORT'] ?? 8000));
-        if ($relayAppPort < 1 || $relayAppPort > 65535) {
-            $relayAppPort = 8000;
+        $frpVhostPort = (int)(getenv('FRP_VHOST_HTTP_PORT') ?: ($_ENV['FRP_VHOST_HTTP_PORT'] ?? 7080));
+        if ($frpVhostPort < 1 || $frpVhostPort > 65535) {
+            $frpVhostPort = 7080;
         }
 
         $config = $safeDomain . " {\n"
-            . "    rewrite * /tunnel{uri}\n"
-            . "    reverse_proxy 127.0.0.1:{$relayAppPort}\n"
+            . "    reverse_proxy 127.0.0.1:{$frpVhostPort}\n"
             . "    encode gzip\n"
             . "}\n";
 
@@ -934,7 +933,7 @@ class HostingController
             'success' => true,
             'available' => $availableFile,
             'enabled' => $enabledFile,
-            'proxy_target' => '127.0.0.1:' . $relayAppPort,
+            'proxy_target' => '127.0.0.1:' . $frpVhostPort,
         ];
     }
 
