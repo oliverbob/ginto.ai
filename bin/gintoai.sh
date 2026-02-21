@@ -2832,14 +2832,14 @@ build_sandbox_images() {
 # Start sandbox services only (main stack runs on host)
 start_sandbox_services() {
     log_step "Starting Docker sandbox services..."
-    
+
     cd "$PROJECT_DIR"
-    
+
     local COMPOSE_CMD="docker compose"
     if ! docker compose version &>/dev/null 2>&1; then
         COMPOSE_CMD="docker-compose"
     fi
-    
+
     # Ensure the external Docker network exists before compose tries to attach to it
     if ! docker network inspect ginto-sandbox &>/dev/null 2>&1; then
         log_info "Creating Docker network: ginto-sandbox"
@@ -2852,6 +2852,18 @@ start_sandbox_services() {
 
     # Also remove any old containers that might be using our ports
     docker rm -f ginto-sandbox-proxy ginto-terminal-server ginto-sandbox-manager 2>/dev/null || true
+
+    # Kill any non-Docker processes still holding sandbox ports
+    for port in "${SANDBOX_PROXY_PORT:-3000}" "${TERMINAL_SERVER_PORT:-3001}"; do
+        local pids
+        pids=$(lsof -t -i TCP:"$port" -sTCP:LISTEN 2>/dev/null || true)
+        if [ -n "$pids" ]; then
+            log_info "Port $port still in use by PID(s) $pids — killing..."
+            # shellcheck disable=SC2086
+            kill -9 $pids 2>/dev/null || true
+            sleep 1
+        fi
+    done
 
     # Start sandbox services
     log_info "Starting sandbox proxy and terminal server..."
