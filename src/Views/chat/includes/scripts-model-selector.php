@@ -7,6 +7,8 @@
 <!-- Model Selector Script (available to admin and non-admin users) -->
 <script>
 (function() {
+  const forceGroqVisionForAllModels = <?= ((getenv('GROQ_VISION_FOR_ALL_MODELS') ?: ($_ENV['GROQ_VISION_FOR_ALL_MODELS'] ?? 'false')) === 'true') ? 'true' : 'false' ?>;
+
   // Support both desktop and mobile model selector elements.
   const btnEls = Array.from(document.querySelectorAll('#model-selector-btn, #model-selector-btn-mobile'));
   const dropdownDesktop = document.getElementById('model-dropdown');
@@ -327,14 +329,13 @@
     window.GINTO_MODEL_CAPABILITIES = capabilities || { vision: false, thinking: false };
     
     if (attachBtn) {
-      if (capabilities?.vision) {
-        // Show attachment button for vision-enabled models
+      if (capabilities?.vision || forceGroqVisionForAllModels) {
         attachBtn.classList.remove('hidden');
-        attachBtn.title = 'Attach image (vision enabled)';
+        attachBtn.title = forceGroqVisionForAllModels
+          ? 'Attach image (Groq vision pre-analysis enabled for all models)'
+          : 'Attach image (vision enabled)';
       } else {
-        // Hide attachment button for non-vision models
         attachBtn.classList.add('hidden');
-        // Clear any pending attachment
         if (attachInput) attachInput.value = '';
         if (attachPreview) attachPreview.classList.add('hidden');
       }

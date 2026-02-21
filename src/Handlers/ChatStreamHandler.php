@@ -824,7 +824,8 @@ class ChatStreamHandler
 
             // Local LLM config
             $localLlmConfig = \App\Core\LLM\LocalLLMConfig::getInstance();
-            $canUseLocalVision = $hasImage && $localLlmConfig->isEnabled() && $localLlmConfig->isVisionServerHealthy();
+            $forceGroqVisionForAllModels = $hasImage && strtolower(getenv('GROQ_VISION_FOR_ALL_MODELS') ?: ($_ENV['GROQ_VISION_FOR_ALL_MODELS'] ?? 'false')) === 'true';
+            $canUseLocalVision = $hasImage && !$forceGroqVisionForAllModels && $localLlmConfig->isEnabled() && $localLlmConfig->isVisionServerHealthy();
 
             $requiresGroq = $needsWebSearch && !$useLightpandaSearch;
             $requiresCloudVision = $hasImage && !$canUseLocalVision;
@@ -1015,7 +1016,19 @@ class ChatStreamHandler
                 $adminLogEvents[] = '[vision] using local vision model: ' . $modelName;
             } elseif ($hasImage && $imageDataUrl) {
                 // Cloud vision - user already selected a vision model, or we need to find one
-                if ($userSelectedVisionModel && $sessionCloudModel) {
+                if ($forceGroqVisionForAllModels) {
+                    $modelName = $modelMapping['groq']['vision'];
+                    $visionProvider = 'groq';
+                    $directVisionInMainChat = false;
+                    $groqKeyData = $keyManager->getAvailableKey('groq');
+                    if ($groqKeyData) {
+                        $visionApiKey = $groqKeyData['api_key'];
+                    } else {
+                        $visionApiKey = getenv('GROQ_API_KEY') ?: ($_ENV['GROQ_API_KEY'] ?? '');
+                    }
+                    error_log("[ChatStream] GROQ_VISION_FOR_ALL_MODELS enabled; pre-analyzing image with Groq: $modelName");
+                    $adminLogEvents[] = '[vision] GROQ_VISION_FOR_ALL_MODELS enabled, pre-analyzing with groq/' . $modelName;
+                } elseif ($userSelectedVisionModel && $sessionCloudModel) {
                     // User selected a vision-capable model, use it with already-selected provider/key
                     $modelName = $sessionCloudModel;
                     $visionProvider = $selectedProvider;
@@ -1077,14 +1090,7 @@ class ChatStreamHandler
                     'model' => $config['model'],
                     'base_url' => $config['base_url'],
                 ]);
-            } elseif ($useLocalLlm) {
-                $config = $localLlmConfig->getReasoningProviderConfig();
-                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider('local', [
-                    'api_key' => $config['api_key'],
-                    'model' => $config['model'],
-                    'base_url' => $config['base_url'],
-                ]);
-            } elseif ($hasImage && $imageDataUrl && !$useLocalVision && !$directVisionInMainChat) {
+            } elseif ($hasImage && $imageDataUrl && !$useLocalVision && ($forceGroqVisionForAllModels || !$directVisionInMainChat)) {
                 // Cloud vision - call the vision-capable provider (Groq) FIRST,
                 // attaching the current conversation history so the vision model
                 // can use context when analyzing the image. Then continue the
@@ -1093,7 +1099,9 @@ class ChatStreamHandler
                 // Save main provider/model/key so we can continue the chat there
                 $mainProviderName = $selectedProvider;
                 $mainApiKey = $apiKey;
-                $mainModelName = ($sessionCloudModel ?? $defaultModel ?? ($selectedProvider === 'cerebras' ? 'gpt-oss-120b' : ($selectedProvider === 'groq' ? 'llama-3.3-70b-versatile' : 'llama-3.3-70b-versatile')));
+                $mainModelName = $useLocalLlm
+                    ? $localLlmConfig->getReasoningModel()
+                    : ($sessionCloudModel ?? $defaultModel ?? ($selectedProvider === 'cerebras' ? 'gpt-oss-120b' : ($selectedProvider === 'groq' ? 'llama-3.3-70b-versatile' : 'llama-3.3-70b-versatile')));
 
                 // Vision model (already computed into $modelName) and Groq key
                 $visionModelName = $modelName;
@@ -1156,6 +1164,13 @@ class ChatStreamHandler
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
                     'api_key' => $apiKey,
                     'model' => $modelName,
+                ]);
+            } elseif ($useLocalLlm) {
+                $config = $localLlmConfig->getReasoningProviderConfig();
+                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider('local', [
+                    'api_key' => $config['api_key'],
+                    'model' => $config['model'],
+                    'base_url' => $config['base_url'],
                 ]);
             } else {
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
@@ -1449,7 +1464,7 @@ class ChatStreamHandler
 
                 // Log the actual outgoing payload to storage/logs for post-mortem
                 try {
-                    if (strtolower($providerNameForLimit) === 'groq') {
+                    if (strtolower($providerNameForLimit) === 'groq' && !$hasImage) {
                         $this->logOutgoingPayload($previewPayload, 'groq');
                     }
                 } catch (\Throwable $_) {
