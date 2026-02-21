@@ -884,6 +884,59 @@ class HostingController
         ];
     }
 
+    private function provisionRelayDomainConfig(string $domain): array
+    {
+        $safeDomain = strtolower(trim($domain));
+        if (!preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $safeDomain)) {
+            return ['success' => false, 'error' => 'Invalid relay domain'];
+        }
+
+        $availableDir = '/etc/caddy/sites-available';
+        $enabledDir = '/etc/caddy/sites-enabled';
+        if (!is_dir($availableDir)) {
+            @mkdir($availableDir, 0755, true);
+        }
+        if (!is_dir($enabledDir)) {
+            @mkdir($enabledDir, 0755, true);
+        }
+
+        $availableFile = $availableDir . '/' . $safeDomain . '.caddy';
+        $enabledFile = $enabledDir . '/' . $safeDomain . '.caddy';
+
+        $redirectTarget = trim((string)(getenv('TUNNEL_RELAY_REDIRECT_TARGET') ?: ($_ENV['TUNNEL_RELAY_REDIRECT_TARGET'] ?? 'http://localhost/tunnel')));
+        if ($redirectTarget === '') {
+            $redirectTarget = 'http://localhost/tunnel';
+        }
+
+        $config = $safeDomain . " {\n"
+            . "    redir {$redirectTarget}{uri} 302\n"
+            . "    encode gzip\n"
+            . "}\n";
+
+        if (@file_put_contents($availableFile, $config) === false) {
+            return ['success' => false, 'error' => 'Failed to write relay Caddy config'];
+        }
+
+        if (file_exists($enabledFile) || is_link($enabledFile)) {
+            @unlink($enabledFile);
+        }
+        if (!@symlink($availableFile, $enabledFile)) {
+            return ['success' => false, 'error' => 'Failed to enable relay Caddy config'];
+        }
+
+        $reload = $this->runCommand('sudo systemctl reload caddy');
+        if ((int)($reload['code'] ?? 1) !== 0) {
+            return ['success' => false, 'error' => 'Failed to reload Caddy: ' . trim((string)($reload['output'] ?? 'unknown'))];
+        }
+
+        return [
+            'success' => true,
+            'available' => $availableFile,
+            'enabled' => $enabledFile,
+            'redirect_target' => $redirectTarget,
+        ];
+    }
+
     /**
      * Get tunnel blocklist
      */
@@ -1225,37 +1278,18 @@ class HostingController
             $localRelayPort = 18080;
         }
 
-        $relayProvision = $this->provisionRelayProxy($subdomain, $localRelayPort);
-        if (empty($relayProvision['success'])) {
+        $relayDomain = $subdomain . '.ginto.ai';
+        $caddyProvision = $this->provisionRelayDomainConfig($relayDomain);
+        if (empty($caddyProvision['success'])) {
             http_response_code(500);
             echo json_encode([
                 'success' => false,
-                'error' => $relayProvision['error'] ?? 'Failed to provision relay proxy',
+                'error' => $caddyProvision['error'] ?? 'Failed to provision relay Caddy config',
             ]);
             exit;
         }
 
-        $relayDomain = $subdomain . '.ginto.ai';
-        $relayTarget = '127.0.0.1:' . $localRelayPort;
-        $domainProvision = $this->createDomain([
-            'domain' => $relayDomain,
-            'php' => false,
-            'ssl' => true,
-            'proxy_type' => 'relay',
-            'proxy_target' => $relayTarget,
-            'proxy_container_name' => null,
-            'owner_username' => 'system',
-            'owner_fullname' => 'Tunnel Relay',
-        ]);
-        if (empty($domainProvision['success'])) {
-            $this->stopRelayProxyProcess($subdomain);
-            http_response_code(500);
-            echo json_encode([
-                'success' => false,
-                'error' => $domainProvision['error'] ?? 'Failed to provision Caddy/DNS for relay domain',
-            ]);
-            exit;
-        }
+        $dnsProvision = $this->autoCreateDnsForDomain($relayDomain);
 
         $clientIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'admin');
 
@@ -1268,7 +1302,6 @@ class HostingController
             'registered_at' => date('Y-m-d H:i:s')
         ];
         if (!$this->saveTunnelRegistry($registry)) {
-            $this->stopRelayProxyProcess($subdomain);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
             exit;
@@ -1277,7 +1310,6 @@ class HostingController
         $blocklist = $this->getTunnelBlocklist();
         $blocklist = array_values(array_diff($blocklist, [$subdomain]));
         if (!$this->saveTunnelBlocklist($blocklist)) {
-            $this->stopRelayProxyProcess($subdomain);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to update tunnel blocklist']);
             exit;
@@ -1289,14 +1321,15 @@ class HostingController
             'domain' => $relayDomain,
             'expires_at' => $registry[$subdomain]['expires_at'],
             'local_port' => $localRelayPort,
-            'relay_pid' => $relayProvision['pid'] ?? null,
-            'relay_config' => $relayProvision['config_path'] ?? null,
+            'relay_pid' => null,
+            'relay_config' => null,
             'caddy' => [
-                'available' => '/etc/caddy/sites-available/' . $relayDomain . '.caddy',
-                'enabled' => '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy',
+                'available' => $caddyProvision['available'] ?? '/etc/caddy/sites-available/' . $relayDomain . '.caddy',
+                'enabled' => $caddyProvision['enabled'] ?? '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy',
+                'redirect_target' => $caddyProvision['redirect_target'] ?? null,
             ],
-            'dns' => $domainProvision['dns'] ?? null,
-            'message' => 'Relay approved and provisioned (FRP + Caddy + DNS)'
+            'dns' => $dnsProvision,
+            'message' => 'Relay approved and provisioned (Caddy + DNS)'
         ]);
         exit;
     }
