@@ -144,6 +144,9 @@ $currentPage = 'tunnels';
             <div><span class="text-gray-500">Expires:</span> <span id="relay-expiry" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Relay Process:</span> <span id="relay-frpc-status" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Relay Config:</span> <span id="relay-frpc-config" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Caddy Available:</span> <span id="relay-caddy-available" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Caddy Enabled:</span> <span id="relay-caddy-enabled" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">DNS Zone:</span> <span id="relay-dns-zone" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Last Approval Check:</span> <span id="relay-last-check" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Check Source:</span> <span id="relay-last-check-ip" class="ml-2 font-mono">-</span></div>
           </div>
@@ -230,6 +233,11 @@ $currentPage = 'tunnels';
           ? `<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Running${relayFrpcPid ? ` (PID ${relayFrpcPid})` : ''}</span>`
           : '<span class="px-2 py-1 text-xs rounded bg-gray-500/10 text-gray-500">Stopped</span>';
         document.getElementById('relay-frpc-config').textContent = relay.frpc_config_path || '-';
+        document.getElementById('relay-caddy-available').textContent = relay.caddy_available_path || '-';
+        document.getElementById('relay-caddy-enabled').textContent = relay.caddy_enabled_path || '-';
+        document.getElementById('relay-dns-zone').innerHTML = relay.dns_zone_exists
+          ? '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Created</span>'
+          : '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-500">Missing</span>';
 
         const relayLastCheckAt = Number(relay.last_check_at || 0);
         const relayLastCheckCount = Number(relay.last_check_count || 0);

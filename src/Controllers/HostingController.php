@@ -849,6 +849,8 @@ class HostingController
         if ($relayLocalPort < 1024 || $relayLocalPort > 65535) {
             $relayLocalPort = 18080;
         }
+        $relayAvailableCaddy = '/etc/caddy/sites-available/' . $relayDomain . '.caddy';
+        $relayEnabledCaddy = '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy';
 
         // Get FRP dashboard credentials
         $frpDashboardPwd = trim(shell_exec("grep FRP_DASHBOARD_PWD /etc/frp/frps.env 2>/dev/null | cut -d= -f2") ?: '');
@@ -943,6 +945,12 @@ class HostingController
         $relayBlocked = in_array($relaySubdomain, $blocklist, true);
         $relayApproved = !$relayBlocked && is_array($relayEntry) && $relayExpiresAt > $now;
         $relayProxyState = $this->getRelayProxyState($relaySubdomain);
+        $relayDnsZoneExists = false;
+        try {
+            $relayDnsZoneExists = (bool)$this->db->has('dns_zones', ['name' => $relayDomain]);
+        } catch (\Throwable $_) {
+            $relayDnsZoneExists = false;
+        }
         $relayChecks = [];
         if (file_exists(self::TUNNEL_RELAY_CHECKS_FILE)) {
             $relayChecksDecoded = json_decode((string)file_get_contents(self::TUNNEL_RELAY_CHECKS_FILE), true);
@@ -999,6 +1007,9 @@ class HostingController
                 'frpc_pid' => $relayProxyState['pid'],
                 'frpc_running' => (bool)$relayProxyState['running'],
                 'frpc_config_path' => $relayProxyState['config_path'],
+                'caddy_available_path' => file_exists($relayAvailableCaddy) ? $relayAvailableCaddy : null,
+                'caddy_enabled_path' => file_exists($relayEnabledCaddy) ? $relayEnabledCaddy : null,
+                'dns_zone_exists' => $relayDnsZoneExists,
                 'last_check_at' => $relayCheckInfo['checked_at'] ?? null,
                 'last_check_at_iso' => $relayCheckInfo['checked_at_iso'] ?? null,
                 'last_check_ip' => $relayCheckInfo['client_ip'] ?? null,
@@ -1145,6 +1156,28 @@ class HostingController
             exit;
         }
 
+        $relayDomain = $subdomain . '.ginto.ai';
+        $relayTarget = '127.0.0.1:' . $localRelayPort;
+        $domainProvision = $this->createDomain([
+            'domain' => $relayDomain,
+            'php' => false,
+            'ssl' => true,
+            'proxy_type' => 'relay',
+            'proxy_target' => $relayTarget,
+            'proxy_container_name' => null,
+            'owner_username' => 'system',
+            'owner_fullname' => 'Tunnel Relay',
+        ]);
+        if (empty($domainProvision['success'])) {
+            $this->stopRelayProxyProcess($subdomain);
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $domainProvision['error'] ?? 'Failed to provision Caddy/DNS for relay domain',
+            ]);
+            exit;
+        }
+
         $clientIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'admin');
 
         $registry = $this->getTunnelRegistry();
@@ -1174,11 +1207,17 @@ class HostingController
         echo json_encode([
             'success' => true,
             'subdomain' => $subdomain,
+            'domain' => $relayDomain,
             'expires_at' => $registry[$subdomain]['expires_at'],
             'local_port' => $localRelayPort,
             'relay_pid' => $relayProvision['pid'] ?? null,
             'relay_config' => $relayProvision['config_path'] ?? null,
-            'message' => 'Relay approved and provisioned'
+            'caddy' => [
+                'available' => '/etc/caddy/sites-available/' . $relayDomain . '.caddy',
+                'enabled' => '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy',
+            ],
+            'dns' => $domainProvision['dns'] ?? null,
+            'message' => 'Relay approved and provisioned (FRP + Caddy + DNS)'
         ]);
         exit;
     }
