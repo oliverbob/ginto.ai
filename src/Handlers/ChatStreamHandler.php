@@ -2373,15 +2373,16 @@ class ChatStreamHandler
      */
     private function executeImageGeneration(string $prompt): array
     {
-        $sdcpuBaseUrl = 'http://127.0.0.1:8888';
-        $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
-        
         if (empty(trim($prompt))) {
             return ['success' => false, 'error' => 'Prompt is required'];
         }
 
         // SDCPU_ACTIVE=true bypasses the subscription gate entirely
         $sdcpuActive = strtolower(trim($_ENV['SDCPU_ACTIVE'] ?? getenv('SDCPU_ACTIVE') ?? 'false')) === 'true';
+        $sdcpuTunnel = $sdcpuActive
+            && strtolower(trim($_ENV['SDCPU_TUNNEL'] ?? getenv('SDCPU_TUNNEL') ?? 'false')) === 'true';
+        $sdcpuBaseUrl = $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+        $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
 
         // Check if user has ImageGen subscription
         $userId = $_SESSION['user_id'] ?? null;
@@ -2440,11 +2441,22 @@ class ChatStreamHandler
             flush();
         };
 
-        $emitProgress(0, 'Connecting to FastSD CPU server...');
+        $emitProgress(0, $sdcpuTunnel ? 'Connecting to FastSD tunnel relay...' : 'Connecting to FastSD CPU server...');
 
         // Check health
-        $healthCheck = @file_get_contents($sdcpuBaseUrl . '/api/health');
-        if ($healthCheck === false) {
+        $healthCheckUrl = $sdcpuBaseUrl . '/api/health';
+        $healthCurl = curl_init($healthCheckUrl);
+        curl_setopt_array($healthCurl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+        $healthCheck = curl_exec($healthCurl);
+        $healthHttpCode = (int) curl_getinfo($healthCurl, CURLINFO_HTTP_CODE);
+        curl_close($healthCurl);
+
+        if ($healthCheck === false || $healthHttpCode < 200 || $healthHttpCode >= 300) {
             return ['success' => false, 'error' => 'Image generation server is not available'];
         }
 
@@ -2561,6 +2573,7 @@ class ChatStreamHandler
         return [
             'success' => true,
             'prompt' => $prompt,
+            'tunneled' => $sdcpuTunnel,
             'model' => 'FastSD CPU (sd-turbo-openvino)',
             'images' => [
                 [

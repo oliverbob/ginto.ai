@@ -23,6 +23,21 @@ class ImageGenHandler
     
     /** @var string SDCPU API endpoint (FastSD CPU with OpenVINO - ~1 second generation!) */
     private const SDCPU_API_URL = 'http://127.0.0.1:8888/api/generate';
+
+    private function isEnvEnabled(string $key): bool
+    {
+        return strtolower(trim((string)($_ENV[$key] ?? getenv($key) ?? 'false'))) === 'true';
+    }
+
+    private function resolveSdcpuApiUrl(): string
+    {
+        $sdcpuActive = $this->isEnvEnabled('SDCPU_ACTIVE');
+        $sdcpuTunnel = $sdcpuActive && $this->isEnvEnabled('SDCPU_TUNNEL');
+        if ($sdcpuTunnel) {
+            return 'https://vision.ginto.ai/api/generate';
+        }
+        return self::SDCPU_API_URL;
+    }
     
     public function __construct($db = null)
     {
@@ -127,7 +142,7 @@ class ImageGenHandler
             $requestData['strength'] = max(0.0, min(1.0, $strength));
         }
         
-        $ch = curl_init(self::SDCPU_API_URL);
+        $ch = curl_init($this->resolveSdcpuApiUrl());
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($requestData),
@@ -235,6 +250,8 @@ class ImageGenHandler
      */
     private function handleSdcpuGeneration(string $prompt, float $startTime, ?string $initImage = null, float $strength = 0.5): void
     {
+        $sdcpuApiUrl = $this->resolveSdcpuApiUrl();
+        $sdcpuBaseUrl = preg_replace('#/api/generate$#', '', $sdcpuApiUrl) ?: 'http://127.0.0.1:8888';
         $mode = $initImage ? 'img2img' : 'txt2img';
         
         $this->emit([
@@ -267,7 +284,7 @@ class ImageGenHandler
         }
         
         // Use streaming endpoint if available, otherwise fallback to regular
-        $streamUrl = str_replace('/generate', '/generate-stream', self::SDCPU_API_URL);
+        $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
         
         // First try the streaming endpoint
         $ch = curl_init($streamUrl);
@@ -365,7 +382,7 @@ class ImageGenHandler
                 'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
             ]);
             
-            $ch = curl_init(self::SDCPU_API_URL);
+            $ch = curl_init($sdcpuApiUrl);
             curl_setopt_array($ch, [
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => json_encode($requestData),
