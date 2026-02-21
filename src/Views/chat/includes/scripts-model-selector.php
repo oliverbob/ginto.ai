@@ -195,10 +195,8 @@
         const dotClass = isModelRunning ? 'w-2 h-2 rounded-full bg-green-500' : 'w-2 h-2 rounded-full bg-red-500';
         updateModelDisplay(data.current_model, dotClass);
         
-        // Update capability UI on initial load
-        if (data.current_capabilities) {
-          updateCapabilityUI(data.current_capabilities);
-        }
+        // Update capability UI on initial load (default non-vision when unknown)
+        updateCapabilityUI(data.current_capabilities || { vision: false, thinking: false });
       }
     } catch (err) {
       modelList.innerHTML = '<div class="px-4 py-3 text-sm text-red-500">Failed to load models</div>';
@@ -379,10 +377,8 @@
       if (data.success) {
         updateModelDisplay(model, 'w-2 h-2 rounded-full bg-green-500');
         
-        // Update UI based on capabilities
-        if (data.capabilities) {
-          updateCapabilityUI(data.capabilities);
-        }
+        // Update UI based on capabilities (default non-vision when unknown)
+        updateCapabilityUI(data.capabilities || { vision: false, thinking: false });
         
         // Update local state
         if (modelsData) {

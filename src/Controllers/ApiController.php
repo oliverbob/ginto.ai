@@ -917,6 +917,25 @@ class ApiController extends Controller
             }
         }
 
+        $effectiveCurrentProvider = $globalSelection['provider'] ?? ($_SESSION['current_provider'] ?? null);
+        $effectiveCurrentModel = $globalSelection['model'] ?? ($_SESSION['current_model'] ?? null);
+
+        $currentCapabilities = null;
+        if (!empty($effectiveCurrentProvider) && !empty($effectiveCurrentModel)) {
+            $providerCaps = $providers[$effectiveCurrentProvider]['capabilities'] ?? [];
+            $currentCapabilities = $providerCaps[$effectiveCurrentModel] ?? null;
+
+            // Fallback: derive capabilities heuristically when model wasn't in fetched list
+            if ($currentCapabilities === null && class_exists('\App\Core\LLM\ProviderRegistry')) {
+                try {
+                    $registry = \App\Core\LLM\ProviderRegistry::getInstance()->setDatabase($this->db);
+                    $currentCapabilities = $registry->detectCapabilities((string)$effectiveCurrentModel);
+                } catch (\Throwable $_) {
+                    $currentCapabilities = null;
+                }
+            }
+        }
+
         $response = [
             'success' => true,
             // Return associative providers keyed by provider name (frontend expects an object)
@@ -924,11 +943,11 @@ class ApiController extends Controller
             'is_admin' => $isAdmin,
             'current_user_id' => $_SESSION['user_id'] ?? null,
             'user_has_keys' => isset($userHasAnyKey) ? (bool)$userHasAnyKey : false,
-            'current_provider' => $_SESSION['current_provider'] ?? null,
-            'current_model' => $_SESSION['current_model'] ?? null,
+            'current_provider' => $effectiveCurrentProvider,
+            'current_model' => $effectiveCurrentModel,
             'global_selection' => $globalSelection,
             'running_models' => [],
-            'current_capabilities' => null
+            'current_capabilities' => $currentCapabilities
         ];
 
         echo json_encode($response);
@@ -1191,7 +1210,22 @@ class ApiController extends Controller
             }
         } catch (\Throwable $_) { /* ignore errors */ }
 
-        echo json_encode(['success' => true, 'provider' => $_SESSION['current_provider'] ?? null, 'model' => $_SESSION['current_model'] ?? null]);
+        $capabilities = null;
+        if (!empty($provider) && !empty($model) && class_exists('\App\Core\LLM\ProviderRegistry')) {
+            try {
+                $registry = \App\Core\LLM\ProviderRegistry::getInstance()->setDatabase($this->db);
+                $capabilities = $registry->getModelCapabilities((string)$provider, (string)$model);
+            } catch (\Throwable $_) {
+                $capabilities = null;
+            }
+        }
+
+        echo json_encode([
+            'success' => true,
+            'provider' => $_SESSION['current_provider'] ?? null,
+            'model' => $_SESSION['current_model'] ?? null,
+            'capabilities' => $capabilities,
+        ]);
         exit();
     }
 
