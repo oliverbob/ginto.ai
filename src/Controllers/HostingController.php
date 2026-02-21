@@ -1278,9 +1278,17 @@ class HostingController
             $localRelayPort = 18080;
         }
 
-        // Clear any stale locally-provisioned relay process.
-        // Unified relay must reflect a real active tunnel endpoint.
+        // Ensure a fresh relay FRP process is provisioned for the approved subdomain.
         $this->stopRelayProxyProcess($subdomain);
+        $relayProvision = $this->provisionRelayProxy($subdomain, $localRelayPort);
+        if (empty($relayProvision['success'])) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $relayProvision['error'] ?? 'Failed to start relay FRP process',
+            ]);
+            exit;
+        }
 
         $relayDomain = $subdomain . '.ginto.ai';
         $caddyProvision = $this->provisionRelayDomainConfig($relayDomain);
@@ -1325,15 +1333,15 @@ class HostingController
             'domain' => $relayDomain,
             'expires_at' => $registry[$subdomain]['expires_at'],
             'local_port' => $localRelayPort,
-            'relay_pid' => null,
-            'relay_config' => null,
+            'relay_pid' => $relayProvision['pid'] ?? null,
+            'relay_config' => $relayProvision['config_path'] ?? null,
             'caddy' => [
                 'available' => $caddyProvision['available'] ?? '/etc/caddy/sites-available/' . $relayDomain . '.caddy',
                 'enabled' => $caddyProvision['enabled'] ?? '/etc/caddy/sites-enabled/' . $relayDomain . '.caddy',
                 'proxy_target' => $caddyProvision['proxy_target'] ?? null,
             ],
             'dns' => $dnsProvision,
-            'message' => 'Relay approved and provisioned (Caddy + DNS)'
+            'message' => 'Relay approved and provisioned (FRP + Caddy + DNS)'
         ]);
         exit;
     }
