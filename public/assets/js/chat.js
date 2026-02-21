@@ -4149,6 +4149,19 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             // Update admin console if this event includes provider/model/raw info
             try { updateAdminConsole(data); } catch (e) { /* ignore */ }
 
+            // Admin-only backend debug log toast stream
+            if (data.admin_log && data.message) {
+              try {
+                const isAdmin = !!(window.GINTO_SETUP && window.GINTO_SETUP.isAdmin);
+                if (isAdmin && typeof window.showToast === 'function') {
+                  const p = data.provider || '-';
+                  const m = data.model || '-';
+                  window.showToast(`[${p}/${m}] ${data.message}`, 'info', 4500);
+                }
+              } catch (e) {}
+              continue;
+            }
+
             // Handle special actions (register, upgrade, login)
             if (data.action === 'register') {
               // Visitor limit reached - show register modal

@@ -588,6 +588,8 @@ class ChatStreamHandler
         string $selectedProvider, string $defaultModel, bool $usingFallback, float $requestStartTime,
         $rateLimitService, $userRateLimiter, $db, ?int $documentId = null
     ): void {
+        $adminLogEvents = [];
+
         // Respect both legacy llm_* session keys and the UI's current_* keys
         $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
         $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
@@ -859,6 +861,7 @@ class ChatStreamHandler
             if ($useLocalVision && $hasImage && $imageDataUrl) {
                 $modelName = $localLlmConfig->getVisionModel();
                 $directVisionInMainChat = true;
+                $adminLogEvents[] = '[vision] using local vision model: ' . $modelName;
             } elseif ($hasImage && $imageDataUrl) {
                 // Cloud vision - user already selected a vision model, or we need to find one
                 if ($userSelectedVisionModel && $sessionCloudModel) {
@@ -868,6 +871,7 @@ class ChatStreamHandler
                     $visionApiKey = $apiKey;
                     $directVisionInMainChat = true;
                     error_log("[ChatStream] Using user's vision model: $modelName on $visionProvider");
+                    $adminLogEvents[] = '[vision] using selected vision model: ' . $visionProvider . '/' . $modelName;
                 } elseif (!empty($visionCapableModels[$selectedProvider])) {
                     // Selected provider has vision models, use its default vision model
                     $modelName = $modelMapping[$selectedProvider]['vision'] ?? $visionCapableModels[$selectedProvider][0];
@@ -875,6 +879,7 @@ class ChatStreamHandler
                     $visionApiKey = $apiKey;
                     $directVisionInMainChat = true;
                     error_log("[ChatStream] Using provider's vision model: $modelName on $visionProvider");
+                    $adminLogEvents[] = '[vision] using provider default vision model: ' . $visionProvider . '/' . $modelName;
                 } else {
                     // Provider doesn't support vision (e.g., Cerebras), fall back to Groq
                     $modelName = $modelMapping['groq']['vision'];
@@ -887,6 +892,7 @@ class ChatStreamHandler
                         $visionApiKey = getenv('GROQ_API_KEY') ?: ($_ENV['GROQ_API_KEY'] ?? '');
                     }
                     error_log("[ChatStream] Provider $selectedProvider has no vision, falling back to Groq: $modelName");
+                    $adminLogEvents[] = '[vision] provider has no vision, pre-analyzing with groq/' . $modelName;
                 }
             } elseif ($useLocalLlm) {
                 $modelName = $localLlmConfig->getReasoningModel();
@@ -972,6 +978,7 @@ class ChatStreamHandler
                         'type' => 'image_url',
                         'image_url' => ['url' => $resolvedImageUrl],
                     ];
+                    $adminLogEvents[] = '[vision] built multimodal payload with image_url';
                 }
 
                 $visionMessages[] = ['role' => 'user', 'content' => $visionUserContent];
@@ -990,11 +997,14 @@ class ChatStreamHandler
                         $analysisMsg = ['role' => 'system', 'content' => "[Image analysis from {$visionProviderName} - model {$visionModelName}]:\n" . $visionAnalysis];
                         array_unshift($history, $analysisMsg);
                         error_log("[ChatStream] Vision analysis attached to history ({$visionProviderName}): " . substr($visionAnalysis, 0, 200));
+                        $adminLogEvents[] = '[vision] pre-analysis success, chars=' . strlen($visionAnalysis);
                     } else {
                         error_log('[ChatStream] Vision analysis returned empty content');
+                        $adminLogEvents[] = '[vision] pre-analysis returned empty content';
                     }
                 } catch (\Throwable $ve) {
                     error_log('[ChatStream] Vision analysis failed: ' . $ve->getMessage());
+                    $adminLogEvents[] = '[vision] pre-analysis failed: ' . $ve->getMessage();
                 }
 
                 // Continue with the main (non-vision) provider using the original selection
@@ -1014,6 +1024,18 @@ class ChatStreamHandler
 
             // Prepare SSE
             self::prepareSSE();
+
+            if ($isAdminUser && !empty($adminLogEvents)) {
+                foreach ($adminLogEvents as $logMessage) {
+                    echo "data: " . json_encode([
+                        'admin_log' => true,
+                        'message' => $logMessage,
+                        'provider' => $selectedProvider,
+                        'model' => $modelName,
+                    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                    flush();
+                }
+            }
 
             $parsedown = self::getParsedown();
             
