@@ -286,7 +286,6 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
                     default => $maxUserChars,
                 };
                 $payload['messages'][$i]['content'] = mb_substr($msg['content'], -$limitChars); // keep tail (recent context)
-                $payload['messages'][$i]['__truncated'] = true;
             }
         }
 
