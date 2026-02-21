@@ -373,18 +373,49 @@ class ChatStreamHandler
             return $messages;
         }
 
-        $limit = $limitBytes ?? 180000; // default ~180KB target
+        $containsBase64Image = false;
+        foreach ($messages as $msg) {
+            $content = $msg['content'] ?? null;
+            if (!is_array($content)) {
+                continue;
+            }
+            foreach ($content as $part) {
+                $imageUrl = $part['image_url']['url'] ?? null;
+                if (is_string($imageUrl) && str_starts_with($imageUrl, 'data:image/')) {
+                    $containsBase64Image = true;
+                    break 2;
+                }
+            }
+        }
+
+        $limit = $limitBytes ?? ($containsBase64Image ? 3500000 : 180000);
 
         $payload = ['model' => $messages[0]['model'] ?? null, 'messages' => $messages];
         $json = @json_encode($payload);
         if ($json === false) return $messages;
 
+        // Keep the latest user message (typically the current turn with image)
+        // so truncation never drops the actual prompt being answered.
+        $protectedIndex = null;
+        for ($i = count($messages) - 1; $i >= 0; $i--) {
+            if (($messages[$i]['role'] ?? '') === 'user') {
+                $protectedIndex = $i;
+                break;
+            }
+        }
+
         // Remove oldest non-system messages until under limit
         while (strlen($json) > $limit) {
             $removed = false;
             for ($i = 1; $i < count($messages); $i++) {
+                if ($protectedIndex !== null && $i === $protectedIndex) {
+                    continue;
+                }
                 if (($messages[$i]['role'] ?? '') !== 'system') {
                     array_splice($messages, $i, 1);
+                    if ($protectedIndex !== null && $i < $protectedIndex) {
+                        $protectedIndex--;
+                    }
                     $removed = true;
                     break;
                 }
@@ -1426,13 +1457,15 @@ class ChatStreamHandler
                 }
 
                 // If Groq and payload is large, truncate messages conservatively
-                if (strtolower($providerNameForLimit) === 'groq' && $previewSize > 200000) {
-                    $messages = $this->truncateMessagesForProvider($messages, 'groq', 180000);
+                $groqLimitBytes = ($hasImage && $directVisionInMainChat) ? 3500000 : 180000;
+                $groqTriggerBytes = ($hasImage && $directVisionInMainChat) ? 3600000 : 200000;
+                if (strtolower($providerNameForLimit) === 'groq' && $previewSize > $groqTriggerBytes) {
+                    $messages = $this->truncateMessagesForProvider($messages, 'groq', $groqLimitBytes);
                     $afterJson = @json_encode(['model' => $modelName, 'messages' => $messages, 'tools' => $tools]) ?: '';
                     error_log('[ChatStream] Payload truncated for Groq; new size: ' . strlen($afterJson) . ' bytes');
 
                     // If still too large, take more aggressive steps: shorten system prompt and remove tools
-                    $limitAggressive = 170000;
+                    $limitAggressive = ($hasImage && $directVisionInMainChat) ? 3400000 : 170000;
                     if (strlen($afterJson) > $limitAggressive) {
                         // Shorten system prompt (first message expected to be system)
                         if (!empty($messages) && isset($messages[0]['role']) && $messages[0]['role'] === 'system' && isset($messages[0]['content'])) {
