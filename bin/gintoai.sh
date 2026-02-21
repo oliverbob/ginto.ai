@@ -1739,6 +1739,29 @@ configure_systemd_service() {
     STORAGE_DIR="$(dirname "$PROJECT_DIR")/storage"
     mkdir -p "$STORAGE_DIR/logs"
     
+    # Detect composer binary — check common install locations in order
+    local COMPOSER_BIN=""
+    local composer_candidates=(
+        "$(command -v composer 2>/dev/null || true)"
+        "/usr/local/bin/composer"
+        "/usr/bin/composer"
+        "$INSTALL_USER_HOME/.local/bin/composer"
+        "$INSTALL_USER_HOME/.composer/vendor/bin/composer"
+        "/home/$INSTALL_USER/.local/bin/composer"
+    )
+    for candidate in "${composer_candidates[@]}"; do
+        if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+            COMPOSER_BIN="$candidate"
+            break
+        fi
+    done
+
+    if [ -z "$COMPOSER_BIN" ]; then
+        log_error "Cannot locate composer binary. Please install Composer and re-run."
+        return 1
+    fi
+    log_info "Using composer at: $COMPOSER_BIN"
+
     # Create the systemd service file
     sudo tee /etc/systemd/system/ginto.service > /dev/null << EOF
 [Unit]
@@ -1751,13 +1774,13 @@ Type=simple
 User=$INSTALL_USER
 Group=$INSTALL_USER
 WorkingDirectory=$PROJECT_DIR
-ExecStart=/usr/local/bin/composer start --services
+ExecStart=$COMPOSER_BIN start --services
 ExecStop=/usr/bin/pkill -f "php.*ginto"
 Restart=always
 RestartSec=5
 StandardOutput=append:$(dirname $PROJECT_DIR)/storage/logs/ginto.log
 StandardError=append:$(dirname $PROJECT_DIR)/storage/logs/ginto-error.log
-Environment=PATH=/usr/bin:/usr/local/bin:/home/$INSTALL_USER/.local/bin
+Environment=PATH=$(dirname "$COMPOSER_BIN"):/usr/bin:/usr/local/bin:/home/$INSTALL_USER/.local/bin
 Environment=HOME=$INSTALL_USER_HOME
 Environment=COMPOSER_HOME=$INSTALL_USER_HOME/.composer
 
