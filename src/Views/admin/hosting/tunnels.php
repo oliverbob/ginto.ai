@@ -132,6 +132,18 @@ $currentPage = 'tunnels';
             <span class="ml-2 font-mono">*.ginto.ai</span>
           </div>
         </div>
+
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <h3 class="font-semibold mb-2">Unified Relay (/tunnel)</h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+            <div><span class="text-gray-500">Relay Domain:</span> <span id="relay-domain" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Relay Endpoint:</span> <span id="relay-endpoint" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Approval Check:</span> <span id="relay-approval-url" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Reserved Local Port:</span> <span id="relay-local-port" class="ml-2 font-mono">-</span></div>
+            <div><span class="text-gray-500">Status:</span> <span id="relay-status" class="ml-2">-</span></div>
+            <div><span class="text-gray-500">Expires:</span> <span id="relay-expiry" class="ml-2">-</span></div>
+          </div>
+        </div>
       </div>
     </main>
   </div>
@@ -153,6 +165,37 @@ $currentPage = 'tunnels';
         // Registry info
         document.getElementById('registry-info').textContent = 
           `Registry: ${data.registry_count || 0} | Blocked: ${data.blocklist_count || 0}`;
+
+        const relay = data.relay || {};
+        const relayDomain = relay.domain || '-';
+        const relayEndpoint = relay.endpoint || '/tunnel';
+        const relayApproved = !!relay.approved;
+        const relayBlocked = !!relay.blocked;
+        const relayRemaining = Number(relay.remaining || 0);
+        const relayExpiresAt = Number(relay.expires_at || 0);
+
+        document.getElementById('relay-domain').textContent = relayDomain;
+        document.getElementById('relay-endpoint').textContent = `https://ginto.ai${relayEndpoint}`;
+        document.getElementById('relay-approval-url').textContent = relay.approval_url || '-';
+        document.getElementById('relay-local-port').textContent = relay.local_port ? `127.0.0.1:${relay.local_port}` : '-';
+
+        const relayStatusEl = document.getElementById('relay-status');
+        if (relayBlocked) {
+          relayStatusEl.innerHTML = '<span class="px-2 py-1 text-xs rounded bg-gray-500/10 text-gray-500">Blocked</span>';
+        } else if (relayApproved) {
+          relayStatusEl.innerHTML = '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Approved</span>';
+        } else {
+          relayStatusEl.innerHTML = '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-500">Not Approved</span>';
+        }
+
+        const relayExpiryEl = document.getElementById('relay-expiry');
+        if (relayExpiresAt > 0) {
+          relayExpiryEl.textContent = relayRemaining > 0
+            ? `${formatDuration(relayRemaining)} (at ${formatTime(relayExpiresAt)})`
+            : `Expired at ${formatTime(relayExpiresAt)}`;
+        } else {
+          relayExpiryEl.textContent = '-';
+        }
         
         const tbody = document.getElementById('tunnels-list');
         

@@ -16,6 +16,7 @@ class TunnelController
     private const VISION_RELAY_SUBDOMAIN = 'vision';
     private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
     private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
+    private const APPROVAL_SERVER = 'https://ginto.ai';
     
     public function __construct(?\Medoo\Medoo $db = null)
     {
@@ -38,6 +39,30 @@ class TunnelController
         $this->proxyVisionRequest('/' . ltrim($path, '/'));
     }
 
+    /**
+     * Public approval endpoint used by local /tunnel relay checks
+     * GET /api/tunnel/relay/approval?subdomain=vision
+     */
+    public function relayApproval(): void
+    {
+        header('Content-Type: application/json');
+        $subdomain = strtolower((string)($_GET['subdomain'] ?? self::VISION_RELAY_SUBDOMAIN));
+
+        $approved = $this->isSubdomainApprovedLocally($subdomain);
+        $registry = $this->readRegistry();
+        $entry = is_array($registry) ? ($registry[$subdomain] ?? null) : null;
+        $expiresAt = (int)($entry['expires_at'] ?? 0);
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'approved' => $approved,
+            'blocked' => $this->isSubdomainBlockedLocally($subdomain),
+            'expires_at' => $expiresAt,
+            'remaining' => $expiresAt > 0 ? max(0, $expiresAt - time()) : 0,
+        ]);
+    }
+
     private function proxyVisionRequest(string $path): void
     {
         $localRelayPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
@@ -45,7 +70,7 @@ class TunnelController
             $localRelayPort = 18080;
         }
 
-        if (!$this->isVisionRelayApproved()) {
+        if (!$this->isVisionRelayApprovedRemote()) {
             http_response_code(403);
             header('Content-Type: text/html; charset=utf-8');
             echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.ginto.ai relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
@@ -133,22 +158,35 @@ class TunnelController
         echo $body;
     }
 
-    private function isVisionRelayApproved(): bool
+    private function isVisionRelayApprovedRemote(): bool
     {
+        $server = rtrim((string)(getenv('TUNNEL_APPROVAL_SERVER') ?: ($_ENV['TUNNEL_APPROVAL_SERVER'] ?? self::APPROVAL_SERVER)), '/');
         $subdomain = self::VISION_RELAY_SUBDOMAIN;
+        $approvalUrl = $server . '/api/tunnel/relay/approval?subdomain=' . rawurlencode($subdomain);
 
-        if (file_exists(self::TUNNEL_BLOCKLIST_FILE)) {
-            $blocklist = json_decode((string)file_get_contents(self::TUNNEL_BLOCKLIST_FILE), true);
-            if (is_array($blocklist) && in_array($subdomain, $blocklist, true)) {
-                return false;
-            }
-        }
+        $ch = curl_init($approvalUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-        if (!file_exists(self::TUNNEL_REGISTRY_FILE)) {
+        if ($response === false || $httpCode < 200 || $httpCode >= 300) {
             return false;
         }
 
-        $registry = json_decode((string)file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
+        $decoded = json_decode((string)$response, true);
+        return is_array($decoded) && !empty($decoded['approved']);
+    }
+
+    private function isSubdomainApprovedLocally(string $subdomain): bool
+    {
+        if ($this->isSubdomainBlockedLocally($subdomain)) {
+            return false;
+        }
+
+        $registry = $this->readRegistry();
         if (!is_array($registry) || !isset($registry[$subdomain])) {
             return false;
         }
@@ -159,6 +197,24 @@ class TunnelController
         }
 
         return true;
+    }
+
+    private function isSubdomainBlockedLocally(string $subdomain): bool
+    {
+        if (!file_exists(self::TUNNEL_BLOCKLIST_FILE)) {
+            return false;
+        }
+        $blocklist = json_decode((string)file_get_contents(self::TUNNEL_BLOCKLIST_FILE), true);
+        return is_array($blocklist) && in_array($subdomain, $blocklist, true);
+    }
+
+    private function readRegistry(): array
+    {
+        if (!file_exists(self::TUNNEL_REGISTRY_FILE)) {
+            return [];
+        }
+        $registry = json_decode((string)file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
+        return is_array($registry) ? $registry : [];
     }
 
     private function getIncomingHeaders(): array

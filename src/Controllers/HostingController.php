@@ -671,6 +671,14 @@ class HostingController
         header('Content-Type: application/json');
         $this->requireAdmin();
 
+        $relaySubdomain = 'vision';
+        $relayDomain = $relaySubdomain . '.ginto.ai';
+        $relayEndpoint = '/tunnel';
+        $relayLocalPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
+        if ($relayLocalPort < 1024 || $relayLocalPort > 65535) {
+            $relayLocalPort = 18080;
+        }
+
         // Get FRP dashboard credentials
         $frpDashboardPwd = trim(shell_exec("grep FRP_DASHBOARD_PWD /etc/frp/frps.env 2>/dev/null | cut -d= -f2") ?: '');
         
@@ -759,6 +767,11 @@ class HostingController
         $blocklist = $this->getTunnelBlocklist();
         $now = time();
 
+        $relayEntry = $registry[$relaySubdomain] ?? null;
+        $relayExpiresAt = (int)($relayEntry['expires_at'] ?? 0);
+        $relayBlocked = in_array($relaySubdomain, $blocklist, true);
+        $relayApproved = !$relayBlocked && is_array($relayEntry) && $relayExpiresAt > $now;
+
         foreach ($proxies as &$p) {
             $subdomain = $p['subdomain'] ?? $p['name'] ?? '';
             
@@ -789,7 +802,19 @@ class HostingController
             'stats' => $stats,
             'proxies' => $proxies,
             'registry_count' => count($registry),
-            'blocklist_count' => count($blocklist)
+            'blocklist_count' => count($blocklist),
+            'relay' => [
+                'subdomain' => $relaySubdomain,
+                'domain' => $relayDomain,
+                'endpoint' => $relayEndpoint,
+                'approval_url' => '/api/tunnel/relay/approval?subdomain=' . $relaySubdomain,
+                'approved' => $relayApproved,
+                'blocked' => $relayBlocked,
+                'expires_at' => $relayExpiresAt,
+                'remaining' => $relayExpiresAt > 0 ? max(0, $relayExpiresAt - $now) : 0,
+                'client_ip' => $relayEntry['client_ip'] ?? null,
+                'local_port' => $relayLocalPort,
+            ],
         ]);
         exit;
     }
