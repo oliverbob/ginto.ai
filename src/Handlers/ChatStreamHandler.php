@@ -469,6 +469,126 @@ class ChatStreamHandler
         return $data;
     }
 
+    private function emitAdminLogEvent(bool $isAdminUser, string $message, string $provider, string $model): void
+    {
+        if (!$isAdminUser) {
+            return;
+        }
+
+        echo "data: " . json_encode([
+            'admin_log' => true,
+            'message' => $message,
+            'provider' => $provider,
+            'model' => $model,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+        flush();
+    }
+
+    private function isPrivateOrLocalHost(string $host): bool
+    {
+        $host = strtolower(trim($host));
+        if ($host === '' || $host === 'localhost' || $host === 'host.docker.internal' || str_ends_with($host, '.local')) {
+            return true;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP)) {
+            return !filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+        }
+
+        return false;
+    }
+
+    private function localPathFromPublicImagePath(string $path): ?string
+    {
+        if ($path === '') {
+            return null;
+        }
+
+        if (str_starts_with($path, '/storage/chat_images/')) {
+            return STORAGE_PATH . '/chat_images/' . ltrim(substr($path, strlen('/storage/chat_images/')), '/');
+        }
+        if (str_starts_with($path, '/storage/generated_images/')) {
+            return STORAGE_PATH . '/generated_images/' . ltrim(substr($path, strlen('/storage/generated_images/')), '/');
+        }
+        if (str_starts_with($path, '/storage/imagegen/')) {
+            return STORAGE_PATH . '/imagegen/' . ltrim(substr($path, strlen('/storage/imagegen/')), '/');
+        }
+        if (str_starts_with($path, '/assets/uploads/')) {
+            return ROOT_PATH . '/public/assets/uploads/' . ltrim(substr($path, strlen('/assets/uploads/')), '/');
+        }
+
+        return null;
+    }
+
+    private function dataUrlFromLocalImagePath(string $path): ?string
+    {
+        if (!is_file($path) || !is_readable($path)) {
+            return null;
+        }
+
+        $size = @filesize($path);
+        if (!is_int($size) || $size <= 0) {
+            return null;
+        }
+
+        if ($size > 3 * 1024 * 1024) {
+            return null;
+        }
+
+        $binary = @file_get_contents($path);
+        if ($binary === false || $binary === '') {
+            return null;
+        }
+
+        $mime = @mime_content_type($path) ?: 'image/jpeg';
+        if (!str_starts_with((string)$mime, 'image/')) {
+            return null;
+        }
+
+        return 'data:' . $mime . ';base64,' . base64_encode($binary);
+    }
+
+    private function prepareVisionImageInput(string $imageInput, array &$adminLogEvents = []): string
+    {
+        $resolved = trim($imageInput);
+        if ($resolved === '') {
+            return $resolved;
+        }
+
+        if (str_starts_with($resolved, 'data:image/')) {
+            $adminLogEvents[] = '[vision] image input already data URL';
+            return $resolved;
+        }
+
+        if (str_starts_with($resolved, '/')) {
+            $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
+                ? 'https'
+                : 'http';
+            $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+            $resolved = $scheme . '://' . $host . $resolved;
+        }
+
+        $parts = @parse_url($resolved);
+        $host = strtolower((string)($parts['host'] ?? ''));
+        $path = (string)($parts['path'] ?? '');
+
+        if ($host !== '' && $this->isPrivateOrLocalHost($host)) {
+            $localPath = $this->localPathFromPublicImagePath($path);
+            if ($localPath) {
+                $dataUrl = $this->dataUrlFromLocalImagePath($localPath);
+                if ($dataUrl) {
+                    $adminLogEvents[] = '[vision] converted local URL to data URL for provider reachability';
+                    return $dataUrl;
+                }
+                $adminLogEvents[] = '[vision] local URL detected but conversion to data URL failed';
+            } else {
+                $adminLogEvents[] = '[vision] local URL path not mappable to storage path';
+            }
+        }
+
+        return $resolved;
+    }
+
     /**
      * Handle Ollama provider requests
      */
@@ -963,22 +1083,13 @@ class ChatStreamHandler
                 ];
 
                 if (is_string($imageDataUrl) && $imageDataUrl !== '') {
-                    $resolvedImageUrl = $imageDataUrl;
-
-                    // Convert site-relative URL to absolute URL for provider APIs
-                    if (str_starts_with($resolvedImageUrl, '/')) {
-                        $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
-                            ? 'https'
-                            : 'http';
-                        $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                        $resolvedImageUrl = $scheme . '://' . $host . $resolvedImageUrl;
-                    }
+                    $resolvedImageUrl = $this->prepareVisionImageInput($imageDataUrl, $adminLogEvents);
 
                     $visionUserContent[] = [
                         'type' => 'image_url',
                         'image_url' => ['url' => $resolvedImageUrl],
                     ];
-                    $adminLogEvents[] = '[vision] built multimodal payload with image_url';
+                    $adminLogEvents[] = '[vision] built multimodal payload with image_url type=' . (str_starts_with($resolvedImageUrl, 'data:image/') ? 'data-url' : 'url');
                 }
 
                 $visionMessages[] = ['role' => 'user', 'content' => $visionUserContent];
@@ -1197,14 +1308,13 @@ class ChatStreamHandler
 
             // Add user message
             if ($hasImage && $imageDataUrl && $directVisionInMainChat) {
-                $resolvedImageUrl = $imageDataUrl;
-                if (is_string($resolvedImageUrl) && str_starts_with($resolvedImageUrl, '/')) {
-                    $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
-                        ? 'https'
-                        : 'http';
-                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-                    $resolvedImageUrl = $scheme . '://' . $host . $resolvedImageUrl;
-                }
+                $resolvedImageUrl = $this->prepareVisionImageInput((string)$imageDataUrl, $adminLogEvents);
+                $this->emitAdminLogEvent(
+                    $isAdminUser,
+                    '[vision] dispatching multimodal main request image_url=' . (str_starts_with($resolvedImageUrl, 'data:image/') ? 'data-url' : 'url'),
+                    $selectedProvider,
+                    $modelName
+                );
 
                 $messages[] = [
                     'role' => 'user',
@@ -1348,6 +1458,7 @@ class ChatStreamHandler
                 
                 // Debug: log iteration
                 error_log("[ChatStream] Tool loop iteration $iteration");
+                $this->emitAdminLogEvent($isAdminUser, '[chat] sending request iteration=' . $iteration . ' messages=' . count($messages) . ' tools=' . count($tools), $selectedProvider, $modelName);
                 
                 $response = $provider->chatStream(
                     messages: $messages,
