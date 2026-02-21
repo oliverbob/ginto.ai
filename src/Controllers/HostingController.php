@@ -9,6 +9,7 @@ class HostingController
 {
     protected $db;
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
+    private const RELAY_FRPC_DIR = '/var/lib/ginto/relay-frpc';
 
     public function __construct($db = null)
     {
@@ -636,6 +637,175 @@ class HostingController
         file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT));
     }
 
+    private function getFrpAuthToken(): string
+    {
+        $token = trim((string)(getenv('FRP_AUTH_TOKEN') ?: ($_ENV['FRP_AUTH_TOKEN'] ?? '')));
+        if ($token !== '') {
+            return $token;
+        }
+
+        $envFile = '/etc/frp/frps.env';
+        if (!file_exists($envFile)) {
+            return '';
+        }
+
+        $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if (!is_array($lines)) {
+            return '';
+        }
+
+        foreach ($lines as $line) {
+            $line = trim((string)$line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+            if (!str_starts_with($line, 'FRP_AUTH_TOKEN=')) {
+                continue;
+            }
+            return trim(substr($line, strlen('FRP_AUTH_TOKEN=')));
+        }
+
+        return '';
+    }
+
+    private function getFrpcBinaryPath(): ?string
+    {
+        $candidates = [
+            trim((string)shell_exec('command -v frpc 2>/dev/null')),
+            '/usr/local/bin/frpc',
+            '/usr/bin/frpc',
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '' && is_file($candidate) && is_executable($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function stopRelayProxyProcess(string $subdomain): void
+    {
+        $safeSubdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomain);
+        $pidFile = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
+
+        if (file_exists($pidFile)) {
+            $pid = trim((string)@file_get_contents($pidFile));
+            if ($pid !== '' && ctype_digit($pid)) {
+                @exec('kill ' . escapeshellarg($pid) . ' 2>/dev/null');
+            }
+            @unlink($pidFile);
+        }
+
+        @exec("pkill -f 'frpc.*frpc-relay-{$safeSubdomain}\\.toml' 2>/dev/null");
+    }
+
+    private function provisionRelayProxy(string $subdomain, int $localPort): array
+    {
+        $safeSubdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomain);
+        if ($safeSubdomain === '') {
+            return ['success' => false, 'error' => 'Invalid subdomain for relay provisioning'];
+        }
+
+        $frpc = $this->getFrpcBinaryPath();
+        if ($frpc === null) {
+            return ['success' => false, 'error' => 'frpc binary not found on server'];
+        }
+
+        $token = $this->getFrpAuthToken();
+        if ($token === '') {
+            return ['success' => false, 'error' => 'FRP auth token not configured'];
+        }
+
+        if (!is_dir(self::RELAY_FRPC_DIR)) {
+            @mkdir(self::RELAY_FRPC_DIR, 0755, true);
+        }
+        if (!is_dir(self::RELAY_FRPC_DIR)) {
+            return ['success' => false, 'error' => 'Failed to create relay config directory'];
+        }
+
+        $configPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.toml';
+        $logPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.log';
+        $pidPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
+
+        $config = "serverAddr = \"127.0.0.1\"\n"
+            . "serverPort = 7000\n"
+            . "auth.method = \"token\"\n"
+            . "auth.token = \"{$token}\"\n"
+            . "log.to = \"{$logPath}\"\n"
+            . "log.level = \"info\"\n\n"
+            . "[[proxies]]\n"
+            . "name = \"relay-{$safeSubdomain}\"\n"
+            . "type = \"http\"\n"
+            . "localIP = \"127.0.0.1\"\n"
+            . "localPort = {$localPort}\n"
+            . "subdomain = \"{$safeSubdomain}\"\n";
+
+        if (@file_put_contents($configPath, $config) === false) {
+            return ['success' => false, 'error' => 'Failed to write relay FRP config'];
+        }
+
+        $this->stopRelayProxyProcess($safeSubdomain);
+
+        $cmd = 'nohup ' . escapeshellcmd($frpc)
+            . ' -c ' . escapeshellarg($configPath)
+            . ' > ' . escapeshellarg($logPath)
+            . ' 2>&1 & echo $!';
+        $pid = trim((string)@shell_exec($cmd));
+
+        if ($pid === '' || !ctype_digit($pid)) {
+            return ['success' => false, 'error' => 'Failed to start relay FRP process'];
+        }
+
+        @file_put_contents($pidPath, $pid);
+        usleep(300000);
+
+        $psOut = [];
+        $psCode = 1;
+        @exec('ps -p ' . escapeshellarg($pid) . ' >/dev/null 2>&1', $psOut, $psCode);
+        if ($psCode !== 0) {
+            $logTail = trim((string)@shell_exec('tail -n 20 ' . escapeshellarg($logPath) . ' 2>/dev/null'));
+            return [
+                'success' => false,
+                'error' => 'Relay FRP process exited after start' . ($logTail !== '' ? (': ' . $logTail) : ''),
+            ];
+        }
+
+        return [
+            'success' => true,
+            'pid' => (int)$pid,
+            'config_path' => $configPath,
+            'log_path' => $logPath,
+        ];
+    }
+
+    private function getRelayProxyState(string $subdomain): array
+    {
+        $safeSubdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomain);
+        $configPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.toml';
+        $pidPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
+        $pid = 0;
+        $running = false;
+
+        if (file_exists($pidPath)) {
+            $pidRaw = trim((string)@file_get_contents($pidPath));
+            if ($pidRaw !== '' && ctype_digit($pidRaw)) {
+                $pid = (int)$pidRaw;
+                $psOut = [];
+                $psCode = 1;
+                @exec('ps -p ' . escapeshellarg((string)$pid) . ' >/dev/null 2>&1', $psOut, $psCode);
+                $running = ($psCode === 0);
+            }
+        }
+
+        return [
+            'config_path' => file_exists($configPath) ? $configPath : null,
+            'pid' => $pid > 0 ? $pid : null,
+            'running' => $running,
+        ];
+    }
+
     /**
      * Get tunnel blocklist
      */
@@ -772,6 +942,7 @@ class HostingController
         $relayExpiresAt = (int)($relayEntry['expires_at'] ?? 0);
         $relayBlocked = in_array($relaySubdomain, $blocklist, true);
         $relayApproved = !$relayBlocked && is_array($relayEntry) && $relayExpiresAt > $now;
+        $relayProxyState = $this->getRelayProxyState($relaySubdomain);
         $relayChecks = [];
         if (file_exists(self::TUNNEL_RELAY_CHECKS_FILE)) {
             $relayChecksDecoded = json_decode((string)file_get_contents(self::TUNNEL_RELAY_CHECKS_FILE), true);
@@ -825,6 +996,9 @@ class HostingController
                 'remaining' => $relayExpiresAt > 0 ? max(0, $relayExpiresAt - $now) : 0,
                 'client_ip' => $relayEntry['client_ip'] ?? null,
                 'local_port' => $relayLocalPort,
+                'frpc_pid' => $relayProxyState['pid'],
+                'frpc_running' => (bool)$relayProxyState['running'],
+                'frpc_config_path' => $relayProxyState['config_path'],
                 'last_check_at' => $relayCheckInfo['checked_at'] ?? null,
                 'last_check_at_iso' => $relayCheckInfo['checked_at_iso'] ?? null,
                 'last_check_ip' => $relayCheckInfo['client_ip'] ?? null,
@@ -956,6 +1130,21 @@ class HostingController
         }
 
         $expiresIn = $minutes * 60;
+        $localRelayPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
+        if ($localRelayPort < 1024 || $localRelayPort > 65535) {
+            $localRelayPort = 18080;
+        }
+
+        $relayProvision = $this->provisionRelayProxy($subdomain, $localRelayPort);
+        if (empty($relayProvision['success'])) {
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'error' => $relayProvision['error'] ?? 'Failed to provision relay proxy',
+            ]);
+            exit;
+        }
+
         $clientIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'admin');
 
         $registry = $this->getTunnelRegistry();
@@ -966,17 +1155,30 @@ class HostingController
             'client_ip' => $clientIp,
             'registered_at' => date('Y-m-d H:i:s')
         ];
-        $this->saveTunnelRegistry($registry);
+        if (@file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT)) === false) {
+            $this->stopRelayProxyProcess($subdomain);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
+            exit;
+        }
 
         $blocklist = $this->getTunnelBlocklist();
         $blocklist = array_values(array_diff($blocklist, [$subdomain]));
-        $this->saveTunnelBlocklist($blocklist);
+        if (@file_put_contents(self::TUNNEL_BLOCKLIST_FILE, json_encode($blocklist, JSON_PRETTY_PRINT)) === false) {
+            $this->stopRelayProxyProcess($subdomain);
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to update tunnel blocklist']);
+            exit;
+        }
 
         echo json_encode([
             'success' => true,
             'subdomain' => $subdomain,
             'expires_at' => $registry[$subdomain]['expires_at'],
-            'message' => 'Relay approved'
+            'local_port' => $localRelayPort,
+            'relay_pid' => $relayProvision['pid'] ?? null,
+            'relay_config' => $relayProvision['config_path'] ?? null,
+            'message' => 'Relay approved and provisioned'
         ]);
         exit;
     }
@@ -1002,13 +1204,23 @@ class HostingController
 
         $registry = $this->getTunnelRegistry();
         unset($registry[$subdomain]);
-        $this->saveTunnelRegistry($registry);
+        if (@file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT)) === false) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
+            exit;
+        }
 
         $blocklist = $this->getTunnelBlocklist();
         if (!in_array($subdomain, $blocklist, true)) {
             $blocklist[] = $subdomain;
-            $this->saveTunnelBlocklist($blocklist);
+            if (@file_put_contents(self::TUNNEL_BLOCKLIST_FILE, json_encode($blocklist, JSON_PRETTY_PRINT)) === false) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Failed to update tunnel blocklist']);
+                exit;
+            }
         }
+
+        $this->stopRelayProxyProcess($subdomain);
 
         echo json_encode([
             'success' => true,

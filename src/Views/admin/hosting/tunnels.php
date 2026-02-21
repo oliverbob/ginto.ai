@@ -142,6 +142,8 @@ $currentPage = 'tunnels';
             <div><span class="text-gray-500">Reserved Local Port:</span> <span id="relay-local-port" class="ml-2 font-mono">-</span></div>
             <div><span class="text-gray-500">Status:</span> <span id="relay-status" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Expires:</span> <span id="relay-expiry" class="ml-2">-</span></div>
+            <div><span class="text-gray-500">Relay Process:</span> <span id="relay-frpc-status" class="ml-2">-</span></div>
+            <div><span class="text-gray-500">Relay Config:</span> <span id="relay-frpc-config" class="ml-2 font-mono">-</span></div>
             <div><span class="text-gray-500">Last Approval Check:</span> <span id="relay-last-check" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Check Source:</span> <span id="relay-last-check-ip" class="ml-2 font-mono">-</span></div>
           </div>
@@ -220,6 +222,14 @@ $currentPage = 'tunnels';
         } else {
           relayExpiryEl.textContent = '-';
         }
+
+        const relayFrpcStatusEl = document.getElementById('relay-frpc-status');
+        const relayFrpcRunning = !!relay.frpc_running;
+        const relayFrpcPid = relay.frpc_pid || null;
+        relayFrpcStatusEl.innerHTML = relayFrpcRunning
+          ? `<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Running${relayFrpcPid ? ` (PID ${relayFrpcPid})` : ''}</span>`
+          : '<span class="px-2 py-1 text-xs rounded bg-gray-500/10 text-gray-500">Stopped</span>';
+        document.getElementById('relay-frpc-config').textContent = relay.frpc_config_path || '-';
 
         const relayLastCheckAt = Number(relay.last_check_at || 0);
         const relayLastCheckCount = Number(relay.last_check_count || 0);
@@ -393,6 +403,7 @@ $currentPage = 'tunnels';
         });
         const data = await res.json();
         if (data.success) {
+          alert(data.message || 'Relay approved');
           loadTunnels();
           return;
         }
@@ -412,6 +423,7 @@ $currentPage = 'tunnels';
         });
         const data = await res.json();
         if (data.success) {
+          alert(data.message || 'Relay revoked');
           loadTunnels();
           return;
         }
