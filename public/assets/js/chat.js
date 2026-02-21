@@ -4180,21 +4180,6 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               continue;
             }
 
-            // Admin-only notice when backend switches providers due to rate limits
-            if (data.provider_fallback) {
-              try {
-                const isAdmin = !!(window.GINTO_SETUP && window.GINTO_SETUP.isAdmin);
-                if (isAdmin && typeof window.showToast === 'function') {
-                  const fromProvider = data.from_provider || 'current provider';
-                  const toProvider = data.to_provider || 'fallback provider';
-                  const fromModel = data.from_model || 'current model';
-                  const toModel = data.to_model || 'fallback model';
-                  window.showToast(`${fromProvider}/${fromModel} unavailable, switched to ${toProvider}/${toModel}`, 'info', 6500);
-                }
-              } catch (e) {}
-              continue;
-            }
-
             // Handle phase events (matches pandasearch format - separate from activity events)
             // Phase events are one-time markers, not start/complete pairs, so no spinners needed
             if (data.phase && !data.activity && data.phase !== 'error') {

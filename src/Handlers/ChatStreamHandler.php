@@ -1308,8 +1308,6 @@ class ChatStreamHandler
             }
 
             $streamRetryUsed = false;
-            $streamKeyRetryUsed = false;
-            $streamProviderFallbackUsed = false;
             while ($iteration < $maxIterations) {
                 $iteration++;
                 
@@ -1383,115 +1381,6 @@ class ChatStreamHandler
                                 'model' => $modelName,
                             ]);
                             $streamRetryUsed = true;
-                            continue;
-                        }
-                    }
-
-                    $canRetryGroqKey =
-                        !$streamKeyRetryUsed
-                        && strtolower((string)$selectedProvider) === 'groq'
-                        && $this->isRateLimitErrorMessage($streamError->getMessage())
-                        && !empty($currentKeyId)
-                        && isset($keyManager);
-
-                    if ($canRetryGroqKey) {
-                        try {
-                            $keyManager->markKeyRateLimited((int)$currentKeyId, 60);
-                            $nextKey = $keyManager->getNextAvailableKey((int)$currentKeyId);
-                            if ($nextKey && strtolower((string)($nextKey['provider'] ?? '')) === 'groq' && !empty($nextKey['api_key'])) {
-                                $oldKeyId = $currentKeyId;
-                                $apiKey = $nextKey['api_key'];
-                                $currentKeyId = $nextKey['id'];
-                                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
-                                    'api_key' => $apiKey,
-                                    'model' => $modelName,
-                                ]);
-                                $streamKeyRetryUsed = true;
-                                error_log("[ChatStream] Groq key rotated {$oldKeyId} -> {$currentKeyId} after rate limit");
-                                echo "data: " . json_encode([
-                                    'model_fallback' => true,
-                                    'provider' => $selectedProvider,
-                                    'from_model' => $modelName,
-                                    'to_model' => $modelName,
-                                    'reason' => 'key_rotated'
-                                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-                                flush();
-                                continue;
-                            }
-                        } catch (\Throwable $_) {
-                            // ignore and try provider fallback below
-                        }
-                    }
-
-                    $canProviderFallback =
-                        !$streamProviderFallbackUsed
-                        && $this->isRateLimitErrorMessage($streamError->getMessage())
-                        && strtolower((string)$selectedProvider) === 'groq';
-
-                    if ($canProviderFallback) {
-                        $fallbackCandidates = ['cerebras', 'novita', 'openai', 'together', 'fireworks'];
-                        $fallbackProvider = null;
-                        $fallbackApiKey = null;
-                        $fallbackKeyId = null;
-
-                        foreach ($fallbackCandidates as $candidateProvider) {
-                            try {
-                                $candidateKey = $keyManager->getAvailableKey($candidateProvider);
-                                if ($candidateKey && !empty($candidateKey['api_key'])) {
-                                    $fallbackProvider = $candidateProvider;
-                                    $fallbackApiKey = $candidateKey['api_key'];
-                                    $fallbackKeyId = $candidateKey['id'] ?? null;
-                                    break;
-                                }
-                            } catch (\Throwable $_) {
-                                // ignore DB errors for candidate
-                            }
-
-                            $envKeyName = strtoupper($candidateProvider) . '_API_KEY';
-                            $envKeyVal = getenv($envKeyName) ?: ($_ENV[$envKeyName] ?? '');
-                            if (!empty($envKeyVal)) {
-                                $fallbackProvider = $candidateProvider;
-                                $fallbackApiKey = $envKeyVal;
-                                $fallbackKeyId = null;
-                                break;
-                            }
-                        }
-
-                        if ($fallbackProvider && $fallbackApiKey) {
-                            $oldProvider = $selectedProvider;
-                            $oldModel = $modelName;
-                            $selectedProvider = $fallbackProvider;
-                            $apiKey = $fallbackApiKey;
-                            $currentKeyId = $fallbackKeyId;
-
-                            if ($selectedProvider === 'cerebras') {
-                                $modelName = 'gpt-oss-120b';
-                            } elseif ($selectedProvider === 'novita') {
-                                $modelName = 'meta-llama/llama-3.1-8b-instruct';
-                            } elseif ($selectedProvider === 'openai') {
-                                $modelName = 'gpt-4o-mini';
-                            } elseif ($selectedProvider === 'together') {
-                                $modelName = 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo';
-                            } elseif ($selectedProvider === 'fireworks') {
-                                $modelName = 'accounts/fireworks/models/llama-v3p1-8b-instruct';
-                            }
-
-                            $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
-                                'api_key' => $apiKey,
-                                'model' => $modelName,
-                            ]);
-
-                            $streamProviderFallbackUsed = true;
-                            error_log("[ChatStream] Provider fallback due to Groq rate limit: {$oldProvider}/{$oldModel} -> {$selectedProvider}/{$modelName}");
-                            echo "data: " . json_encode([
-                                'provider_fallback' => true,
-                                'from_provider' => $oldProvider,
-                                'to_provider' => $selectedProvider,
-                                'from_model' => $oldModel,
-                                'to_model' => $modelName,
-                                'reason' => 'rate_limited'
-                            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-                            flush();
                             continue;
                         }
                     }
