@@ -17,6 +17,8 @@ class TunnelController
     private const VISION_RELAY_SUBDOMAIN = 'vision';
     private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
     private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
+    private const TUNNEL_REGISTRY_FALLBACK_FILE = '/tmp/ginto-tunnel-registry.json';
+    private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const APPROVAL_SERVER = 'https://ginto.ai';
     
@@ -221,20 +223,33 @@ class TunnelController
 
     private function isSubdomainBlockedLocally(string $subdomain): bool
     {
-        if (!file_exists(self::TUNNEL_BLOCKLIST_FILE)) {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_BLOCKLIST_FILE, self::TUNNEL_BLOCKLIST_FALLBACK_FILE);
+        if ($path === null) {
             return false;
         }
-        $blocklist = json_decode((string)file_get_contents(self::TUNNEL_BLOCKLIST_FILE), true);
+        $blocklist = json_decode((string)file_get_contents($path), true);
         return is_array($blocklist) && in_array($subdomain, $blocklist, true);
     }
 
     private function readRegistry(): array
     {
-        if (!file_exists(self::TUNNEL_REGISTRY_FILE)) {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
             return [];
         }
-        $registry = json_decode((string)file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
+        $registry = json_decode((string)file_get_contents($path), true);
         return is_array($registry) ? $registry : [];
+    }
+
+    private function resolveTunnelDataReadPath(string $primary, string $fallback): ?string
+    {
+        if (file_exists($primary)) {
+            return $primary;
+        }
+        if (file_exists($fallback)) {
+            return $fallback;
+        }
+        return null;
     }
 
     private function recordRelayApprovalCheck(string $subdomain, array $check): void

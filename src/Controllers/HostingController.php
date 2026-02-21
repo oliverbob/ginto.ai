@@ -638,33 +638,64 @@ class HostingController
 
     private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
     private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
+    private const TUNNEL_REGISTRY_FALLBACK_FILE = '/tmp/ginto-tunnel-registry.json';
+    private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
+
+    private function resolveTunnelDataReadPath(string $primary, string $fallback): ?string
+    {
+        if (file_exists($primary)) {
+            return $primary;
+        }
+        if (file_exists($fallback)) {
+            return $fallback;
+        }
+        return null;
+    }
+
+    private function resolveTunnelDataWritePath(string $primary, string $fallback): ?string
+    {
+        $primaryDir = dirname($primary);
+        if (!is_dir($primaryDir)) {
+            @mkdir($primaryDir, 0755, true);
+        }
+        if (is_dir($primaryDir) && is_writable($primaryDir)) {
+            return $primary;
+        }
+
+        $fallbackDir = dirname($fallback);
+        if (!is_dir($fallbackDir)) {
+            @mkdir($fallbackDir, 0755, true);
+        }
+        if (is_dir($fallbackDir) && is_writable($fallbackDir)) {
+            return $fallback;
+        }
+
+        return null;
+    }
 
     /**
      * Get tunnel registry (server-side tracking of all tunnels with expiry)
      */
     private function getTunnelRegistry(): array
     {
-        $dir = dirname(self::TUNNEL_REGISTRY_FILE);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
-        }
-        if (!file_exists(self::TUNNEL_REGISTRY_FILE)) {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
             return [];
         }
-        $data = json_decode(file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
+        $data = json_decode((string)file_get_contents($path), true);
         return is_array($data) ? $data : [];
     }
 
     /**
      * Save tunnel registry
      */
-    private function saveTunnelRegistry(array $registry): void
+    private function saveTunnelRegistry(array $registry): bool
     {
-        $dir = dirname(self::TUNNEL_REGISTRY_FILE);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        $path = $this->resolveTunnelDataWritePath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
+            return false;
         }
-        file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT));
+        return @file_put_contents($path, json_encode($registry, JSON_PRETTY_PRINT)) !== false;
     }
 
     private function getFrpAuthToken(): string
@@ -858,23 +889,24 @@ class HostingController
      */
     private function getTunnelBlocklist(): array
     {
-        if (!file_exists(self::TUNNEL_BLOCKLIST_FILE)) {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_BLOCKLIST_FILE, self::TUNNEL_BLOCKLIST_FALLBACK_FILE);
+        if ($path === null) {
             return [];
         }
-        $data = json_decode(file_get_contents(self::TUNNEL_BLOCKLIST_FILE), true);
+        $data = json_decode((string)file_get_contents($path), true);
         return is_array($data) ? $data : [];
     }
 
     /**
      * Save tunnel blocklist
      */
-    private function saveTunnelBlocklist(array $blocklist): void
+    private function saveTunnelBlocklist(array $blocklist): bool
     {
-        $dir = dirname(self::TUNNEL_BLOCKLIST_FILE);
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        $path = $this->resolveTunnelDataWritePath(self::TUNNEL_BLOCKLIST_FILE, self::TUNNEL_BLOCKLIST_FALLBACK_FILE);
+        if ($path === null) {
+            return false;
         }
-        file_put_contents(self::TUNNEL_BLOCKLIST_FILE, json_encode($blocklist, JSON_PRETTY_PRINT));
+        return @file_put_contents($path, json_encode($blocklist, JSON_PRETTY_PRINT)) !== false;
     }
 
     public function tunnels(): void
@@ -1235,7 +1267,7 @@ class HostingController
             'client_ip' => $clientIp,
             'registered_at' => date('Y-m-d H:i:s')
         ];
-        if (@file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT)) === false) {
+        if (!$this->saveTunnelRegistry($registry)) {
             $this->stopRelayProxyProcess($subdomain);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
@@ -1244,7 +1276,7 @@ class HostingController
 
         $blocklist = $this->getTunnelBlocklist();
         $blocklist = array_values(array_diff($blocklist, [$subdomain]));
-        if (@file_put_contents(self::TUNNEL_BLOCKLIST_FILE, json_encode($blocklist, JSON_PRETTY_PRINT)) === false) {
+        if (!$this->saveTunnelBlocklist($blocklist)) {
             $this->stopRelayProxyProcess($subdomain);
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to update tunnel blocklist']);
@@ -1290,7 +1322,7 @@ class HostingController
 
         $registry = $this->getTunnelRegistry();
         unset($registry[$subdomain]);
-        if (@file_put_contents(self::TUNNEL_REGISTRY_FILE, json_encode($registry, JSON_PRETTY_PRINT)) === false) {
+        if (!$this->saveTunnelRegistry($registry)) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
             exit;
@@ -1299,7 +1331,7 @@ class HostingController
         $blocklist = $this->getTunnelBlocklist();
         if (!in_array($subdomain, $blocklist, true)) {
             $blocklist[] = $subdomain;
-            if (@file_put_contents(self::TUNNEL_BLOCKLIST_FILE, json_encode($blocklist, JSON_PRETTY_PRINT)) === false) {
+            if (!$this->saveTunnelBlocklist($blocklist)) {
                 http_response_code(500);
                 echo json_encode(['success' => false, 'error' => 'Failed to update tunnel blocklist']);
                 exit;
