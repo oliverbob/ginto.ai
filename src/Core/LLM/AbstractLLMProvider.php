@@ -162,8 +162,25 @@ abstract class AbstractLLMProvider implements LLMProviderInterface
             if ($e instanceof \GuzzleHttp\Exception\RequestException && $e->hasResponse()) {
                 $errorBody = (string) $e->getResponse()->getBody();
             }
-            error_log("[postStream] Streaming error: " . $e->getMessage() . " | Response: " . $errorBody);
-            throw new \RuntimeException("Streaming error: " . $e->getMessage(), 0, $e);
+            $errorMessage = $e->getMessage();
+            if ($errorBody !== '') {
+                $decoded = json_decode($errorBody, true);
+                if (is_array($decoded)) {
+                    $errorMessage = $decoded['error']['message']
+                        ?? $decoded['message']
+                        ?? $errorMessage;
+                }
+            }
+
+            $errorBodyPreview = $errorBody !== '' ? mb_substr($errorBody, 0, 4000) : '';
+            error_log("[postStream] Streaming error: " . $e->getMessage() . " | Parsed: " . $errorMessage . " | Response: " . $errorBodyPreview);
+
+            $finalMessage = "Streaming error: " . $errorMessage;
+            if ($errorBodyPreview !== '' && stripos($finalMessage, trim($errorBodyPreview)) === false) {
+                $finalMessage .= " | body: " . $errorBodyPreview;
+            }
+
+            throw new \RuntimeException($finalMessage, 0, $e);
         }
     }
 
