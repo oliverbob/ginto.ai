@@ -1367,14 +1367,6 @@ class ChatStreamHandler
                         $fallbackModel = 'llama-3.1-8b-instant';
                         if (($modelName ?? '') !== $fallbackModel) {
                             error_log("[ChatStream] Groq model rate-limited ({$modelName}), retrying once with {$fallbackModel}");
-                            echo "data: " . json_encode([
-                                'model_fallback' => true,
-                                'provider' => $selectedProvider,
-                                'from_model' => $modelName,
-                                'to_model' => $fallbackModel,
-                                'reason' => 'rate_limited'
-                            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-                            flush();
                             $modelName = $fallbackModel;
                             $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
                                 'api_key' => $apiKey,
