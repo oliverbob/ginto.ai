@@ -908,8 +908,17 @@ class HostingController
             $frpVhostPort = 7080;
         }
 
+        $proxyTarget = '127.0.0.1:' . $frpVhostPort;
+        if ($safeDomain === 'vision.ginto.ai') {
+            $relayLocalPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
+            if ($relayLocalPort < 1024 || $relayLocalPort > 65535) {
+                $relayLocalPort = 18080;
+            }
+            $proxyTarget = '127.0.0.1:' . $relayLocalPort;
+        }
+
         $config = $safeDomain . " {\n"
-            . "    reverse_proxy 127.0.0.1:{$frpVhostPort}\n"
+            . "    reverse_proxy {$proxyTarget}\n"
             . "    encode gzip\n"
             . "}\n";
 
@@ -933,7 +942,7 @@ class HostingController
             'success' => true,
             'available' => $availableFile,
             'enabled' => $enabledFile,
-            'proxy_target' => '127.0.0.1:' . $frpVhostPort,
+            'proxy_target' => $proxyTarget,
         ];
     }
 
