@@ -13,9 +13,11 @@ namespace Ginto\Controllers;
 class TunnelController
 {
     protected ?\Medoo\Medoo $db;
+    private string $lastRelayApprovalDetail = '';
     private const VISION_RELAY_SUBDOMAIN = 'vision';
     private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
     private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
+    private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const APPROVAL_SERVER = 'https://ginto.ai';
     
     public function __construct(?\Medoo\Medoo $db = null)
@@ -52,12 +54,24 @@ class TunnelController
         $registry = $this->readRegistry();
         $entry = is_array($registry) ? ($registry[$subdomain] ?? null) : null;
         $expiresAt = (int)($entry['expires_at'] ?? 0);
+        $blocked = $this->isSubdomainBlockedLocally($subdomain);
+
+        $this->recordRelayApprovalCheck($subdomain, [
+            'checked_at' => time(),
+            'checked_at_iso' => date('c'),
+            'client_ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+            'host' => $_SERVER['HTTP_HOST'] ?? '',
+            'user_agent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 220),
+            'approved' => $approved,
+            'blocked' => $blocked,
+            'expires_at' => $expiresAt,
+        ]);
 
         echo json_encode([
             'success' => true,
             'subdomain' => $subdomain,
             'approved' => $approved,
-            'blocked' => $this->isSubdomainBlockedLocally($subdomain),
+            'blocked' => $blocked,
             'expires_at' => $expiresAt,
             'remaining' => $expiresAt > 0 ? max(0, $expiresAt - time()) : 0,
         ]);
@@ -73,7 +87,7 @@ class TunnelController
         if (!$this->isVisionRelayApprovedRemote()) {
             http_response_code(403);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.ginto.ai relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.ginto.ai relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Approval check: <code>' . htmlspecialchars($this->lastRelayApprovalDetail, ENT_QUOTES, 'UTF-8') . '</code></p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
             return;
         }
 
@@ -163,21 +177,27 @@ class TunnelController
         $server = rtrim((string)(getenv('TUNNEL_APPROVAL_SERVER') ?: ($_ENV['TUNNEL_APPROVAL_SERVER'] ?? self::APPROVAL_SERVER)), '/');
         $subdomain = self::VISION_RELAY_SUBDOMAIN;
         $approvalUrl = $server . '/api/tunnel/relay/approval?subdomain=' . rawurlencode($subdomain);
+        $this->lastRelayApprovalDetail = 'request=' . $approvalUrl;
 
         $ch = curl_init($approvalUrl);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, 8);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Ginto-Relay-Check: 1']);
         $response = curl_exec($ch);
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
 
         if ($response === false || $httpCode < 200 || $httpCode >= 300) {
+            $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' error=' . ($curlError !== '' ? $curlError : 'none');
             return false;
         }
 
         $decoded = json_decode((string)$response, true);
-        return is_array($decoded) && !empty($decoded['approved']);
+        $approved = is_array($decoded) && !empty($decoded['approved']);
+        $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' approved=' . ($approved ? 'true' : 'false');
+        return $approved;
     }
 
     private function isSubdomainApprovedLocally(string $subdomain): bool
@@ -215,6 +235,30 @@ class TunnelController
         }
         $registry = json_decode((string)file_get_contents(self::TUNNEL_REGISTRY_FILE), true);
         return is_array($registry) ? $registry : [];
+    }
+
+    private function recordRelayApprovalCheck(string $subdomain, array $check): void
+    {
+        try {
+            $dir = dirname(self::TUNNEL_RELAY_CHECKS_FILE);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+
+            $data = [];
+            if (file_exists(self::TUNNEL_RELAY_CHECKS_FILE)) {
+                $decoded = json_decode((string)file_get_contents(self::TUNNEL_RELAY_CHECKS_FILE), true);
+                if (is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+
+            $count = (int)($data[$subdomain]['check_count'] ?? 0) + 1;
+            $check['check_count'] = $count;
+            $data[$subdomain] = $check;
+            @file_put_contents(self::TUNNEL_RELAY_CHECKS_FILE, json_encode($data, JSON_PRETTY_PRINT));
+        } catch (\Throwable $_) {
+        }
     }
 
     private function getIncomingHeaders(): array

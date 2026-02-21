@@ -8,6 +8,7 @@ namespace Ginto\Controllers;
 class HostingController
 {
     protected $db;
+    private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
 
     public function __construct($db = null)
     {
@@ -771,6 +772,14 @@ class HostingController
         $relayExpiresAt = (int)($relayEntry['expires_at'] ?? 0);
         $relayBlocked = in_array($relaySubdomain, $blocklist, true);
         $relayApproved = !$relayBlocked && is_array($relayEntry) && $relayExpiresAt > $now;
+        $relayChecks = [];
+        if (file_exists(self::TUNNEL_RELAY_CHECKS_FILE)) {
+            $relayChecksDecoded = json_decode((string)file_get_contents(self::TUNNEL_RELAY_CHECKS_FILE), true);
+            if (is_array($relayChecksDecoded)) {
+                $relayChecks = $relayChecksDecoded;
+            }
+        }
+        $relayCheckInfo = is_array($relayChecks[$relaySubdomain] ?? null) ? $relayChecks[$relaySubdomain] : [];
 
         foreach ($proxies as &$p) {
             $subdomain = $p['subdomain'] ?? $p['name'] ?? '';
@@ -814,6 +823,11 @@ class HostingController
                 'remaining' => $relayExpiresAt > 0 ? max(0, $relayExpiresAt - $now) : 0,
                 'client_ip' => $relayEntry['client_ip'] ?? null,
                 'local_port' => $relayLocalPort,
+                'last_check_at' => $relayCheckInfo['checked_at'] ?? null,
+                'last_check_at_iso' => $relayCheckInfo['checked_at_iso'] ?? null,
+                'last_check_ip' => $relayCheckInfo['client_ip'] ?? null,
+                'last_check_host' => $relayCheckInfo['host'] ?? null,
+                'last_check_count' => (int)($relayCheckInfo['check_count'] ?? 0),
             ],
         ]);
         exit;

@@ -142,6 +142,8 @@ $currentPage = 'tunnels';
             <div><span class="text-gray-500">Reserved Local Port:</span> <span id="relay-local-port" class="ml-2 font-mono">-</span></div>
             <div><span class="text-gray-500">Status:</span> <span id="relay-status" class="ml-2">-</span></div>
             <div><span class="text-gray-500">Expires:</span> <span id="relay-expiry" class="ml-2">-</span></div>
+            <div><span class="text-gray-500">Last Approval Check:</span> <span id="relay-last-check" class="ml-2">-</span></div>
+            <div><span class="text-gray-500">Check Source:</span> <span id="relay-last-check-ip" class="ml-2 font-mono">-</span></div>
           </div>
         </div>
       </div>
@@ -196,6 +198,15 @@ $currentPage = 'tunnels';
         } else {
           relayExpiryEl.textContent = '-';
         }
+
+        const relayLastCheckAt = Number(relay.last_check_at || 0);
+        const relayLastCheckCount = Number(relay.last_check_count || 0);
+        const relayLastCheckEl = document.getElementById('relay-last-check');
+        relayLastCheckEl.textContent = relayLastCheckAt > 0
+          ? `${formatTime(relayLastCheckAt)} (#${relayLastCheckCount})`
+          : '-';
+        const relayLastCheckIpEl = document.getElementById('relay-last-check-ip');
+        relayLastCheckIpEl.textContent = relay.last_check_ip || '-';
         
         const tbody = document.getElementById('tunnels-list');
         
