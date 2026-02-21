@@ -11,6 +11,36 @@ class HostingController
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const RELAY_FRPC_DIR = '/var/lib/ginto/relay-frpc';
 
+    private function getRelayFrpcDirCandidates(): array
+    {
+        return [
+            self::RELAY_FRPC_DIR,
+            '/tmp/ginto-relay-frpc',
+        ];
+    }
+
+    private function resolveRelayFrpcDir(bool $createIfMissing = true): ?string
+    {
+        foreach ($this->getRelayFrpcDirCandidates() as $dir) {
+            if (is_dir($dir)) {
+                if (is_writable($dir)) {
+                    return $dir;
+                }
+                continue;
+            }
+
+            if (!$createIfMissing) {
+                continue;
+            }
+
+            if (@mkdir($dir, 0755, true) && is_dir($dir) && is_writable($dir)) {
+                return $dir;
+            }
+        }
+
+        return null;
+    }
+
     public function __construct($db = null)
     {
         $this->db = $db ?? \Ginto\Core\Database::getInstance();
@@ -688,14 +718,16 @@ class HostingController
     private function stopRelayProxyProcess(string $subdomain): void
     {
         $safeSubdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomain);
-        $pidFile = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
 
-        if (file_exists($pidFile)) {
-            $pid = trim((string)@file_get_contents($pidFile));
-            if ($pid !== '' && ctype_digit($pid)) {
-                @exec('kill ' . escapeshellarg($pid) . ' 2>/dev/null');
+        foreach ($this->getRelayFrpcDirCandidates() as $relayDir) {
+            $pidFile = $relayDir . '/frpc-relay-' . $safeSubdomain . '.pid';
+            if (file_exists($pidFile)) {
+                $pid = trim((string)@file_get_contents($pidFile));
+                if ($pid !== '' && ctype_digit($pid)) {
+                    @exec('kill ' . escapeshellarg($pid) . ' 2>/dev/null');
+                }
+                @unlink($pidFile);
             }
-            @unlink($pidFile);
         }
 
         @exec("pkill -f 'frpc.*frpc-relay-{$safeSubdomain}\\.toml' 2>/dev/null");
@@ -718,16 +750,17 @@ class HostingController
             return ['success' => false, 'error' => 'FRP auth token not configured'];
         }
 
-        if (!is_dir(self::RELAY_FRPC_DIR)) {
-            @mkdir(self::RELAY_FRPC_DIR, 0755, true);
-        }
-        if (!is_dir(self::RELAY_FRPC_DIR)) {
-            return ['success' => false, 'error' => 'Failed to create relay config directory'];
+        $relayDir = $this->resolveRelayFrpcDir(true);
+        if ($relayDir === null) {
+            return [
+                'success' => false,
+                'error' => 'Failed to create relay config directory (tried: ' . implode(', ', $this->getRelayFrpcDirCandidates()) . ')',
+            ];
         }
 
-        $configPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.toml';
-        $logPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.log';
-        $pidPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
+        $configPath = $relayDir . '/frpc-relay-' . $safeSubdomain . '.toml';
+        $logPath = $relayDir . '/frpc-relay-' . $safeSubdomain . '.log';
+        $pidPath = $relayDir . '/frpc-relay-' . $safeSubdomain . '.pid';
 
         $config = "serverAddr = \"127.0.0.1\"\n"
             . "serverPort = 7000\n"
@@ -775,6 +808,7 @@ class HostingController
         return [
             'success' => true,
             'pid' => (int)$pid,
+            'dir_path' => $relayDir,
             'config_path' => $configPath,
             'log_path' => $logPath,
         ];
@@ -783,25 +817,38 @@ class HostingController
     private function getRelayProxyState(string $subdomain): array
     {
         $safeSubdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomain);
-        $configPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.toml';
-        $pidPath = self::RELAY_FRPC_DIR . '/frpc-relay-' . $safeSubdomain . '.pid';
-        $pid = 0;
+        $pid = null;
         $running = false;
+        $configPath = null;
 
-        if (file_exists($pidPath)) {
-            $pidRaw = trim((string)@file_get_contents($pidPath));
-            if ($pidRaw !== '' && ctype_digit($pidRaw)) {
-                $pid = (int)$pidRaw;
-                $psOut = [];
-                $psCode = 1;
-                @exec('ps -p ' . escapeshellarg((string)$pid) . ' >/dev/null 2>&1', $psOut, $psCode);
-                $running = ($psCode === 0);
+        foreach ($this->getRelayFrpcDirCandidates() as $relayDir) {
+            $candidateConfig = $relayDir . '/frpc-relay-' . $safeSubdomain . '.toml';
+            $candidatePid = $relayDir . '/frpc-relay-' . $safeSubdomain . '.pid';
+
+            if ($configPath === null && file_exists($candidateConfig)) {
+                $configPath = $candidateConfig;
+            }
+
+            if (!$running && file_exists($candidatePid)) {
+                $pidRaw = trim((string)@file_get_contents($candidatePid));
+                if ($pidRaw !== '' && ctype_digit($pidRaw)) {
+                    $candidatePidInt = (int)$pidRaw;
+                    $psOut = [];
+                    $psCode = 1;
+                    @exec('ps -p ' . escapeshellarg((string)$candidatePidInt) . ' >/dev/null 2>&1', $psOut, $psCode);
+                    if ($psCode === 0) {
+                        $running = true;
+                        $pid = $candidatePidInt;
+                    } elseif ($pid === null) {
+                        $pid = $candidatePidInt;
+                    }
+                }
             }
         }
 
         return [
-            'config_path' => file_exists($configPath) ? $configPath : null,
-            'pid' => $pid > 0 ? $pid : null,
+            'config_path' => $configPath,
+            'pid' => $pid,
             'running' => $running,
         ];
     }
