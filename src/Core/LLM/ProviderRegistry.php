@@ -39,6 +39,12 @@ class ProviderRegistry
             'display_name' => 'Cerebras',
             'supports_tools' => true,
         ],
+        'novita' => [
+            'base_url' => 'https://api.novita.ai/v3/openai/',
+            'env_key' => 'NOVITA_API_KEY',
+            'display_name' => 'Novita AI',
+            'supports_tools' => true,
+        ],
         'openai' => [
             'base_url' => 'https://api.openai.com/v1/',
             'env_key' => 'OPENAI_API_KEY',
@@ -77,6 +83,56 @@ class ProviderRegistry
             'display_name' => 'Ginto AI Default - Llama.cpp',
             'supports_tools' => false,
             'no_auth' => true,
+        ],
+    ];
+
+    // Static fallback model lists — used when the live /v1/models API call fails or returns nothing.
+    // Keeps the model selector functional even without a network round-trip.
+    private const FALLBACK_MODELS = [
+        'cerebras' => [
+            ['id' => 'llama-3.3-70b',   'name' => 'Llama 3.3 70B'],
+            ['id' => 'llama3.1-8b',     'name' => 'Llama 3.1 8B'],
+            ['id' => 'qwen-3-32b',      'name' => 'Qwen 3 32B'],
+        ],
+        'groq' => [
+            ['id' => 'llama-3.3-70b-versatile',  'name' => 'Llama 3.3 70B Versatile'],
+            ['id' => 'llama-3.1-8b-instant',     'name' => 'Llama 3.1 8B Instant'],
+            ['id' => 'llama3-70b-8192',           'name' => 'Llama 3 70B'],
+            ['id' => 'gemma2-9b-it',              'name' => 'Gemma 2 9B'],
+            ['id' => 'compound-beta',             'name' => 'Compound Beta'],
+        ],
+        'novita' => [
+            ['id' => 'meta-llama/llama-3.1-8b-instruct',   'name' => 'Llama 3.1 8B Instruct'],
+            ['id' => 'meta-llama/llama-3.3-70b-instruct',  'name' => 'Llama 3.3 70B Instruct'],
+            ['id' => 'qwen/qwen2.5-72b-instruct',          'name' => 'Qwen 2.5 72B Instruct'],
+            ['id' => 'deepseek/deepseek-v3',               'name' => 'DeepSeek V3'],
+            ['id' => 'deepseek/deepseek-r1',               'name' => 'DeepSeek R1'],
+        ],
+        'openai' => [
+            ['id' => 'gpt-4o',      'name' => 'GPT-4o'],
+            ['id' => 'gpt-4o-mini', 'name' => 'GPT-4o Mini'],
+            ['id' => 'gpt-4-turbo', 'name' => 'GPT-4 Turbo'],
+            ['id' => 'o3-mini',     'name' => 'o3 Mini'],
+            ['id' => 'o1',          'name' => 'o1'],
+        ],
+        'anthropic' => [
+            ['id' => 'claude-opus-4-5',             'name' => 'Claude Opus 4.5'],
+            ['id' => 'claude-sonnet-4-5',           'name' => 'Claude Sonnet 4.5'],
+            ['id' => 'claude-3-5-sonnet-20241022',  'name' => 'Claude 3.5 Sonnet'],
+            ['id' => 'claude-3-5-haiku-20241022',   'name' => 'Claude 3.5 Haiku'],
+            ['id' => 'claude-3-opus-20240229',      'name' => 'Claude 3 Opus'],
+        ],
+        'together' => [
+            ['id' => 'meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo',  'name' => 'Llama 3.1 8B Turbo'],
+            ['id' => 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo', 'name' => 'Llama 3.1 70B Turbo'],
+            ['id' => 'Qwen/Qwen2.5-72B-Instruct-Turbo',              'name' => 'Qwen 2.5 72B Turbo'],
+            ['id' => 'mistralai/Mixtral-8x7B-Instruct-v0.1',         'name' => 'Mixtral 8x7B'],
+        ],
+        'fireworks' => [
+            ['id' => 'accounts/fireworks/models/llama-v3p3-70b-instruct', 'name' => 'Llama 3.3 70B'],
+            ['id' => 'accounts/fireworks/models/llama-v3p1-8b-instruct',  'name' => 'Llama 3.1 8B'],
+            ['id' => 'accounts/fireworks/models/mixtral-8x7b-instruct',   'name' => 'Mixtral 8x7B'],
+            ['id' => 'accounts/fireworks/models/qwen2p5-72b-instruct',    'name' => 'Qwen 2.5 72B'],
         ],
     ];
     
@@ -290,26 +346,55 @@ class ProviderRegistry
     public function getModels(string $provider, bool $forceRefresh = false): array
     {
         $cacheKey = "models_{$provider}";
-        
+
         // Check cache first
         if (!$forceRefresh && isset($this->modelCache[$cacheKey])) {
             $cached = $this->modelCache[$cacheKey];
             if (time() - ($cached['fetched_at'] ?? 0) < $this->cacheTtl) {
-                return $cached['models'] ?? [];
+                $cached_models = $cached['models'] ?? [];
+                // Even from cache, fall back to static list if empty
+                if (!empty($cached_models)) {
+                    return $cached_models;
+                }
             }
         }
-        
+
         // Fetch from API
         $models = $this->fetchModelsFromApi($provider);
-        
-        // Cache the result
+
+        // If API returned nothing, use static fallback list
+        if (empty($models)) {
+            $models = $this->getStaticFallbackModels($provider);
+        }
+
+        // Cache the result (even fallbacks, with a shorter TTL handled above)
         $this->modelCache[$cacheKey] = [
             'models' => $models,
             'fetched_at' => time(),
         ];
         $this->saveCacheToDisk();
-        
+
         return $models;
+    }
+
+    /**
+     * Return static fallback models for a provider when the live API is unreachable.
+     * Capabilities are auto-detected from model IDs.
+     */
+    private function getStaticFallbackModels(string $provider): array
+    {
+        $entries = self::FALLBACK_MODELS[$provider] ?? [];
+        if (empty($entries)) {
+            return [];
+        }
+        return array_map(function(array $m) {
+            return [
+                'id'           => $m['id'],
+                'name'         => $m['name'],
+                'owned_by'     => 'static',
+                'capabilities' => $this->detectCapabilities($m['id']),
+            ];
+        }, $entries);
     }
     
     /**
@@ -705,6 +790,6 @@ class ProviderRegistry
      */
     public static function getProviderPriority(): array
     {
-        return ['local', 'ollama', 'cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks'];
+        return ['local', 'ollama', 'cerebras', 'groq', 'openai', 'anthropic', 'novita', 'together', 'fireworks'];
     }
 }
