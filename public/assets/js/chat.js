@@ -209,7 +209,11 @@
       if (!data || typeof data !== 'object') return;
       const provider = data.provider || null;
       const model = data.model || null;
-      const raw = data.raw_content || data.text || (data.html ? (data.html.replace(/<[^>]+>/g, '')) : '') || '';
+      let raw = data.raw_content || data.text || (data.html ? (data.html.replace(/<[^>]+>/g, '')) : '') || '';
+      if (data.admin_log && data.message) {
+        const ts = new Date().toLocaleTimeString();
+        raw = `[${ts}] ${data.message}`;
+      }
       if (!provider && !model && !raw) return;
       const provEl = document.getElementById('admin-console-provider');
       const modelEl = document.getElementById('admin-console-model');
@@ -218,7 +222,14 @@
       const toggleBtn = document.getElementById('admin-console-toggle');
       if (provEl) provEl.textContent = provider || provEl.textContent || '-';
       if (modelEl) modelEl.textContent = model || modelEl.textContent || '-';
-      if (rawEl) rawEl.textContent = raw || rawEl.textContent || '';
+      if (rawEl) {
+        if (data.admin_log && raw) {
+          const prev = rawEl.textContent || '';
+          rawEl.textContent = prev ? `${prev}\n${raw}` : raw;
+        } else {
+          rawEl.textContent = raw || rawEl.textContent || '';
+        }
+      }
       if (toggleBtn) toggleBtn.classList.remove('hidden');
       if (overlay) overlay.classList.remove('hidden');
     } catch (e) { console.debug('updateAdminConsole failed', e); }
@@ -4149,16 +4160,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             // Update admin console if this event includes provider/model/raw info
             try { updateAdminConsole(data); } catch (e) { /* ignore */ }
 
-            // Admin-only backend debug log toast stream
+            // admin_log events are shown in Admin Console via updateAdminConsole()
             if (data.admin_log && data.message) {
-              try {
-                const isAdmin = !!(window.GINTO_SETUP && window.GINTO_SETUP.isAdmin);
-                if (isAdmin && typeof window.showToast === 'function') {
-                  const p = data.provider || '-';
-                  const m = data.model || '-';
-                  window.showToast(`[${p}/${m}] ${data.message}`, 'info', 4500);
-                }
-              } catch (e) {}
               continue;
             }
 
