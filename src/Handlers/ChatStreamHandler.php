@@ -854,9 +854,11 @@ class ChatStreamHandler
             // Determine vision provider and model for cloud vision
             $visionProvider = $selectedProvider;
             $visionApiKey = $apiKey;
+            $directVisionInMainChat = false;
             
             if ($useLocalVision && $hasImage && $imageDataUrl) {
                 $modelName = $localLlmConfig->getVisionModel();
+                $directVisionInMainChat = true;
             } elseif ($hasImage && $imageDataUrl) {
                 // Cloud vision - user already selected a vision model, or we need to find one
                 if ($userSelectedVisionModel && $sessionCloudModel) {
@@ -864,12 +866,14 @@ class ChatStreamHandler
                     $modelName = $sessionCloudModel;
                     $visionProvider = $selectedProvider;
                     $visionApiKey = $apiKey;
+                    $directVisionInMainChat = true;
                     error_log("[ChatStream] Using user's vision model: $modelName on $visionProvider");
                 } elseif (!empty($visionCapableModels[$selectedProvider])) {
                     // Selected provider has vision models, use its default vision model
                     $modelName = $modelMapping[$selectedProvider]['vision'] ?? $visionCapableModels[$selectedProvider][0];
                     $visionProvider = $selectedProvider;
                     $visionApiKey = $apiKey;
+                    $directVisionInMainChat = true;
                     error_log("[ChatStream] Using provider's vision model: $modelName on $visionProvider");
                 } else {
                     // Provider doesn't support vision (e.g., Cerebras), fall back to Groq
@@ -923,7 +927,7 @@ class ChatStreamHandler
                     'model' => $config['model'],
                     'base_url' => $config['base_url'],
                 ]);
-            } elseif ($hasImage && $imageDataUrl && !$useLocalVision) {
+            } elseif ($hasImage && $imageDataUrl && !$useLocalVision && !$directVisionInMainChat) {
                 // Cloud vision - call the vision-capable provider (Groq) FIRST,
                 // attaching the current conversation history so the vision model
                 // can use context when analyzing the image. Then continue the
@@ -1170,10 +1174,27 @@ class ChatStreamHandler
             }
 
             // Add user message
-            // Do NOT include raw image or image_url in the main chat model prompt.
-            // The vision analysis (if any) has already been attached to history as
-            // a system message above, so the chat model can reason using that.
-            $messages[] = ['role' => 'user', 'content' => $prompt];
+            if ($hasImage && $imageDataUrl && $directVisionInMainChat) {
+                $resolvedImageUrl = $imageDataUrl;
+                if (is_string($resolvedImageUrl) && str_starts_with($resolvedImageUrl, '/')) {
+                    $scheme = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https'))
+                        ? 'https'
+                        : 'http';
+                    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+                    $resolvedImageUrl = $scheme . '://' . $host . $resolvedImageUrl;
+                }
+
+                $messages[] = [
+                    'role' => 'user',
+                    'content' => [
+                        ['type' => 'text', 'text' => $prompt],
+                        ['type' => 'image_url', 'image_url' => ['url' => $resolvedImageUrl]],
+                    ],
+                ];
+            } else {
+                // Non-vision providers use pre-analysis only
+                $messages[] = ['role' => 'user', 'content' => $prompt];
+            }
 
             // Calculate max tokens (pass provider for provider-specific limits)
             $maxTokens = $this->calculateMaxTokens($userRole, $hasImage, $imageDataUrl, $useLocalVision, $localLlmConfig ?? null, $selectedProvider);
