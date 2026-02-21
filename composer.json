@@ -30,7 +30,7 @@
     },
     "scripts": {
         "serve": "php -S 0.0.0.0:8000 -t public 2>&1 | sed -E '/\\.well-known\\/appspecific\\/com\\.chrome\\.devtools\\.json/d'",
-        "start": "cd ../saicms && composer start-http & bash bin/ginto start --services && tail -n 200 -F /tmp/ginto-web.log",
+        "start": "([ -d ../saicms ] && cd ../saicms && composer start-http &) 2>/dev/null; bash bin/ginto start --services && tail -n 200 -F /tmp/ginto-web.log",
         "stop": "bash bin/stop_all.sh && bash bin/mcp_stop.sh",
         "restart": [
             "@stop",
