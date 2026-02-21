@@ -1094,45 +1094,50 @@ install_llamacpp() {
         return 1
     fi
     
-    # Clone the repository
+    # Clone the repository; re-clone if CMakeLists.txt is missing (partial/corrupted clone)
     if [ -d "$LLAMACPP_DIR" ]; then
-        log_info "llama.cpp directory exists, pulling latest..."
-        cd "$LLAMACPP_DIR"
-        git pull origin master || true
+        if [ ! -f "$LLAMACPP_DIR/CMakeLists.txt" ]; then
+            log_warn "llama.cpp directory exists but CMakeLists.txt is missing (corrupted clone) — re-cloning..."
+            rm -rf "$LLAMACPP_DIR"
+            git clone https://github.com/ggerganov/llama.cpp.git "$LLAMACPP_DIR"
+        else
+            log_info "llama.cpp directory exists, pulling latest..."
+            git -C "$LLAMACPP_DIR" pull origin master || true
+        fi
     else
         log_info "Cloning llama.cpp repository..."
         git clone https://github.com/ggerganov/llama.cpp.git "$LLAMACPP_DIR"
-        cd "$LLAMACPP_DIR"
     fi
-    
+
+    # Guard: ensure CMakeLists.txt is present before attempting to build
+    if [ ! -f "$LLAMACPP_DIR/CMakeLists.txt" ]; then
+        log_error "CMakeLists.txt not found in $LLAMACPP_DIR after clone. Cannot build llama.cpp."
+        cd "$PROJECT_DIR"
+        return 1
+    fi
+
     # If download-only mode, stop here
     if [[ "${LLAMACPP_MODE:-compile}" == "download" ]]; then
         log_success "llama.cpp downloaded to $LLAMACPP_DIR"
         log_info "To compile manually:"
-        echo "  cd $LLAMACPP_DIR"
-        echo "  mkdir -p build && cd build"
-        echo "  cmake .. -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON -DLLAMA_NATIVE=ON -DLLAMA_BUILD_SERVER=ON"
-        echo "  cmake --build . --config Release -j$(nproc)"
+        echo "  cmake -S \"$LLAMACPP_DIR\" -B \"$LLAMACPP_DIR/build\" -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=ON -DLLAMA_NATIVE=ON -DLLAMA_BUILD_SERVER=ON"
+        echo "  cmake --build \"$LLAMACPP_DIR/build\" --config Release -j\$(nproc)"
         cd "$PROJECT_DIR"
         return 0
     fi
-    
-    # Create build directory
-    mkdir -p build
-    cd build
-    
-    # Configure with CMake
+
+    # Configure with CMake using explicit -S/-B to avoid relative-path issues
     log_info "Configuring llama.cpp build..."
-    cmake .. \
+    cmake -S "$LLAMACPP_DIR" -B "$LLAMACPP_DIR/build" \
         -DCMAKE_BUILD_TYPE=Release \
         -DLLAMA_CURL=ON \
         -DLLAMA_NATIVE=ON \
         -DLLAMA_BUILD_SERVER=ON
-    
+
     # Build using all available cores
     local NPROC=$(nproc 2>/dev/null || echo 4)
     log_info "Building llama.cpp with $NPROC cores (this may take a few minutes)..."
-    cmake --build . --config Release -j"$NPROC"
+    cmake --build "$LLAMACPP_DIR/build" --config Release -j"$NPROC"
     
     # Verify installation and configure PATH
     if [ -f "$LLAMACPP_BIN/llama-server" ] || [ -f "$LLAMACPP_BIN/llama-cli" ]; then
