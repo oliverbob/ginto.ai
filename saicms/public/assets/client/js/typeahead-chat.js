@@ -2583,7 +2583,7 @@ class ChatUIManager {
 		setTimeout(() => {
 			if (!chat.element) return;
 			this._hideRemoteUserTypingIndicator(chatId, chat.userId);
-			const replies = ["That's interesting!", "I see.", "Tell me more.", "Okay!", "Got it."];
+			const replies = ["That's interesting!", "I see.", "Tell me more.", "Okay!"];
 			const randomReply = replies[Math.floor(Math.random() * replies.length)];
 			const replyMessage = {
 				id: `sim_reply_${Date.now()}`, sender_id: chat.userId, sender_full_name: chat.userName,
