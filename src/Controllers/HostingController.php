@@ -903,9 +903,9 @@ class HostingController
         $availableFile = $availableDir . '/' . $safeDomain . '.caddy';
         $enabledFile = $enabledDir . '/' . $safeDomain . '.caddy';
 
-        $redirectTarget = trim((string)(getenv('TUNNEL_RELAY_REDIRECT_TARGET') ?: ($_ENV['TUNNEL_RELAY_REDIRECT_TARGET'] ?? 'http://localhost/tunnel')));
+        $redirectTarget = trim((string)(getenv('TUNNEL_RELAY_REDIRECT_TARGET') ?: ($_ENV['TUNNEL_RELAY_REDIRECT_TARGET'] ?? 'https://ginto.ai/tunnel')));
         if ($redirectTarget === '') {
-            $redirectTarget = 'http://localhost/tunnel';
+            $redirectTarget = 'https://ginto.ai/tunnel';
         }
 
         $config = $safeDomain . " {\n"

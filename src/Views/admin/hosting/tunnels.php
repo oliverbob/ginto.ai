@@ -250,10 +250,13 @@ $currentPage = 'tunnels';
 
         const approveBtn = document.getElementById('relay-approve-btn');
         const revokeBtn = document.getElementById('relay-revoke-btn');
-        approveBtn.disabled = relayApproved && !relayBlocked;
+        approveBtn.disabled = false;
         revokeBtn.disabled = !relayApproved && !relayBlocked;
         approveBtn.classList.toggle('opacity-50', approveBtn.disabled);
         revokeBtn.classList.toggle('opacity-50', revokeBtn.disabled);
+        approveBtn.innerHTML = relayApproved && !relayBlocked
+          ? '<i class="fas fa-sync mr-1"></i>Reapply'
+          : '<i class="fas fa-check mr-1"></i>Approve';
         
         const tbody = document.getElementById('tunnels-list');
         
