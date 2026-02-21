@@ -906,6 +906,29 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             <input type="hidden" name="sdcpu_active" id="sdcpu-active-input" value="<?= $sdcpuActive ? '1' : '0' ?>">
                         </div>
 
+                        <!-- SDCPU Tunnel Toggle -->
+                        <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                                    <svg class="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-.837.836m0 0a2.25 2.25 0 01-3.182 0l-.836-.836a4.5 4.5 0 010-6.364l1.757-1.757a4.5 4.5 0 016.364 0l.836.836a4.5 4.5 0 010 6.364l-1.757 1.757m-3.182-3.182l4.5-4.5" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <label class="font-medium text-gray-900 dark:text-white">SDCPU Tunnel</label>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Enable tunnel-aware SDCPU pipeline via SDCPU_TUNNEL in .env (for future image processor integration)</p>
+                                </div>
+                            </div>
+                            <?php $sdcpuTunnel = ($envValues['SDCPU_TUNNEL'] ?? 'false') === 'true'; ?>
+                            <button type="button" id="sdcpu-tunnel-toggle"
+                                    onclick="toggleSdcpuTunnel(this)"
+                                    data-enabled="<?= $sdcpuTunnel ? 'true' : 'false' ?>"
+                                    style="width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background-color 0.2s; background-color: <?= $sdcpuTunnel ? '#4f46e5' : '#d1d5db' ?>;">
+                                <span id="sdcpu-tunnel-knob" style="position: absolute; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: left 0.2s; left: <?= $sdcpuTunnel ? '28px' : '4px' ?>;"></span>
+                            </button>
+                            <input type="hidden" name="sdcpu_tunnel" id="sdcpu-tunnel-input" value="<?= $sdcpuTunnel ? '1' : '0' ?>">
+                        </div>
+
                         <!-- Groq Vision for All Models Toggle -->
                         <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
                             <div class="flex items-center gap-3">
@@ -1095,6 +1118,17 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             btn.style.backgroundColor = newState ? '#7c3aed' : '#d1d5db';
             knob.style.left = newState ? '28px' : '4px';
             document.getElementById('sdcpu-active-input').value = newState ? '1' : '0';
+        }
+
+        // Toggle SDCPU tunnel mode
+        function toggleSdcpuTunnel(btn) {
+            const isEnabled = btn.dataset.enabled === 'true';
+            const newState = !isEnabled;
+            const knob = document.getElementById('sdcpu-tunnel-knob');
+            btn.dataset.enabled = newState ? 'true' : 'false';
+            btn.style.backgroundColor = newState ? '#4f46e5' : '#d1d5db';
+            knob.style.left = newState ? '28px' : '4px';
+            document.getElementById('sdcpu-tunnel-input').value = newState ? '1' : '0';
         }
 
         // Toggle Groq vision pre-analysis for all models
