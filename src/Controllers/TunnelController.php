@@ -93,10 +93,10 @@ class TunnelController
             return;
         }
 
-        $targetHost = self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
         $normalizedPath = '/' . ltrim($path, '/');
         $queryString = $_SERVER['QUERY_STRING'] ?? '';
-        $targetUrl = 'https://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+        $targetHost = '127.0.0.1:' . $localRelayPort;
+        $targetUrl = 'http://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
 
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $ch = curl_init($targetUrl);
@@ -123,8 +123,8 @@ class TunnelController
         $headers[] = 'Host: ' . $targetHost;
         $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
         $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
-        $headers[] = 'X-Forwarded-Proto: https';
-        $headers[] = 'X-Ginto-Tunnel-Relay: ' . $targetHost;
+        $headers[] = 'X-Forwarded-Proto: ' . ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http');
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
@@ -136,7 +136,7 @@ class TunnelController
         if ($response === false) {
             http_response_code(502);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach vision.ginto.ai relay</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Failed to reach local relay target</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Expected local relay target: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
             return;
         }
 
@@ -163,7 +163,10 @@ class TunnelController
                 continue;
             }
             if ($lower === 'location') {
+                $value = str_replace('http://' . $targetHost, '/tunnel', $value);
                 $value = str_replace('https://' . $targetHost, '/tunnel', $value);
+                $value = str_replace('http://localhost:' . $localRelayPort, '/tunnel', $value);
+                $value = str_replace('https://localhost:' . $localRelayPort, '/tunnel', $value);
                 if (str_starts_with($value, '/')) {
                     $value = '/tunnel' . $value;
                 }
