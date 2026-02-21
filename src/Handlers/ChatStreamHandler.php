@@ -603,7 +603,7 @@ class ChatStreamHandler
         // Session-selected cloud provider
         $sessionCloudProvider = null;
         $sessionCloudModel = null;
-        $cloudProviders = ['cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks', 'novita'];
+        $cloudProviders = ['cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks'];
         if ($sessionProvider && $sessionModel && in_array($sessionProvider, $cloudProviders, true)) {
             $sessionCloudProvider = $sessionProvider;
             $sessionCloudModel = $sessionModel;
@@ -953,46 +953,19 @@ class ChatStreamHandler
                 $visionMessages[] = ['role' => 'user', 'content' => $prompt . "\n\n[Image]: " . $imageRef];
 
                 try {
-                    $visionCandidates = array_values(array_unique(array_filter([
-                        $visionModelName,
-                        'llama-3.2-11b-vision-preview',
-                        'meta-llama/llama-4-scout-17b-16e-instruct',
-                    ])));
+                    $visionProviderInstance = new \App\Core\LLM\Providers\OpenAICompatibleProvider('groq', [
+                        'api_key' => $visionApiKey,
+                        'model' => $visionModelName,
+                    ]);
 
-                    $visionAnalysis = '';
-                    $visionModelUsed = null;
-                    $visionLastError = null;
-
-                    foreach ($visionCandidates as $candidateModel) {
-                        try {
-                            $visionProviderInstance = new \App\Core\LLM\Providers\OpenAICompatibleProvider('groq', [
-                                'api_key' => $visionApiKey,
-                                'model' => $candidateModel,
-                            ]);
-                            $visionResp = $visionProviderInstance->chat($visionMessages, [], ['max_tokens' => 768, 'model' => $candidateModel]);
-                            $candidateContent = trim((string)$visionResp->getContent());
-                            if ($candidateContent !== '') {
-                                $visionAnalysis = $candidateContent;
-                                $visionModelUsed = $candidateModel;
-                                break;
-                            }
-                        } catch (\Throwable $candidateError) {
-                            $visionLastError = $candidateError;
-                            if ($this->isRateLimitErrorMessage($candidateError->getMessage())) {
-                                error_log('[ChatStream] Vision model rate-limited, trying fallback model: ' . $candidateModel);
-                                continue;
-                            }
-                            continue;
-                        }
-                    }
-
+                    // Request a concise analysis from the vision model
+                    $visionResp = $visionProviderInstance->chat($visionMessages, [], ['max_tokens' => 1024, 'model' => $visionModelName]);
+                    $visionAnalysis = trim((string)$visionResp->getContent());
                     if (!empty($visionAnalysis)) {
-                        $visionAnalysisShort = mb_substr($visionAnalysis, 0, 1800);
-                        $analysisMsg = ['role' => 'system', 'content' => "[Image analysis from {$visionProviderName} - model " . ($visionModelUsed ?? $visionModelName) . "]:\n" . $visionAnalysisShort];
+                        // Prepend analysis as a system message so the main model can use it
+                        $analysisMsg = ['role' => 'system', 'content' => "[Image analysis from {$visionProviderName} - model {$visionModelName}]:\n" . $visionAnalysis];
                         array_unshift($history, $analysisMsg);
-                        error_log("[ChatStream] Vision analysis attached to history ({$visionProviderName}): " . substr($visionAnalysisShort, 0, 200));
-                    } elseif ($visionLastError) {
-                        error_log('[ChatStream] Vision analysis failed after fallbacks: ' . $visionLastError->getMessage());
+                        error_log("[ChatStream] Vision analysis attached to history ({$visionProviderName}): " . substr($visionAnalysis, 0, 200));
                     } else {
                         error_log('[ChatStream] Vision analysis returned empty content');
                     }
@@ -1307,78 +1280,57 @@ class ChatStreamHandler
                 error_log('[ChatStream] Payload sizing error: ' . $e->getMessage());
             }
 
-            $streamRetryUsed = false;
             while ($iteration < $maxIterations) {
                 $iteration++;
                 
                 // Debug: log iteration
                 error_log("[ChatStream] Tool loop iteration $iteration");
                 
-                try {
-                    $response = $provider->chatStream(
-                        messages: $messages,
-                        tools: $tools,
-                        options: ['max_tokens' => $maxTokens, 'tool_choice' => 'auto'],
-                        onChunk: function($chunk, $event = null) use (&$accumulatedContent, &$accumulatedReasoning, $parsedown) {
-                            if ($event !== null) {
-                                if (isset($event['activity'])) {
-                                    $payload = array_filter([
-                                        'activity' => $event['activity'],
-                                        'type' => $event['type'] ?? null,
-                                        'query' => $event['query'] ?? null,
-                                        'url' => $event['url'] ?? null,
-                                        'domain' => $event['domain'] ?? null,
-                                        'status' => $event['status'] ?? 'running',
-                                    ], fn($v) => $v !== null);
-                                    echo "data: " . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-                                    flush();
-                                    return;
-                                }
-
-                                if (isset($event['reasoning'])) {
-                                    $reasoningText = self::stripMarkers($event['text'] ?? '');
-                                    $accumulatedReasoning .= $reasoningText;
-                                    echo "data: " . json_encode(['reasoning' => $reasoningText], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
-                                    flush();
-                                    return;
-                                }
+                $response = $provider->chatStream(
+                    messages: $messages,
+                    tools: $tools,
+                    options: ['max_tokens' => $maxTokens, 'tool_choice' => 'auto'],
+                    onChunk: function($chunk, $event = null) use (&$accumulatedContent, &$accumulatedReasoning, $parsedown) {
+                        if ($event !== null) {
+                            if (isset($event['activity'])) {
+                                $payload = array_filter([
+                                    'activity' => $event['activity'],
+                                    'type' => $event['type'] ?? null,
+                                    'query' => $event['query'] ?? null,
+                                    'url' => $event['url'] ?? null,
+                                    'domain' => $event['domain'] ?? null,
+                                    'status' => $event['status'] ?? 'running',
+                                ], fn($v) => $v !== null);
+                                echo "data: " . json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                                flush();
                                 return;
                             }
 
-                            if ($chunk !== '' && $chunk !== null) {
-                                if (preg_match('/[^\s]/', $chunk)) {
-                                    $chunk = self::stripMarkers($chunk);
-                                }
-                                if ($chunk === '') return;
-                                $accumulatedContent .= $chunk;
-                                error_log("[ChatStream] Streaming text chunk: " . strlen($chunk) . " chars");
-                                echo "data: " . json_encode(['text' => $chunk], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                            if (isset($event['reasoning'])) {
+                                $reasoningText = self::stripMarkers($event['text'] ?? '');
+                                $accumulatedReasoning .= $reasoningText;
+                                echo "data: " . json_encode(['reasoning' => $reasoningText], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
                                 flush();
+                                return;
                             }
+                            return;
                         }
-                    );
-                } catch (\Throwable $streamError) {
-                    $canRetryWithGroqFallback =
-                        !$streamRetryUsed
-                        && strtolower((string)$selectedProvider) === 'groq'
-                        && $this->isRateLimitErrorMessage($streamError->getMessage());
 
-                    if ($canRetryWithGroqFallback) {
-                        $fallbackModel = 'llama-3.1-8b-instant';
-                        if (($modelName ?? '') !== $fallbackModel) {
-                            error_log("[ChatStream] Groq model rate-limited ({$modelName}), retrying once with {$fallbackModel}");
-                            $modelName = $fallbackModel;
-                            $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
-                                'api_key' => $apiKey,
-                                'model' => $modelName,
-                            ]);
-                            $streamRetryUsed = true;
-                            continue;
+                        if ($chunk !== '' && $chunk !== null) {
+                            // Only strip markers if the chunk has actual content, not just whitespace
+                            // Important: preserve space-only chunks as they separate words
+                            if (preg_match('/[^\s]/', $chunk)) {
+                                $chunk = self::stripMarkers($chunk);
+                            }
+                            // Skip truly empty chunks but keep whitespace-only chunks
+                            if ($chunk === '') return;
+                            $accumulatedContent .= $chunk;
+                            error_log("[ChatStream] Streaming text chunk: " . strlen($chunk) . " chars");
+                            echo "data: " . json_encode(['text' => $chunk], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                            flush();
                         }
                     }
-
-                    throw $streamError;
-                }
+                );
 
                 // Check if model wants to use tools
                 $toolCalls = $response->getToolCalls();
@@ -1909,16 +1861,6 @@ class ChatStreamHandler
         \Ginto\Helpers\AdminErrorLogger::log($e->getMessage(), ['route' => '/chat', 'trace' => $e->getTraceAsString()]);
         echo "data: " . json_encode(['error' => $userError]) . "\n\n";
         flush();
-    }
-
-    private function isRateLimitErrorMessage(string $errorMessage): bool
-    {
-        return (
-            stripos($errorMessage, 'rate limit') !== false ||
-            stripos($errorMessage, 'rate_limit') !== false ||
-            stripos($errorMessage, '429') !== false ||
-            stripos($errorMessage, 'too many requests') !== false
-        );
     }
 
     /**
