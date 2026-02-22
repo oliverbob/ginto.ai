@@ -158,6 +158,10 @@ $currentPage = 'tunnels';
               <option value="1440" selected>24 hours</option>
               <option value="10080">7 days</option>
               <option value="43200">30 days</option>
+              <option value="525600">1 year</option>
+              <option value="1576800">3 years</option>
+              <option value="2628000">5 years</option>
+              <option value="-1">Never expire</option>
             </select>
             <button id="relay-approve-btn" onclick="approveRelay()" class="px-3 py-1.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white rounded transition-colors">
               <i class="fas fa-check mr-1"></i>Approve
@@ -195,6 +199,7 @@ $currentPage = 'tunnels';
         const relayEndpoint = relay.endpoint || '/tunnel';
         const relayApproved = !!relay.approved;
         const relayBlocked = !!relay.blocked;
+        const relayNeverExpires = !!relay.never_expires;
         const relayRemaining = Number(relay.remaining || 0);
         const relayExpiresAt = Number(relay.expires_at || 0);
 
@@ -218,7 +223,9 @@ $currentPage = 'tunnels';
         }
 
         const relayExpiryEl = document.getElementById('relay-expiry');
-        if (relayExpiresAt > 0) {
+        if (relayNeverExpires) {
+          relayExpiryEl.textContent = 'Never';
+        } else if (relayExpiresAt > 0) {
           relayExpiryEl.textContent = relayRemaining > 0
             ? `${formatDuration(relayRemaining)} (at ${formatTime(relayExpiresAt)})`
             : `Expired at ${formatTime(relayExpiresAt)}`;

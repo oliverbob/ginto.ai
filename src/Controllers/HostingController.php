@@ -1099,8 +1099,11 @@ class HostingController
 
         $relayEntry = $registry[$relaySubdomain] ?? null;
         $relayExpiresAt = (int)($relayEntry['expires_at'] ?? 0);
+        $relayNeverExpires = !empty($relayEntry['never_expires']);
         $relayBlocked = in_array($relaySubdomain, $blocklist, true);
-        $relayApproved = !$relayBlocked && is_array($relayEntry) && $relayExpiresAt > $now;
+        $relayApproved = !$relayBlocked
+            && is_array($relayEntry)
+            && ($relayNeverExpires || $relayExpiresAt > $now);
         $relayProxyState = $this->getRelayProxyState($relaySubdomain);
         $relayDnsZoneExists = false;
         try {
@@ -1157,8 +1160,9 @@ class HostingController
                 'revoke_url' => '/admin/hosting/tunnels/relay/revoke',
                 'approved' => $relayApproved,
                 'blocked' => $relayBlocked,
+                'never_expires' => $relayNeverExpires,
                 'expires_at' => $relayExpiresAt,
-                'remaining' => $relayExpiresAt > 0 ? max(0, $relayExpiresAt - $now) : 0,
+                'remaining' => $relayNeverExpires ? null : ($relayExpiresAt > 0 ? max(0, $relayExpiresAt - $now) : 0),
                 'client_ip' => $relayEntry['client_ip'] ?? null,
                 'local_port' => $relayLocalPort,
                 'frpc_pid' => $relayProxyState['pid'],
@@ -1290,14 +1294,17 @@ class HostingController
         }
 
         $minutes = (int)($input['minutes'] ?? 1440);
-        if ($minutes < 1) {
-            $minutes = 1;
-        }
-        if ($minutes > 43200) {
-            $minutes = 43200;
+        $neverExpires = $minutes === -1;
+        if (!$neverExpires) {
+            if ($minutes < 1) {
+                $minutes = 1;
+            }
+            if ($minutes > 2628000) {
+                $minutes = 2628000;
+            }
         }
 
-        $expiresIn = $minutes * 60;
+        $expiresIn = $neverExpires ? (100 * 365 * 24 * 60 * 60) : ($minutes * 60);
         $localRelayPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
         if ($localRelayPort < 1024 || $localRelayPort > 65535) {
             $localRelayPort = 18080;
@@ -1331,10 +1338,12 @@ class HostingController
         $clientIp = (string)($_SERVER['REMOTE_ADDR'] ?? 'admin');
 
         $registry = $this->getTunnelRegistry();
+        $expiresAt = time() + $expiresIn;
         $registry[$subdomain] = [
             'subdomain' => $subdomain,
             'started_at' => time(),
-            'expires_at' => time() + $expiresIn,
+            'expires_at' => $expiresAt,
+            'never_expires' => $neverExpires,
             'client_ip' => $clientIp,
             'registered_at' => date('Y-m-d H:i:s')
         ];
@@ -1357,6 +1366,7 @@ class HostingController
             'subdomain' => $subdomain,
             'domain' => $relayDomain,
             'expires_at' => $registry[$subdomain]['expires_at'],
+            'never_expires' => $neverExpires,
             'local_port' => $localRelayPort,
             'relay_pid' => $relayProvision['pid'] ?? null,
             'relay_config' => $relayProvision['config_path'] ?? null,
