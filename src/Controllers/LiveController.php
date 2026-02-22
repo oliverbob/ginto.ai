@@ -985,6 +985,9 @@ class LiveController
                     }
                 }
             }
+            if (empty($sizeMap)) {
+                $sizeMap = $this->fetchHuggingFaceModelSizes($sizeQueryModels);
+            }
 
             $availableLookup = [];
             foreach ($availableModels as $modelId) {
@@ -1173,5 +1176,104 @@ class LiveController
 
         $decoded = json_decode($response, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    private function fetchHuggingFaceModelSizes(array $modelIds, int $ttlSeconds = 86400): array
+    {
+        $result = [];
+        $modelIds = array_values(array_unique(array_filter(array_map(static fn($id) => trim((string)$id), $modelIds), static fn($id) => $id !== '')));
+        if (empty($modelIds)) {
+            return $result;
+        }
+
+        $cacheDir = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(dirname(__DIR__), 2) . '/storage') . '/cache';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0755, true);
+        }
+        $cachePath = $cacheDir . '/imagegen_model_sizes.json';
+
+        $cache = [];
+        if (is_file($cachePath)) {
+            $raw = @file_get_contents($cachePath);
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            if (is_array($decoded)) {
+                $cache = $decoded;
+            }
+        }
+
+        $now = time();
+        $toFetch = [];
+        foreach ($modelIds as $modelId) {
+            $entry = $cache[$modelId] ?? null;
+            if (is_array($entry)
+                && isset($entry['fetched_at'], $entry['size_bytes'])
+                && ($now - (int)$entry['fetched_at']) < $ttlSeconds
+                && is_numeric($entry['size_bytes'])) {
+                $result[$modelId] = (int)$entry['size_bytes'];
+            } else {
+                $toFetch[] = $modelId;
+            }
+        }
+
+        if (!empty($toFetch)) {
+            $mh = curl_multi_init();
+            $handles = [];
+            foreach ($toFetch as $modelId) {
+                $url = 'https://huggingface.co/api/models/' . rawurlencode($modelId);
+                $ch = curl_init($url);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 8,
+                    CURLOPT_CONNECTTIMEOUT => 3,
+                    CURLOPT_FOLLOWLOCATION => true,
+                    CURLOPT_HTTPHEADER => ['Accept: application/json', 'User-Agent: ginto-live/1.0'],
+                ]);
+                curl_multi_add_handle($mh, $ch);
+                $handles[$modelId] = $ch;
+            }
+
+            $running = null;
+            do {
+                curl_multi_exec($mh, $running);
+                if ($running) {
+                    curl_multi_select($mh, 1.0);
+                }
+            } while ($running);
+
+            foreach ($handles as $modelId => $ch) {
+                $body = curl_multi_getcontent($ch);
+                $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $sizeBytes = null;
+                if ($httpCode >= 200 && $httpCode < 300 && is_string($body) && $body !== '') {
+                    $payload = json_decode($body, true);
+                    if (is_array($payload) && isset($payload['siblings']) && is_array($payload['siblings'])) {
+                        $sum = 0;
+                        $found = false;
+                        foreach ($payload['siblings'] as $sibling) {
+                            if (is_array($sibling) && isset($sibling['size']) && is_numeric($sibling['size'])) {
+                                $sum += (int)$sibling['size'];
+                                $found = true;
+                            }
+                        }
+                        if ($found && $sum > 0) {
+                            $sizeBytes = $sum;
+                        }
+                    }
+                }
+
+                if (is_int($sizeBytes) && $sizeBytes > 0) {
+                    $result[$modelId] = $sizeBytes;
+                    $cache[$modelId] = ['size_bytes' => $sizeBytes, 'fetched_at' => $now];
+                }
+
+                curl_multi_remove_handle($mh, $ch);
+                curl_close($ch);
+            }
+            curl_multi_close($mh);
+
+            @file_put_contents($cachePath, json_encode($cache, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+
+        return $result;
     }
 }
