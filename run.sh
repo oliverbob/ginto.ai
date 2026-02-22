@@ -119,10 +119,6 @@ case "${1:-help}" in
     novnc-local)
         cmd_novnc_local
         ;;
-    novnc)
-        log_warn "'novnc' is deprecated. Use 'novnc-local' instead."
-        cmd_novnc_local
-        ;;
     help|--help|-h)
         show_help
         ;;

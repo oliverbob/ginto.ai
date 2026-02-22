@@ -3759,11 +3759,6 @@ case "${1:-help}" in
         detect_os
         install_novnc_service
         ;;
-    novnc)
-        log_warn "'novnc' is deprecated. Use 'novnc-local' instead."
-        detect_os
-        install_novnc_service
-        ;;
     *)
         echo "Ginto AI Installation Script"
         echo ""
@@ -3780,7 +3775,6 @@ case "${1:-help}" in
         echo "  restart   - Restart all services"
         echo "  status    - Show service status"
         echo "  novnc-local - Install/update local noVNC from GitHub and configure novnc.service"
-        echo "  novnc       - (deprecated alias) use novnc-local"
         echo ""
         echo "Other Commands:"
         echo "  reset     - Clear installation checkpoint to start fresh"
