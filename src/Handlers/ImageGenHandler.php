@@ -65,6 +65,56 @@ class ImageGenHandler
         return $value;
     }
 
+    private function wantsMultiSubject(string $prompt): bool
+    {
+        $normalized = strtolower(trim($prompt));
+        if ($normalized === '') {
+            return false;
+        }
+
+        if (preg_match('/\b(\d+)\s+(people|persons|characters|subjects|figures)\b/', $normalized)) {
+            return true;
+        }
+
+        $multiHints = [
+            'two ',
+            'three ',
+            'four ',
+            'five ',
+            'group',
+            'crowd',
+            'multiple',
+            'pair',
+            'twins',
+            'people',
+            'characters',
+            'subjects',
+            'team',
+            'family',
+        ];
+
+        foreach ($multiHints as $hint) {
+            if (strpos($normalized, $hint) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function buildPromptPayload(string $prompt): array
+    {
+        if ($this->wantsMultiSubject($prompt)) {
+            return ['prompt' => $prompt];
+        }
+
+        $singlePrompt = rtrim($prompt) . ', single subject, one character only, centered composition';
+        return [
+            'prompt' => $singlePrompt,
+            'negative_prompt' => 'duplicate subject, multiple people, multiple characters, twins, clone, mirrored person, group photo',
+        ];
+    }
+
     private function resolveImageGenProfile(): array
     {
         $profile = $this->envValue('IMAGEGEN_PROFILE', 'balanced');
@@ -247,13 +297,18 @@ class ImageGenHandler
         
         // Generate the image synchronously (for MCP tool use)
         $generationConfig = $this->resolveImageGenProfile();
+        $promptPayload = $this->buildPromptPayload($prompt);
         $requestData = [
-            'prompt' => $prompt,
+            'prompt' => $promptPayload['prompt'],
             'width' => $generationConfig['width'],
             'height' => $generationConfig['height'],
             'num_inference_steps' => $generationConfig['num_inference_steps'],
             'guidance_scale' => $generationConfig['guidance_scale'],
+            'num_images' => 1,
         ];
+        if (!empty($promptPayload['negative_prompt'])) {
+            $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
+        }
         
         // Add img2img parameters if provided
         if ($init_image) {
@@ -385,13 +440,18 @@ class ImageGenHandler
         
         // Build the API request - use streaming endpoint for progress
         $generationConfig = $this->resolveImageGenProfile();
+        $promptPayload = $this->buildPromptPayload($prompt);
         $requestData = [
-            'prompt' => $prompt,
+            'prompt' => $promptPayload['prompt'],
             'width' => $generationConfig['width'],
             'height' => $generationConfig['height'],
             'num_inference_steps' => $generationConfig['num_inference_steps'],
             'guidance_scale' => $generationConfig['guidance_scale'],
+            'num_images' => 1,
         ];
+        if (!empty($promptPayload['negative_prompt'])) {
+            $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
+        }
         
         // Add img2img parameters if provided
         if ($initImage) {
