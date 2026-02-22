@@ -101,6 +101,7 @@ class TunnelController
         $queryString = $_SERVER['QUERY_STRING'] ?? '';
         $targetScheme = $isHttpTarget ? 'http' : 'https';
         $targetUrl = $targetScheme . '://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+        $timeoutSeconds = $this->resolveRelayTimeoutSeconds($normalizedPath);
 
         $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
         $relayBody = null;
@@ -113,7 +114,7 @@ class TunnelController
         curl_setopt($ch, CURLOPT_HEADER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
         curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
-        curl_setopt($ch, CURLOPT_TIMEOUT, 60);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutSeconds);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
         if ($relayBody !== null) {
             curl_setopt($ch, CURLOPT_POSTFIELDS, $relayBody);
@@ -181,6 +182,20 @@ class TunnelController
         }
 
         echo $body;
+    }
+
+    private function resolveRelayTimeoutSeconds(string $normalizedPath): int
+    {
+        // Image generation can take much longer than standard API calls,
+        // especially through local CPU relay and model warm-up.
+        if (str_starts_with($normalizedPath, '/api/generate-stream')) {
+            return 600;
+        }
+        if (str_starts_with($normalizedPath, '/api/generate')) {
+            return 300;
+        }
+
+        return 60;
     }
 
     private function isVisionRelayApprovedRemote(): bool
