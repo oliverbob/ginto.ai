@@ -69,6 +69,15 @@ class ImageGenHandler
     {
         $profile = $this->envValue('IMAGEGEN_PROFILE', 'balanced');
         switch ($profile) {
+            case 'startup':
+                $config = [
+                    'profile' => 'startup',
+                    'width' => 384,
+                    'height' => 384,
+                    'num_inference_steps' => 3,
+                    'guidance_scale' => 0.8,
+                ];
+                break;
             case 'fast':
                 $config = [
                     'profile' => 'fast',

@@ -863,6 +863,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         <div>
                             <label class="label-text">Image Quality Profile</label>
                             <select name="imagegen_profile" class="input-field">
+                                <option value="startup" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'startup') ? 'selected' : '' ?>>Startup low-cost (Minimal infra usage)</option>
                                 <option value="fast" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'fast') ? 'selected' : '' ?>>Fast (Lower quality, quickest response)</option>
                                 <option value="balanced" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'balanced') ? 'selected' : '' ?>>Balanced (Default)</option>
                                 <option value="quality" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'quality') ? 'selected' : '' ?>>Quality (Higher detail)</option>

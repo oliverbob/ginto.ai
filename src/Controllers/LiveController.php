@@ -652,7 +652,7 @@ class LiveController
         $data['groq_vision_for_all_models'] = isset($data['groq_vision_for_all_models']) && $data['groq_vision_for_all_models'] ? 'true' : 'false';
 
         // Validate select fields with strict allowlists
-        $allowedImagegenProfiles = ['fast', 'balanced', 'quality', 'ultra'];
+        $allowedImagegenProfiles = ['startup', 'fast', 'balanced', 'quality', 'ultra'];
         $imagegenProfile = (string)($data['imagegen_profile'] ?? 'balanced');
         $data['imagegen_profile'] = in_array($imagegenProfile, $allowedImagegenProfiles, true)
             ? $imagegenProfile
