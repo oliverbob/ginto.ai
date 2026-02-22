@@ -4473,6 +4473,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               
               // Remove progress bar when complete
               if (data.progress >= 100) {
+                progressContainer.dataset.finalizedAt = String(Date.now());
+                progressContainer.dataset.removeDelayMs = '500';
                 setTimeout(() => {
                   progressContainer.remove();
                 }, 500);
@@ -4494,6 +4496,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                   if (bar) bar.style.width = '100%';
                   if (percentLabel) percentLabel.textContent = '100%';
                   if (status) status.textContent = success ? 'Complete!' : 'Failed';
+                  progressContainer.dataset.finalizedAt = String(Date.now());
+                  progressContainer.dataset.removeDelayMs = success ? '600' : '300';
                   setTimeout(() => {
                     if (progressContainer.parentNode) progressContainer.remove();
                   }, success ? 600 : 300);
@@ -4605,7 +4609,21 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               // Clean up any lingering image progress UI on final event.
               const lingeringProgress = currentCard.response.querySelector('.image-gen-progress');
               if (lingeringProgress && lingeringProgress.parentNode) {
-                lingeringProgress.remove();
+                const finalizedAt = parseInt(lingeringProgress.dataset.finalizedAt || '0', 10);
+                const removeDelayMs = parseInt(lingeringProgress.dataset.removeDelayMs || '0', 10);
+                if (finalizedAt > 0 && removeDelayMs > 0) {
+                  const elapsedMs = Date.now() - finalizedAt;
+                  const remainingMs = Math.max(0, removeDelayMs - elapsedMs);
+                  if (remainingMs === 0) {
+                    lingeringProgress.remove();
+                  } else {
+                    setTimeout(() => {
+                      if (lingeringProgress.parentNode) lingeringProgress.remove();
+                    }, remainingMs);
+                  }
+                } else {
+                  lingeringProgress.remove();
+                }
               }
 
               // Always show the response label and handle content
