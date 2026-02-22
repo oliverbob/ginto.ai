@@ -845,6 +845,7 @@ $router->req('/chat/create_sandbox', 'ChatController@createSandbox', ['POST']);
 $router->get('/live', 'LiveController@index');
 $router->post('/live', 'LiveController@save');
 $router->post('/live/activate', 'LiveController@activate');
+$router->get('/live/imagegen/model-status', 'LiveController@imagegenModelStatus');
 $router->req('/chat/upload-image', 'ChatController@uploadImage', ['POST']);
 $router->req('/chat/upload-document', 'ChatController@uploadDocument', ['POST']);
 $router->req('/chat/documents', 'ChatController@getDocuments');

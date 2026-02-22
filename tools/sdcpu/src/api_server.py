@@ -15,6 +15,7 @@ import io
 import os
 import sys
 import time
+from pathlib import Path
 from argparse import ArgumentParser
 from typing import Optional
 
@@ -158,7 +159,45 @@ async def api_root():
 @app.get("/health")
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "txt2img_loaded": _txt2img_pipeline is not None, "img2img_loaded": _img2img_pipeline is not None}
+    return {
+        "status": "ok",
+        "txt2img_loaded": _txt2img_pipeline is not None,
+        "img2img_loaded": _img2img_pipeline is not None,
+        "current_model": _current_model,
+    }
+
+
+def _discover_cached_models() -> list[str]:
+    models: set[str] = set()
+    hf_home = Path(os.getenv("HF_HOME", str(Path.home() / ".cache" / "huggingface")))
+    hub_dir = hf_home / "hub"
+
+    if hub_dir.exists() and hub_dir.is_dir():
+        for path in hub_dir.glob("models--*"):
+            name = path.name
+            if not name.startswith("models--"):
+                continue
+            repo = name[len("models--"):].replace("--", "/")
+            if repo:
+                models.add(repo)
+
+    models.add(DEFAULT_MODEL_CPU)
+    models.add(DEFAULT_MODEL_CUDA)
+    if _current_model:
+        models.add(_current_model)
+
+    return sorted(models)
+
+
+@app.get("/api/models")
+async def models():
+    return {
+        "models": _discover_cached_models(),
+        "current_model": _current_model,
+        "default_model_cpu": DEFAULT_MODEL_CPU,
+        "default_model_cuda": DEFAULT_MODEL_CUDA,
+        "device": DEVICE,
+    }
 
 
 @app.post("/api/generate", response_model=GenerateResponse)

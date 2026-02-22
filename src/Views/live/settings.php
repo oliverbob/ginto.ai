@@ -882,6 +882,35 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             <p class="help-text">Controls whether image generation prefers local CPU or GPU tunnel endpoint.</p>
                         </div>
 
+                        <div class="md:col-span-2">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <label class="label-text !mb-0">Loaded Image Model</label>
+                                <button type="button" id="refresh-imagegen-model-status" class="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    Refresh
+                                </button>
+                            </div>
+                            <div id="imagegen-model-status" class="px-3 py-2 rounded border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 text-sm text-gray-700 dark:text-gray-300">
+                                Checking model status...
+                            </div>
+                            <p class="help-text">Shows the currently loaded model reported by the image generation service.</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Downloaded Models</label>
+                            <select id="imagegen-available-models" class="input-field">
+                                <option value="">(Select detected model)</option>
+                            </select>
+                            <p class="help-text">Detected from imagegen service model list (if supported by backend).</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Image Model (HuggingFace ID)</label>
+                            <input type="text" name="imagegen_model_id" id="imagegen-model-id" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['IMAGEGEN_MODEL_ID'] ?? '') ?>"
+                                   placeholder="e.g. stabilityai/sd-turbo">
+                            <p class="help-text">Set a model repo ID. This model will be used on subsequent image generation requests.</p>
+                        </div>
+
                         <div>
                             <label class="label-text">Inference Steps (override)</label>
                             <input type="number" name="imagegen_steps" class="input-field" min="1" max="50"
@@ -1160,6 +1189,50 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             }
         }
 
+        async function refreshImagegenModelStatus() {
+            const statusEl = document.getElementById('imagegen-model-status');
+            const selectEl = document.getElementById('imagegen-available-models');
+            if (!statusEl || !selectEl) return;
+
+            statusEl.textContent = 'Checking model status...';
+
+            try {
+                const res = await fetch('/live/imagegen/model-status', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+
+                if (!data.success) {
+                    throw new Error(data.error || 'Failed to fetch model status');
+                }
+
+                const endpoint = data.endpoint || '-';
+                const selectedModel = data.selected_model || '(default)';
+                const loadedModel = data.loaded_model || '(unknown)';
+                const isUp = !!data.service_up;
+                statusEl.innerHTML = `
+                    <div><strong>Endpoint:</strong> ${endpoint}</div>
+                    <div><strong>Service:</strong> ${isUp ? 'Online' : 'Offline/Unavailable'}</div>
+                    <div><strong>Selected Model:</strong> ${selectedModel}</div>
+                    <div><strong>Loaded Model:</strong> ${loadedModel}</div>
+                `;
+
+                const models = Array.isArray(data.available_models) ? data.available_models : [];
+                selectEl.innerHTML = '<option value="">(Select detected model)</option>';
+                for (const model of models) {
+                    const opt = document.createElement('option');
+                    opt.value = model;
+                    opt.textContent = model;
+                    selectEl.appendChild(opt);
+                }
+            } catch (err) {
+                statusEl.textContent = `Unable to fetch model status: ${err.message}`;
+                selectEl.innerHTML = '<option value="">(Unavailable)</option>';
+            }
+        }
+
         // Toggle OpenWebUI enabled/disabled
         function toggleOpenWebUI(btn) {
             const isEnabled = btn.dataset.enabled === 'true';
@@ -1219,6 +1292,23 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
 
         // Initialize nav buttons on load
         updateNavButtons();
+
+        const refreshModelBtn = document.getElementById('refresh-imagegen-model-status');
+        if (refreshModelBtn) {
+            refreshModelBtn.addEventListener('click', refreshImagegenModelStatus);
+        }
+
+        const imagegenAvailableModels = document.getElementById('imagegen-available-models');
+        const imagegenModelInput = document.getElementById('imagegen-model-id');
+        if (imagegenAvailableModels && imagegenModelInput) {
+            imagegenAvailableModels.addEventListener('change', () => {
+                if (imagegenAvailableModels.value) {
+                    imagegenModelInput.value = imagegenAvailableModels.value;
+                }
+            });
+        }
+
+        refreshImagegenModelStatus();
 
         // ============================================
         // LocalStorage Persistence for Setup Wizard

@@ -575,6 +575,7 @@ class LiveController
             'imagegen_guidance_scale' => 'IMAGEGEN_GUIDANCE_SCALE',
             'imagegen_width' => 'IMAGEGEN_WIDTH',
             'imagegen_height' => 'IMAGEGEN_HEIGHT',
+            'imagegen_model_id' => 'IMAGEGEN_MODEL_ID',
             
             // LLM Provider
             'llm_provider' => 'LLM_PROVIDER',
@@ -688,6 +689,16 @@ class LiveController
         $data['imagegen_height'] = $heightRaw === ''
             ? ''
             : (string)max(256, min(1536, (int)$heightRaw));
+
+        // Optional HuggingFace model ID override for image generation
+        $modelIdRaw = trim((string)($data['imagegen_model_id'] ?? ''));
+        if ($modelIdRaw === '') {
+            $data['imagegen_model_id'] = '';
+        } else {
+            $modelIdSanitized = strip_tags($modelIdRaw);
+            $modelIdSanitized = preg_replace('/[^a-zA-Z0-9_\-\.\/@]/', '', $modelIdSanitized);
+            $data['imagegen_model_id'] = $modelIdSanitized;
+        }
         
         // Update values
         foreach ($keyMap as $formKey => $envKey) {
@@ -704,7 +715,7 @@ class LiveController
         $groups = [
             'Ecommerce' => ['PAYPAL_WEBHOOK_ID', 'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_ENVIRONMENT', 'PAYPAL_INTERNAL_API_KEY', 'PAYPAL_CLIENT_ID_SANDBOX', 'PAYPAL_CLIENT_SECRET_SANDBOX'],
             'Datacenter' => ['B2_ACCOUNT_ID', 'B2_APP_KEY', 'B2_BUCKET_ID', 'B2_BUCKET_NAME', 'FILE_CDN_BASE_URL', 'DATACENTER'],
-            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE', 'IMAGEGEN_STEPS', 'IMAGEGEN_GUIDANCE_SCALE', 'IMAGEGEN_WIDTH', 'IMAGEGEN_HEIGHT'],
+            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE', 'IMAGEGEN_STEPS', 'IMAGEGEN_GUIDANCE_SCALE', 'IMAGEGEN_WIDTH', 'IMAGEGEN_HEIGHT', 'IMAGEGEN_MODEL_ID'],
             'Database' => ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_GUEST_USER', 'DB_GUEST_PASSWORD'],
             'LLM Provider' => ['LLM_PROVIDER', 'LLM_MODEL', 'DEFAULT_PROVIDER'],
             'GROQ API' => ['GROQ_API_KEY', 'GROQ_TTS_MODEL', 'GROQ_STT_MODEL'],
@@ -856,5 +867,103 @@ class LiveController
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+
+    public function imagegenModelStatus(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+
+        $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
+        if ($installedMarkerExists && !UserController::isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin access required']);
+            exit;
+        }
+
+        try {
+            $envValues = $this->getEnvValues();
+            $computeMode = strtolower(trim((string)($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto')));
+            $sdcpuActive = strtolower(trim((string)($envValues['SDCPU_ACTIVE'] ?? 'false'))) === 'true';
+            $sdcpuTunnel = $sdcpuActive && strtolower(trim((string)($envValues['SDCPU_TUNNEL'] ?? 'false'))) === 'true';
+
+            if ($computeMode === 'gpu') {
+                $baseUrl = 'https://vision.ginto.ai';
+            } elseif ($computeMode === 'cpu') {
+                $baseUrl = 'http://127.0.0.1:8888';
+            } else {
+                $baseUrl = $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+            }
+
+            $health = $this->fetchJson($baseUrl . '/api/health');
+            $models = $this->fetchJson($baseUrl . '/api/models');
+
+            $availableModels = [];
+            if (is_array($models)) {
+                if (isset($models['models']) && is_array($models['models'])) {
+                    $availableModels = $models['models'];
+                } else {
+                    foreach ($models as $value) {
+                        if (is_array($value)) {
+                            foreach ($value as $item) {
+                                if (is_string($item) && $item !== '') {
+                                    $availableModels[] = $item;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            $availableModels = array_values(array_unique(array_filter($availableModels, static fn($item) => is_string($item) && trim($item) !== '')));
+
+            $selectedModel = trim((string)($envValues['IMAGEGEN_MODEL_ID'] ?? ''));
+            $loadedModel = null;
+            $serviceUp = false;
+
+            if (is_array($health)) {
+                $serviceUp = (($health['status'] ?? '') === 'ok');
+                $loadedModel = $health['current_model'] ?? $health['model_name'] ?? $health['loaded_model'] ?? null;
+            }
+
+            echo json_encode([
+                'success' => true,
+                'endpoint' => $baseUrl,
+                'service_up' => $serviceUp,
+                'selected_model' => $selectedModel,
+                'loaded_model' => is_string($loadedModel) ? $loadedModel : null,
+                'available_models' => $availableModels,
+                'health' => $health,
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function fetchJson(string $url, int $timeoutSeconds = 5): ?array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeoutSeconds,
+            CURLOPT_CONNECTTIMEOUT => min(3, $timeoutSeconds),
+            CURLOPT_FOLLOWLOCATION => true,
+        ]);
+
+        $body = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($body === false || $httpCode < 200 || $httpCode >= 300) {
+            return null;
+        }
+
+        $decoded = json_decode($body, true);
+        return is_array($decoded) ? $decoded : null;
     }
 }

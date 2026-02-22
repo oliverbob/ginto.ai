@@ -2457,6 +2457,15 @@ class ChatStreamHandler
         ];
     }
 
+    private function resolveImageGenModelId(): ?string
+    {
+        $modelId = trim($this->imageGenRaw('IMAGEGEN_MODEL_ID'));
+        if ($modelId === '') {
+            return null;
+        }
+        return $modelId;
+    }
+
     private function resolveImageGenerationConfig(): array
     {
         $profile = $this->imageGenEnv('IMAGEGEN_PROFILE', 'balanced');
@@ -2647,6 +2656,10 @@ class ChatStreamHandler
             'guidance_scale' => $generationConfig['guidance_scale'],
             'num_images' => 1,
         ];
+        $modelId = $this->resolveImageGenModelId();
+        if ($modelId !== null) {
+            $requestData['model'] = $modelId;
+        }
         if (!empty($promptPayload['negative_prompt'])) {
             $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
         }
