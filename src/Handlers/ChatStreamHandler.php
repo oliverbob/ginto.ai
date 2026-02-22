@@ -2625,6 +2625,76 @@ class ChatStreamHandler
         return is_array($decoded) ? $decoded : null;
     }
 
+    private function normalizeImageGenResult(?array $result): ?array
+    {
+        if (!is_array($result) || $result === []) {
+            return null;
+        }
+
+        $imageValue = $result['image'] ?? null;
+
+        if (!is_string($imageValue) || trim($imageValue) === '') {
+            $images = $result['images'] ?? null;
+            if (is_array($images) && isset($images[0])) {
+                if (is_string($images[0])) {
+                    $imageValue = $images[0];
+                } elseif (is_array($images[0])) {
+                    $imageValue = $images[0]['image'] ?? ($images[0]['b64_json'] ?? null);
+                }
+            }
+        }
+
+        if ((!is_string($imageValue) || trim($imageValue) === '') && isset($result['data'])) {
+            $data = $result['data'];
+            if (is_array($data)) {
+                if (isset($data[0]) && is_array($data[0])) {
+                    $imageValue = $data[0]['b64_json'] ?? ($data[0]['image'] ?? null);
+                } elseif (isset($data['image']) && is_string($data['image'])) {
+                    $imageValue = $data['image'];
+                }
+            }
+        }
+
+        if (!is_string($imageValue) || trim($imageValue) === '') {
+            return null;
+        }
+
+        $imageValue = trim($imageValue);
+        if (str_starts_with($imageValue, 'data:image/')) {
+            $commaPos = strpos($imageValue, 'base64,');
+            if ($commaPos !== false) {
+                $imageValue = substr($imageValue, $commaPos + 7);
+            }
+        }
+
+        if ($imageValue === '') {
+            return null;
+        }
+
+        $result['image'] = $imageValue;
+        return $result;
+    }
+
+    private function summarizeImageGenApiResultForDebug(?array $result): string
+    {
+        if (!is_array($result)) {
+            return 'non-json response';
+        }
+
+        $keys = array_keys($result);
+        $summary = 'keys=' . implode(',', array_slice($keys, 0, 8));
+
+        if (!empty($result['detail']) && is_string($result['detail'])) {
+            $summary .= ' detail=' . substr($result['detail'], 0, 180);
+        } elseif (!empty($result['message']) && is_string($result['message'])) {
+            $summary .= ' message=' . substr($result['message'], 0, 180);
+        } elseif (!empty($result['error']) && is_string($result['error'])) {
+            $summary .= ' error=' . substr($result['error'], 0, 180);
+        }
+
+        return $summary;
+    }
+
     private function executeImageGeneration(string $prompt): array
     {
         if (empty(trim($prompt))) {
@@ -2738,6 +2808,7 @@ class ChatStreamHandler
         $responseBuffer = '';
         $lastProgress = 0;
         $finalResult = null;
+        $streamApiError = null;
         
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
@@ -2756,6 +2827,10 @@ class ChatStreamHandler
                         continue;
                     }
 
+                    if (!empty($event['error']) && is_string($event['error'])) {
+                        $streamApiError = $event['error'];
+                    }
+
                     if (isset($event['step']) && isset($event['total_steps'])) {
                         // Real step progress from server
                         $step = $event['step'];
@@ -2770,10 +2845,13 @@ class ChatStreamHandler
                                 $total
                             );
                         }
-                    } elseif (isset($event['image'])) {
+                    } else {
+                        $normalizedEvent = $this->normalizeImageGenResult($event);
+                        if ($normalizedEvent && isset($normalizedEvent['image'])) {
                         // Final result with image
-                        $finalResult = $event;
-                        $emitProgress(90, 'Processing image...');
+                            $finalResult = $normalizedEvent;
+                            $emitProgress(90, 'Processing image...');
+                        }
                     }
                 }
                 
@@ -2789,12 +2867,14 @@ class ChatStreamHandler
         if (!$finalResult && trim($responseBuffer) !== '') {
             $tail = trim($responseBuffer);
             $tailEvent = $this->imageGenDecodeSsePayload($tail);
-            if (is_array($tailEvent) && isset($tailEvent['image'])) {
-                $finalResult = $tailEvent;
+            $normalizedTailEvent = $this->normalizeImageGenResult(is_array($tailEvent) ? $tailEvent : null);
+            if (is_array($normalizedTailEvent) && isset($normalizedTailEvent['image'])) {
+                $finalResult = $normalizedTailEvent;
             } else {
                 $tailJson = @json_decode($tail, true);
-                if (is_array($tailJson) && isset($tailJson['image'])) {
-                    $finalResult = $tailJson;
+                $normalizedTailJson = $this->normalizeImageGenResult(is_array($tailJson) ? $tailJson : null);
+                if (is_array($normalizedTailJson) && isset($normalizedTailJson['image'])) {
+                    $finalResult = $normalizedTailJson;
                 }
             }
         }
@@ -2815,11 +2895,16 @@ class ChatStreamHandler
             $response = curl_exec($ch);
             curl_close($ch);
             
-            $finalResult = @json_decode($response, true);
+            $decoded = @json_decode((string)$response, true);
+            $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
         }
         
         if (!$finalResult || !isset($finalResult['image'])) {
-            return ['success' => false, 'error' => 'Failed to generate image'];
+            $debugSummary = $this->summarizeImageGenApiResultForDebug(is_array($finalResult) ? $finalResult : null);
+            if ($streamApiError) {
+                $debugSummary .= ' stream_error=' . substr($streamApiError, 0, 180);
+            }
+            return ['success' => false, 'error' => 'Failed to generate image (' . $debugSummary . ')'];
         }
         
         $emitProgress(95, 'Saving image...');

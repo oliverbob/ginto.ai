@@ -280,6 +280,76 @@ class ImageGenHandler
 
         return is_array($decoded) ? $decoded : null;
     }
+
+    private function normalizeImageResult(?array $result): ?array
+    {
+        if (!is_array($result) || $result === []) {
+            return null;
+        }
+
+        $imageValue = $result['image'] ?? null;
+
+        if (!is_string($imageValue) || trim($imageValue) === '') {
+            $images = $result['images'] ?? null;
+            if (is_array($images) && isset($images[0])) {
+                if (is_string($images[0])) {
+                    $imageValue = $images[0];
+                } elseif (is_array($images[0])) {
+                    $imageValue = $images[0]['image'] ?? ($images[0]['b64_json'] ?? null);
+                }
+            }
+        }
+
+        if ((!is_string($imageValue) || trim($imageValue) === '') && isset($result['data'])) {
+            $data = $result['data'];
+            if (is_array($data)) {
+                if (isset($data[0]) && is_array($data[0])) {
+                    $imageValue = $data[0]['b64_json'] ?? ($data[0]['image'] ?? null);
+                } elseif (isset($data['image']) && is_string($data['image'])) {
+                    $imageValue = $data['image'];
+                }
+            }
+        }
+
+        if (!is_string($imageValue) || trim($imageValue) === '') {
+            return null;
+        }
+
+        $imageValue = trim($imageValue);
+        if (str_starts_with($imageValue, 'data:image/')) {
+            $commaPos = strpos($imageValue, 'base64,');
+            if ($commaPos !== false) {
+                $imageValue = substr($imageValue, $commaPos + 7);
+            }
+        }
+
+        if ($imageValue === '') {
+            return null;
+        }
+
+        $result['image'] = $imageValue;
+        return $result;
+    }
+
+    private function summarizeApiResultForDebug(?array $result): string
+    {
+        if (!is_array($result)) {
+            return 'non-json response';
+        }
+
+        $keys = array_keys($result);
+        $summary = 'keys=' . implode(',', array_slice($keys, 0, 8));
+
+        if (!empty($result['detail']) && is_string($result['detail'])) {
+            $summary .= ' detail=' . substr($result['detail'], 0, 180);
+        } elseif (!empty($result['message']) && is_string($result['message'])) {
+            $summary .= ' message=' . substr($result['message'], 0, 180);
+        } elseif (!empty($result['error']) && is_string($result['error'])) {
+            $summary .= ' error=' . substr($result['error'], 0, 180);
+        }
+
+        return $summary;
+    }
     
     public function __construct($db = null)
     {
@@ -413,9 +483,9 @@ class ImageGenHandler
             return ['success' => false, 'error' => $curlError ?: "API returned HTTP {$httpCode}"];
         }
         
-        $result = json_decode($response, true);
+        $result = $this->normalizeImageResult(json_decode($response, true));
         if (!$result || !isset($result['image'])) {
-            return ['success' => false, 'error' => 'Invalid response from image API'];
+            return ['success' => false, 'error' => 'Invalid response from image API (' . $this->summarizeApiResultForDebug(json_decode((string)$response, true)) . ')'];
         }
         
         // Save the base64 image to storage
@@ -554,6 +624,7 @@ class ImageGenHandler
         $self = $this;
         $lastProgress = 0;
         $finalResult = null;  // Store the final result with image
+        $streamApiError = null;
         
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
@@ -572,9 +643,15 @@ class ImageGenHandler
                         continue;
                     }
 
+                    // Capture explicit API error events
+                    if (!empty($eventData['error']) && is_string($eventData['error'])) {
+                        $streamApiError = $eventData['error'];
+                    }
+
                     // Check if this is the final result with image
-                    if (isset($eventData['image'])) {
-                        $finalResult = $eventData;
+                    $normalizedEvent = $self->normalizeImageResult($eventData);
+                    if ($normalizedEvent !== null && isset($normalizedEvent['image'])) {
+                        $finalResult = $normalizedEvent;
                     }
 
                     // Forward progress events to client
@@ -620,12 +697,14 @@ class ImageGenHandler
         if (!$result && !empty($responseBuffer)) {
             $responseBuffer = trim($responseBuffer);
             $eventData = $this->decodeSseEventPayload($responseBuffer);
-            if ($eventData && isset($eventData['image'])) {
-                $result = $eventData;
+            $normalizedEvent = $this->normalizeImageResult($eventData);
+            if ($normalizedEvent && isset($normalizedEvent['image'])) {
+                $result = $normalizedEvent;
             } else {
                 $plainJson = @json_decode($responseBuffer, true);
-                if (is_array($plainJson) && isset($plainJson['image'])) {
-                    $result = $plainJson;
+                $normalizedPlain = $this->normalizeImageResult(is_array($plainJson) ? $plainJson : null);
+                if ($normalizedPlain && isset($normalizedPlain['image'])) {
+                    $result = $normalizedPlain;
                 }
             }
         }
@@ -657,7 +736,8 @@ class ImageGenHandler
             $curlError = curl_error($ch);
             curl_close($ch);
             
-            $result = json_decode($response, true);
+            $decodedResponse = json_decode((string)$response, true);
+            $result = $this->normalizeImageResult(is_array($decodedResponse) ? $decodedResponse : null);
         }
         
         if ($curlError || $httpCode !== 200) {
@@ -672,9 +752,13 @@ class ImageGenHandler
         }
 
         if (!$result || !isset($result['image'])) {
+            $debugSummary = $this->summarizeApiResultForDebug(is_array($result) ? $result : null);
+            if ($streamApiError) {
+                $debugSummary .= ' stream_error=' . substr($streamApiError, 0, 180);
+            }
             $this->emit([
                 'error' => true,
-                'message' => 'Invalid response from SDCPU API',
+                'message' => 'Invalid response from SDCPU API (' . $debugSummary . ')',
                 'progress' => 0,
                 'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
             ]);
