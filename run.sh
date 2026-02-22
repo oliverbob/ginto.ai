@@ -110,44 +110,56 @@ cmd_local_tunnel() {
         exit 1
     fi
 
-    if ! command -v python3 >/dev/null 2>&1; then
-        log_error "python3 not found. Install Python 3 first."
+    if ! command -v docker >/dev/null 2>&1; then
+        log_error "docker not found. Install Docker first."
         exit 1
     fi
 
-    local target_user="${SUDO_USER:-$USER}"
-    local target_home
-    target_home="$(getent passwd "$target_user" | cut -d: -f6)"
-    if [ -z "$target_home" ] || [ ! -d "$target_home" ]; then
-        log_error "Could not determine home directory for user: $target_user"
-        exit 1
-    fi
-
-    local venv_path="$target_home/.env"
     local service_path="/etc/systemd/system/ginto-lt.service"
+    local relay_dir="/etc/ginto/local-tunnel"
+    local relay_conf="$relay_dir/nginx.conf"
 
-    log_info "Preparing Python virtual environment at: $venv_path"
-    if [ ! -x "$venv_path/bin/python" ]; then
-        sudo -u "$target_user" python3 -m venv "$venv_path"
-    fi
+    log_info "Ensuring Docker service is enabled and running..."
+    systemctl enable docker >/dev/null 2>&1 || true
+    systemctl restart docker
 
-    log_info "Installing/updating mitmproxy in virtual environment..."
-    sudo -u "$target_user" "$venv_path/bin/pip" install --upgrade pip >/dev/null
-    sudo -u "$target_user" "$venv_path/bin/pip" install --upgrade mitmproxy
+    log_info "Creating local tunnel nginx config at: $relay_conf"
+    mkdir -p "$relay_dir"
+    cat > "$relay_conf" <<'EOF'
+events {}
+
+http {
+    server {
+        listen 18080;
+
+        location / {
+            proxy_pass http://host.docker.internal:8888;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_read_timeout 300;
+        }
+    }
+}
+EOF
 
     log_info "Creating systemd service: $service_path"
     cat > "$service_path" <<EOF
 [Unit]
-Description=Ginto Local Tunnel Relay (18080 -> 8888)
-After=network.target
+Description=Ginto Local Tunnel Relay (Docker, 127.0.0.1:18080 -> 127.0.0.1:8888)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
 
 [Service]
 Type=simple
-User=$target_user
-Group=$target_user
-WorkingDirectory=$target_home
-Environment=HOME=$target_home
-ExecStart=$venv_path/bin/mitmproxy --mode reverse:http://127.0.0.1:8888 -p 18080
+ExecStartPre=-/usr/bin/docker rm -f ginto-local-tunnel
+ExecStartPre=/usr/bin/docker pull nginx:alpine
+ExecStart=/usr/bin/docker run --rm --name ginto-local-tunnel --add-host=host.docker.internal:host-gateway -p 127.0.0.1:18080:18080 -v $relay_conf:/etc/nginx/nginx.conf:ro nginx:alpine
+ExecStop=/usr/bin/docker stop ginto-local-tunnel
 Restart=always
 RestartSec=3
 
@@ -162,7 +174,7 @@ EOF
 
     if systemctl is-active --quiet ginto-lt.service; then
         log_success "ginto-lt.service is active"
-        log_info "Relay target should now be reachable at http://127.0.0.1:18080"
+        log_info "Relay is loopback-only at http://127.0.0.1:18080 (not exposed externally)"
     else
         log_warn "ginto-lt.service failed to start"
         log_info "Check logs: sudo journalctl -u ginto-lt.service -n 80 --no-pager"
