@@ -922,11 +922,38 @@ class LiveController
 
             $selectedModel = trim((string)($envValues['IMAGEGEN_MODEL_ID'] ?? ''));
             $loadedModel = null;
+            $loadedModelSource = 'service';
             $serviceUp = false;
 
             if (is_array($health)) {
                 $serviceUp = (($health['status'] ?? '') === 'ok');
                 $loadedModel = $health['current_model'] ?? $health['model_name'] ?? $health['loaded_model'] ?? null;
+            }
+
+            $inferredModel = null;
+            if (is_array($models)) {
+                if ($baseUrl === 'https://vision.ginto.ai') {
+                    $inferredModel = $models['default_model_cuda'] ?? $models['default_model'] ?? null;
+                } else {
+                    $inferredModel = $models['default_model_cpu'] ?? $models['default_model'] ?? null;
+                }
+            }
+
+            if (!is_string($inferredModel) || trim($inferredModel) === '') {
+                $inferredModel = $baseUrl === 'https://vision.ginto.ai'
+                    ? 'stabilityai/sd-turbo'
+                    : 'rupeshs/sd-turbo-openvino';
+            }
+
+            // If service has not yet loaded a model, show selected model or install default instead of unknown.
+            if (!is_string($loadedModel) || trim($loadedModel) === '') {
+                if ($selectedModel !== '') {
+                    $loadedModel = $selectedModel;
+                    $loadedModelSource = 'selected';
+                } else {
+                    $loadedModel = $inferredModel;
+                    $loadedModelSource = 'default';
+                }
             }
 
             echo json_encode([
@@ -935,6 +962,8 @@ class LiveController
                 'service_up' => $serviceUp,
                 'selected_model' => $selectedModel,
                 'loaded_model' => is_string($loadedModel) ? $loadedModel : null,
+                'loaded_model_source' => $loadedModelSource,
+                'default_model' => $inferredModel,
                 'available_models' => $availableModels,
                 'health' => $health,
             ]);

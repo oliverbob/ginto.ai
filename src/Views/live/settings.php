@@ -1211,12 +1211,15 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 const endpoint = data.endpoint || '-';
                 const selectedModel = data.selected_model || '(default)';
                 const loadedModel = data.loaded_model || '(unknown)';
+                const loadedModelSource = data.loaded_model_source || 'service';
+                const defaultModel = data.default_model || '(none)';
                 const isUp = !!data.service_up;
                 statusEl.innerHTML = `
                     <div><strong>Endpoint:</strong> ${endpoint}</div>
                     <div><strong>Service:</strong> ${isUp ? 'Online' : 'Offline/Unavailable'}</div>
                     <div><strong>Selected Model:</strong> ${selectedModel}</div>
-                    <div><strong>Loaded Model:</strong> ${loadedModel}</div>
+                    <div><strong>Loaded Model:</strong> ${loadedModel} <span class="text-xs text-gray-500 dark:text-gray-400">(${loadedModelSource})</span></div>
+                    <div><strong>Install Default:</strong> ${defaultModel}</div>
                 `;
 
                 const models = Array.isArray(data.available_models) ? data.available_models : [];
