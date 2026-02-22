@@ -2574,7 +2574,7 @@ class ChatStreamHandler
             'success' => true,
             'prompt' => $prompt,
             'tunneled' => $sdcpuTunnel,
-            'model' => 'FastSD CPU (sd-turbo-openvino)',
+            'model' => 'Ginto AI ImageGen 1.0',
             'images' => [
                 [
                     'url' => $webUrl,
