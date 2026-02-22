@@ -2553,6 +2553,15 @@ class ChatStreamHandler
             return 'http://127.0.0.1:8888';
         }
 
+        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $requestHost = preg_replace('/:\\d+$/', '', $requestHost);
+        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
+
+        // On local host (PC2), use local tunnel relay so local SDCPU still works.
+        if ($isLocalRequest) {
+            return 'http://127.0.0.1:18080';
+        }
+
         $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
             return 'https://vision.ginto.ai';
@@ -2575,7 +2584,7 @@ class ChatStreamHandler
         // SDCPU_ACTIVE=true bypasses the subscription gate entirely
         $sdcpuActive = strtolower(trim($_ENV['SDCPU_ACTIVE'] ?? getenv('SDCPU_ACTIVE') ?? 'false')) === 'true';
         $sdcpuBaseUrl = $this->resolveImageGenBaseUrl($sdcpuActive);
-        $sdcpuTunnel = $sdcpuBaseUrl === 'https://vision.ginto.ai';
+        $sdcpuTunnel = $sdcpuBaseUrl !== 'http://127.0.0.1:8888';
         $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
 
         // Check if user has ImageGen subscription
