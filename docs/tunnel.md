@@ -32,13 +32,13 @@ For the ImageGen-specific relay control plane (approve/revoke, server/client syn
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                          GINTO TUNNEL                                │
+│                          GINTO TUNNEL                               │
 ├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  [Local Machine]                        [ginto.ai Server]            │
+│                                                                     │
+│  [Local Machine]                        [ginto.ai Server]           │
 │  ┌──────────────┐                      ┌──────────────────────────┐ │
 │  │ OpenWebUI    │                      │ Tunnel Server (ws:8765)  │ │
-│  │ :8088        │◄───────────────────►│ ┌──────────────────────┐ │ │
+│  │ :8088        │◄───────────────────►│ ┌──────────────────────┐  │ │
 │  └──────────────┘   WebSocket Tunnel   │ │ Caddy Reverse Proxy  │ │ │
 │        │                               │ │ xyz.ginto.ai:443     │ │ │
 │        │                               │ └──────────────────────┘ │ │
@@ -46,10 +46,10 @@ For the ImageGen-specific relay control plane (approve/revoke, server/client syn
 │  │ expose.sh    │                                  ▲                │
 │  │ client       │──────────────────────────────────┘                │
 │  └──────────────┘                                                   │
-│                                                                      │
-│  [Internet User]                                                     │
+│                                                                     │
+│  [Internet User]                                                    │
 │  Browser: https://xyz.ginto.ai ──────────────────► Caddy ► Tunnel   │
-│                                                                      │
+│                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
