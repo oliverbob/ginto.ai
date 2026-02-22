@@ -116,36 +116,10 @@ cmd_local_tunnel() {
     fi
 
     local service_path="/etc/systemd/system/ginto-lt.service"
-    local relay_dir="/etc/ginto/local-tunnel"
-    local relay_conf="$relay_dir/nginx.conf"
 
     log_info "Ensuring Docker service is enabled and running..."
     systemctl enable docker >/dev/null 2>&1 || true
     systemctl restart docker
-
-    log_info "Creating local tunnel nginx config at: $relay_conf"
-    mkdir -p "$relay_dir"
-    cat > "$relay_conf" <<'EOF'
-events {}
-
-http {
-    server {
-        listen 18080;
-
-        location / {
-            proxy_pass http://host.docker.internal:8888;
-            proxy_http_version 1.1;
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_read_timeout 300;
-        }
-    }
-}
-EOF
 
     log_info "Creating systemd service: $service_path"
     cat > "$service_path" <<EOF
@@ -157,8 +131,8 @@ Wants=network-online.target docker.service
 [Service]
 Type=simple
 ExecStartPre=-/usr/bin/docker rm -f ginto-local-tunnel
-ExecStartPre=/usr/bin/docker pull nginx:alpine
-ExecStart=/usr/bin/docker run --rm --name ginto-local-tunnel --add-host=host.docker.internal:host-gateway -p 127.0.0.1:18080:18080 -v $relay_conf:/etc/nginx/nginx.conf:ro nginx:alpine
+ExecStartPre=/usr/bin/docker pull alpine/socat:latest
+ExecStart=/usr/bin/docker run --rm --name ginto-local-tunnel --network host alpine/socat:latest -d -d TCP-LISTEN:18080,bind=127.0.0.1,fork,reuseaddr TCP:127.0.0.1:8888
 ExecStop=/usr/bin/docker stop ginto-local-tunnel
 Restart=always
 RestartSec=3
