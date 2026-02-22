@@ -956,6 +956,19 @@ class LiveController
                 }
             }
 
+            // Always expose at least usable model choices in the dropdown,
+            // even if /api/models is missing/empty on older service versions.
+            if ($selectedModel !== '') {
+                $availableModels[] = $selectedModel;
+            }
+            if (is_string($loadedModel) && trim($loadedModel) !== '') {
+                $availableModels[] = $loadedModel;
+            }
+            if (is_string($inferredModel) && trim($inferredModel) !== '') {
+                $availableModels[] = $inferredModel;
+            }
+            $availableModels = array_values(array_unique(array_filter($availableModels, static fn($item) => is_string($item) && trim($item) !== '')));
+
             echo json_encode([
                 'success' => true,
                 'endpoint' => $baseUrl,

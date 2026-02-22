@@ -1230,6 +1230,17 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                     opt.textContent = model;
                     selectEl.appendChild(opt);
                 }
+
+                const modelInputEl = document.getElementById('imagegen-model-id');
+                const preferredModel = (data.selected_model && data.selected_model.trim())
+                    ? data.selected_model.trim()
+                    : ((data.loaded_model && data.loaded_model.trim()) ? data.loaded_model.trim() : '');
+                if (preferredModel && Array.from(selectEl.options).some(o => o.value === preferredModel)) {
+                    selectEl.value = preferredModel;
+                }
+                if (modelInputEl && !modelInputEl.value && preferredModel) {
+                    modelInputEl.value = preferredModel;
+                }
             } catch (err) {
                 statusEl.textContent = `Unable to fetch model status: ${err.message}`;
                 selectEl.innerHTML = '<option value="">(Unavailable)</option>';
