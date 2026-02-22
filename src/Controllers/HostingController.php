@@ -8,8 +8,24 @@ namespace Ginto\Controllers;
 class HostingController
 {
     protected $db;
+    private ?array $requestInputCache = null;
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const RELAY_FRPC_DIR = '/var/lib/ginto/relay-frpc';
+
+    private function getRequestInput(): array
+    {
+        if ($this->requestInputCache !== null) {
+            return $this->requestInputCache;
+        }
+
+        $decoded = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($decoded)) {
+            $decoded = [];
+        }
+
+        $this->requestInputCache = !empty($decoded) ? $decoded : (is_array($_POST) ? $_POST : []);
+        return $this->requestInputCache;
+    }
 
     private function getRelayFrpcDirCandidates(): array
     {
@@ -80,7 +96,7 @@ class HostingController
      */
     private function validateCsrf(): bool
     {
-        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $input = $this->getRequestInput();
         $token = $input['csrf_token'] ?? $_POST['csrf_token'] ?? '';
         if (empty($token) || $token !== ($_SESSION['csrf_token'] ?? '')) {
             http_response_code(403);
@@ -1203,8 +1219,8 @@ class HostingController
         header('Content-Type: application/json');
         $this->requireAdmin();
         $this->validateCsrf();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+
+        $input = $this->getRequestInput();
         $subdomain = $input['subdomain'] ?? null;
         
         if (!$subdomain) {
@@ -1237,8 +1253,8 @@ class HostingController
         header('Content-Type: application/json');
         $this->requireAdmin();
         $this->validateCsrf();
-        
-        $input = json_decode(file_get_contents('php://input'), true);
+
+        $input = $this->getRequestInput();
         $subdomain = $input['subdomain'] ?? null;
         
         if (!$subdomain) {
@@ -1264,7 +1280,7 @@ class HostingController
         $this->requireAdmin();
         $this->validateCsrf();
 
-        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $input = $this->getRequestInput();
         $subdomainInput = (string)($input['subdomain'] ?? 'vision');
         $subdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput);
 
@@ -1365,7 +1381,7 @@ class HostingController
         $this->requireAdmin();
         $this->validateCsrf();
 
-        $input = json_decode(file_get_contents('php://input'), true) ?: [];
+        $input = $this->getRequestInput();
         $subdomainInput = (string)($input['subdomain'] ?? 'vision');
         $subdomain = preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput);
 
