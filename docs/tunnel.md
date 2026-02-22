@@ -18,6 +18,12 @@ Ginto offers two tunnel implementations:
 
 **For most users, we recommend the FRP tunnel** - see [FRP Tunnel Documentation](../tools/tunnel/frp/README.md).
 
+## ImageGen Relay (`/tunnel`)
+
+For the ImageGen-specific relay control plane (approve/revoke, server/client sync, and `vision.ginto.ai` behavior), see:
+
+- [ImageGen Tunnel Relay Documentation](./tunnel-imagegen.md)
+
 ---
 
 ## WebSocket Tunnel (Legacy)
