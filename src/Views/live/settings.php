@@ -911,6 +911,20 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             <p class="help-text">Set a model repo ID. This model will be used on subsequent image generation requests.</p>
                         </div>
 
+                        <div class="md:col-span-2">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <button type="button" id="imagegen-download-btn" class="px-4 py-2 text-sm rounded bg-indigo-600 text-white hover:bg-indigo-700 transition-colors">
+                                    Download Model from HuggingFace
+                                </button>
+                                <span id="imagegen-download-message" class="text-sm text-gray-600 dark:text-gray-300">Idle</span>
+                            </div>
+                            <div class="mt-3 w-full h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+                                <div id="imagegen-download-progress-bar" class="h-full bg-indigo-600 transition-all" style="width: 0%;"></div>
+                            </div>
+                            <div class="mt-2 text-xs text-gray-500 dark:text-gray-400" id="imagegen-download-progress-text">0%</div>
+                            <p class="help-text">Downloads run in background and can be monitored here in real-time.</p>
+                        </div>
+
                         <div>
                             <label class="label-text">Inference Steps (override)</label>
                             <input type="number" name="imagegen_steps" class="input-field" min="1" max="50"
@@ -1247,6 +1261,142 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             }
         }
 
+        function formatBytes(bytes) {
+            const value = Number(bytes || 0);
+            if (!Number.isFinite(value) || value <= 0) return '0 B';
+            const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+            let size = value;
+            let idx = 0;
+            while (size >= 1024 && idx < units.length - 1) {
+                size /= 1024;
+                idx += 1;
+            }
+            return `${size.toFixed(idx === 0 ? 0 : 1)} ${units[idx]}`;
+        }
+
+        function renderImagegenDownloadState(state) {
+            const bar = document.getElementById('imagegen-download-progress-bar');
+            const msg = document.getElementById('imagegen-download-message');
+            const text = document.getElementById('imagegen-download-progress-text');
+            const btn = document.getElementById('imagegen-download-btn');
+            if (!bar || !msg || !text || !btn) return;
+
+            const status = (state && state.status) ? state.status : 'idle';
+            const progress = Math.max(0, Math.min(100, Number(state?.progress_percent || 0)));
+            const downloaded = Number(state?.downloaded_bytes || 0);
+            const total = Number(state?.total_bytes || 0);
+            const model = state?.model_id || '';
+
+            bar.style.width = `${progress}%`;
+
+            if (status === 'downloading') {
+                msg.textContent = state?.message || `Downloading ${model}...`;
+                text.textContent = total > 0
+                    ? `${progress.toFixed(1)}% • ${formatBytes(downloaded)} / ${formatBytes(total)}`
+                    : `${formatBytes(downloaded)} downloaded`;
+                btn.disabled = true;
+                btn.classList.add('opacity-70', 'cursor-not-allowed');
+            } else if (status === 'completed') {
+                msg.textContent = state?.message || 'Download completed.';
+                text.textContent = `100% • ${formatBytes(downloaded)}`;
+                bar.style.width = '100%';
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            } else if (status === 'failed') {
+                msg.textContent = state?.error ? `Download failed: ${state.error}` : 'Download failed.';
+                text.textContent = `${progress.toFixed(1)}%`;
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            } else {
+                msg.textContent = 'Idle';
+                text.textContent = '0%';
+                bar.style.width = '0%';
+                btn.disabled = false;
+                btn.classList.remove('opacity-70', 'cursor-not-allowed');
+            }
+        }
+
+        let imagegenDownloadPollTimer = null;
+        async function pollImagegenDownloadStatus() {
+            try {
+                const res = await fetch('/live/imagegen/model-download/status', {
+                    method: 'GET',
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin'
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    throw new Error(data.error || 'Unable to fetch download status');
+                }
+
+                const state = data.state || { status: 'idle' };
+                renderImagegenDownloadState(state);
+
+                if (state.status === 'downloading') {
+                    if (imagegenDownloadPollTimer) clearTimeout(imagegenDownloadPollTimer);
+                    imagegenDownloadPollTimer = setTimeout(pollImagegenDownloadStatus, 1200);
+                } else {
+                    if (imagegenDownloadPollTimer) {
+                        clearTimeout(imagegenDownloadPollTimer);
+                        imagegenDownloadPollTimer = null;
+                    }
+                    if (state.status === 'completed') {
+                        refreshImagegenModelStatus();
+                    }
+                }
+            } catch (err) {
+                const msg = document.getElementById('imagegen-download-message');
+                if (msg) msg.textContent = `Status error: ${err.message}`;
+                if (imagegenDownloadPollTimer) {
+                    clearTimeout(imagegenDownloadPollTimer);
+                    imagegenDownloadPollTimer = null;
+                }
+            }
+        }
+
+        async function startImagegenModelDownload() {
+            const modelInput = document.getElementById('imagegen-model-id');
+            const csrfEl = document.querySelector('input[name="csrf_token"]');
+            if (!modelInput || !csrfEl) return;
+
+            const modelId = (modelInput.value || '').trim();
+            if (!modelId || !modelId.includes('/')) {
+                if (typeof GintoUI !== 'undefined') {
+                    GintoUI.error('Enter a valid HuggingFace model id (owner/model).');
+                }
+                return;
+            }
+
+            try {
+                const response = await fetch('/live/imagegen/model-download/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': csrfEl.value
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ model_id: modelId, csrf_token: csrfEl.value })
+                });
+                const data = await response.json();
+                if (!data.success) {
+                    throw new Error(data.error || data.message || 'Failed to start download');
+                }
+
+                renderImagegenDownloadState((data.state || { status: 'downloading', model_id: modelId }));
+                if (typeof GintoUI !== 'undefined') {
+                    GintoUI.success('Model download started.');
+                }
+                pollImagegenDownloadStatus();
+            } catch (err) {
+                if (typeof GintoUI !== 'undefined') {
+                    GintoUI.error(err.message);
+                }
+                const msg = document.getElementById('imagegen-download-message');
+                if (msg) msg.textContent = `Start failed: ${err.message}`;
+            }
+        }
+
         // Toggle OpenWebUI enabled/disabled
         function toggleOpenWebUI(btn) {
             const isEnabled = btn.dataset.enabled === 'true';
@@ -1322,7 +1472,13 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             });
         }
 
+        const imagegenDownloadBtn = document.getElementById('imagegen-download-btn');
+        if (imagegenDownloadBtn) {
+            imagegenDownloadBtn.addEventListener('click', startImagegenModelDownload);
+        }
+
         refreshImagegenModelStatus();
+        pollImagegenDownloadStatus();
 
         // ============================================
         // LocalStorage Persistence for Setup Wizard

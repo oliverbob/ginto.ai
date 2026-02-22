@@ -886,17 +886,7 @@ class LiveController
 
         try {
             $envValues = $this->getEnvValues();
-            $computeMode = strtolower(trim((string)($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto')));
-            $sdcpuActive = strtolower(trim((string)($envValues['SDCPU_ACTIVE'] ?? 'false'))) === 'true';
-            $sdcpuTunnel = $sdcpuActive && strtolower(trim((string)($envValues['SDCPU_TUNNEL'] ?? 'false'))) === 'true';
-
-            if ($computeMode === 'gpu') {
-                $baseUrl = 'https://vision.ginto.ai';
-            } elseif ($computeMode === 'cpu') {
-                $baseUrl = 'http://127.0.0.1:8888';
-            } else {
-                $baseUrl = $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
-            }
+            $baseUrl = $this->resolveImagegenBaseUrl($envValues);
 
             $health = $this->fetchJson($baseUrl . '/api/health');
             $models = $this->fetchJson($baseUrl . '/api/models');
@@ -987,6 +977,107 @@ class LiveController
         exit;
     }
 
+    public function imagegenModelDownloadStart(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+
+        $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
+        if ($installedMarkerExists && !UserController::isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin access required']);
+            exit;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($token) || empty($sessionToken) || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+
+        $modelId = trim((string)($input['model_id'] ?? ''));
+        $modelId = preg_replace('/[^a-zA-Z0-9_\-\.\/@]/', '', strip_tags($modelId));
+        if ($modelId === '' || strpos($modelId, '/') === false) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Valid HuggingFace model id is required']);
+            exit;
+        }
+
+        try {
+            $envValues = $this->getEnvValues();
+            $baseUrl = $this->resolveImagegenBaseUrl($envValues);
+            $result = $this->fetchJsonWithBody($baseUrl . '/api/models/download', ['model_id' => $modelId], 20);
+
+            if (!is_array($result)) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'error' => 'Image model download endpoint unavailable']);
+                exit;
+            }
+
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    public function imagegenModelDownloadStatus(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+
+        $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
+        if ($installedMarkerExists && !UserController::isAdmin()) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Admin access required']);
+            exit;
+        }
+
+        try {
+            $envValues = $this->getEnvValues();
+            $baseUrl = $this->resolveImagegenBaseUrl($envValues);
+            $result = $this->fetchJson($baseUrl . '/api/models/download-status', 8);
+
+            if (!is_array($result)) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'error' => 'Image model download status unavailable']);
+                exit;
+            }
+
+            $result['endpoint'] = $baseUrl;
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function resolveImagegenBaseUrl(array $envValues): string
+    {
+        $computeMode = strtolower(trim((string)($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto')));
+        $sdcpuActive = strtolower(trim((string)($envValues['SDCPU_ACTIVE'] ?? 'false'))) === 'true';
+        $sdcpuTunnel = $sdcpuActive && strtolower(trim((string)($envValues['SDCPU_TUNNEL'] ?? 'false'))) === 'true';
+
+        if ($computeMode === 'gpu') {
+            return 'https://vision.ginto.ai';
+        }
+        if ($computeMode === 'cpu') {
+            return 'http://127.0.0.1:8888';
+        }
+        return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+    }
+
     private function fetchJson(string $url, int $timeoutSeconds = 5): ?array
     {
         $ch = curl_init($url);
@@ -1006,6 +1097,31 @@ class LiveController
         }
 
         $decoded = json_decode($body, true);
+        return is_array($decoded) ? $decoded : null;
+    }
+
+    private function fetchJsonWithBody(string $url, array $body, int $timeoutSeconds = 10): ?array
+    {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => $timeoutSeconds,
+            CURLOPT_CONNECTTIMEOUT => min(3, $timeoutSeconds),
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_POST => true,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+            CURLOPT_POSTFIELDS => json_encode($body),
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($response === false || $httpCode < 200 || $httpCode >= 300) {
+            return null;
+        }
+
+        $decoded = json_decode($response, true);
         return is_array($decoded) ? $decoded : null;
     }
 }

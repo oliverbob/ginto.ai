@@ -15,6 +15,7 @@ import io
 import os
 import sys
 import time
+import threading
 from pathlib import Path
 from argparse import ArgumentParser
 from typing import Optional
@@ -55,6 +56,22 @@ app.add_middleware(
 _txt2img_pipeline = None
 _img2img_pipeline = None
 _current_model = None
+_download_lock = threading.Lock()
+_download_state = {
+    "status": "idle",
+    "model_id": None,
+    "progress_percent": 0.0,
+    "downloaded_bytes": 0,
+    "total_bytes": 0,
+    "message": "",
+    "error": None,
+    "started_at": None,
+    "finished_at": None,
+}
+
+
+class ModelDownloadRequest(BaseModel):
+    model_id: str = Field(..., description="HuggingFace model repository id")
 
 
 class GenerateRequest(BaseModel):
@@ -189,6 +206,109 @@ def _discover_cached_models() -> list[str]:
     return sorted(models)
 
 
+def _model_cache_dir(model_id: str) -> Path:
+    hf_home = Path(os.getenv("HF_HOME", str(Path.home() / ".cache" / "huggingface")))
+    hub_dir = hf_home / "hub"
+    return hub_dir / f"models--{model_id.replace('/', '--')}"
+
+
+def _dir_size(path: Path) -> int:
+    if not path.exists():
+        return 0
+    total = 0
+    for root, _, files in os.walk(path):
+        for name in files:
+            try:
+                total += os.path.getsize(os.path.join(root, name))
+            except OSError:
+                continue
+    return total
+
+
+def _set_download_state(**kwargs):
+    with _download_lock:
+        _download_state.update(kwargs)
+
+
+def _get_download_state() -> dict:
+    with _download_lock:
+        return dict(_download_state)
+
+
+def _download_model_worker(model_id: str):
+    from huggingface_hub import HfApi, snapshot_download
+
+    started_at = int(time.time())
+    cache_dir = _model_cache_dir(model_id)
+
+    _set_download_state(
+        status="downloading",
+        model_id=model_id,
+        progress_percent=0.0,
+        downloaded_bytes=0,
+        total_bytes=0,
+        message="Preparing model download...",
+        error=None,
+        started_at=started_at,
+        finished_at=None,
+    )
+
+    total_bytes = 0
+    try:
+        info = HfApi().model_info(model_id, files_metadata=True)
+        for sibling in (info.siblings or []):
+            size = getattr(sibling, "size", None)
+            if isinstance(size, int) and size > 0:
+                total_bytes += size
+    except Exception:
+        total_bytes = 0
+
+    _set_download_state(total_bytes=total_bytes)
+
+    stop_monitor = threading.Event()
+
+    def monitor_progress():
+        while not stop_monitor.is_set():
+            downloaded = _dir_size(cache_dir)
+            progress = 0.0
+            if total_bytes > 0:
+                progress = min(100.0, (downloaded / total_bytes) * 100.0)
+            _set_download_state(
+                downloaded_bytes=downloaded,
+                progress_percent=round(progress, 2),
+                message="Downloading model from HuggingFace...",
+            )
+            stop_monitor.wait(1.0)
+
+    monitor_thread = threading.Thread(target=monitor_progress, daemon=True)
+    monitor_thread.start()
+
+    try:
+        snapshot_download(repo_id=model_id, resume_download=True)
+        downloaded = _dir_size(cache_dir)
+        progress = 100.0 if total_bytes > 0 else 0.0
+        if total_bytes > 0 and downloaded > 0:
+            progress = min(100.0, (downloaded / total_bytes) * 100.0)
+
+        _set_download_state(
+            status="completed",
+            progress_percent=round(progress, 2) if total_bytes > 0 else 100.0,
+            downloaded_bytes=downloaded,
+            message="Model download completed.",
+            finished_at=int(time.time()),
+        )
+    except Exception as ex:
+        _set_download_state(
+            status="failed",
+            error=str(ex),
+            message="Model download failed.",
+            finished_at=int(time.time()),
+        )
+    finally:
+        stop_monitor.set()
+        monitor_thread.join(timeout=1.5)
+
+
 @app.get("/api/models")
 async def models():
     return {
@@ -197,6 +317,38 @@ async def models():
         "default_model_cpu": DEFAULT_MODEL_CPU,
         "default_model_cuda": DEFAULT_MODEL_CUDA,
         "device": DEVICE,
+    }
+
+
+@app.post("/api/models/download")
+async def download_model(request: ModelDownloadRequest):
+    model_id = request.model_id.strip()
+    if not model_id or "/" not in model_id:
+        raise HTTPException(status_code=400, detail="Invalid model_id")
+
+    state = _get_download_state()
+    if state.get("status") == "downloading":
+        return {
+            "success": False,
+            "message": "Another model download is already in progress",
+            "state": state,
+        }
+
+    worker = threading.Thread(target=_download_model_worker, args=(model_id,), daemon=True)
+    worker.start()
+
+    return {
+        "success": True,
+        "message": "Model download started",
+        "state": _get_download_state(),
+    }
+
+
+@app.get("/api/models/download-status")
+async def download_model_status():
+    return {
+        "success": True,
+        "state": _get_download_state(),
     }
 
 
