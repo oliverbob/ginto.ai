@@ -880,6 +880,38 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             </select>
                             <p class="help-text">Controls whether image generation prefers local CPU or GPU tunnel endpoint.</p>
                         </div>
+
+                        <div>
+                            <label class="label-text">Inference Steps (override)</label>
+                            <input type="number" name="imagegen_steps" class="input-field" min="1" max="50"
+                                   value="<?= htmlspecialchars($envValues['IMAGEGEN_STEPS'] ?? '') ?>"
+                                   placeholder="Blank = profile default">
+                            <p class="help-text">Lower = faster and cheaper. Higher = better quality but slower.</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Guidance Scale (override)</label>
+                            <input type="number" step="0.1" name="imagegen_guidance_scale" class="input-field" min="0.1" max="20"
+                                   value="<?= htmlspecialchars($envValues['IMAGEGEN_GUIDANCE_SCALE'] ?? '') ?>"
+                                   placeholder="Blank = profile default">
+                            <p class="help-text">Higher guidance follows prompt more strictly but can reduce naturalness.</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Output Width (override)</label>
+                            <input type="number" name="imagegen_width" class="input-field" min="256" max="1536"
+                                   value="<?= htmlspecialchars($envValues['IMAGEGEN_WIDTH'] ?? '') ?>"
+                                   placeholder="Blank = profile default">
+                            <p class="help-text">Lower resolutions reduce GPU/CPU load and latency.</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Output Height (override)</label>
+                            <input type="number" name="imagegen_height" class="input-field" min="256" max="1536"
+                                   value="<?= htmlspecialchars($envValues['IMAGEGEN_HEIGHT'] ?? '') ?>"
+                                   placeholder="Blank = profile default">
+                            <p class="help-text">Set together with width for custom output dimensions.</p>
+                        </div>
                     </div>
                 </div>
 

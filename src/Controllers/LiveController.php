@@ -571,6 +571,10 @@ class LiveController
             'groq_vision_for_all_models' => 'GROQ_VISION_FOR_ALL_MODELS',
             'imagegen_profile' => 'IMAGEGEN_PROFILE',
             'imagegen_compute_mode' => 'IMAGEGEN_COMPUTE_MODE',
+            'imagegen_steps' => 'IMAGEGEN_STEPS',
+            'imagegen_guidance_scale' => 'IMAGEGEN_GUIDANCE_SCALE',
+            'imagegen_width' => 'IMAGEGEN_WIDTH',
+            'imagegen_height' => 'IMAGEGEN_HEIGHT',
             
             // LLM Provider
             'llm_provider' => 'LLM_PROVIDER',
@@ -659,6 +663,31 @@ class LiveController
         $data['imagegen_compute_mode'] = in_array($imagegenComputeMode, $allowedComputeModes, true)
             ? $imagegenComputeMode
             : 'auto';
+
+        // Numeric image generation overrides (blank = use profile defaults)
+        $stepsRaw = trim((string)($data['imagegen_steps'] ?? ''));
+        $data['imagegen_steps'] = $stepsRaw === ''
+            ? ''
+            : (string)max(1, min(50, (int)$stepsRaw));
+
+        $guidanceRaw = trim((string)($data['imagegen_guidance_scale'] ?? ''));
+        if ($guidanceRaw === '') {
+            $data['imagegen_guidance_scale'] = '';
+        } else {
+            $guidance = (float)$guidanceRaw;
+            $guidance = max(0.1, min(20.0, $guidance));
+            $data['imagegen_guidance_scale'] = rtrim(rtrim(number_format($guidance, 2, '.', ''), '0'), '.');
+        }
+
+        $widthRaw = trim((string)($data['imagegen_width'] ?? ''));
+        $data['imagegen_width'] = $widthRaw === ''
+            ? ''
+            : (string)max(256, min(1536, (int)$widthRaw));
+
+        $heightRaw = trim((string)($data['imagegen_height'] ?? ''));
+        $data['imagegen_height'] = $heightRaw === ''
+            ? ''
+            : (string)max(256, min(1536, (int)$heightRaw));
         
         // Update values
         foreach ($keyMap as $formKey => $envKey) {
@@ -675,7 +704,7 @@ class LiveController
         $groups = [
             'Ecommerce' => ['PAYPAL_WEBHOOK_ID', 'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_ENVIRONMENT', 'PAYPAL_INTERNAL_API_KEY', 'PAYPAL_CLIENT_ID_SANDBOX', 'PAYPAL_CLIENT_SECRET_SANDBOX'],
             'Datacenter' => ['B2_ACCOUNT_ID', 'B2_APP_KEY', 'B2_BUCKET_ID', 'B2_BUCKET_NAME', 'FILE_CDN_BASE_URL', 'DATACENTER'],
-            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE'],
+            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE', 'IMAGEGEN_STEPS', 'IMAGEGEN_GUIDANCE_SCALE', 'IMAGEGEN_WIDTH', 'IMAGEGEN_HEIGHT'],
             'Database' => ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_GUEST_USER', 'DB_GUEST_PASSWORD'],
             'LLM Provider' => ['LLM_PROVIDER', 'LLM_MODEL', 'DEFAULT_PROVIDER'],
             'GROQ API' => ['GROQ_API_KEY', 'GROQ_TTS_MODEL', 'GROQ_STT_MODEL'],

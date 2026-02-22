@@ -34,43 +34,100 @@ class ImageGenHandler
         return strtolower(trim((string)($_ENV[$key] ?? getenv($key) ?? $default)));
     }
 
+    private function envRaw(string $key): string
+    {
+        return trim((string)($_ENV[$key] ?? getenv($key) ?? ''));
+    }
+
+    private function envIntInRange(string $key, int $min, int $max): ?int
+    {
+        $raw = $this->envRaw($key);
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+        $value = (int)$raw;
+        if ($value < $min || $value > $max) {
+            return null;
+        }
+        return $value;
+    }
+
+    private function envFloatInRange(string $key, float $min, float $max): ?float
+    {
+        $raw = $this->envRaw($key);
+        if ($raw === '' || !is_numeric($raw)) {
+            return null;
+        }
+        $value = (float)$raw;
+        if ($value < $min || $value > $max) {
+            return null;
+        }
+        return $value;
+    }
+
     private function resolveImageGenProfile(): array
     {
         $profile = $this->envValue('IMAGEGEN_PROFILE', 'balanced');
         switch ($profile) {
             case 'fast':
-                return [
+                $config = [
                     'profile' => 'fast',
                     'width' => 512,
                     'height' => 384,
                     'num_inference_steps' => 3,
                     'guidance_scale' => 0.9,
                 ];
+                break;
             case 'quality':
-                return [
+                $config = [
                     'profile' => 'quality',
                     'width' => 768,
                     'height' => 512,
                     'num_inference_steps' => 8,
                     'guidance_scale' => 1.5,
                 ];
+                break;
             case 'ultra':
-                return [
+                $config = [
                     'profile' => 'ultra',
                     'width' => 1024,
                     'height' => 576,
                     'num_inference_steps' => 12,
                     'guidance_scale' => 2.0,
                 ];
+                break;
             default:
-                return [
+                $config = [
                     'profile' => 'balanced',
                     'width' => 512,
                     'height' => 384,
                     'num_inference_steps' => 4,
                     'guidance_scale' => 1.0,
                 ];
+                break;
         }
+
+        $stepsOverride = $this->envIntInRange('IMAGEGEN_STEPS', 1, 50);
+        if ($stepsOverride !== null) {
+            $config['num_inference_steps'] = $stepsOverride;
+        }
+
+        $guidanceOverride = $this->envFloatInRange('IMAGEGEN_GUIDANCE_SCALE', 0.1, 20.0);
+        if ($guidanceOverride !== null) {
+            $config['guidance_scale'] = $guidanceOverride;
+        }
+
+        $widthOverride = $this->envIntInRange('IMAGEGEN_WIDTH', 256, 1536);
+        if ($widthOverride !== null) {
+            $config['width'] = $widthOverride;
+        }
+
+        $heightOverride = $this->envIntInRange('IMAGEGEN_HEIGHT', 256, 1536);
+        if ($heightOverride !== null) {
+            $config['height'] = $heightOverride;
+        }
+
+        return $config;
     }
 
     private function resolveSdcpuApiUrl(): string
