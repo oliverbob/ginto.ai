@@ -3600,7 +3600,7 @@ install_novnc_service() {
     local NOVNC_PARENT_DIR="$INSTALL_USER_HOME/storage"
     local NOVNC_DIR="$NOVNC_PARENT_DIR/novnc"
     local NOVNC_REPO_URL="https://github.com/novnc/noVNC.git"
-    local NOVNC_LISTEN_PORT="${NOVNC_LISTEN_PORT:-1905}"
+    local NOVNC_LISTEN_PORT="${NOVNC_LISTEN_PORT:-6080}"
     local NOVNC_VNC_TARGET="${NOVNC_VNC_TARGET:-localhost:5905}"
 
     # Ensure required tools exist
