@@ -2548,24 +2548,6 @@ class ChatStreamHandler
             true
         );
 
-        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-        $requestHost = preg_replace('/:\d+$/', '', $requestHost);
-        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
-
-        // SDCPU_TUNNEL=false is a hard local override.
-        if (!$sdcpuTunnelEnabled && $isLocalRequest) {
-            return $this->resolveLocalImageGenTunnelBaseUrl();
-        }
-
-        if (!$sdcpuTunnelEnabled) {
-            return 'http://127.0.0.1:8888';
-        }
-
-        // On local host (PC2), use local tunnel relay so local SDCPU still works.
-        if ($isLocalRequest) {
-            return $this->resolveLocalImageGenTunnelBaseUrl();
-        }
-
         $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
             return 'https://vision.ginto.ai';
@@ -2574,9 +2556,7 @@ class ChatStreamHandler
             return 'http://127.0.0.1:8888';
         }
 
-        $sdcpuTunnel = $sdcpuActive && $sdcpuTunnelEnabled;
-
-        return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+        return ($sdcpuActive && $sdcpuTunnelEnabled) ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
     }
 
     private function resolveLocalImageGenTunnelBaseUrl(): string
