@@ -4483,6 +4483,22 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             if (data.tool_result) {
               // Server finished executing a tool - replace spinner with result
               currentCard.hasToolResults = true;
+
+              if (data.tool_name === 'generate_image') {
+                const progressContainer = currentCard.response.querySelector('.image-gen-progress');
+                if (progressContainer) {
+                  const bar = progressContainer.querySelector('.image-gen-bar');
+                  const status = progressContainer.querySelector('.image-gen-status');
+                  const percentLabel = progressContainer.querySelector('.image-gen-percent');
+                  const success = !!(data.result && data.result.success);
+                  if (bar) bar.style.width = '100%';
+                  if (percentLabel) percentLabel.textContent = '100%';
+                  if (status) status.textContent = success ? 'Complete!' : 'Failed';
+                  setTimeout(() => {
+                    if (progressContainer.parentNode) progressContainer.remove();
+                  }, success ? 600 : 300);
+                }
+              }
               
               // Collect for persistence - but truncate large results like lightpanda_search
               let persistData = data;
@@ -4586,6 +4602,12 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
 
             // Handle final HTML response
             if (data.final) {
+              // Clean up any lingering image progress UI on final event.
+              const lingeringProgress = currentCard.response.querySelector('.image-gen-progress');
+              if (lingeringProgress && lingeringProgress.parentNode) {
+                lingeringProgress.remove();
+              }
+
               // Always show the response label and handle content
               currentCard.responseLabel.classList.remove('hidden');
               
@@ -4645,6 +4667,10 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             }
 
             if (data.error) {
+              const lingeringProgress = currentCard.response.querySelector('.image-gen-progress');
+              if (lingeringProgress && lingeringProgress.parentNode) {
+                lingeringProgress.remove();
+              }
               currentCard.response.innerHTML = `<p class="text-red-400">Error: ${data.error}</p>`;
             }
 

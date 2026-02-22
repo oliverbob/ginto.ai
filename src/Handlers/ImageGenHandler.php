@@ -1997,6 +1997,7 @@ class ImageGenHandler
             if (data.image) {
                 log(time + '✓ Image generated!', 'event-image');
                 generatedImageUrl = data.url;
+                updateProgress(100, 'Complete!');
                 
                 // Show comparison for img2img
                 if (currentMode === 'img2img' && sourceImageData) {
@@ -2029,11 +2030,12 @@ class ImageGenHandler
                 
                 // Show actions
                 imageActions.classList.remove('hidden');
-                
-                hideProgress();
+
+                setTimeout(hideProgress, 400);
             } else if (data.error) {
                 log(time + '✗ ' + (data.message || data.error), 'event-error');
-                hideProgress();
+                updateProgress(100, 'Failed');
+                setTimeout(hideProgress, 300);
                 imageContainer.innerHTML = '<div class="text-center text-red-400"><i class="fas fa-exclamation-triangle text-3xl mb-2"></i><p class="text-sm">' + (data.message || 'Generation failed') + '</p></div>';
             } else if (data.phase) {
                 log(time + data.message || data.phase, 'event-phase');
