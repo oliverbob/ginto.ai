@@ -238,16 +238,12 @@ class ImageGenHandler
 
     private function resolveLocalTunnelBaseUrl(): string
     {
-        $requestHost = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
-        if ($requestHost === '') {
-            return 'http://127.0.0.1/tunnel';
+        $localRelayPort = (int)($this->envRaw('TUNNEL_RELAY_LOCAL_PORT') ?: '18080');
+        if ($localRelayPort < 1024 || $localRelayPort > 65535) {
+            $localRelayPort = 18080;
         }
 
-        $forwardedProto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
-        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https';
-        $scheme = $isHttps ? 'https' : 'http';
-
-        return $scheme . '://' . $requestHost . '/tunnel';
+        return 'http://127.0.0.1:' . $localRelayPort;
     }
 
     private function consumeSseEventFromBuffer(string &$buffer): ?string
