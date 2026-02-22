@@ -1317,7 +1317,8 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
         }
 
         let imagegenDownloadPollTimer = null;
-        async function pollImagegenDownloadStatus() {
+        let imagegenDownloadMonitorActive = false;
+        async function pollImagegenDownloadStatus(showErrors = false) {
             try {
                 const res = await fetch('/live/imagegen/model-download/status', {
                     method: 'GET',
@@ -1333,8 +1334,12 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 renderImagegenDownloadState(state);
 
                 if (state.status === 'downloading') {
+                    imagegenDownloadMonitorActive = true;
+                }
+
+                if (state.status === 'downloading') {
                     if (imagegenDownloadPollTimer) clearTimeout(imagegenDownloadPollTimer);
-                    imagegenDownloadPollTimer = setTimeout(pollImagegenDownloadStatus, 1200);
+                    imagegenDownloadPollTimer = setTimeout(() => pollImagegenDownloadStatus(showErrors), 1200);
                 } else {
                     if (imagegenDownloadPollTimer) {
                         clearTimeout(imagegenDownloadPollTimer);
@@ -1346,7 +1351,13 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 }
             } catch (err) {
                 const msg = document.getElementById('imagegen-download-message');
-                if (msg) msg.textContent = `Status error: ${err.message}`;
+                if (showErrors || imagegenDownloadMonitorActive) {
+                    if (msg) msg.textContent = `Status error: ${err.message}`;
+                } else {
+                    if (msg && (msg.textContent || '').trim() === '') {
+                        msg.textContent = 'Idle';
+                    }
+                }
                 if (imagegenDownloadPollTimer) {
                     clearTimeout(imagegenDownloadPollTimer);
                     imagegenDownloadPollTimer = null;
@@ -1387,7 +1398,8 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 if (typeof GintoUI !== 'undefined') {
                     GintoUI.success('Model download started.');
                 }
-                pollImagegenDownloadStatus();
+                imagegenDownloadMonitorActive = true;
+                pollImagegenDownloadStatus(true);
             } catch (err) {
                 if (typeof GintoUI !== 'undefined') {
                     GintoUI.error(err.message);
@@ -1478,7 +1490,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
         }
 
         refreshImagegenModelStatus();
-        pollImagegenDownloadStatus();
+        pollImagegenDownloadStatus(false);
 
         // ============================================
         // LocalStorage Persistence for Setup Wizard
