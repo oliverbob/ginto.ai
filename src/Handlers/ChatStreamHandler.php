@@ -2548,14 +2548,18 @@ class ChatStreamHandler
             true
         );
 
+        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $requestHost = preg_replace('/:\d+$/', '', $requestHost);
+        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
+
         // SDCPU_TUNNEL=false is a hard local override.
+        if (!$sdcpuTunnelEnabled && $isLocalRequest) {
+            return $this->resolveLocalImageGenTunnelBaseUrl();
+        }
+
         if (!$sdcpuTunnelEnabled) {
             return 'http://127.0.0.1:8888';
         }
-
-        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-        $requestHost = preg_replace('/:\\d+$/', '', $requestHost);
-        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
 
         // On local host (PC2), use local tunnel relay so local SDCPU still works.
         if ($isLocalRequest) {

@@ -202,14 +202,18 @@ class ImageGenHandler
     {
         $sdcpuTunnelEnabled = $this->isEnvEnabled('SDCPU_TUNNEL');
 
+        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $requestHost = preg_replace('/:\d+$/', '', $requestHost);
+        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
+
         // SDCPU_TUNNEL=false is a hard local override.
+        if (!$sdcpuTunnelEnabled && $isLocalRequest) {
+            return $this->resolveLocalTunnelBaseUrl() . '/api/generate';
+        }
+
         if (!$sdcpuTunnelEnabled) {
             return self::SDCPU_API_URL;
         }
-
-        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
-        $requestHost = preg_replace('/:\\d+$/', '', $requestHost);
-        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
 
         // On local host (PC2), use local tunnel relay so requests are parsed the same way as tunnel flow.
         if ($isLocalRequest) {
