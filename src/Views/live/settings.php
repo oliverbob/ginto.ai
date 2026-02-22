@@ -572,6 +572,26 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                                 <option value="0" <?= ($envValues['USE_PY_STT'] ?? '1') === '0' ? 'selected' : '' ?>>No</option>
                             </select>
                         </div>
+
+                        <div class="md:col-span-2 flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg flex items-center justify-center">
+                                    <i class="fas fa-robot text-cyan-600 dark:text-cyan-400"></i>
+                                </div>
+                                <div>
+                                    <label class="font-medium text-gray-900 dark:text-white">Detect Ollama</label>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Enable automatic Ollama detection for local LLM integration</p>
+                                </div>
+                            </div>
+                            <?php $detectOllamaEnabled = in_array(strtoupper((string)($envValues['DETECT_OLLAMA'] ?? 'FALSE')), ['TRUE', '1', 'YES', 'ON'], true); ?>
+                            <button type="button" id="detect-ollama-toggle"
+                                    onclick="toggleDetectOllama(this)"
+                                    data-enabled="<?= $detectOllamaEnabled ? 'true' : 'false' ?>"
+                                    style="width: 56px; height: 32px; border-radius: 16px; position: relative; cursor: pointer; transition: background-color 0.2s; background-color: <?= $detectOllamaEnabled ? '#06b6d4' : '#d1d5db' ?>;">
+                                <span id="detect-ollama-knob" style="position: absolute; top: 4px; width: 24px; height: 24px; border-radius: 50%; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); transition: left 0.2s; left: <?= $detectOllamaEnabled ? '28px' : '4px' ?>;"></span>
+                            </button>
+                            <input type="hidden" name="detect_ollama" id="detect-ollama-input" value="<?= $detectOllamaEnabled ? '1' : '0' ?>">
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1520,6 +1540,17 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             btn.style.backgroundColor = newState ? '#10b981' : '#d1d5db';
             knob.style.left = newState ? '28px' : '4px';
             document.getElementById('groq-vision-for-all-models-input').value = newState ? '1' : '0';
+        }
+
+        // Toggle Ollama auto-detection
+        function toggleDetectOllama(btn) {
+            const isEnabled = btn.dataset.enabled === 'true';
+            const newState = !isEnabled;
+            const knob = document.getElementById('detect-ollama-knob');
+            btn.dataset.enabled = newState ? 'true' : 'false';
+            btn.style.backgroundColor = newState ? '#06b6d4' : '#d1d5db';
+            knob.style.left = newState ? '28px' : '4px';
+            document.getElementById('detect-ollama-input').value = newState ? '1' : '0';
         }
 
         document.querySelectorAll('.tab-btn').forEach(btn => {

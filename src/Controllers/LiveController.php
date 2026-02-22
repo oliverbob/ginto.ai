@@ -617,6 +617,7 @@ class LiveController
             // MCP
             'mcp_server_url' => 'MCP_SERVER_URL',
             'use_py_stt' => 'USE_PY_STT',
+            'detect_ollama' => 'DETECT_OLLAMA',
             'python3_path' => 'PYTHON3_PATH',
             
             // Rate Limiting
@@ -651,6 +652,7 @@ class LiveController
         $data['sdcpu_active'] = isset($data['sdcpu_active']) && $data['sdcpu_active'] ? 'true' : 'false';
         $data['sdcpu_tunnel'] = isset($data['sdcpu_tunnel']) && $data['sdcpu_tunnel'] ? 'true' : 'false';
         $data['groq_vision_for_all_models'] = isset($data['groq_vision_for_all_models']) && $data['groq_vision_for_all_models'] ? 'true' : 'false';
+        $data['detect_ollama'] = isset($data['detect_ollama']) && $data['detect_ollama'] ? 'TRUE' : 'FALSE';
 
         // Validate select fields with strict allowlists
         $allowedImagegenProfiles = ['startup', 'fast', 'balanced', 'quality', 'ultra'];
@@ -722,7 +724,7 @@ class LiveController
             'Cerebras API' => ['CEREBRAS_API_KEY', 'CEREBRAS_API_URL'],
             'Novita API' => ['NOVITA_API_KEY'],
             'Local LLM' => ['LOCAL_LLM_URL', 'LOCAL_LLM_MODEL', 'VISION_MODEL_URL', 'VISION_MODEL_NAME'],
-            'MCP Configuration' => ['MCP_SERVER_URL', 'USE_PY_STT', 'PYTHON3_PATH'],
+            'MCP Configuration' => ['MCP_SERVER_URL', 'USE_PY_STT', 'DETECT_OLLAMA', 'PYTHON3_PATH'],
             'Rate Limiting' => ['RATE_LIMIT_ADMIN_PERCENT', 'RATE_LIMIT_USER_PERCENT', 'RATE_LIMIT_VISITOR_PERCENT', 'RATE_LIMIT_FALLBACK_PROVIDER', 'RATE_LIMIT_FALLBACK_THRESHOLD'],
             'Token Limits' => ['MAX_TOKENS_BASE', 'MAX_TOKENS_ADMIN_PERCENT', 'MAX_TOKENS_USER_PERCENT', 'MAX_TOKENS_VISITOR_PERCENT'],
             'TTS Limits' => ['TTS_LIMIT_ADMIN_HOURLY', 'TTS_LIMIT_USER_HOURLY', 'TTS_LIMIT_VISITOR_SESSION', 'TTS_SILENT_STOP_PERCENT'],
