@@ -2542,6 +2542,17 @@ class ChatStreamHandler
 
     private function resolveImageGenBaseUrl(bool $sdcpuActive): string
     {
+        $sdcpuTunnelEnabled = in_array(
+            strtoupper(trim((string)($_ENV['SDCPU_TUNNEL'] ?? getenv('SDCPU_TUNNEL') ?? 'false'))),
+            ['TRUE', '1', 'YES', 'ON'],
+            true
+        );
+
+        // SDCPU_TUNNEL=false is a hard local override.
+        if (!$sdcpuTunnelEnabled) {
+            return 'http://127.0.0.1:8888';
+        }
+
         $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
             return 'https://vision.ginto.ai';
@@ -2550,8 +2561,7 @@ class ChatStreamHandler
             return 'http://127.0.0.1:8888';
         }
 
-        $sdcpuTunnel = $sdcpuActive
-            && strtolower(trim($_ENV['SDCPU_TUNNEL'] ?? getenv('SDCPU_TUNNEL') ?? 'false')) === 'true';
+        $sdcpuTunnel = $sdcpuActive && $sdcpuTunnelEnabled;
 
         return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
     }

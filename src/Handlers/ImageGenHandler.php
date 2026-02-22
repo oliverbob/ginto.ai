@@ -200,6 +200,13 @@ class ImageGenHandler
 
     private function resolveSdcpuApiUrl(): string
     {
+        $sdcpuTunnelEnabled = $this->isEnvEnabled('SDCPU_TUNNEL');
+
+        // SDCPU_TUNNEL=false is a hard local override.
+        if (!$sdcpuTunnelEnabled) {
+            return self::SDCPU_API_URL;
+        }
+
         $computeMode = $this->envValue('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
             return 'https://vision.ginto.ai/api/generate';
@@ -209,7 +216,7 @@ class ImageGenHandler
         }
 
         $sdcpuActive = $this->isEnvEnabled('SDCPU_ACTIVE');
-        $sdcpuTunnel = $sdcpuActive && $this->isEnvEnabled('SDCPU_TUNNEL');
+        $sdcpuTunnel = $sdcpuActive && $sdcpuTunnelEnabled;
         if ($sdcpuTunnel) {
             return 'https://vision.ginto.ai/api/generate';
         }
