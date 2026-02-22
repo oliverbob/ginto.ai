@@ -213,7 +213,7 @@ class ImageGenHandler
 
         // On local host (PC2), use local tunnel relay so requests are parsed the same way as tunnel flow.
         if ($isLocalRequest) {
-            return 'http://127.0.0.1:18080/api/generate';
+            return $this->resolveLocalTunnelBaseUrl() . '/api/generate';
         }
 
         $computeMode = $this->envValue('IMAGEGEN_COMPUTE_MODE', 'auto');
@@ -230,6 +230,55 @@ class ImageGenHandler
             return 'https://vision.ginto.ai/api/generate';
         }
         return self::SDCPU_API_URL;
+    }
+
+    private function resolveLocalTunnelBaseUrl(): string
+    {
+        $requestHost = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+        if ($requestHost === '') {
+            return 'http://127.0.0.1/tunnel';
+        }
+
+        $forwardedProto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https';
+        $scheme = $isHttps ? 'https' : 'http';
+
+        return $scheme . '://' . $requestHost . '/tunnel';
+    }
+
+    private function consumeSseEventFromBuffer(string &$buffer): ?string
+    {
+        if (!preg_match('/\r\n\r\n|\n\n|\r\r/', $buffer, $matches, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $separator = $matches[0][0];
+        $offset = $matches[0][1];
+        $event = substr($buffer, 0, $offset);
+        $buffer = substr($buffer, $offset + strlen($separator));
+
+        return trim($event);
+    }
+
+    private function decodeSseEventPayload(string $event): ?array
+    {
+        $lines = preg_split('/\r\n|\n|\r/', trim($event)) ?: [];
+        $dataLines = [];
+
+        foreach ($lines as $line) {
+            if (strpos($line, 'data:') === 0) {
+                $dataLines[] = ltrim(substr($line, 5));
+            }
+        }
+
+        if ($dataLines === []) {
+            return null;
+        }
+
+        $json = implode("\n", $dataLines);
+        $decoded = @json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
     
     public function __construct($db = null)
@@ -516,35 +565,31 @@ class ImageGenHandler
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, $self, $startTime, &$lastProgress, &$finalResult) {
                 $responseBuffer .= $data;
                 
-                // Parse SSE events from buffer - look for complete events ending with \n\n
-                while (($pos = strpos($responseBuffer, "\n\n")) !== false) {
-                    $event = substr($responseBuffer, 0, $pos);
-                    $responseBuffer = substr($responseBuffer, $pos + 2);
-                    
-                    // Parse "data: {...}" format - extract JSON after "data: "
-                    if (strpos($event, 'data: ') === 0) {
-                        $jsonStr = substr($event, 6); // Remove "data: " prefix
-                        $eventData = @json_decode($jsonStr, true);
-                        if ($eventData) {
-                            // Check if this is the final result with image
-                            if (isset($eventData['image'])) {
-                                $finalResult = $eventData;
-                            }
-                            // Forward progress events to client
-                            if (isset($eventData['progress'])) {
-                                $progress = (int)$eventData['progress'];
-                                if ($progress > $lastProgress) {
-                                    $lastProgress = $progress;
-                                    $self->emit([
-                                        'phase' => 'generating',
-                                        'message' => $eventData['message'] ?? "Generating... {$progress}%",
-                                        'progress' => $progress,
-                                        'step' => $eventData['step'] ?? null,
-                                        'total_steps' => $eventData['total_steps'] ?? null,
-                                        'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
-                                    ]);
-                                }
-                            }
+                // Parse SSE events from buffer (supports both \n\n and \r\n\r\n separators)
+                while (($event = $self->consumeSseEventFromBuffer($responseBuffer)) !== null) {
+                    $eventData = $self->decodeSseEventPayload($event);
+                    if (!$eventData) {
+                        continue;
+                    }
+
+                    // Check if this is the final result with image
+                    if (isset($eventData['image'])) {
+                        $finalResult = $eventData;
+                    }
+
+                    // Forward progress events to client
+                    if (isset($eventData['progress'])) {
+                        $progress = (int)$eventData['progress'];
+                        if ($progress > $lastProgress) {
+                            $lastProgress = $progress;
+                            $self->emit([
+                                'phase' => 'generating',
+                                'message' => $eventData['message'] ?? "Generating... {$progress}%",
+                                'progress' => $progress,
+                                'step' => $eventData['step'] ?? null,
+                                'total_steps' => $eventData['total_steps'] ?? null,
+                                'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
+                            ]);
                         }
                     }
                 }
@@ -571,20 +616,22 @@ class ImageGenHandler
         // Use the final result captured during streaming
         $result = $finalResult;
         
-        // Debug: if we have leftover buffer, try to parse it (image might not have \n\n at end)
+        // If we have leftover buffer, try to parse trailing SSE or plain JSON.
         if (!$result && !empty($responseBuffer)) {
             $responseBuffer = trim($responseBuffer);
-            if (strpos($responseBuffer, 'data: ') === 0) {
-                $jsonStr = substr($responseBuffer, 6);
-                $eventData = @json_decode($jsonStr, true);
-                if ($eventData && isset($eventData['image'])) {
-                    $result = $eventData;
+            $eventData = $this->decodeSseEventPayload($responseBuffer);
+            if ($eventData && isset($eventData['image'])) {
+                $result = $eventData;
+            } else {
+                $plainJson = @json_decode($responseBuffer, true);
+                if (is_array($plainJson) && isset($plainJson['image'])) {
+                    $result = $plainJson;
                 }
             }
         }
         
-        // If we still didn't get an image but streaming succeeded (httpCode 200), don't retry
-        $shouldRetry = ($httpCode !== 200 || $curlError) && !$result;
+        // Retry regular endpoint if streaming failed OR if stream returned no final image payload.
+        $shouldRetry = $curlError !== '' || ($httpCode !== 200 && $httpCode !== 0) || !$result || !isset($result['image']);
         
         // If streaming failed or no image, try regular endpoint
         if ($shouldRetry) {

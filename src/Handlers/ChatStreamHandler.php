@@ -2559,7 +2559,7 @@ class ChatStreamHandler
 
         // On local host (PC2), use local tunnel relay so local SDCPU still works.
         if ($isLocalRequest) {
-            return 'http://127.0.0.1:18080';
+            return $this->resolveLocalImageGenTunnelBaseUrl();
         }
 
         $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
@@ -2573,6 +2573,55 @@ class ChatStreamHandler
         $sdcpuTunnel = $sdcpuActive && $sdcpuTunnelEnabled;
 
         return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+    }
+
+    private function resolveLocalImageGenTunnelBaseUrl(): string
+    {
+        $requestHost = trim((string)($_SERVER['HTTP_HOST'] ?? ''));
+        if ($requestHost === '') {
+            return 'http://127.0.0.1/tunnel';
+        }
+
+        $forwardedProto = strtolower(trim((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')));
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string)$_SERVER['HTTPS']) !== 'off') || $forwardedProto === 'https';
+        $scheme = $isHttps ? 'https' : 'http';
+
+        return $scheme . '://' . $requestHost . '/tunnel';
+    }
+
+    private function imageGenConsumeSseEventFromBuffer(string &$buffer): ?string
+    {
+        if (!preg_match('/\r\n\r\n|\n\n|\r\r/', $buffer, $matches, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+
+        $separator = $matches[0][0];
+        $offset = $matches[0][1];
+        $event = substr($buffer, 0, $offset);
+        $buffer = substr($buffer, $offset + strlen($separator));
+
+        return trim($event);
+    }
+
+    private function imageGenDecodeSsePayload(string $event): ?array
+    {
+        $lines = preg_split('/\r\n|\n|\r/', trim($event)) ?: [];
+        $dataLines = [];
+
+        foreach ($lines as $line) {
+            if (strpos($line, 'data:') === 0) {
+                $dataLines[] = ltrim(substr($line, 5));
+            }
+        }
+
+        if ($dataLines === []) {
+            return null;
+        }
+
+        $json = implode("\n", $dataLines);
+        $decoded = @json_decode($json, true);
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     private function executeImageGeneration(string $prompt): array
@@ -2699,36 +2748,31 @@ class ChatStreamHandler
             CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, &$lastProgress, &$finalResult, $emitProgress) {
                 $responseBuffer .= $data;
                 
-                // Parse SSE events
-                while (($pos = strpos($responseBuffer, "\n\n")) !== false) {
-                    $chunk = substr($responseBuffer, 0, $pos);
-                    $responseBuffer = substr($responseBuffer, $pos + 2);
-                    
-                    if (strpos($chunk, 'data: ') === 0) {
-                        $json = substr($chunk, 6);
-                        $event = @json_decode($json, true);
-                        
-                        if ($event) {
-                            if (isset($event['step']) && isset($event['total_steps'])) {
-                                // Real step progress from server
-                                $step = $event['step'];
-                                $total = $event['total_steps'];
-                                $progress = 10 + (80 * $step / $total); // 10-90% range for steps
-                                if ($progress > $lastProgress) {
-                                    $lastProgress = $progress;
-                                    $emitProgress(
-                                        round($progress), 
-                                        "Step {$step}/{$total}",
-                                        $step,
-                                        $total
-                                    );
-                                }
-                            } elseif (isset($event['image'])) {
-                                // Final result with image
-                                $finalResult = $event;
-                                $emitProgress(90, 'Processing image...');
-                            }
+                // Parse SSE events (supports both \n\n and \r\n\r\n separators)
+                while (($chunk = $this->imageGenConsumeSseEventFromBuffer($responseBuffer)) !== null) {
+                    $event = $this->imageGenDecodeSsePayload($chunk);
+                    if (!$event) {
+                        continue;
+                    }
+
+                    if (isset($event['step']) && isset($event['total_steps'])) {
+                        // Real step progress from server
+                        $step = $event['step'];
+                        $total = $event['total_steps'];
+                        $progress = 10 + (80 * $step / $total); // 10-90% range for steps
+                        if ($progress > $lastProgress) {
+                            $lastProgress = $progress;
+                            $emitProgress(
+                                round($progress),
+                                "Step {$step}/{$total}",
+                                $step,
+                                $total
+                            );
                         }
+                    } elseif (isset($event['image'])) {
+                        // Final result with image
+                        $finalResult = $event;
+                        $emitProgress(90, 'Processing image...');
                     }
                 }
                 
@@ -2740,8 +2784,21 @@ class ChatStreamHandler
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = curl_error($ch);
         curl_close($ch);
+
+        if (!$finalResult && trim($responseBuffer) !== '') {
+            $tail = trim($responseBuffer);
+            $tailEvent = $this->imageGenDecodeSsePayload($tail);
+            if (is_array($tailEvent) && isset($tailEvent['image'])) {
+                $finalResult = $tailEvent;
+            } else {
+                $tailJson = @json_decode($tail, true);
+                if (is_array($tailJson) && isset($tailJson['image'])) {
+                    $finalResult = $tailJson;
+                }
+            }
+        }
         
-        if (!$success || ($httpCode !== 200 && $httpCode !== 0)) {
+        if (!$success || ($httpCode !== 200 && $httpCode !== 0) || !$finalResult || !isset($finalResult['image'])) {
             // Fallback to non-streaming endpoint
             $emitProgress(20, 'Fallback to standard generation...');
             
