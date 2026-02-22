@@ -696,6 +696,14 @@ class ApiController extends Controller
     {
         header('Content-Type: application/json');
 
+        // Flag whether current user is admin (if UserController available)
+        $isAdmin = false;
+        try {
+            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                $isAdmin = true;
+            }
+        } catch (\Throwable $_) { /* ignore */ }
+
         // Build providers list from DB-backed keys and .env keys so UI can show configured providers
         $providers = [];
         $db = $this->db;
@@ -769,6 +777,23 @@ class ApiController extends Controller
             }
         }
 
+        // Admin-only local Ollama detection toggle from /live MCP Configuration
+        // When enabled, expose Ollama in provider list even without OLLAMA_API_KEY.
+        $detectOllamaRaw = $this->getEnvVar('DETECT_OLLAMA');
+        $detectOllamaEnabled = in_array(strtoupper((string)$detectOllamaRaw), ['TRUE', '1', 'YES', 'ON'], true);
+        if ($isAdmin && $detectOllamaEnabled) {
+            if (!isset($providers['ollama'])) {
+                $providers['ollama'] = [
+                    'provider' => 'ollama',
+                    'configured' => true,
+                    'db_keys' => [],
+                    'env_key' => false,
+                ];
+            } else {
+                $providers['ollama']['configured'] = true;
+            }
+        }
+
         // Attempt to enrich each configured provider with available models and capabilities
         if (class_exists('\App\Core\LLM\ProviderRegistry')) {
             try {
@@ -835,14 +860,6 @@ class ApiController extends Controller
                         $globalSelection = $decoded;
                     }
                 }
-            }
-        } catch (\Throwable $_) { /* ignore */ }
-
-        // Flag whether current user is admin (if UserController available)
-        $isAdmin = false;
-        try {
-            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
-                $isAdmin = true;
             }
         } catch (\Throwable $_) { /* ignore */ }
 
