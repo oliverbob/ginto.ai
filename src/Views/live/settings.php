@@ -1242,6 +1242,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 const models = Array.isArray(data.available_models) ? data.available_models : [];
                 const recommendedCpu = Array.isArray(data?.recommended_models?.cpu) ? data.recommended_models.cpu : [];
                 const recommendedGpu = Array.isArray(data?.recommended_models?.gpu) ? data.recommended_models.gpu : [];
+                const modelSizes = (data && typeof data.model_sizes === 'object' && data.model_sizes) ? data.model_sizes : {};
 
                 const downloadedMap = {};
                 for (const item of recommendedCpu) {
@@ -1267,7 +1268,12 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 const appendModelOption = (modelId, downloaded) => {
                     const opt = document.createElement('option');
                     opt.value = modelId;
-                    opt.textContent = downloaded ? `${modelId} • downloaded` : modelId;
+                    const sizeBytesRaw = modelSizes[modelId];
+                    const hasSize = Number.isFinite(Number(sizeBytesRaw)) && Number(sizeBytesRaw) > 0;
+                    const sizeText = hasSize ? ` • ~${formatBytes(Number(sizeBytesRaw))}` : '';
+                    opt.textContent = downloaded
+                        ? `${modelId} • downloaded${sizeText}`
+                        : `${modelId}${sizeText}`;
                     selectEl.appendChild(opt);
                 };
 

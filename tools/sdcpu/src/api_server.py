@@ -57,6 +57,8 @@ _txt2img_pipeline = None
 _img2img_pipeline = None
 _current_model = None
 _download_lock = threading.Lock()
+_size_lock = threading.Lock()
+_model_size_cache: dict[str, dict] = {}
 _download_state = {
     "status": "idle",
     "model_id": None,
@@ -72,6 +74,10 @@ _download_state = {
 
 class ModelDownloadRequest(BaseModel):
     model_id: str = Field(..., description="HuggingFace model repository id")
+
+
+class ModelSizesRequest(BaseModel):
+    model_ids: list[str] = Field(default_factory=list, description="List of HuggingFace model ids")
 
 
 class GenerateRequest(BaseModel):
@@ -204,6 +210,41 @@ def _discover_cached_models() -> list[str]:
         models.add(_current_model)
 
     return sorted(models)
+
+
+def _fetch_model_total_size(model_id: str) -> Optional[int]:
+    from huggingface_hub import HfApi
+
+    try:
+        info = HfApi().model_info(model_id, files_metadata=True)
+        total = 0
+        found = False
+        for sibling in (info.siblings or []):
+            size = getattr(sibling, "size", None)
+            if isinstance(size, int) and size > 0:
+                found = True
+                total += size
+        if found:
+            return total
+    except Exception:
+        return None
+    return None
+
+
+def _get_model_size_cached(model_id: str, ttl_seconds: int = 3600) -> Optional[int]:
+    now = int(time.time())
+    with _size_lock:
+        entry = _model_size_cache.get(model_id)
+        if entry and (now - int(entry.get("fetched_at", 0))) < ttl_seconds:
+            return entry.get("size_bytes")
+
+    size_bytes = _fetch_model_total_size(model_id)
+    with _size_lock:
+        _model_size_cache[model_id] = {
+            "size_bytes": size_bytes,
+            "fetched_at": now,
+        }
+    return size_bytes
 
 
 def _model_cache_dir(model_id: str) -> Path:
@@ -341,6 +382,21 @@ async def download_model(request: ModelDownloadRequest):
         "success": True,
         "message": "Model download started",
         "state": _get_download_state(),
+    }
+
+
+@app.post("/api/models/sizes")
+async def model_sizes(request: ModelSizesRequest):
+    sizes: dict[str, Optional[int]] = {}
+    for model_id in (request.model_ids or []):
+        model_id = (model_id or "").strip()
+        if not model_id or "/" not in model_id:
+            continue
+        sizes[model_id] = _get_model_size_cached(model_id)
+
+    return {
+        "success": True,
+        "sizes": sizes,
     }
 
 

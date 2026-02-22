@@ -975,18 +975,30 @@ class LiveController
                 'rupeshs/SDXL-Lightning-2steps',
             ];
 
+            $sizeMap = [];
+            $sizeQueryModels = array_values(array_unique(array_merge($cpuRecommended, $gpuRecommended, $availableModels)));
+            $sizesResponse = $this->fetchJsonWithBody($baseUrl . '/api/models/sizes', ['model_ids' => $sizeQueryModels], 20);
+            if (is_array($sizesResponse) && isset($sizesResponse['sizes']) && is_array($sizesResponse['sizes'])) {
+                foreach ($sizesResponse['sizes'] as $modelId => $bytes) {
+                    if (is_string($modelId) && is_numeric($bytes)) {
+                        $sizeMap[$modelId] = (int)$bytes;
+                    }
+                }
+            }
+
             $availableLookup = [];
             foreach ($availableModels as $modelId) {
                 $availableLookup[strtolower(trim((string)$modelId))] = true;
             }
 
-            $toRecommended = static function(array $models, array $lookup): array {
+            $toRecommended = static function(array $models, array $lookup, array $sizeMap): array {
                 $items = [];
                 foreach ($models as $modelId) {
                     $normalized = strtolower(trim((string)$modelId));
                     $items[] = [
                         'id' => $modelId,
                         'downloaded' => isset($lookup[$normalized]),
+                        'size_bytes' => isset($sizeMap[$modelId]) ? (int)$sizeMap[$modelId] : null,
                     ];
                 }
                 return $items;
@@ -1001,9 +1013,10 @@ class LiveController
                 'loaded_model_source' => $loadedModelSource,
                 'default_model' => $inferredModel,
                 'available_models' => $availableModels,
+                'model_sizes' => $sizeMap,
                 'recommended_models' => [
-                    'cpu' => $toRecommended($cpuRecommended, $availableLookup),
-                    'gpu' => $toRecommended($gpuRecommended, $availableLookup),
+                    'cpu' => $toRecommended($cpuRecommended, $availableLookup, $sizeMap),
+                    'gpu' => $toRecommended($gpuRecommended, $availableLookup, $sizeMap),
                 ],
                 'health' => $health,
             ]);
