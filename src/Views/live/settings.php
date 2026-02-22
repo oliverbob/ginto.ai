@@ -896,11 +896,14 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         </div>
 
                         <div>
-                            <label class="label-text">Downloaded Models</label>
+                            <div class="flex items-center justify-between gap-2 mb-1">
+                                <label class="label-text !mb-0">Recommended Models</label>
+                                <span id="imagegen-model-downloaded-badge" class="px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">Not downloaded</span>
+                            </div>
                             <select id="imagegen-available-models" class="input-field">
                                 <option value="">(Select detected model)</option>
                             </select>
-                            <p class="help-text">Detected from imagegen service model list (if supported by backend).</p>
+                            <p class="help-text">Grouped by CPU/GPU support. Badge shows if selected model is already downloaded.</p>
                         </div>
 
                         <div>
@@ -1237,12 +1240,60 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 `;
 
                 const models = Array.isArray(data.available_models) ? data.available_models : [];
-                selectEl.innerHTML = '<option value="">(Select detected model)</option>';
+                const recommendedCpu = Array.isArray(data?.recommended_models?.cpu) ? data.recommended_models.cpu : [];
+                const recommendedGpu = Array.isArray(data?.recommended_models?.gpu) ? data.recommended_models.gpu : [];
+
+                const downloadedMap = {};
+                for (const item of recommendedCpu) {
+                    if (item && item.id) downloadedMap[String(item.id)] = !!item.downloaded;
+                }
+                for (const item of recommendedGpu) {
+                    if (item && item.id) downloadedMap[String(item.id)] = !!item.downloaded;
+                }
                 for (const model of models) {
+                    downloadedMap[String(model)] = true;
+                }
+
+                selectEl.innerHTML = '<option value="">(Select detected model)</option>';
+
+                const appendDivider = (label) => {
+                    const divider = document.createElement('option');
+                    divider.value = '';
+                    divider.textContent = label;
+                    divider.disabled = true;
+                    selectEl.appendChild(divider);
+                };
+
+                const appendModelOption = (modelId, downloaded) => {
                     const opt = document.createElement('option');
-                    opt.value = model;
-                    opt.textContent = model;
+                    opt.value = modelId;
+                    opt.textContent = downloaded ? `${modelId} • downloaded` : modelId;
                     selectEl.appendChild(opt);
+                };
+
+                if (recommendedCpu.length > 0) {
+                    appendDivider('── CPU / OpenVINO recommended ──');
+                    for (const item of recommendedCpu) {
+                        appendModelOption(String(item.id), !!item.downloaded);
+                    }
+                }
+
+                if (recommendedGpu.length > 0) {
+                    appendDivider('── GPU / CUDA recommended ──');
+                    for (const item of recommendedGpu) {
+                        appendModelOption(String(item.id), !!item.downloaded);
+                    }
+                }
+
+                const shown = new Set();
+                for (const item of recommendedCpu) shown.add(String(item.id));
+                for (const item of recommendedGpu) shown.add(String(item.id));
+                const extras = models.filter(model => !shown.has(String(model)));
+                if (extras.length > 0) {
+                    appendDivider('── Other detected models ──');
+                    for (const model of extras) {
+                        appendModelOption(String(model), true);
+                    }
                 }
 
                 const modelInputEl = document.getElementById('imagegen-model-id');
@@ -1255,6 +1306,18 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                 if (modelInputEl && !modelInputEl.value && preferredModel) {
                     modelInputEl.value = preferredModel;
                 }
+
+                const badge = document.getElementById('imagegen-model-downloaded-badge');
+                const currentModel = selectEl.value || (modelInputEl ? modelInputEl.value : '');
+                const downloaded = !!downloadedMap[String(currentModel)];
+                if (badge) {
+                    badge.textContent = downloaded ? 'Downloaded' : 'Not downloaded';
+                    badge.className = downloaded
+                        ? 'px-2 py-0.5 text-xs rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                        : 'px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+                }
+
+                window.__imagegenDownloadedMap = downloadedMap;
             } catch (err) {
                 statusEl.textContent = `Unable to fetch model status: ${err.message}`;
                 selectEl.innerHTML = '<option value="">(Unavailable)</option>';
@@ -1480,6 +1543,28 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             imagegenAvailableModels.addEventListener('change', () => {
                 if (imagegenAvailableModels.value) {
                     imagegenModelInput.value = imagegenAvailableModels.value;
+                }
+
+                const badge = document.getElementById('imagegen-model-downloaded-badge');
+                const map = window.__imagegenDownloadedMap || {};
+                const downloaded = !!map[String(imagegenAvailableModels.value || '')];
+                if (badge) {
+                    badge.textContent = downloaded ? 'Downloaded' : 'Not downloaded';
+                    badge.className = downloaded
+                        ? 'px-2 py-0.5 text-xs rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                        : 'px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+                }
+            });
+
+            imagegenModelInput.addEventListener('input', () => {
+                const badge = document.getElementById('imagegen-model-downloaded-badge');
+                const map = window.__imagegenDownloadedMap || {};
+                const downloaded = !!map[String(imagegenModelInput.value || '')];
+                if (badge) {
+                    badge.textContent = downloaded ? 'Downloaded' : 'Not downloaded';
+                    badge.className = downloaded
+                        ? 'px-2 py-0.5 text-xs rounded bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                        : 'px-2 py-0.5 text-xs rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
                 }
             });
         }

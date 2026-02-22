@@ -959,6 +959,39 @@ class LiveController
             }
             $availableModels = array_values(array_unique(array_filter($availableModels, static fn($item) => is_string($item) && trim($item) !== '')));
 
+            $cpuRecommended = [
+                'rupeshs/sd-turbo-openvino',
+                'rupeshs/sdxs-512-0.9-openvino',
+                'rupeshs/SDXL-Lightning-2steps-openvino-int8',
+                'rupeshs/sdxl-turbo-openvino-int8',
+                'rupeshs/hyper-sd-sdxl-1-step-openvino-int8',
+                'rupeshs/sd15-lcm-square-openvino-int8',
+            ];
+
+            $gpuRecommended = [
+                'stabilityai/sd-turbo',
+                'stabilityai/sdxl-turbo',
+                'SimianLuo/LCM_Dreamshaper_v7',
+                'rupeshs/SDXL-Lightning-2steps',
+            ];
+
+            $availableLookup = [];
+            foreach ($availableModels as $modelId) {
+                $availableLookup[strtolower(trim((string)$modelId))] = true;
+            }
+
+            $toRecommended = static function(array $models, array $lookup): array {
+                $items = [];
+                foreach ($models as $modelId) {
+                    $normalized = strtolower(trim((string)$modelId));
+                    $items[] = [
+                        'id' => $modelId,
+                        'downloaded' => isset($lookup[$normalized]),
+                    ];
+                }
+                return $items;
+            };
+
             echo json_encode([
                 'success' => true,
                 'endpoint' => $baseUrl,
@@ -968,6 +1001,10 @@ class LiveController
                 'loaded_model_source' => $loadedModelSource,
                 'default_model' => $inferredModel,
                 'available_models' => $availableModels,
+                'recommended_models' => [
+                    'cpu' => $toRecommended($cpuRecommended, $availableLookup),
+                    'gpu' => $toRecommended($gpuRecommended, $availableLookup),
+                ],
                 'health' => $health,
             ]);
         } catch (\Throwable $e) {
