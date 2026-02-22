@@ -3592,6 +3592,99 @@ prompt_install_mode() {
     log_success "Selected mode: $INSTALL_MODE"
 }
 
+install_novnc_service() {
+    log_step "Installing/updating noVNC from GitHub and configuring systemd service..."
+
+    check_sudo
+
+    local NOVNC_PARENT_DIR="$INSTALL_USER_HOME/storage"
+    local NOVNC_DIR="$NOVNC_PARENT_DIR/novnc"
+    local NOVNC_REPO_URL="https://github.com/novnc/noVNC.git"
+    local NOVNC_LISTEN_PORT="${NOVNC_LISTEN_PORT:-1905}"
+    local NOVNC_VNC_TARGET="${NOVNC_VNC_TARGET:-localhost:5905}"
+
+    # Ensure required tools exist
+    if ! command -v git >/dev/null 2>&1; then
+        log_info "Installing git..."
+        case "$OS" in
+            ubuntu|debian)
+                sudo apt-get update -qq
+                sudo apt-get install -y git
+                ;;
+            fedora|rhel|centos)
+                sudo dnf install -y git
+                ;;
+            *)
+                log_error "Unsupported OS for automatic git installation: $OS"
+                return 1
+                ;;
+        esac
+    fi
+
+    mkdir -p "$NOVNC_PARENT_DIR"
+
+    if [ -d "$NOVNC_DIR/.git" ]; then
+        log_info "noVNC repository already exists at $NOVNC_DIR, pulling latest changes..."
+        git -C "$NOVNC_DIR" fetch --all --tags --prune || true
+        git -C "$NOVNC_DIR" pull --ff-only || true
+    else
+        if [ -d "$NOVNC_DIR" ] && [ ! -d "$NOVNC_DIR/.git" ]; then
+            log_warn "Existing directory at $NOVNC_DIR is not a git repository; backing it up"
+            mv "$NOVNC_DIR" "$NOVNC_DIR.backup.$(date +%Y%m%d_%H%M%S)"
+        fi
+        log_info "Cloning noVNC from GitHub into $NOVNC_DIR..."
+        git clone "$NOVNC_REPO_URL" "$NOVNC_DIR"
+    fi
+
+    # Ensure proper ownership for runtime user
+    sudo chown -R "$INSTALL_USER:$INSTALL_USER" "$NOVNC_DIR"
+
+    # Ensure proxy script exists
+    if [ ! -x "$NOVNC_DIR/utils/novnc_proxy" ]; then
+        if [ -f "$NOVNC_DIR/utils/novnc_proxy" ]; then
+            chmod +x "$NOVNC_DIR/utils/novnc_proxy"
+        else
+            log_error "novnc_proxy not found at $NOVNC_DIR/utils/novnc_proxy"
+            return 1
+        fi
+    fi
+
+    log_info "Writing /etc/systemd/system/novnc.service"
+    sudo tee /etc/systemd/system/novnc.service > /dev/null << EOF
+[Unit]
+Description=noVNC Web VNC Proxy
+After=network.target vncserver.service
+
+[Service]
+Type=simple
+User=$INSTALL_USER
+Group=$INSTALL_USER
+WorkingDirectory=$NOVNC_DIR
+ExecStart=$NOVNC_DIR/utils/novnc_proxy --listen $NOVNC_LISTEN_PORT --vnc $NOVNC_VNC_TARGET
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable novnc.service
+    sudo systemctl restart novnc.service
+
+    if sudo systemctl is-active --quiet novnc.service; then
+        log_success "noVNC service configured and running"
+        log_info "Service: novnc.service"
+        log_info "Repo path: $NOVNC_DIR"
+        log_info "Listening on: 0.0.0.0:$NOVNC_LISTEN_PORT"
+        log_info "VNC target: $NOVNC_VNC_TARGET"
+    else
+        log_error "novnc.service failed to start"
+        sudo systemctl status novnc.service --no-pager || true
+        return 1
+    fi
+}
+
 # Command dispatcher
 case "${1:-help}" in
     install)
@@ -3661,6 +3754,11 @@ case "${1:-help}" in
         sudo systemctl restart caddy.service
         echo "Services restarted"
         ;;
+    novnc)
+        # OS detection is needed for package handling in this command
+        detect_os
+        install_novnc_service
+        ;;
     *)
         echo "Ginto AI Installation Script"
         echo ""
@@ -3676,6 +3774,7 @@ case "${1:-help}" in
         echo "  stop      - Stop Ginto service"
         echo "  restart   - Restart all services"
         echo "  status    - Show service status"
+        echo "  novnc     - Install/update noVNC from GitHub and configure novnc.service"
         echo ""
         echo "Other Commands:"
         echo "  reset     - Clear installation checkpoint to start fresh"

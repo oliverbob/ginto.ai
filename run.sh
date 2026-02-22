@@ -5,6 +5,7 @@
 #   start    - Start the web server and services
 #   stop     - Stop all services
 #   status   - Show status of services
+#   novnc    - Install/update noVNC from GitHub and configure systemd service
 #   help     - Show this help message
 
 set -euo pipefail
@@ -34,6 +35,7 @@ show_help() {
     echo "  start      Start the web server and services"
     echo "  stop       Stop all running services"
     echo "  status     Show status of all services"
+    echo "  novnc      Install/update noVNC and configure novnc.service"
     echo "  help       Show this help message"
     echo ""
     echo "Examples:"
@@ -95,6 +97,11 @@ cmd_status() {
     echo ""
 }
 
+cmd_novnc() {
+    log_info "Installing/configuring noVNC via bin/gintoai.sh..."
+    bash "$SCRIPT_DIR/bin/gintoai.sh" novnc
+}
+
 # Main command dispatcher
 case "${1:-help}" in
     install)
@@ -108,6 +115,9 @@ case "${1:-help}" in
         ;;
     status)
         cmd_status
+        ;;
+    novnc)
+        cmd_novnc
         ;;
     help|--help|-h)
         show_help
