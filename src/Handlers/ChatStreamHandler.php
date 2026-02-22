@@ -2371,6 +2371,66 @@ class ChatStreamHandler
     /**
      * Execute image generation with progress streaming
      */
+    private function imageGenEnv(string $key, string $default = ''): string
+    {
+        return strtolower(trim((string)($_ENV[$key] ?? getenv($key) ?? $default)));
+    }
+
+    private function resolveImageGenerationConfig(): array
+    {
+        $profile = $this->imageGenEnv('IMAGEGEN_PROFILE', 'balanced');
+        switch ($profile) {
+            case 'fast':
+                return [
+                    'profile' => 'fast',
+                    'width' => 512,
+                    'height' => 384,
+                    'num_inference_steps' => 3,
+                    'guidance_scale' => 0.9,
+                ];
+            case 'quality':
+                return [
+                    'profile' => 'quality',
+                    'width' => 768,
+                    'height' => 512,
+                    'num_inference_steps' => 8,
+                    'guidance_scale' => 1.5,
+                ];
+            case 'ultra':
+                return [
+                    'profile' => 'ultra',
+                    'width' => 1024,
+                    'height' => 576,
+                    'num_inference_steps' => 12,
+                    'guidance_scale' => 2.0,
+                ];
+            default:
+                return [
+                    'profile' => 'balanced',
+                    'width' => 512,
+                    'height' => 384,
+                    'num_inference_steps' => 4,
+                    'guidance_scale' => 1.0,
+                ];
+        }
+    }
+
+    private function resolveImageGenBaseUrl(bool $sdcpuActive): string
+    {
+        $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
+        if ($computeMode === 'gpu') {
+            return 'https://vision.ginto.ai';
+        }
+        if ($computeMode === 'cpu') {
+            return 'http://127.0.0.1:8888';
+        }
+
+        $sdcpuTunnel = $sdcpuActive
+            && strtolower(trim($_ENV['SDCPU_TUNNEL'] ?? getenv('SDCPU_TUNNEL') ?? 'false')) === 'true';
+
+        return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+    }
+
     private function executeImageGeneration(string $prompt): array
     {
         if (empty(trim($prompt))) {
@@ -2379,9 +2439,8 @@ class ChatStreamHandler
 
         // SDCPU_ACTIVE=true bypasses the subscription gate entirely
         $sdcpuActive = strtolower(trim($_ENV['SDCPU_ACTIVE'] ?? getenv('SDCPU_ACTIVE') ?? 'false')) === 'true';
-        $sdcpuTunnel = $sdcpuActive
-            && strtolower(trim($_ENV['SDCPU_TUNNEL'] ?? getenv('SDCPU_TUNNEL') ?? 'false')) === 'true';
-        $sdcpuBaseUrl = $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+        $sdcpuBaseUrl = $this->resolveImageGenBaseUrl($sdcpuActive);
+        $sdcpuTunnel = $sdcpuBaseUrl === 'https://vision.ginto.ai';
         $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
 
         // Check if user has ImageGen subscription
@@ -2462,12 +2521,13 @@ class ChatStreamHandler
 
         $emitProgress(5, 'Server ready, starting generation...');
         
+        $generationConfig = $this->resolveImageGenerationConfig();
         $requestData = [
             'prompt' => $prompt,
-            'width' => 512,
-            'height' => 384,
-            'num_inference_steps' => 4,
-            'guidance_scale' => 1.0,
+            'width' => $generationConfig['width'],
+            'height' => $generationConfig['height'],
+            'num_inference_steps' => $generationConfig['num_inference_steps'],
+            'guidance_scale' => $generationConfig['guidance_scale'],
         ];
         
         // Use streaming endpoint for real-time progress

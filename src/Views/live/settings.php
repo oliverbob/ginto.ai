@@ -854,6 +854,35 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                     </div>
                 </div>
 
+                <div class="section-card mt-6">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        <i class="fas fa-image mr-2 text-indigo-500"></i>Image Generation Settings
+                    </h2>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="label-text">Image Quality Profile</label>
+                            <select name="imagegen_profile" class="input-field">
+                                <option value="fast" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'fast') ? 'selected' : '' ?>>Fast (Lower quality, quickest response)</option>
+                                <option value="balanced" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'balanced') ? 'selected' : '' ?>>Balanced (Default)</option>
+                                <option value="quality" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'quality') ? 'selected' : '' ?>>Quality (Higher detail)</option>
+                                <option value="ultra" <?= (($envValues['IMAGEGEN_PROFILE'] ?? 'balanced') === 'ultra') ? 'selected' : '' ?>>Ultra (Maximum detail, slowest)</option>
+                            </select>
+                            <p class="help-text">Controls inference steps, output size, and guidance settings used by image generation.</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">Image Compute Mode</label>
+                            <select name="imagegen_compute_mode" class="input-field">
+                                <option value="auto" <?= (($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto') === 'auto') ? 'selected' : '' ?>>Auto (Use existing SDCPU/SDCPU_TUNNEL logic)</option>
+                                <option value="cpu" <?= (($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto') === 'cpu') ? 'selected' : '' ?>>CPU (Force local CPU endpoint)</option>
+                                <option value="gpu" <?= (($envValues['IMAGEGEN_COMPUTE_MODE'] ?? 'auto') === 'gpu') ? 'selected' : '' ?>>GPU/Tunnel (Force vision.ginto.ai endpoint)</option>
+                            </select>
+                            <p class="help-text">Controls whether image generation prefers local CPU or GPU tunnel endpoint.</p>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Feature Toggles Section -->
                 <div class="section-card mt-6">
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">

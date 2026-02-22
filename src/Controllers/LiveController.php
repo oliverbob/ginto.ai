@@ -569,6 +569,8 @@ class LiveController
             'sdcpu_active' => 'SDCPU_ACTIVE',
             'sdcpu_tunnel' => 'SDCPU_TUNNEL',
             'groq_vision_for_all_models' => 'GROQ_VISION_FOR_ALL_MODELS',
+            'imagegen_profile' => 'IMAGEGEN_PROFILE',
+            'imagegen_compute_mode' => 'IMAGEGEN_COMPUTE_MODE',
             
             // LLM Provider
             'llm_provider' => 'LLM_PROVIDER',
@@ -644,6 +646,19 @@ class LiveController
         $data['sdcpu_active'] = isset($data['sdcpu_active']) && $data['sdcpu_active'] ? 'true' : 'false';
         $data['sdcpu_tunnel'] = isset($data['sdcpu_tunnel']) && $data['sdcpu_tunnel'] ? 'true' : 'false';
         $data['groq_vision_for_all_models'] = isset($data['groq_vision_for_all_models']) && $data['groq_vision_for_all_models'] ? 'true' : 'false';
+
+        // Validate select fields with strict allowlists
+        $allowedImagegenProfiles = ['fast', 'balanced', 'quality', 'ultra'];
+        $imagegenProfile = (string)($data['imagegen_profile'] ?? 'balanced');
+        $data['imagegen_profile'] = in_array($imagegenProfile, $allowedImagegenProfiles, true)
+            ? $imagegenProfile
+            : 'balanced';
+
+        $allowedComputeModes = ['auto', 'cpu', 'gpu'];
+        $imagegenComputeMode = (string)($data['imagegen_compute_mode'] ?? 'auto');
+        $data['imagegen_compute_mode'] = in_array($imagegenComputeMode, $allowedComputeModes, true)
+            ? $imagegenComputeMode
+            : 'auto';
         
         // Update values
         foreach ($keyMap as $formKey => $envKey) {
@@ -660,7 +675,7 @@ class LiveController
         $groups = [
             'Ecommerce' => ['PAYPAL_WEBHOOK_ID', 'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_ENVIRONMENT', 'PAYPAL_INTERNAL_API_KEY', 'PAYPAL_CLIENT_ID_SANDBOX', 'PAYPAL_CLIENT_SECRET_SANDBOX'],
             'Datacenter' => ['B2_ACCOUNT_ID', 'B2_APP_KEY', 'B2_BUCKET_ID', 'B2_BUCKET_NAME', 'FILE_CDN_BASE_URL', 'DATACENTER'],
-            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS'],
+            'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'APP_URL', 'TIMEZONE', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE'],
             'Database' => ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_GUEST_USER', 'DB_GUEST_PASSWORD'],
             'LLM Provider' => ['LLM_PROVIDER', 'LLM_MODEL', 'DEFAULT_PROVIDER'],
             'GROQ API' => ['GROQ_API_KEY', 'GROQ_TTS_MODEL', 'GROQ_STT_MODEL'],

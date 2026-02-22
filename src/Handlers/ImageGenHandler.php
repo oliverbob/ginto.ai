@@ -29,8 +29,60 @@ class ImageGenHandler
         return strtolower(trim((string)($_ENV[$key] ?? getenv($key) ?? 'false'))) === 'true';
     }
 
+    private function envValue(string $key, string $default = ''): string
+    {
+        return strtolower(trim((string)($_ENV[$key] ?? getenv($key) ?? $default)));
+    }
+
+    private function resolveImageGenProfile(): array
+    {
+        $profile = $this->envValue('IMAGEGEN_PROFILE', 'balanced');
+        switch ($profile) {
+            case 'fast':
+                return [
+                    'profile' => 'fast',
+                    'width' => 512,
+                    'height' => 384,
+                    'num_inference_steps' => 3,
+                    'guidance_scale' => 0.9,
+                ];
+            case 'quality':
+                return [
+                    'profile' => 'quality',
+                    'width' => 768,
+                    'height' => 512,
+                    'num_inference_steps' => 8,
+                    'guidance_scale' => 1.5,
+                ];
+            case 'ultra':
+                return [
+                    'profile' => 'ultra',
+                    'width' => 1024,
+                    'height' => 576,
+                    'num_inference_steps' => 12,
+                    'guidance_scale' => 2.0,
+                ];
+            default:
+                return [
+                    'profile' => 'balanced',
+                    'width' => 512,
+                    'height' => 384,
+                    'num_inference_steps' => 4,
+                    'guidance_scale' => 1.0,
+                ];
+        }
+    }
+
     private function resolveSdcpuApiUrl(): string
     {
+        $computeMode = $this->envValue('IMAGEGEN_COMPUTE_MODE', 'auto');
+        if ($computeMode === 'gpu') {
+            return 'https://vision.ginto.ai/api/generate';
+        }
+        if ($computeMode === 'cpu') {
+            return self::SDCPU_API_URL;
+        }
+
         $sdcpuActive = $this->isEnvEnabled('SDCPU_ACTIVE');
         $sdcpuTunnel = $sdcpuActive && $this->isEnvEnabled('SDCPU_TUNNEL');
         if ($sdcpuTunnel) {
@@ -128,12 +180,13 @@ class ImageGenHandler
         */
         
         // Generate the image synchronously (for MCP tool use)
+        $generationConfig = $this->resolveImageGenProfile();
         $requestData = [
             'prompt' => $prompt,
-            'width' => 512,
-            'height' => 384,
-            'num_inference_steps' => 4,
-            'guidance_scale' => 1.0,
+            'width' => $generationConfig['width'],
+            'height' => $generationConfig['height'],
+            'num_inference_steps' => $generationConfig['num_inference_steps'],
+            'guidance_scale' => $generationConfig['guidance_scale'],
         ];
         
         // Add img2img parameters if provided
@@ -265,12 +318,13 @@ class ImageGenHandler
         ]);
         
         // Build the API request - use streaming endpoint for progress
+        $generationConfig = $this->resolveImageGenProfile();
         $requestData = [
             'prompt' => $prompt,
-            'width' => 512,
-            'height' => 384,
-            'num_inference_steps' => 4,  // Use 4 steps for better quality with progress
-            'guidance_scale' => 1.0,
+            'width' => $generationConfig['width'],
+            'height' => $generationConfig['height'],
+            'num_inference_steps' => $generationConfig['num_inference_steps'],
+            'guidance_scale' => $generationConfig['guidance_scale'],
         ];
         
         // Add img2img parameters if provided
