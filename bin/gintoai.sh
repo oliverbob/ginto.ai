@@ -3754,8 +3754,13 @@ case "${1:-help}" in
         sudo systemctl restart caddy.service
         echo "Services restarted"
         ;;
-    novnc)
+    novnc-local)
         # OS detection is needed for package handling in this command
+        detect_os
+        install_novnc_service
+        ;;
+    novnc)
+        log_warn "'novnc' is deprecated. Use 'novnc-local' instead."
         detect_os
         install_novnc_service
         ;;
@@ -3774,7 +3779,8 @@ case "${1:-help}" in
         echo "  stop      - Stop Ginto service"
         echo "  restart   - Restart all services"
         echo "  status    - Show service status"
-        echo "  novnc     - Install/update noVNC from GitHub and configure novnc.service"
+        echo "  novnc-local - Install/update local noVNC from GitHub and configure novnc.service"
+        echo "  novnc       - (deprecated alias) use novnc-local"
         echo ""
         echo "Other Commands:"
         echo "  reset     - Clear installation checkpoint to start fresh"
