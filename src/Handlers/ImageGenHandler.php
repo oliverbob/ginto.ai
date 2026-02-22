@@ -633,7 +633,7 @@ class ImageGenHandler
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, $self, $startTime, &$lastProgress, &$finalResult) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, $self, $startTime, &$lastProgress, &$finalResult, &$streamApiError) {
                 $responseBuffer .= $data;
                 
                 // Parse SSE events from buffer (supports both \n\n and \r\n\r\n separators)
@@ -738,12 +738,64 @@ class ImageGenHandler
             
             $decodedResponse = json_decode((string)$response, true);
             $result = $this->normalizeImageResult(is_array($decodedResponse) ? $decodedResponse : null);
+
+            $needsCompatRetry = $curlError !== '' || $httpCode !== 200 || !$result || !isset($result['image']);
+            if ($needsCompatRetry) {
+                $compatRequestData = $requestData;
+                unset($compatRequestData['negative_prompt'], $compatRequestData['model'], $compatRequestData['num_images']);
+
+                $this->emit([
+                    'phase' => 'generating',
+                    'message' => 'Retrying with compatibility payload...',
+                    'progress' => 15,
+                    'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
+                ]);
+
+                $compatCh = curl_init($sdcpuApiUrl);
+                curl_setopt_array($compatCh, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($compatRequestData),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 60,
+                    CURLOPT_CONNECTTIMEOUT => 10,
+                ]);
+
+                $compatResponse = curl_exec($compatCh);
+                $compatHttpCode = curl_getinfo($compatCh, CURLINFO_HTTP_CODE);
+                $compatCurlError = curl_error($compatCh);
+                curl_close($compatCh);
+
+                if ($compatCurlError === '' && $compatHttpCode === 200) {
+                    $compatDecoded = json_decode((string)$compatResponse, true);
+                    $compatResult = $this->normalizeImageResult(is_array($compatDecoded) ? $compatDecoded : null);
+                    if ($compatResult && isset($compatResult['image'])) {
+                        $result = $compatResult;
+                        $curlError = '';
+                        $httpCode = 200;
+                        $decodedResponse = is_array($compatDecoded) ? $compatDecoded : null;
+                    } else {
+                        $decodedResponse = is_array($compatDecoded) ? $compatDecoded : $decodedResponse;
+                    }
+                } else {
+                    $compatDecoded = json_decode((string)$compatResponse, true);
+                    if (is_array($compatDecoded)) {
+                        $decodedResponse = $compatDecoded;
+                    }
+                    $curlError = $compatCurlError !== '' ? $compatCurlError : $curlError;
+                    $httpCode = $compatHttpCode > 0 ? $compatHttpCode : $httpCode;
+                }
+            }
         }
         
         if ($curlError || $httpCode !== 200) {
+            $upstreamDetail = $this->summarizeApiResultForDebug(isset($decodedResponse) && is_array($decodedResponse) ? $decodedResponse : null);
+            if ($streamApiError) {
+                $upstreamDetail .= ' stream_error=' . substr($streamApiError, 0, 180);
+            }
             $this->emit([
                 'error' => true,
-                'message' => $curlError ?: "SDCPU API returned HTTP {$httpCode}",
+                'message' => ($curlError ?: "SDCPU API returned HTTP {$httpCode}") . ' (' . $upstreamDetail . ')',
                 'progress' => 0,
                 'elapsed_ms' => round((microtime(true) - $startTime) * 1000),
             ]);

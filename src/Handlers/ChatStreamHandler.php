@@ -2817,7 +2817,7 @@ class ChatStreamHandler
             CURLOPT_RETURNTRANSFER => false,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, &$lastProgress, &$finalResult, $emitProgress) {
+            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, &$lastProgress, &$finalResult, &$streamApiError, $emitProgress) {
                 $responseBuffer .= $data;
                 
                 // Parse SSE events (supports both \n\n and \r\n\r\n separators)
@@ -2893,10 +2893,48 @@ class ChatStreamHandler
             ]);
             
             $response = curl_exec($ch);
+            $fallbackHttpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $fallbackCurlError = curl_error($ch);
             curl_close($ch);
             
             $decoded = @json_decode((string)$response, true);
             $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
+
+            $needsCompatRetry = $fallbackCurlError !== '' || $fallbackHttpCode !== 200 || !$finalResult || !isset($finalResult['image']);
+            if ($needsCompatRetry) {
+                $emitProgress(25, 'Retrying with compatibility payload...');
+
+                $compatRequestData = $requestData;
+                unset($compatRequestData['negative_prompt'], $compatRequestData['model'], $compatRequestData['num_images']);
+
+                $compatCh = curl_init($sdcpuBaseUrl . '/api/generate');
+                curl_setopt_array($compatCh, [
+                    CURLOPT_POST => true,
+                    CURLOPT_POSTFIELDS => json_encode($compatRequestData),
+                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 60,
+                ]);
+
+                $compatResponse = curl_exec($compatCh);
+                $compatHttpCode = (int)curl_getinfo($compatCh, CURLINFO_HTTP_CODE);
+                $compatCurlError = curl_error($compatCh);
+                curl_close($compatCh);
+
+                $compatDecoded = @json_decode((string)$compatResponse, true);
+                $compatResult = $this->normalizeImageGenResult(is_array($compatDecoded) ? $compatDecoded : null);
+
+                if ($compatCurlError === '' && $compatHttpCode === 200 && $compatResult && isset($compatResult['image'])) {
+                    $finalResult = $compatResult;
+                } else {
+                    if (is_array($compatDecoded)) {
+                        $decoded = $compatDecoded;
+                    }
+                    if ($compatCurlError !== '') {
+                        $streamApiError = trim(($streamApiError ? ($streamApiError . ' | ') : '') . $compatCurlError);
+                    }
+                }
+            }
         }
         
         if (!$finalResult || !isset($finalResult['image'])) {
