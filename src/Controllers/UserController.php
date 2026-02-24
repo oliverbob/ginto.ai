@@ -406,7 +406,7 @@ class UserController extends \Core\Controller
                 'revoked' => 0,
             ]);
 
-            $plain = bin2hex(random_bytes(32));
+            $plain = 'ginto-' . bin2hex(random_bytes(32));
             $hash = hash('sha256', $plain);
 
             $this->db->insert('api_tokens', [
