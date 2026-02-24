@@ -87,6 +87,10 @@ function ginto_extract_tunnel_token(): string {
     if (!empty($_POST['api_key'])) {
         return trim((string)$_POST['api_key']);
     }
+    // Visible unauthorized form field (intentionally not named api_key to avoid autofill).
+    if (!empty($_POST['ginto_key'])) {
+        return trim((string)$_POST['ginto_key']);
+    }
     if (!empty($_POST['tunnel_token'])) {
         return trim((string)$_POST['tunnel_token']);
     }
@@ -404,7 +408,7 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     // If the key was submitted via POST form, treat it as an auth handshake:
     // set an HttpOnly cookie and redirect to GET so the original POST is not proxied upstream.
     $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-    if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['tunnel_token']))) {
+    if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token']))) {
         $cookieValue = $token;
         $cookieName = 'ginto_tunnel_token';
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
