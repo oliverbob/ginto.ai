@@ -238,13 +238,15 @@
   <!-- User Account (always at bottom) -->
   <div class="pb-2 space-y-0.5 border-t border-gray-200 dark:border-gray-800">
     <?php if (!empty($isLoggedIn)): ?>
-    <div class="nav-item flex items-center gap-2 py-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors cursor-pointer group">
-      <div class="nav-icon w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-        <?= strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?>
-      </div>
-      <div class="flex-1 min-w-0 sidebar-label">
-        <span class="text-sm text-gray-700 dark:text-gray-200 truncate block"><?= htmlspecialchars($_SESSION['username'] ?? 'User') ?></span>
-      </div>
+    <div class="nav-item flex items-center gap-2 py-1.5 rounded-md hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group">
+      <a href="/account" class="flex items-center gap-2 flex-1 min-w-0 sidebar-label">
+        <div class="nav-icon w-5 h-5 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+          <?= strtoupper(substr($_SESSION['username'] ?? 'U', 0, 1)) ?>
+        </div>
+        <div class="min-w-0">
+          <span class="text-sm text-gray-700 dark:text-gray-200 truncate block"><?= htmlspecialchars($_SESSION['username'] ?? 'User') ?></span>
+        </div>
+      </a>
       <a id="logout-link" href="/logout" class="sidebar-label p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-red-400 hover:text-red-500 transition-all" title="Logout">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
