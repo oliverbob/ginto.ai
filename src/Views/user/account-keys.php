@@ -41,7 +41,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
           <option value="86400">24 hours</option>
         </select>
       </div>
-      <button id="akGenerate" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
+      <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
     </div>
 
     <div id="akResult" class="mt-4" style="display:none;">
@@ -49,12 +49,12 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <div class="text-sm text-gray-500 mb-2">Copy this token now (it is shown only once):</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
           <input id="akToken" type="text" readonly class="flex-1 min-w-[320px] px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 font-mono text-xs" />
-          <button id="akCopy" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Copy</button>
+          <button id="akCopy" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Copy</button>
         </div>
         <div class="mt-3 text-sm text-gray-500">Link format:</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
           <input id="akLink" type="text" readonly class="flex-1 min-w-[320px] px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 font-mono text-xs" />
-          <button id="akCopyLink" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Copy link</button>
+          <button id="akCopyLink" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Copy link</button>
         </div>
       </div>
     </div>
@@ -97,6 +97,41 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       }
     } catch (e) {}
     alert(message || title || '');
+  }
+
+  function setTempButtonState(btn, text, ms) {
+    if (!btn) return;
+    const prev = btn.textContent;
+    btn.textContent = text;
+    setTimeout(() => { btn.textContent = prev; }, ms || 1200);
+  }
+
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {
+      // fall through
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
   }
 
   async function loadKeys() {
@@ -185,23 +220,22 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     }
   }
 
-  function copyValue(id) {
+  async function copyValue(id, btnId) {
     const el = document.getElementById(id);
+    const btn = btnId ? document.getElementById(btnId) : null;
     if (!el) return;
-    el.select();
-    el.setSelectionRange(0, 99999);
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(el.value);
-      } else {
-        document.execCommand('copy');
-      }
-    } catch (e) {}
+    const ok = await copyTextToClipboard(el.value);
+    if (ok) {
+      setTempButtonState(btn, 'Copied', 1200);
+    } else {
+      setTempButtonState(btn, 'Copy failed', 1400);
+      uiModal('Copy failed', 'Your browser blocked clipboard access.');
+    }
   }
 
   document.getElementById('akGenerate').addEventListener('click', generateKey);
-  document.getElementById('akCopy').addEventListener('click', () => copyValue('akToken'));
-  document.getElementById('akCopyLink').addEventListener('click', () => copyValue('akLink'));
+  document.getElementById('akCopy').addEventListener('click', () => copyValue('akToken','akCopy'));
+  document.getElementById('akCopyLink').addEventListener('click', () => copyValue('akLink','akCopyLink'));
   loadKeys();
 </script>
 
