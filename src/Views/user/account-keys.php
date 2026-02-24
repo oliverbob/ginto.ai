@@ -391,6 +391,10 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
           showServerlessUpgradeModal();
           return;
         }
+        if (data.code === 'DOMAIN_NOT_AVAILABLE') {
+          uiModal('Domain not available', 'That subdomain is not available. Choose another.');
+          return;
+        }
         uiModal('Generate failed', data.error || 'Failed to generate');
         return;
       }

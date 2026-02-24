@@ -1406,6 +1406,51 @@ TOML;
             $ttl = 86400 * 365;
         }
 
+        // Prevent users from generating keys for subdomains owned by someone else.
+        // Ownership is tracked in the tunnel registry (written during tunnel registration / FRP key setup).
+        try {
+            $registry = $this->readRegistry();
+            $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
+            $owner = (int)($entry['owner_user_id'] ?? 0);
+            if ($owner !== 0 && $owner !== (int)$userId) {
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'DOMAIN_NOT_AVAILABLE',
+                    'error' => 'Domain is not available.',
+                ]);
+                return;
+            }
+        } catch (\Throwable $_) {
+            // If registry cannot be read, do not block here.
+        }
+
+        // Additional safety: if another user already has an active key for this subdomain,
+        // treat it as unavailable.
+        if ($this->db) {
+            try {
+                $nowSql = date('Y-m-d H:i:s');
+                $other = $this->db->get('tunnel_access_keys', ['id'], [
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'expires_at[>]' => $nowSql,
+                    'user_id[!]' => (int)$userId,
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                if ($other) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'DOMAIN_NOT_AVAILABLE',
+                        'error' => 'Domain is not available.',
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // ignore
+            }
+        }
+
         // Enforce user key limits (admins unlimited).
         // Rule: non-admins can have 3 active (unrevoked, unexpired) keys for free.
         // Additional keys require an active "serverless_key" addon subscription ($105/mo per key).
