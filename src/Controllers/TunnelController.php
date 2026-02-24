@@ -1478,11 +1478,11 @@ TOML;
 
         if (!$isAdmin && $this->db) {
             try {
-                $nowSql = date('Y-m-d H:i:s');
+                // Limit is based on *unrevoked* keys (not "unexpired").
+                // Users must revoke old keys to free up slots.
                 $activeKeys = (int)$this->db->count('tunnel_access_keys', [
                     'user_id' => (int)$userId,
                     'revoked' => 0,
-                    'expires_at[>]' => $nowSql,
                 ]);
 
                 $extraSlots = 0;
@@ -1516,8 +1516,8 @@ TOML;
         }
 
         try {
-            // Enforce one active key per user+subdomain.
-            // User must revoke the existing key before generating a new one.
+            // Enforce one key per user+subdomain.
+            // User must revoke the existing key before generating a new one (even if expired).
             if ($this->db) {
                 $existingActive = $this->db->get('tunnel_access_keys', ['id', 'expires_at'], [
                     'user_id' => (int)$userId,
@@ -1526,16 +1526,12 @@ TOML;
                     'ORDER' => ['id' => 'DESC'],
                 ]);
                 if ($existingActive) {
-                    $expiresAt = (string)($existingActive['expires_at'] ?? '');
-                    $isExpired = ($expiresAt !== '' && strtotime($expiresAt) !== false && strtotime($expiresAt) <= time());
-                    if (!$isExpired) {
-                        http_response_code(409);
-                        echo json_encode([
-                            'success' => false,
-                            'error' => 'Key already exists for this subdomain. Revoke it first.',
-                        ]);
-                        return;
-                    }
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'Key already exists for this subdomain. Revoke it first.',
+                    ]);
+                    return;
                 }
             }
 

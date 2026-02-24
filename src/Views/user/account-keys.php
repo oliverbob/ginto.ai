@@ -316,10 +316,15 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       }
       tbody.innerHTML = keys.map(k => {
         const revoked = Number(k.revoked || 0) === 1;
-        const status = revoked ? 'revoked' : 'active';
+        const expMs = k.expires_at ? Date.parse(String(k.expires_at).replace(' ', 'T') + 'Z') : NaN;
+        const expired = !revoked && Number.isFinite(expMs) && expMs <= Date.now();
         const statusBadge = revoked
           ? '<span class="px-2 py-1 text-xs rounded bg-gray-500/10 text-gray-500">revoked</span>'
-          : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">active</span>';
+          : (expired
+              ? '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-600">expired</span>'
+              : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">active</span>'
+            );
+        // Keep revoke available for all unrevoked keys (including expired) so users can free slots.
         const btn = revoked
           ? ''
           : `<button class="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white" onclick="revokeKey(${Number(k.id)})">Revoke</button>`;
