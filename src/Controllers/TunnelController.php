@@ -1404,6 +1404,29 @@ TOML;
         }
 
         try {
+            // Enforce one active key per user+subdomain.
+            // User must revoke the existing key before generating a new one.
+            if ($this->db) {
+                $existingActive = $this->db->get('tunnel_access_keys', ['id', 'expires_at'], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                if ($existingActive) {
+                    $expiresAt = (string)($existingActive['expires_at'] ?? '');
+                    $isExpired = ($expiresAt !== '' && strtotime($expiresAt) !== false && strtotime($expiresAt) <= time());
+                    if (!$isExpired) {
+                        http_response_code(409);
+                        echo json_encode([
+                            'success' => false,
+                            'error' => 'Key already exists for this subdomain. Revoke it first.',
+                        ]);
+                        return;
+                    }
+                }
+            }
+
             $jti = bin2hex(random_bytes(16));
             $now = time();
             $payload = [
