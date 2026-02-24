@@ -137,6 +137,32 @@ button, a { user-select:none; }
     }
   }
 
+  async function ensureDefaultKeyOnce() {
+    // Behave like typical API providers: create a default key automatically
+    // the first time the user visits /account.
+    try {
+      const flag = 'ginto_default_api_key_autocreated_v1';
+      if (window.localStorage && localStorage.getItem(flag) === '1') {
+        return;
+      }
+
+      const res = await fetch('/api/account/default-key/status', { credentials: 'same-origin' });
+      const data = await res.json();
+      if (!data || !data.success) {
+        return;
+      }
+      if (data.has_key) {
+        if (window.localStorage) localStorage.setItem(flag, '1');
+        return;
+      }
+
+      await rotateDefaultKey();
+      if (window.localStorage) localStorage.setItem(flag, '1');
+    } catch (e) {
+      // Don't block page load; user can still click Generate/Rotate manually.
+    }
+  }
+
   async function rotateDefaultKey() {
     try {
       const res = await fetch('/api/account/default-key/rotate', {
@@ -161,6 +187,7 @@ button, a { user-select:none; }
   var rotateBtn = document.getElementById('rotateDefaultKey');
   rotateBtn && rotateBtn.addEventListener('click', rotateDefaultKey);
   loadDefaultStatus();
+  ensureDefaultKeyOnce();
 })();
 </script>
 
