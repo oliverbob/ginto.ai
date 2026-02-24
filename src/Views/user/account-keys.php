@@ -287,6 +287,11 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       el.textContent = '$105 / month per additional key';
       return;
     }
+    if (m >= 36) {
+      const years = Math.floor(m / 12);
+      el.textContent = '$105 / month per additional key • one-time payment ($' + total + ' for ' + years + ' years)';
+      return;
+    }
     if (m >= 12) {
       // Year-based TTLs are billed yearly.
       el.textContent = '$105 / month per additional key • billed yearly ($1260 / year)';

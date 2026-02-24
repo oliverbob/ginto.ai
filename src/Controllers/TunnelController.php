@@ -1489,15 +1489,24 @@ TOML;
                 $extraSlots = 0;
                 try {
                     $nowSql = date('Y-m-d H:i:s');
-                    $extraSlots = (int)$this->db->count('user_addons', [
+                    $subscriptionSlots = (int)$this->db->count('user_addons', [
                         'user_id' => (int)$userId,
-                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y', 'serverless_key_term'],
+                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y'],
                         'status' => 'active',
                         'OR' => [
                             'subscription_next_billing' => null,
                             'subscription_next_billing[>]' => $nowSql,
                         ],
                     ]);
+
+                    $termSlots = (int)$this->db->count('user_addons', [
+                        'user_id' => (int)$userId,
+                        'addon_type[~]' => 'serverless_key_term%',
+                        'status' => 'active',
+                        'subscription_next_billing[>]' => $nowSql,
+                    ]);
+
+                    $extraSlots = max(0, $subscriptionSlots) + max(0, $termSlots);
                 } catch (\Throwable $_) {
                     $extraSlots = 0;
                 }

@@ -1137,9 +1137,11 @@ $router->req('/api/addon/one-time/capture', function() use ($db) {
         'paypal_order_id' => $paypalOrderId,
         'months' => $months,
     ];
+    // Use a unique addon_type suffix to avoid collisions if a legacy unique constraint exists.
+    $termAddonType = 'serverless_key_term_' . $months . '_' . substr($paypalOrderId, 0, 8);
     $db->insert('user_addons', [
         'user_id' => $userId,
-        'addon_type' => 'serverless_key_term',
+        'addon_type' => $termAddonType,
         'paypal_subscription_id' => null,
         'status' => 'active',
         'amount_usd' => (float)($local['amount'] ?? 0),
