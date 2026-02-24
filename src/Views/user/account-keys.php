@@ -8,6 +8,14 @@ if (!defined('ROOT_PATH')) {
 }
 if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
+if (empty($_SESSION['csrf_token'])) {
+  try {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+  } catch (\Throwable $e) {
+    $_SESSION['csrf_token'] = '';
+  }
+}
+
 include ROOT_PATH . '/src/Views/layout/header.php';
 include ROOT_PATH . '/src/Views/layout/sidebar.php';
 
@@ -85,7 +93,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     const tbody = document.getElementById('akList');
     tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Loading…</td></tr>';
     try {
-      const res = await fetch('/api/tunnel/access-keys');
+      const res = await fetch('/api/tunnel/access-keys', { credentials: 'same-origin' });
       const data = await res.json();
       const keys = Array.isArray(data.keys) ? data.keys : [];
       if (!keys.length) {
@@ -122,6 +130,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     try {
       const res = await fetch('/api/tunnel/access-key/revoke', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, csrf_token: csrfToken })
       });
@@ -146,6 +155,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     try {
       const res = await fetch('/api/tunnel/access-key/generate', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subdomain, ttl_seconds: ttl, csrf_token: csrfToken })
       });

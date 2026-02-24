@@ -1561,6 +1561,11 @@ TOML;
             return (int)$_SESSION['user']['id'];
         }
 
+        // Most of the web app uses a flat session key.
+        if (!empty($_SESSION['user_id'])) {
+            return (int)$_SESSION['user_id'];
+        }
+
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
             $bearer = trim($m[1]);
