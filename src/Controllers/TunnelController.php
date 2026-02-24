@@ -21,6 +21,8 @@ class TunnelController
     private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
     private const APPROVAL_SERVER = 'https://ginto.ai';
+    private const FRP_ONLINE_CACHE_FILE = '/tmp/ginto-frp-online-subdomains.json';
+    private const FRP_ONLINE_CACHE_LOCK = '/tmp/ginto-frp-online-subdomains.lock';
 
     public function __construct(?\Medoo\Medoo $db = null)
     {
@@ -910,65 +912,11 @@ TOML;
 
         // 6. Check FRP dashboard API for an active proxy for this subdomain.
         // This supports real FRP clients that run off-server (no local PID file).
-        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
-        if ($dashPwd === '') {
-            $envFile = '/etc/frp/frps.env';
-            if (file_exists($envFile) && is_readable($envFile)) {
-                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                if (is_array($lines)) {
-                    foreach ($lines as $line) {
-                        $line = trim((string)$line);
-                        if ($line === '' || str_starts_with($line, '#')) {
-                            continue;
-                        }
-                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
-                            continue;
-                        }
-                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
-                        break;
-                    }
-                }
-            }
-        }
-
-        if ($dashPwd !== '') {
-            foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
-                $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
-                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
-                curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
-                $resp = curl_exec($ch);
-                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                curl_close($ch);
-
-                if ($resp === false || $code < 200 || $code >= 300) {
-                    continue;
-                }
-
-                $decoded = json_decode((string)$resp, true);
-                $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
-                if (!is_array($proxies)) {
-                    continue;
-                }
-
-                foreach ($proxies as $proxy) {
-                    if (!is_array($proxy)) {
-                        continue;
-                    }
-                    $status = (string)($proxy['status'] ?? '');
-                    if ($status !== 'online') {
-                        continue;
-                    }
-                    $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
-                    $proxySubdomain = (string)($conf['subdomain'] ?? '');
-                    if ($proxySubdomain !== '' && strtolower($proxySubdomain) === $subdomain) {
-                        http_response_code(200);
-                        echo "OK - FRP dashboard";
-                        return;
-                    }
-                }
-            }
+        // Uses a small on-disk cache to avoid hammering frps during bot/scanner traffic.
+        if ($this->isFrpSubdomainOnline($subdomain)) {
+            http_response_code(200);
+            echo "OK - FRP dashboard";
+            return;
         }
         
         // 7. Check FRP tunnel registry (tracks registered tunnels)
@@ -990,6 +938,153 @@ TOML;
         // This prevents ACME challenges for random/arbitrary subdomains
         http_response_code(404);
         echo "Subdomain not registered or in use";
+    }
+
+    private function isFrpSubdomainOnline(string $subdomain): bool
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return false;
+        }
+
+        // Fast path: very short cache window.
+        $cached = $this->readFrpOnlineCache(2);
+        if ($cached !== null) {
+            return in_array($subdomain, $cached, true);
+        }
+
+        // Update path guarded by a lock to prevent thundering herd.
+        $lockHandle = @fopen(self::FRP_ONLINE_CACHE_LOCK, 'c');
+        if ($lockHandle === false) {
+            // If we can't lock, do a best-effort single fetch without caching.
+            $online = $this->fetchFrpOnlineSubdomains();
+            return in_array($subdomain, $online, true);
+        }
+
+        $gotLock = @flock($lockHandle, LOCK_EX);
+        if (!$gotLock) {
+            @fclose($lockHandle);
+            $online = $this->fetchFrpOnlineSubdomains();
+            return in_array($subdomain, $online, true);
+        }
+
+        // Re-check cache after acquiring lock.
+        $cached = $this->readFrpOnlineCache(2);
+        if ($cached !== null) {
+            @flock($lockHandle, LOCK_UN);
+            @fclose($lockHandle);
+            return in_array($subdomain, $cached, true);
+        }
+
+        $online = $this->fetchFrpOnlineSubdomains();
+        $this->writeFrpOnlineCache($online);
+
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+
+        return in_array($subdomain, $online, true);
+    }
+
+    private function readFrpOnlineCache(int $maxAgeSeconds): ?array
+    {
+        if (!file_exists(self::FRP_ONLINE_CACHE_FILE)) {
+            return null;
+        }
+        $mtime = @filemtime(self::FRP_ONLINE_CACHE_FILE);
+        if (!is_int($mtime) || (time() - $mtime) > $maxAgeSeconds) {
+            return null;
+        }
+        $decoded = json_decode((string)@file_get_contents(self::FRP_ONLINE_CACHE_FILE), true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $subdomains = $decoded['subdomains'] ?? null;
+        if (!is_array($subdomains)) {
+            return null;
+        }
+        $out = [];
+        foreach ($subdomains as $sd) {
+            $sd = strtolower(trim((string)$sd));
+            if ($sd !== '') {
+                $out[] = $sd;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    private function writeFrpOnlineCache(array $subdomains): void
+    {
+        $payload = [
+            'updated_at' => time(),
+            'subdomains' => array_values(array_unique(array_map('strval', $subdomains))),
+        ];
+        @file_put_contents(self::FRP_ONLINE_CACHE_FILE, json_encode($payload));
+    }
+
+    private function fetchFrpOnlineSubdomains(): array
+    {
+        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
+        if ($dashPwd === '') {
+            $envFile = '/etc/frp/frps.env';
+            if (file_exists($envFile) && is_readable($envFile)) {
+                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (is_array($lines)) {
+                    foreach ($lines as $line) {
+                        $line = trim((string)$line);
+                        if ($line === '' || str_starts_with($line, '#')) {
+                            continue;
+                        }
+                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
+                            continue;
+                        }
+                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($dashPwd === '') {
+            return [];
+        }
+
+        $online = [];
+        foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
+            $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
+            $resp = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($resp === false || $code < 200 || $code >= 300) {
+                continue;
+            }
+
+            $decoded = json_decode((string)$resp, true);
+            $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+            if (!is_array($proxies)) {
+                continue;
+            }
+
+            foreach ($proxies as $proxy) {
+                if (!is_array($proxy)) {
+                    continue;
+                }
+                if ((string)($proxy['status'] ?? '') !== 'online') {
+                    continue;
+                }
+                $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+                $sd = strtolower(trim((string)($conf['subdomain'] ?? '')));
+                if ($sd !== '') {
+                    $online[] = $sd;
+                }
+            }
+        }
+
+        return array_values(array_unique($online));
     }
     
     /**
