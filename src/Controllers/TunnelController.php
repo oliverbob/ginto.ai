@@ -1403,6 +1403,55 @@ TOML;
             $ttl = 86400;
         }
 
+        // Enforce user key limits (admins unlimited).
+        // Rule: non-admins can have 3 active (unrevoked, unexpired) keys for free.
+        // Additional keys require an active "serverless_key" addon subscription ($105/mo per key).
+        $isAdmin = false;
+        try {
+            $isAdmin = UserController::isAdmin();
+        } catch (\Throwable $_) {
+            $isAdmin = false;
+        }
+
+        if (!$isAdmin && $this->db) {
+            try {
+                $nowSql = date('Y-m-d H:i:s');
+                $activeKeys = (int)$this->db->count('tunnel_access_keys', [
+                    'user_id' => (int)$userId,
+                    'revoked' => 0,
+                    'expires_at[>]' => $nowSql,
+                ]);
+
+                $extraSlots = 0;
+                try {
+                    $extraSlots = (int)$this->db->count('user_addons', [
+                        'user_id' => (int)$userId,
+                        'addon_type' => 'serverless_key',
+                        'status' => 'active',
+                    ]);
+                } catch (\Throwable $_) {
+                    $extraSlots = 0;
+                }
+
+                $limit = 3 + max(0, $extraSlots);
+                if ($activeKeys >= $limit) {
+                    http_response_code(402);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'KEY_LIMIT_REACHED',
+                        'error' => 'Key limit reached. Upgrade to add more keys.',
+                        'active_keys' => $activeKeys,
+                        'limit' => $limit,
+                        'addon_type' => 'serverless_key',
+                        'addon_price_usd' => 105,
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // If counting fails, do not block key generation.
+            }
+        }
+
         try {
             // Enforce one active key per user+subdomain.
             // User must revoke the existing key before generating a new one.

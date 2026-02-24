@@ -20,6 +20,13 @@ include ROOT_PATH . '/src/Views/layout/header.php';
 include ROOT_PATH . '/src/Views/layout/sidebar.php';
 
 $csrf = $_SESSION['csrf_token'] ?? '';
+
+$paypalEnv = strtolower((string)(getenv('PAYPAL_ENVIRONMENT') ?: ($_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox')));
+$paypalEnv = ($paypalEnv === 'live' || $paypalEnv === 'production') ? 'live' : 'sandbox';
+$paypalClientId = ($paypalEnv === 'sandbox')
+  ? (getenv('PAYPAL_CLIENT_ID_SANDBOX') ?: ($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? ''))
+  : (getenv('PAYPAL_CLIENT_ID') ?: ($_ENV['PAYPAL_CLIENT_ID'] ?? ''));
+$userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 ?>
 
 <div id="mainContent" class="p-6">
@@ -48,7 +55,12 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       <div class="p-3 rounded border border-emerald-500/30 bg-emerald-500/10">
         <div class="text-sm text-gray-500 mb-2">Copy this token now (it is shown only once):</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap: wrap;">
-          <input id="akToken" type="text" readonly class="flex-1 min-w-[320px] px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 font-mono text-xs" />
+          <div class="flex-1 min-w-[320px]" style="position:relative;">
+            <input id="akToken" type="text" readonly class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 font-mono text-xs" style="padding-right:40px;" />
+            <button id="akTokenEye" type="button" title="Show/Hide" aria-label="Show/Hide" style="position:absolute; right:8px; top:50%; transform:translateY(-50%); padding:4px; border-radius:8px; border:0; background:transparent; cursor:pointer; color:#64748b;">
+              <i id="akTokenEyeIcon" class="fas fa-eye"></i>
+            </button>
+          </div>
           <button id="akCopy" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Copy</button>
         </div>
         <div class="mt-3 text-sm text-gray-500">Link format:</div>
@@ -60,9 +72,42 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     </div>
   </div>
 
+  <div id="serverlessUpgradeModal" style="display:none; position:fixed; inset:0; z-index:9999;">
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700" style="position:relative; width:min(560px, calc(100% - 24px)); margin:10vh auto 0 auto; padding:18px;">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <div class="text-lg font-semibold">Serverless Subscription</div>
+          <div class="text-sm text-gray-500">$105 / month per additional key</div>
+        </div>
+        <button id="serverlessUpgradeClose" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Close</button>
+      </div>
+
+      <div class="mt-4 text-sm text-gray-600 dark:text-gray-300">
+        <div class="font-semibold mb-2">Benefits</div>
+        <ul class="list-disc" style="padding-left:18px;">
+          <li>Create additional web server tunnel keys beyond the free limit</li>
+          <li>Each active subscription adds 1 extra unrevoked key slot</li>
+          <li>Instant activation after PayPal approval</li>
+          <li>Cancel anytime</li>
+        </ul>
+      </div>
+
+      <div id="serverlessUpgradeError" class="mt-4" style="display:none;"></div>
+
+      <div class="mt-4">
+        <div id="serverlessPaypalLoading" class="text-sm text-gray-500">Loading PayPal…</div>
+        <div id="serverlessPaypalButtons" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700" style="max-width: 860px;">
     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
       <h2 class="font-semibold">Your Keys</h2>
+  const paypalEnv = <?= json_encode($paypalEnv) ?>;
+  const paypalClientId = <?= json_encode($paypalClientId) ?>;
+  const currentUserId = <?= (int)$userId ?>;
       <button class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-800 text-white" onclick="loadKeys()">Refresh</button>
     </div>
     <div class="overflow-x-auto">
@@ -131,6 +176,128 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       return !!ok;
     } catch (e) {
       return false;
+    }
+  }
+
+  function maskKey(key) {
+    const s = String(key || '');
+    if (!s) return '';
+    const keep = Math.min(12, s.length);
+    return s.slice(0, keep) + '********';
+  }
+
+  function setMaskedValue(input, full, revealed) {
+    if (!input) return;
+    input.dataset.full = String(full || '');
+    input.dataset.revealed = revealed ? '1' : '0';
+    input.value = revealed ? String(full || '') : maskKey(full);
+  }
+
+  function setEyeIcon(revealed) {
+    const icon = document.getElementById('akTokenEyeIcon');
+    if (icon) icon.className = revealed ? 'fas fa-eye-slash' : 'fas fa-eye';
+  }
+
+  function showServerlessUpgradeModal() {
+    const modal = document.getElementById('serverlessUpgradeModal');
+    if (!modal) return;
+    modal.style.display = 'block';
+    initServerlessPaypalButtons();
+  }
+
+  function hideServerlessUpgradeModal() {
+    const modal = document.getElementById('serverlessUpgradeModal');
+    if (!modal) return;
+    modal.style.display = 'none';
+  }
+
+  async function loadAddonInfo(addonType) {
+    const res = await fetch('/api/addon/info/' + encodeURIComponent(addonType), { credentials: 'same-origin' });
+    const data = await res.json();
+    if (!data || !data.success) throw new Error(data?.error || 'Failed to load addon info');
+    return data;
+  }
+
+  function loadPayPalSdkOnce() {
+    return new Promise((resolve, reject) => {
+      if (window.paypal && window.paypal.Buttons) return resolve(true);
+      if (!paypalClientId) return reject(new Error('PayPal client ID not configured'));
+      const existing = document.getElementById('paypal-sdk');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(true));
+        existing.addEventListener('error', () => reject(new Error('Failed to load PayPal SDK')));
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'paypal-sdk';
+      script.src = 'https://www.paypal.com/sdk/js?client-id=' + encodeURIComponent(paypalClientId) + '&vault=true&intent=subscription&currency=USD';
+      script.onload = () => resolve(true);
+      script.onerror = () => reject(new Error('Failed to load PayPal SDK'));
+      document.head.appendChild(script);
+    });
+  }
+
+  let serverlessPaypalInit = false;
+  async function initServerlessPaypalButtons() {
+    if (serverlessPaypalInit) return;
+    serverlessPaypalInit = true;
+
+    const loading = document.getElementById('serverlessPaypalLoading');
+    const buttons = document.getElementById('serverlessPaypalButtons');
+    const errBox = document.getElementById('serverlessUpgradeError');
+    const showErr = (msg) => {
+      if (!errBox) return;
+      errBox.style.display = 'block';
+      errBox.className = 'mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded';
+      errBox.textContent = msg || 'Upgrade failed.';
+    };
+
+    try {
+      const info = await loadAddonInfo('serverless_key');
+      const planId = info.paypal_plan_id;
+      if (!planId) throw new Error('Serverless plan is not configured');
+
+      await loadPayPalSdkOnce();
+      if (loading) loading.style.display = 'none';
+
+      window.paypal.Buttons({
+        style: { shape: 'rect', color: 'blue', layout: 'vertical', label: 'subscribe' },
+        createSubscription: function(data, actions) {
+          return actions.subscription.create({
+            plan_id: planId,
+            custom_id: String(currentUserId || '')
+          });
+        },
+        onApprove: function(data) {
+          // Activate addon server-side (verifies with PayPal)
+          return fetch('/api/addon/activate', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addon_type: 'serverless_key', subscription_id: data.subscriptionID })
+          })
+          .then(r => r.json())
+          .then(result => {
+            if (!result || !result.success) throw new Error(result?.error || 'Activation failed');
+            hideServerlessUpgradeModal();
+            // retry original action after successful upgrade
+            serverlessPaypalInit = false;
+            const btn = document.getElementById('serverlessPaypalButtons');
+            if (btn) btn.innerHTML = '';
+            if (loading) loading.style.display = 'block';
+            generateKey();
+          })
+          .catch(e => { showErr(e.message); });
+        },
+        onError: function(err) {
+          showErr('PayPal error. Please try again.');
+          console.error(err);
+        }
+      }).render(buttons);
+    } catch (e) {
+      if (loading) loading.textContent = 'Unable to load PayPal.';
+      showErr(e.message);
+      serverlessPaypalInit = false;
     }
   }
 
@@ -218,13 +385,22 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       });
       const data = await res.json();
       if (!data.success) {
+        if (data.code === 'KEY_LIMIT_REACHED') {
+          showServerlessUpgradeModal();
+          return;
+        }
         uiModal('Generate failed', data.error || 'Failed to generate');
         return;
       }
       const token = data.token;
       const link = `https://${subdomain}.ginto.ai/?token=${encodeURIComponent(token)}`;
-      document.getElementById('akToken').value = token;
-      document.getElementById('akLink').value = link;
+      setMaskedValue(document.getElementById('akToken'), token, false);
+      setEyeIcon(false);
+      const linkEl = document.getElementById('akLink');
+      if (linkEl) {
+        linkEl.dataset.full = link;
+        linkEl.value = link;
+      }
       document.getElementById('akResult').style.display = 'block';
       loadKeys();
     } catch (e) {
@@ -236,7 +412,8 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     const el = document.getElementById(id);
     const btn = btnId ? document.getElementById(btnId) : null;
     if (!el) return;
-    const ok = await copyTextToClipboard(el.value);
+    const text = (el.dataset && el.dataset.full) ? el.dataset.full : el.value;
+    const ok = await copyTextToClipboard(text);
     if (ok) {
       setTempButtonState(btn, 'Copied', 1200);
     } else {
@@ -248,6 +425,22 @@ $csrf = $_SESSION['csrf_token'] ?? '';
   document.getElementById('akGenerate').addEventListener('click', generateKey);
   document.getElementById('akCopy').addEventListener('click', () => copyValue('akToken','akCopy'));
   document.getElementById('akCopyLink').addEventListener('click', () => copyValue('akLink','akCopyLink'));
+
+  const eye = document.getElementById('akTokenEye');
+  if (eye) {
+    eye.addEventListener('click', () => {
+      const input = document.getElementById('akToken');
+      if (!input) return;
+      const full = (input.dataset && input.dataset.full) ? input.dataset.full : input.value;
+      const revealed = (input.dataset && input.dataset.revealed === '1');
+      setMaskedValue(input, full, !revealed);
+      setEyeIcon(!revealed);
+    });
+  }
+
+  const upgradeClose = document.getElementById('serverlessUpgradeClose');
+  upgradeClose && upgradeClose.addEventListener('click', hideServerlessUpgradeModal);
+
   loadKeys();
 </script>
 

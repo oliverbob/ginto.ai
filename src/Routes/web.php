@@ -487,19 +487,30 @@ $router->req('/api/addon/info/{addonType}', function($addonType) use ($db) {
     // If user is logged in, include their addon status so the UI can avoid showing upgrade prompts when already active
     $userHasAddon = false;
     $userAddon = null;
+    $userAddonActiveCount = 0;
     if (!empty($_SESSION['user_id']) && $db) {
         try {
+            // latest record (for single-addon types)
             $userAddon = $db->get('user_addons', ['status', 'subscription_start_date', 'subscription_next_billing', 'paypal_subscription_id', 'subscription_start_date', 'subscription_next_billing'], [
                 'user_id' => (int)$_SESSION['user_id'],
-                'addon_type' => $addonType
+                'addon_type' => $addonType,
+                'ORDER' => ['id' => 'DESC'],
             ]);
             if (!empty($userAddon)) {
                 $userHasAddon = true;
             }
+
+            // count active subscriptions (needed for multi-quantity addons like serverless_key)
+            $userAddonActiveCount = (int)$db->count('user_addons', [
+                'user_id' => (int)$_SESSION['user_id'],
+                'addon_type' => $addonType,
+                'status' => 'active',
+            ]);
         } catch (\Throwable $_) {
             // ignore DB errors here - we don't want to break addon info API
             $userHasAddon = false;
             $userAddon = null;
+            $userAddonActiveCount = 0;
         }
     }
     
@@ -512,6 +523,7 @@ $router->req('/api/addon/info/{addonType}', function($addonType) use ($db) {
         'features' => $features ?: [],
         'paypal_plan_id' => $addon[$planColumn] ?? null,
         'user_has_addon' => $userHasAddon,
+        'user_active_count' => $userAddonActiveCount,
         'user_addon_status' => $userAddon['status'] ?? null,
         'user_addon_subscription_start' => $userAddon['subscription_start_date'] ?? null,
         'user_addon_next_billing' => $userAddon['subscription_next_billing'] ?? null
@@ -631,22 +643,28 @@ $router->req('/api/addon/activate', function() use ($db) {
         return;
     }
     
-    // Check if user already has this addon
-    $existing = $db->get('user_addons', ['id', 'status'], [
+    // Multi-quantity addon types: allow multiple active subscriptions per user (each adds 1 slot)
+    $multiQuantityAddons = ['serverless_key'];
+    $isMulti = in_array($addonType, $multiQuantityAddons, true);
+
+    // Idempotency: if this exact PayPal subscription id is already recorded, treat as success
+    $existingBySub = $db->get('user_addons', ['id', 'status'], [
         'user_id' => $userId,
-        'addon_type' => $addonType
+        'addon_type' => $addonType,
+        'paypal_subscription_id' => $subscriptionId,
+        'ORDER' => ['id' => 'DESC'],
     ]);
-    
-    if ($existing) {
-        // Update existing record
-        $db->update('user_addons', [
-            'paypal_subscription_id' => $subscriptionId,
-            'status' => 'active',
-            'subscription_start_date' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s')
-        ], ['id' => $existing['id']]);
-    } else {
-        // Insert new record
+    if ($existingBySub) {
+        // ensure status is active
+        if (($existingBySub['status'] ?? '') !== 'active') {
+            $db->update('user_addons', [
+                'status' => 'active',
+                'subscription_start_date' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ], ['id' => $existingBySub['id']]);
+        }
+    } elseif ($isMulti) {
+        // Insert a new record (one row per key slot subscription)
         $db->insert('user_addons', [
             'user_id' => $userId,
             'addon_type' => $addonType,
@@ -657,6 +675,33 @@ $router->req('/api/addon/activate', function() use ($db) {
             'subscription_start_date' => date('Y-m-d H:i:s'),
             'created_at' => date('Y-m-d H:i:s')
         ]);
+    } else {
+        // Single-addon types: update existing record if present, else insert
+        $existing = $db->get('user_addons', ['id', 'status'], [
+            'user_id' => $userId,
+            'addon_type' => $addonType,
+            'ORDER' => ['id' => 'DESC'],
+        ]);
+
+        if ($existing) {
+            $db->update('user_addons', [
+                'paypal_subscription_id' => $subscriptionId,
+                'status' => 'active',
+                'subscription_start_date' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ], ['id' => $existing['id']]);
+        } else {
+            $db->insert('user_addons', [
+                'user_id' => $userId,
+                'addon_type' => $addonType,
+                'paypal_subscription_id' => $subscriptionId,
+                'status' => 'active',
+                'amount_usd' => $addon['amount_usd'],
+                'billing_interval' => 'MONTH',
+                'subscription_start_date' => date('Y-m-d H:i:s'),
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+        }
     }
     
     // Log the activation

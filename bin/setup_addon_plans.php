@@ -150,6 +150,12 @@ $addonPlans = [
         'description' => 'Professional AI Image Generation with GPU acceleration',
         'amount_usd' => '500.00',
     ],
+    [
+        'addon_type' => 'serverless_key',
+        'name' => 'Serverless Subscription',
+        'description' => 'Additional web server tunnel key slot (1 key per active subscription)',
+        'amount_usd' => '105.00',
+    ],
 ];
 
 $column = ($environment === 'sandbox') ? 'paypal_plan_id_sandbox' : 'paypal_plan_id';
