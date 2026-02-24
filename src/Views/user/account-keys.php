@@ -107,7 +107,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         <div id="serverlessPaypalLoading" class="text-sm text-gray-500">Loading PayPal…</div>
         <div id="serverlessPaypalButtons" style="margin-top:10px;"></div>
         <div id="serverlessOneTime" style="display:none; margin-top:10px;">
-          <button id="serverlessOneTimePay" type="button" class="px-4 py-2 rounded bg-[#0070ba] hover:bg-[#005ea6] text-white" style="font-weight:600;">Pay with PayPal</button>
+          <button id="serverlessOneTimePay" type="button" class="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white border border-blue-700" style="font-weight:600; background:#0070ba; color:#fff; border-color:#005ea6;">Pay with PayPal</button>
           <div class="text-xs text-gray-500 mt-2">One-time payment. Grants 1 additional key slot until the selected TTL expires.</div>
         </div>
       </div>
