@@ -774,6 +774,7 @@ $router->req('/api/payment/request-review/{paymentId}', 'PaymentController@reque
 $router->req('/receipt-image/{filename}', 'PaymentController@receiptImage');
 
 $router->req('/dashboard', 'UserController@dashboard');
+$router->req('/account/keys', 'UserController@accountKeys');
 
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');
@@ -901,6 +902,8 @@ $router->req('/api/tunnel/verify', 'TunnelController@verifyTunnel');
 $router->req('/api/tunnel/relay/approval', 'TunnelController@relayApproval');
 $router->req('/api/tunnel/time', 'TunnelController@tunnelTime');
 $router->req('/api/tunnel/access-key/generate', 'TunnelController@generateAccessKey', ['POST']);
+$router->req('/api/tunnel/access-keys', 'TunnelController@listAccessKeys', ['GET']);
+$router->req('/api/tunnel/access-key/revoke', 'TunnelController@revokeAccessKey', ['POST']);
 
 // Member Messenger routes (Facebook-like chat between members)
 $router->req('/messenger', 'MessengerController@index');

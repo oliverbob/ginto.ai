@@ -1376,6 +1376,7 @@ TOML;
 
         $raw = json_decode((string)file_get_contents('php://input'), true);
         $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
 
         $subdomain = strtolower(trim((string)($input['subdomain'] ?? '')));
         $subdomain = preg_replace('/[^a-z0-9\-]/', '', $subdomain);
@@ -1451,6 +1452,105 @@ TOML;
         }
     }
 
+    /**
+     * API: List user's tunnel access keys.
+     * GET /api/tunnel/access-keys
+     */
+    public function listAccessKeys(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        try {
+            $rows = $this->db->select('tunnel_access_keys', [
+                'id',
+                'subdomain',
+                'created_at',
+                'expires_at',
+                'last_used_at',
+                'revoked',
+                'revoked_at',
+            ], [
+                'user_id' => (int)$userId,
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => 200,
+            ]);
+
+            echo json_encode(['success' => true, 'keys' => is_array($rows) ? $rows : []]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to load keys']);
+        }
+    }
+
+    /**
+     * API: Revoke a user's tunnel access key.
+     * POST /api/tunnel/access-key/revoke
+     * Body: {"id":123,"csrf_token":"..."}
+     */
+    public function revokeAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'revoked'], ['id' => $id]);
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+            if ((int)($row['revoked'] ?? 0) === 1) {
+                echo json_encode(['success' => true]);
+                return;
+            }
+            $this->db->update('tunnel_access_keys', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'id' => $id,
+                'user_id' => (int)$userId,
+            ]);
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to revoke key']);
+        }
+    }
+
     private function getAuthenticatedUserId(): ?int
     {
         if (session_status() === PHP_SESSION_NONE) {
@@ -1476,6 +1576,20 @@ TOML;
         }
 
         return null;
+    }
+
+    private function validateCsrfFromInput(array $input): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $token = (string)($input['csrf_token'] ?? '');
+        $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+        if ($token === '' || $sessionToken === '' || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
     }
 
     private function getTunnelKeySigningSecret(): string

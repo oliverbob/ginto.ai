@@ -286,6 +286,25 @@ class UserController extends \Core\Controller
     }
 
     /**
+     * Account Keys page (GET /account/keys)
+     */
+    public function accountKeys(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+
+        \Ginto\Core\View::view('user/account-keys', [
+            'title' => 'Account Keys',
+            'user_id' => (int)$_SESSION['user_id'],
+        ]);
+    }
+
+    /**
      * User network tree view (GET /user/network-tree)
      */
     public function networkTree(): void
