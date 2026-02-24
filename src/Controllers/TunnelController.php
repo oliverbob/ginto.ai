@@ -1359,7 +1359,7 @@ TOML;
     /**
      * API: Generate a tunnel access key (JWT) for a subdomain.
      * POST /api/tunnel/access-key/generate
-     * Body JSON: {"subdomain":"test","ttl_seconds":3600}
+    * Body JSON: {"subdomain":"test","ttl_seconds":2592000}
      *
      * Returns the token once. The server stores only sha256(token) for verification.
      */
@@ -1395,12 +1395,15 @@ TOML;
             return;
         }
 
-        $ttl = (int)($input['ttl_seconds'] ?? 3600);
+        // Default TTL should be long enough that subdomains don't randomly flip back
+        // to unauthorized during normal usage. Revocation remains the primary control.
+        $ttl = (int)($input['ttl_seconds'] ?? (86400 * 30));
         if ($ttl < 60) {
             $ttl = 60;
         }
-        if ($ttl > 86400) {
-            $ttl = 86400;
+        // Cap TTL to reduce long-lived token risk while still being practical.
+        if ($ttl > (86400 * 365)) {
+            $ttl = 86400 * 365;
         }
 
         // Enforce user key limits (admins unlimited).
