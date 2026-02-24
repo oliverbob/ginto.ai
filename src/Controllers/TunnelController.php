@@ -1414,7 +1414,14 @@ TOML;
                 'exp' => $now + $ttl,
             ];
 
-            $jwt = $this->jwtEncodeHs256($payload, $this->getTunnelKeySigningSecret());
+            $secret = $this->getTunnelKeySigningSecret();
+            if ($secret === '') {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Signing secret not configured']);
+                return;
+            }
+
+            $jwt = $this->jwtEncodeHs256($payload, $secret);
             $token = 'gtnl-' . $jwt;
 
             if (!$this->db) {
