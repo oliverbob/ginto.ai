@@ -305,6 +305,127 @@ class UserController extends \Core\Controller
     }
 
     /**
+     * Account summary page (GET /account)
+     */
+    public function account(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        $user = null;
+        try {
+            $user = $this->db->get('users', ['id', 'username', 'fullname', 'email', 'public_id'], ['id' => $userId]);
+        } catch (\Throwable $e) {
+            $user = null;
+        }
+
+        \Ginto\Core\View::view('user/account', [
+            'title' => 'Account',
+            'user' => is_array($user) ? $user : ['id' => $userId],
+        ]);
+    }
+
+    /**
+     * API: Default API key status (GET /api/account/default-key/status)
+     */
+    public function defaultApiKeyStatus(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            $rows = $this->db->select('api_tokens', '*', [
+                'user_id' => $userId,
+                'name' => 'default_api',
+                'revoked' => 0,
+                'ORDER' => ['created_at' => 'DESC'],
+                'LIMIT' => 1,
+            ]);
+            $row = (is_array($rows) && isset($rows[0]) && is_array($rows[0])) ? $rows[0] : null;
+            echo json_encode([
+                'success' => true,
+                'has_key' => $row ? true : false,
+                'created_at' => $row['created_at'] ?? null,
+                'last_used_at' => $row['last_used_at'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'DB error']);
+        }
+    }
+
+    /**
+     * API: Rotate default API key (POST /api/account/default-key/rotate)
+     * Returns the token once.
+     */
+    public function rotateDefaultApiKey(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $csrf = (string)($input['csrf_token'] ?? '');
+        $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+        if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            // Revoke existing default_api tokens
+            $this->db->update('api_tokens', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'user_id' => $userId,
+                'name' => 'default_api',
+                'revoked' => 0,
+            ]);
+
+            $plain = bin2hex(random_bytes(32));
+            $hash = hash('sha256', $plain);
+
+            $this->db->insert('api_tokens', [
+                'user_id' => $userId,
+                'name' => 'default_api',
+                'token' => $hash,
+                'expires_at' => null,
+                'revoked' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            echo json_encode(['success' => true, 'token' => $plain]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to rotate key']);
+        }
+    }
+
+    /**
      * User network tree view (GET /user/network-tree)
      */
     public function networkTree(): void

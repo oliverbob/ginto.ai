@@ -774,7 +774,11 @@ $router->req('/api/payment/request-review/{paymentId}', 'PaymentController@reque
 $router->req('/receipt-image/{filename}', 'PaymentController@receiptImage');
 
 $router->req('/dashboard', 'UserController@dashboard');
+$router->req('/account', 'UserController@account');
 $router->req('/account/keys', 'UserController@accountKeys');
+
+$router->req('/api/account/default-key/status', 'UserController@defaultApiKeyStatus', ['GET']);
+$router->req('/api/account/default-key/rotate', 'UserController@rotateDefaultApiKey', ['POST']);
 
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');

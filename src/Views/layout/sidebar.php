@@ -101,11 +101,11 @@ require_once __DIR__ . '/../admin/parts/icon_helpers.php';
             <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-none flex items-center justify-center" style="border-radius:0;">
                 <span class="text-white font-semibold text-sm">U</span>
             </div>
-            <div class="flex-1 min-w-0">
+            <a href="/account" class="flex-1 min-w-0 block" title="Account">
                 <?php $username = $_SESSION['username'] ?? 'User'; ?>
                 <p class="text-sm font-medium text-gray-900 dark:text-white themed-text truncate"><?= htmlspecialchars($username) ?></p>
                 <p class="text-xs text-gray-500 dark:text-gray-400 themed-text-secondary truncate">Member</p>
-            </div>
+            </a>
             <a href="/logout" class="text-gray-500 dark:text-gray-400 themed-text-secondary p-1 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" title="Sign Out">
                 <i class="fas fa-sign-out-alt text-sm <?= activeIconClass('/logout', 'themed-text-secondary') ?>"></i>
             </a>
