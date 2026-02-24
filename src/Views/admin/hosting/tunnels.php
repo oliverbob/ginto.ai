@@ -178,6 +178,7 @@ $currentPage = 'tunnels';
   <script>
     const csrfToken = '<?= $csrfToken ?>';
     let relayApi = { approveUrl: '/admin/hosting/tunnels/relay/approve', revokeUrl: '/admin/hosting/tunnels/relay/revoke', subdomain: 'vision' };
+    const expiryUrl = '/admin/hosting/tunnels/expiry';
 
     async function loadTunnels() {
       try {
@@ -341,6 +342,20 @@ $currentPage = 'tunnels';
                 : `<button onclick="disconnectTunnel('${subdomain}')" class="px-2 py-1 text-xs bg-red-500/10 text-red-500 hover:bg-red-500/20 rounded transition-colors">
                      <i class="fas fa-ban mr-1"></i>Block
                    </button>`}
+              <div class="mt-2 flex items-center gap-1">
+                <select id="expiry-${subdomain}" class="px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600">
+                  <option value="60">1h</option>
+                  <option value="360">6h</option>
+                  <option value="1440">24h</option>
+                  <option value="10080">7d</option>
+                  <option value="43200">30d</option>
+                  <option value="525600">1y</option>
+                  <option value="-1">Never</option>
+                </select>
+                <button onclick="setExpiry('${subdomain}')" class="px-2 py-1 text-[11px] bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 rounded transition-colors">
+                  <i class="fas fa-clock mr-1"></i>Set
+                </button>
+              </div>
             </td>
           </tr>`;
         }).join('');
@@ -405,6 +420,26 @@ $currentPage = 'tunnels';
         } else {
           alert('Failed: ' + (data.error || 'Unknown error'));
         }
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function setExpiry(subdomain) {
+      const sel = document.getElementById(`expiry-${subdomain}`);
+      const minutes = parseInt(sel?.value || '60', 10);
+      try {
+        const res = await fetch(expiryUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subdomain, minutes, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadTunnels();
+          return;
+        }
+        alert('Failed: ' + (data.error || 'Unknown error'));
       } catch (e) {
         alert('Error: ' + e.message);
       }

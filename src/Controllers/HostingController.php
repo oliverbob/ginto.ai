@@ -1275,6 +1275,70 @@ class HostingController
     }
 
     /**
+     * Set/extend tunnel expiry for a subdomain
+     * POST /admin/hosting/tunnels/expiry
+     *
+     * Body: { subdomain: string, minutes: int (-1 for never), csrf_token: string }
+     */
+    public function tunnelsSetExpiry(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        $input = $this->getRequestInput();
+        $subdomainInput = (string)($input['subdomain'] ?? '');
+        $subdomain = strtolower(preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput));
+        if ($subdomain === '') {
+            echo json_encode(['success' => false, 'error' => 'Missing subdomain']);
+            exit;
+        }
+
+        $minutes = (int)($input['minutes'] ?? 60);
+        $neverExpires = $minutes === -1;
+        if (!$neverExpires) {
+            if ($minutes < 1) {
+                $minutes = 1;
+            }
+            if ($minutes > 2628000) {
+                $minutes = 2628000;
+            }
+        }
+
+        $expiresIn = $neverExpires ? (100 * 365 * 24 * 60 * 60) : ($minutes * 60);
+        $now = time();
+        $expiresAt = $now + $expiresIn;
+
+        $registry = $this->getTunnelRegistry();
+        $existing = is_array($registry[$subdomain] ?? null) ? $registry[$subdomain] : [];
+        $registry[$subdomain] = [
+            'subdomain' => $subdomain,
+            'started_at' => (int)($existing['started_at'] ?? $now),
+            'expires_at' => $expiresAt,
+            'never_expires' => $neverExpires,
+            'client_ip' => (string)($existing['client_ip'] ?? ($_SERVER['REMOTE_ADDR'] ?? 'admin')),
+            'registered_at' => (string)($existing['registered_at'] ?? date('Y-m-d H:i:s')),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if (!$this->saveTunnelRegistry($registry)) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
+            exit;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'expires_at' => $expiresAt,
+            'never_expires' => $neverExpires,
+            'minutes' => $neverExpires ? -1 : $minutes,
+            'message' => $neverExpires ? 'Expiry set to never' : ('Expiry updated (' . $minutes . ' minutes)'),
+        ]);
+        exit;
+    }
+
+    /**
      * Approve unified relay subdomain
      * POST /admin/hosting/tunnels/relay/approve
      */
