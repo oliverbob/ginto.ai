@@ -1254,6 +1254,7 @@ class HostingController
         $subdomain = $input['subdomain'] ?? null;
         $expiresIn = $input['expires_in'] ?? 900; // Default 15 minutes for guests
         $clientIp = $input['client_ip'] ?? $_SERVER['REMOTE_ADDR'] ?? '';
+        $ownerUserId = isset($input['owner_user_id']) ? (int)$input['owner_user_id'] : 0;
         
         if (!$subdomain) {
             echo json_encode(['success' => false, 'error' => 'Missing subdomain']);
@@ -1266,6 +1267,7 @@ class HostingController
             'started_at' => time(),
             'expires_at' => time() + $expiresIn,
             'client_ip' => $clientIp,
+            'owner_user_id' => $ownerUserId,
             'registered_at' => date('Y-m-d H:i:s')
         ];
         $this->saveTunnelRegistry($registry);

@@ -433,10 +433,13 @@ class TunnelController
     protected function registerTunnelWithServer(string $subdomain, int $expiresIn): void
     {
         try {
+            $ownerUserId = $this->getAuthenticatedUserId();
             $data = json_encode([
                 'subdomain' => $subdomain,
                 'expires_in' => $expiresIn,
-                'client_ip' => $_SERVER['REMOTE_ADDR'] ?? ''
+                'client_ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+                // Optional: allow the central registry to attribute ownership.
+                'owner_user_id' => $ownerUserId ?: null,
             ]);
             
             $ch = curl_init('https://ginto.ai/admin/hosting/tunnels/register');
@@ -1413,6 +1416,18 @@ TOML;
             $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
             $owner = (int)($entry['owner_user_id'] ?? 0);
             if ($owner !== 0 && $owner !== (int)$userId) {
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'DOMAIN_NOT_AVAILABLE',
+                    'error' => 'Domain is not available.',
+                ]);
+                return;
+            }
+
+            // If the subdomain is currently registered/active but the owner is unknown, treat it as taken.
+            $expiresAt = (int)($entry['expires_at'] ?? 0);
+            if ($owner === 0 && $expiresAt > time()) {
                 http_response_code(409);
                 echo json_encode([
                     'success' => false,
