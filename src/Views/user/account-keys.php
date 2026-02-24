@@ -89,6 +89,16 @@ $csrf = $_SESSION['csrf_token'] ?? '';
   const csrfToken = <?= json_encode($csrf) ?>;
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
 
+  function uiModal(title, message) {
+    try {
+      if (typeof window.showModal === 'function') {
+        window.showModal(title, message, 'fas fa-exclamation-circle', 'text-yellow-500');
+        return;
+      }
+    } catch (e) {}
+    alert(message || title || '');
+  }
+
   async function loadKeys() {
     const tbody = document.getElementById('akList');
     tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-gray-500">Loading…</td></tr>';
@@ -136,12 +146,12 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       });
       const data = await res.json();
       if (!data.success) {
-        alert(data.error || 'Failed to revoke');
+        uiModal('Revoke failed', data.error || 'Failed to revoke');
         return;
       }
       loadKeys();
     } catch (e) {
-      alert('Error: ' + e.message);
+      uiModal('Network error', 'Error: ' + e.message);
     }
   }
 
@@ -149,7 +159,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     const subdomain = (document.getElementById('akSubdomain').value || '').trim().toLowerCase();
     const ttl = parseInt(document.getElementById('akTtl').value || '3600', 10);
     if (!subdomain) {
-      alert('Enter a subdomain');
+      uiModal('Missing subdomain', 'Enter a subdomain');
       return;
     }
     try {
@@ -161,7 +171,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       });
       const data = await res.json();
       if (!data.success) {
-        alert(data.error || 'Failed to generate');
+        uiModal('Generate failed', data.error || 'Failed to generate');
         return;
       }
       const token = data.token;
@@ -171,7 +181,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       document.getElementById('akResult').style.display = 'block';
       loadKeys();
     } catch (e) {
-      alert('Error: ' + e.message);
+      uiModal('Network error', 'Error: ' + e.message);
     }
   }
 
