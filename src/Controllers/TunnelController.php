@@ -1355,4 +1355,144 @@ TOML;
             'created_at' => $data['created_at'] ?? 0
         ]);
     }
+
+    /**
+     * API: Generate a tunnel access key (JWT) for a subdomain.
+     * POST /api/tunnel/access-key/generate
+     * Body JSON: {"subdomain":"test","ttl_seconds":3600}
+     *
+     * Returns the token once. The server stores only sha256(token) for verification.
+     */
+    public function generateAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+
+        $subdomain = strtolower(trim((string)($input['subdomain'] ?? '')));
+        $subdomain = preg_replace('/[^a-z0-9\-]/', '', $subdomain);
+
+        if ($subdomain === '' || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $subdomain)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            return;
+        }
+
+        // Reserved words still blocked.
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        if (in_array($subdomain, $reserved, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Reserved subdomain']);
+            return;
+        }
+
+        $ttl = (int)($input['ttl_seconds'] ?? 3600);
+        if ($ttl < 60) {
+            $ttl = 60;
+        }
+        if ($ttl > 86400) {
+            $ttl = 86400;
+        }
+
+        try {
+            $jti = bin2hex(random_bytes(16));
+            $now = time();
+            $payload = [
+                'iss' => 'ginto.ai',
+                'sub' => (int)$userId,
+                'sd' => $subdomain,
+                'jti' => $jti,
+                'iat' => $now,
+                'exp' => $now + $ttl,
+            ];
+
+            $jwt = $this->jwtEncodeHs256($payload, $this->getTunnelKeySigningSecret());
+            $token = 'gtnl-' . $jwt;
+
+            if (!$this->db) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Database not available']);
+                return;
+            }
+
+            $this->db->insert('tunnel_access_keys', [
+                'user_id' => (int)$userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'revoked' => 0,
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $subdomain,
+                'expires_at' => $now + $ttl,
+                'token' => $token,
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to generate access key']);
+        }
+    }
+
+    private function getAuthenticatedUserId(): ?int
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        if (!empty($_SESSION['user']['id'])) {
+            return (int)$_SESSION['user']['id'];
+        }
+
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+            $bearer = trim($m[1]);
+            if ($bearer !== '' && $this->db) {
+                $tokenRecord = $this->db->get('api_tokens', ['user_id'], [
+                    'token' => hash('sha256', $bearer),
+                    'revoked' => 0,
+                ]);
+                if ($tokenRecord) {
+                    return (int)$tokenRecord['user_id'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function getTunnelKeySigningSecret(): string
+    {
+        $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+        if ($appKey === '') {
+            // Fail closed if secret missing.
+            return '';
+        }
+        return hash('sha256', $appKey . '|tunnel_access_keys', true);
+    }
+
+    private function jwtEncodeHs256(array $payload, string $secret): string
+    {
+        $header = ['alg' => 'HS256', 'typ' => 'JWT'];
+        $h = $this->base64UrlEncode(json_encode($header, JSON_UNESCAPED_SLASHES));
+        $p = $this->base64UrlEncode(json_encode($payload, JSON_UNESCAPED_SLASHES));
+        $sig = hash_hmac('sha256', $h . '.' . $p, $secret, true);
+        $s = $this->base64UrlEncode($sig);
+        return $h . '.' . $p . '.' . $s;
+    }
+
+    private function base64UrlEncode(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
 }

@@ -994,6 +994,60 @@ class HostingController
         exit;
     }
 
+    /**
+     * Admin page: view generated tunnel access keys.
+     * GET /admin/hosting/tunnels/keys
+     */
+    public function tunnelKeys(): void
+    {
+        $this->requireAdmin();
+        include dirname(__DIR__) . '/Views/admin/hosting/tunnel_keys.php';
+        exit;
+    }
+
+    /**
+     * Admin API: list tunnel access keys.
+     * GET /admin/hosting/tunnels/keys/api
+     */
+    public function tunnelKeysApi(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            exit;
+        }
+
+        try {
+            $rows = $this->db->select('tunnel_access_keys', [
+                'id',
+                'user_id',
+                'subdomain',
+                'jti',
+                'created_at',
+                'expires_at',
+                'last_used_at',
+                'revoked',
+                'revoked_at',
+            ], [
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => 200,
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'keys' => is_array($rows) ? $rows : [],
+            ]);
+            exit;
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to load keys']);
+            exit;
+        }
+    }
+
     public function tunnelsApi(): void
     {
         header('Content-Type: application/json');

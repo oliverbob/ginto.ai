@@ -10,6 +10,91 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
 $hostNoPort = preg_replace('/:\\d+$/', '', $host);
 
+function ginto_bootstrap_db(): ?\Medoo\Medoo {
+    static $db = null;
+    static $did = false;
+    if ($did) return $db;
+    $did = true;
+
+    $root = dirname(__DIR__);
+    $autoload = $root . '/vendor/autoload.php';
+    if (!file_exists($autoload)) {
+        return null;
+    }
+    require_once $autoload;
+
+    try {
+        if (class_exists('Dotenv\\Dotenv')) {
+            $dotenv = Dotenv\Dotenv::createImmutable($root);
+            $dotenv->safeLoad();
+        }
+    } catch (\Exception $e) {
+        // ignore
+    }
+
+    try {
+        $db = \Ginto\Core\Database::getInstance();
+    } catch (\Exception $e) {
+        $db = null;
+    }
+    return $db;
+}
+
+function ginto_base64url_decode(string $s): string {
+    $s = strtr($s, '-_', '+/');
+    $pad = strlen($s) % 4;
+    if ($pad) {
+        $s .= str_repeat('=', 4 - $pad);
+    }
+    $out = base64_decode($s, true);
+    return $out === false ? '' : $out;
+}
+
+function ginto_get_tunnel_jwt_secret(): string {
+    $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+    if ($appKey === '') {
+        return '';
+    }
+    return hash('sha256', $appKey . '|tunnel_access_keys', true);
+}
+
+function ginto_verify_jwt_hs256(string $jwt, string $secret): ?array {
+    $parts = explode('.', $jwt);
+    if (count($parts) !== 3) return null;
+    [$h64, $p64, $s64] = $parts;
+    $sig = ginto_base64url_decode($s64);
+    if ($sig === '') return null;
+    $expected = hash_hmac('sha256', $h64 . '.' . $p64, $secret, true);
+    if (!hash_equals($expected, $sig)) return null;
+    $payloadJson = ginto_base64url_decode($p64);
+    if ($payloadJson === '') return null;
+    $payload = json_decode($payloadJson, true);
+    return is_array($payload) ? $payload : null;
+}
+
+function ginto_extract_tunnel_token(): string {
+    $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+    if (preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) {
+        return trim((string)$m[1]);
+    }
+    if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN'])) {
+        return trim((string)$_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN']);
+    }
+    if (!empty($_GET['token'])) {
+        return trim((string)$_GET['token']);
+    }
+    if (!empty($_GET['t'])) {
+        return trim((string)$_GET['t']);
+    }
+    return '';
+}
+
+function ginto_tunnel_access_denied_key(): void {
+    http_response_code(401);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html><head><meta charset="utf-8"><title>Unauthorized</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Unauthorized</h2><p>This tunnel requires a valid access token.</p></body></html>';
+}
+
 function ginto_resolve_tunnel_registry_read_path(): ?string {
     $primary = '/var/lib/ginto/tunnel-registry.json';
     $fallback = '/tmp/ginto-tunnel-registry.json';
@@ -18,11 +103,7 @@ function ginto_resolve_tunnel_registry_read_path(): ?string {
     return null;
 }
 
-function ginto_tunnel_access_denied(): void {
-    http_response_code(401);
-    header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html><head><meta charset="utf-8"><title>Unauthorized</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Unauthorized</h2><p>This tunnel requires an access key.</p></body></html>';
-}
+function ginto_tunnel_access_denied(): void { ginto_tunnel_access_denied_key(); }
 
 function ginto_frp_dashboard_pwd(): string {
     $pwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
@@ -159,24 +240,65 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $frpHost = '127.0.0.1';
     $frpPort = 7080;
 
-    // Operator-key security layer: if enabled, only proxy when the *connected FRP proxy*
-    // presents the matching key via proxy metas in frpc.toml.
-    $regPath = ginto_resolve_tunnel_registry_read_path();
-    if ($regPath) {
-        $registry = json_decode((string)@file_get_contents($regPath), true);
-        if (is_array($registry) && isset($registry[$subdomain]) && is_array($registry[$subdomain])) {
-            $entry = $registry[$subdomain];
-            $enabled = !empty($entry['access_key_enabled']);
-            $hash = (string)($entry['access_key_hash'] ?? '');
-            if ($enabled && $hash !== '') {
-                $keys = ginto_frp_get_online_key_hashes_cached(2);
-                $seen = (string)($keys[$subdomain] ?? '');
-                if ($seen === '' || !hash_equals($hash, $seen)) {
-                    ginto_tunnel_access_denied();
-                    return true;
-                }
-            }
+    // Enforce MySQL-backed tunnel access key on every request.
+    // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
+    $token = ginto_extract_tunnel_token();
+    if ($token === '' || !str_starts_with($token, 'gtnl-')) {
+        ginto_tunnel_access_denied_key();
+        return true;
+    }
+
+    $secret = ginto_get_tunnel_jwt_secret();
+    if ($secret === '') {
+        http_response_code(503);
+        echo 'Tunnel key secret not configured';
+        return true;
+    }
+
+    $jwt = substr($token, 5);
+    $payload = ginto_verify_jwt_hs256($jwt, $secret);
+    if (!is_array($payload)) {
+        ginto_tunnel_access_denied_key();
+        return true;
+    }
+
+    $sd = strtolower((string)($payload['sd'] ?? ''));
+    $exp = (int)($payload['exp'] ?? 0);
+    if ($sd !== $subdomain || $exp <= time()) {
+        ginto_tunnel_access_denied_key();
+        return true;
+    }
+
+    $db = ginto_bootstrap_db();
+    if (!$db) {
+        http_response_code(503);
+        echo 'Tunnel key validation unavailable';
+        return true;
+    }
+
+    // Verify token exists in DB (hashed) and is active.
+    $hash = hash('sha256', $token);
+    try {
+        $row = $db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], [
+            'subdomain' => $subdomain,
+            'token_hash' => $hash,
+            'revoked' => 0,
+        ]);
+        if (!$row) {
+            ginto_tunnel_access_denied_key();
+            return true;
         }
+        // Also enforce DB expires_at if present.
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            ginto_tunnel_access_denied_key();
+            return true;
+        }
+        // Update last_used_at best-effort.
+        $db->update('tunnel_access_keys', ['last_used_at' => date('Y-m-d H:i:s')], ['id' => (int)$row['id']]);
+    } catch (\Exception $e) {
+        http_response_code(503);
+        echo 'Tunnel key validation error';
+        return true;
     }
     
     // Create a stream context for the proxy

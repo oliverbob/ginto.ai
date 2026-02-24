@@ -900,6 +900,7 @@ $router->req('/api/tunnel/disconnect', 'TunnelController@disconnectTunnel', ['PO
 $router->req('/api/tunnel/verify', 'TunnelController@verifyTunnel');
 $router->req('/api/tunnel/relay/approval', 'TunnelController@relayApproval');
 $router->req('/api/tunnel/time', 'TunnelController@tunnelTime');
+$router->req('/api/tunnel/access-key/generate', 'TunnelController@generateAccessKey', ['POST']);
 
 // Member Messenger routes (Facebook-like chat between members)
 $router->req('/messenger', 'MessengerController@index');

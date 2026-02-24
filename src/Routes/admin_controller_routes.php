@@ -159,11 +159,12 @@ $req('/hosting/firewall/api', 'HostingController@firewallApi');
 // FRP Tunnels
 $req('/hosting/tunnels', 'HostingController@tunnels');
 $req('/hosting/tunnels/api', 'HostingController@tunnelsApi');
+$req('/hosting/tunnels/keys', 'HostingController@tunnelKeys');
+$req('/hosting/tunnels/keys/api', 'HostingController@tunnelKeysApi');
 $req('/hosting/tunnels/register', 'HostingController@tunnelsRegister', ['POST']);
 $req('/hosting/tunnels/disconnect', 'HostingController@tunnelsDisconnect', ['POST']);
 $req('/hosting/tunnels/unblock', 'HostingController@tunnelsUnblock', ['POST']);
 $req('/hosting/tunnels/expiry', 'HostingController@tunnelsSetExpiry', ['POST']);
-$req('/hosting/tunnels/access-key', 'HostingController@tunnelsSetAccessKey', ['POST']);
 $req('/hosting/tunnels/relay/approve', 'HostingController@tunnelsRelayApprove', ['POST']);
 $req('/hosting/tunnels/relay/revoke', 'HostingController@tunnelsRelayRevoke', ['POST']);
 $req('/hosting/tunnels/clear-offline', 'HostingController@tunnelsClearOffline', ['POST']);
