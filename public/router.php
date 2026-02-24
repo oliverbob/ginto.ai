@@ -80,6 +80,16 @@ function ginto_extract_tunnel_token(): string {
     if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN'])) {
         return trim((string)$_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN']);
     }
+    if (!empty($_COOKIE['ginto_tunnel_token'])) {
+        return trim((string)$_COOKIE['ginto_tunnel_token']);
+    }
+    // Allow HTML form POST auth (the unauthorized page submits via POST).
+    if (!empty($_POST['api_key'])) {
+        return trim((string)$_POST['api_key']);
+    }
+    if (!empty($_POST['tunnel_token'])) {
+        return trim((string)$_POST['tunnel_token']);
+    }
     if (!empty($_GET['token'])) {
         return trim((string)$_GET['token']);
     }
@@ -89,10 +99,23 @@ function ginto_extract_tunnel_token(): string {
     return '';
 }
 
-function ginto_tunnel_access_denied_key(): void {
+function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires a valid access token.'): void {
     http_response_code(401);
     header('Content-Type: text/html; charset=utf-8');
-    echo '<!doctype html><html><head><meta charset="utf-8"><title>Unauthorized</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Unauthorized</h2><p>This tunnel requires a valid access token.</p></body></html>';
+    $action = htmlspecialchars((string)($_SERVER['REQUEST_URI'] ?? '/'), ENT_QUOTES, 'UTF-8');
+    $safeMessage = htmlspecialchars($message, ENT_QUOTES, 'UTF-8');
+    echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+        .'<title>Unauthorized</title></head>'
+        .'<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:24px;max-width:720px;margin:0 auto;">'
+        .'<h2 style="margin:0 0 8px 0;">Unauthorized</h2>'
+        .'<p style="margin:0 0 18px 0;color:#475569;">'.$safeMessage.'</p>'
+        .'<form method="POST" action="'.$action.'" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">'
+        .'<input name="api_key" type="password" autocomplete="off" placeholder="Paste API key (gtnl-...)" '
+        .'style="flex:1;min-width:240px;padding:10px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;" />'
+        .'<button type="submit" style="padding:10px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;cursor:pointer;">Authorize</button>'
+        .'</form>'
+        .'<p style="margin:14px 0 0 0;font-size:12px;color:#64748b;">This form submits via POST and sets a secure cookie for this subdomain.</p>'
+        .'</body></html>';
 }
 
 function ginto_resolve_tunnel_registry_read_path(): ?string {
@@ -258,14 +281,14 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $jwt = substr($token, 5);
     $payload = ginto_verify_jwt_hs256($jwt, $secret);
     if (!is_array($payload)) {
-        ginto_tunnel_access_denied_key();
+        ginto_tunnel_access_denied_key('Invalid API key.');
         return true;
     }
 
     $sd = strtolower((string)($payload['sd'] ?? ''));
     $exp = (int)($payload['exp'] ?? 0);
     if ($sd !== $subdomain || $exp <= time()) {
-        ginto_tunnel_access_denied_key();
+        ginto_tunnel_access_denied_key('API key expired or not valid for this subdomain.');
         return true;
     }
 
@@ -285,12 +308,12 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
             'revoked' => 0,
         ]);
         if (!$row) {
-            ginto_tunnel_access_denied_key();
+            ginto_tunnel_access_denied_key('API key not found or revoked.');
             return true;
         }
         // Also enforce DB expires_at if present.
         if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
-            ginto_tunnel_access_denied_key();
+            ginto_tunnel_access_denied_key('API key expired.');
             return true;
         }
         // Update last_used_at best-effort.
@@ -298,6 +321,41 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     } catch (\Exception $e) {
         http_response_code(503);
         echo 'Tunnel key validation error';
+        return true;
+    }
+
+    // If the key was submitted via POST form, treat it as an auth handshake:
+    // set an HttpOnly cookie and redirect to GET so the original POST is not proxied upstream.
+    $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['tunnel_token']))) {
+        $cookieValue = $token;
+        $cookieName = 'ginto_tunnel_token';
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        $cookieParams = [
+            'expires' => time() + 86400 * 7,
+            'path' => '/',
+            'secure' => $isHttps,
+            'httponly' => true,
+            'samesite' => 'Lax',
+        ];
+        @setcookie($cookieName, $cookieValue, $cookieParams);
+
+        // Redirect back to the same path (without leaking token in query strings).
+        $redirectTo = (string)($_SERVER['REQUEST_URI'] ?? '/');
+        // If someone posted to a URL that already had token=..., strip it.
+        $parts = parse_url($redirectTo);
+        $path = $parts['path'] ?? '/';
+        $query = $parts['query'] ?? '';
+        if ($query !== '') {
+            parse_str($query, $qs);
+            unset($qs['token'], $qs['t']);
+            $query = http_build_query($qs);
+        }
+        $location = $path . ($query !== '' ? ('?' . $query) : '');
+
+        http_response_code(303);
+        header('Location: ' . $location);
         return true;
     }
     
@@ -320,6 +378,14 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     foreach (getallheaders() as $name => $value) {
         if (strtolower($name) === 'host') {
             $headers[] = "Host: {$hostNoPort}";
+        } elseif (strtolower($name) === 'cookie') {
+            // Do not leak the tunnel auth cookie to the user's backend.
+            $cookie = (string)$value;
+            $cookie = preg_replace('/(?:^|;\s*)ginto_tunnel_token=[^;]*/', '', $cookie);
+            $cookie = trim((string)preg_replace('/^;+|;+$/', '', $cookie));
+            if ($cookie !== '') {
+                $headers[] = 'Cookie: ' . $cookie;
+            }
         } else {
             $headers[] = "{$name}: {$value}";
         }
