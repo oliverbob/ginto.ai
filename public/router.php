@@ -40,6 +40,38 @@ function ginto_bootstrap_db(): ?\Medoo\Medoo {
     return $db;
 }
 
+function ginto_env(string $key): string {
+    $v = (string)(getenv($key) ?: ($_ENV[$key] ?? ''));
+    if (trim($v) !== '') {
+        return trim($v);
+    }
+
+    static $cache = null;
+    if ($cache === null) {
+        $cache = [];
+        $envFile = dirname(__DIR__) . '/.env';
+        if (file_exists($envFile) && is_readable($envFile)) {
+            $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    $line = trim((string)$line);
+                    if ($line === '' || str_starts_with($line, '#')) continue;
+                    if (strpos($line, '=') === false) continue;
+                    [$k, $val] = explode('=', $line, 2);
+                    $k = trim((string)$k);
+                    $val = trim((string)$val);
+                    if ($k !== '') {
+                        $cache[$k] = $val;
+                    }
+                }
+            }
+        }
+    }
+
+    $v2 = (string)($cache[$key] ?? '');
+    return trim($v2);
+}
+
 function ginto_base64url_decode(string $s): string {
     $s = strtr($s, '-_', '+/');
     $pad = strlen($s) % 4;
@@ -51,7 +83,7 @@ function ginto_base64url_decode(string $s): string {
 }
 
 function ginto_get_tunnel_jwt_secret(): string {
-    $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+    $appKey = ginto_env('APP_KEY');
     if ($appKey === '') {
         return '';
     }
