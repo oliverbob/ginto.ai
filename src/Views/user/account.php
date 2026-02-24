@@ -78,7 +78,12 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       <div id="defaultKeyResult" style="display:none; margin-top:12px;">
         <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Default key (copy):</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-          <input id="defaultApiKey" type="text" readonly value="" />
+          <div style="flex:1; min-width:260px; position:relative;">
+            <input id="defaultApiKey" type="text" readonly value="" style="width:100%; padding-right:44px;" />
+            <button id="toggleDefaultApiKey" type="button" title="Show/Hide" aria-label="Show/Hide" style="position:absolute; right:10px; top:50%; transform:translateY(-50%); padding:6px; border-radius:8px; border:0; background:transparent; cursor:pointer; color:#64748b;">
+              <i id="defaultApiKeyEye" class="fas fa-eye"></i>
+            </button>
+          </div>
           <button id="copyDefaultApiKey" type="button">Copy</button>
         </div>
       </div>
@@ -97,6 +102,20 @@ button, a { user-select:none; }
 
 <script>
 (function(){
+  function maskKey(key) {
+    var s = String(key || '');
+    if (!s) return '';
+    var keep = Math.min(12, s.length);
+    return s.slice(0, keep) + '********';
+  }
+
+  function setMaskedValue(input, full, revealed) {
+    if (!input) return;
+    input.dataset.full = String(full || '');
+    input.dataset.revealed = revealed ? '1' : '0';
+    input.value = revealed ? String(full || '') : maskKey(full);
+  }
+
   function setTempButtonState(btn, text, ms) {
     if (!btn) return;
     var prev = btn.textContent;
@@ -139,7 +158,8 @@ button, a { user-select:none; }
     var btn = buttonId ? document.getElementById(buttonId) : null;
     if (!input) return;
 
-    copyTextToClipboard(input.value).then(function(ok){
+    var text = (input.dataset && input.dataset.full) ? input.dataset.full : input.value;
+    copyTextToClipboard(text).then(function(ok){
       if (ok) {
         if (notice) { notice.style.display='block'; setTimeout(function(){ notice.style.display='none'; }, 2000); }
         setTempButtonState(btn, 'Copied', 1200);
@@ -164,7 +184,7 @@ button, a { user-select:none; }
       if (!data.success) { el.textContent = 'Unavailable'; return; }
       if (!data.has_key) { el.textContent = 'No key yet'; return; }
       if (data.token) {
-        document.getElementById('defaultApiKey').value = data.token;
+        setMaskedValue(document.getElementById('defaultApiKey'), data.token, false);
         document.getElementById('defaultKeyResult').style.display = 'block';
         el.textContent = 'Key ready';
         return;
@@ -220,7 +240,7 @@ button, a { user-select:none; }
         alert(data.error || 'Failed');
         return false;
       }
-      document.getElementById('defaultApiKey').value = data.token;
+      setMaskedValue(document.getElementById('defaultApiKey'), data.token, false);
       document.getElementById('defaultKeyResult').style.display = 'block';
       loadDefaultStatus();
       return true;
@@ -229,6 +249,17 @@ button, a { user-select:none; }
       return false;
     }
   }
+
+  var eyeBtn = document.getElementById('toggleDefaultApiKey');
+  eyeBtn && eyeBtn.addEventListener('click', function(){
+    var input = document.getElementById('defaultApiKey');
+    if (!input) return;
+    var full = (input.dataset && input.dataset.full) ? input.dataset.full : input.value;
+    var revealed = (input.dataset && input.dataset.revealed === '1');
+    setMaskedValue(input, full, !revealed);
+    var icon = document.getElementById('defaultApiKeyEye');
+    if (icon) icon.className = (!revealed) ? 'fas fa-eye-slash' : 'fas fa-eye';
+  });
 
   var rotateBtn = document.getElementById('rotateDefaultKey');
   rotateBtn && rotateBtn.addEventListener('click', rotateDefaultKey);
