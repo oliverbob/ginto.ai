@@ -51,8 +51,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
           <option value="94608000" data-months="36">3 years</option>
           <option value="157680000" data-months="60">5 years</option>
         </select>
-        <div class="text-xs text-gray-500 mt-1">
-          TTL = how long this access key remains valid. After TTL expires, the subdomain will show Unauthorized until you enter a new key.
+        <div class="text-xs text-gray-500 mt-1" style="line-height:1.35; max-width:420px;">
+          TTL controls how long this key remains valid. After it expires, the subdomain will show Unauthorized until you provide a new key.
         </div>
       </div>
       <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
@@ -79,13 +79,14 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
     </div>
   </div>
 
-  <div id="serverlessUpgradeModal" style="display:none; position:fixed; inset:0; z-index:9999;">
-    <div style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
-    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700" style="position:relative; width:min(560px, calc(100% - 24px)); margin:10vh auto 0 auto; padding:18px;">
+  <div id="serverlessUpgradeModal" style="display:none; position:fixed; inset:0; z-index:9999; align-items:center; justify-content:center; padding:12px;">
+    <div id="serverlessUpgradeBackdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700" style="position:relative; width:min(560px, calc(100% - 24px)); padding:18px;">
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-lg font-semibold">Serverless Subscription</div>
           <div id="serverlessUpgradePrice" class="text-sm text-gray-500">$105 / month per additional key</div>
+          <div id="serverlessUpgradeMode" class="text-xs text-gray-500 mt-1">Billing mode: Monthly subscription</div>
         </div>
         <button id="serverlessUpgradeClose" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Close</button>
       </div>
@@ -94,8 +95,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         <div class="font-semibold mb-2">Benefits</div>
         <ul class="list-disc" style="padding-left:18px;">
           <li>Create additional web server tunnel keys beyond the free limit</li>
-          <li>Each active subscription adds 1 extra unrevoked key slot</li>
-          <li>Instant activation after PayPal approval</li>
+          <li>Each completed payment adds 1 extra unrevoked key slot for the selected term</li>
+          <li>Instant activation after PayPal approval/capture</li>
           <li>Cancel anytime</li>
         </ul>
       </div>
@@ -106,7 +107,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         <div id="serverlessPaypalLoading" class="text-sm text-gray-500">Loading PayPal…</div>
         <div id="serverlessPaypalButtons" style="margin-top:10px;"></div>
         <div id="serverlessOneTime" style="display:none; margin-top:10px;">
-          <button id="serverlessOneTimePay" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Pay with PayPal</button>
+          <button id="serverlessOneTimePay" type="button" class="px-4 py-2 rounded bg-[#0070ba] hover:bg-[#005ea6] text-white" style="font-weight:600;">Pay with PayPal</button>
           <div class="text-xs text-gray-500 mt-2">One-time payment. Grants 1 additional key slot until the selected TTL expires.</div>
         </div>
       </div>
@@ -214,7 +215,14 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   function showServerlessUpgradeModal() {
     const modal = document.getElementById('serverlessUpgradeModal');
     if (!modal) return;
-    modal.style.display = 'block';
+    modal.style.display = 'flex';
+    const err = document.getElementById('serverlessUpgradeError');
+    if (err) err.style.display = 'none';
+    const oneTimeBtn = document.getElementById('serverlessOneTimePay');
+    if (oneTimeBtn) {
+      oneTimeBtn.disabled = false;
+      oneTimeBtn.textContent = 'Pay with PayPal';
+    }
     initServerlessPaypalButtons();
   }
 
@@ -222,6 +230,22 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
     const modal = document.getElementById('serverlessUpgradeModal');
     if (!modal) return;
     modal.style.display = 'none';
+  }
+
+  function updateServerlessModeLabel(months, mode) {
+    const el = document.getElementById('serverlessUpgradeMode');
+    if (!el) return;
+    const m = Math.max(1, parseInt(String(months || 1), 10) || 1);
+    if (mode === 'one_time') {
+      const years = Math.max(1, Math.floor(m / 12));
+      el.textContent = 'Billing mode: One-time payment for ' + years + ' year' + (years > 1 ? 's' : '');
+      return;
+    }
+    if (m >= 12) {
+      el.textContent = 'Billing mode: Yearly subscription';
+      return;
+    }
+    el.textContent = 'Billing mode: Monthly subscription';
   }
 
   async function loadAddonInfo(addonType) {
@@ -494,6 +518,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
           serverlessPaymentMode = paymentModeForMonths(serverlessTtlMonths);
           serverlessAddonType = addonTypeForMonths(serverlessTtlMonths);
           updateServerlessPriceLabel(serverlessTtlMonths);
+          updateServerlessModeLabel(serverlessTtlMonths, serverlessPaymentMode);
           // Reset PayPal button render for a potentially different plan.
           serverlessPaypalInit = false;
           const btn = document.getElementById('serverlessPaypalButtons');
@@ -558,6 +583,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 
   const upgradeClose = document.getElementById('serverlessUpgradeClose');
   upgradeClose && upgradeClose.addEventListener('click', hideServerlessUpgradeModal);
+  const upgradeBackdrop = document.getElementById('serverlessUpgradeBackdrop');
+  upgradeBackdrop && upgradeBackdrop.addEventListener('click', hideServerlessUpgradeModal);
 
   // One-time PayPal return handling: PayPal redirects back with ?token=<ORDER_ID>&pp_term=1&state=...
   (function handleOneTimeReturn(){
