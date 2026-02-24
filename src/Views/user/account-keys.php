@@ -35,12 +35,12 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 
   <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6" style="max-width: 860px;">
     <h2 class="font-semibold mb-3">Generate Key</h2>
-    <div class="flex flex-wrap gap-2 items-end">
-      <div style="min-width:200px;">
+    <div style="display:grid; grid-template-columns:minmax(220px, 1fr) minmax(220px, 1fr) auto; gap:10px; align-items:end;">
+      <div>
         <label class="block text-sm text-gray-500 mb-1">Subdomain</label>
         <input id="akSubdomain" type="text" placeholder="test" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900" />
       </div>
-      <div style="min-width:200px;">
+      <div>
         <label class="block text-sm text-gray-500 mb-1">TTL</label>
         <select id="akTtl" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900">
           <option value="3600" data-months="0" selected>1 hour</option>
@@ -51,11 +51,11 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
           <option value="94608000" data-months="36">3 years</option>
           <option value="157680000" data-months="60">5 years</option>
         </select>
-        <div class="text-xs text-gray-500 mt-1" style="line-height:1.35; max-width:420px;">
-          TTL controls how long this key remains valid. After it expires, the subdomain will show Unauthorized until you provide a new key.
-        </div>
       </div>
-      <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
+      <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white" style="height:42px; min-width:130px;">Generate</button>
+    </div>
+    <div class="text-xs text-gray-500 mt-2" style="line-height:1.35; max-width:720px;">
+      TTL controls how long this key remains valid. After it expires, the subdomain will show Unauthorized until you provide a new key.
     </div>
 
     <div id="akResult" class="mt-4" style="display:none;">
