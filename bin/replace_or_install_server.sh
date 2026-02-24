@@ -179,6 +179,7 @@ RestartSec=5
 StandardOutput=append:$(dirname $INSTALL_DIR)/ginto_logs/logs.txt
 StandardError=append:$(dirname $INSTALL_DIR)/ginto_logs/logs.txt
 Environment=PATH=/usr/bin:/usr/local/bin
+Environment=PHP_CLI_SERVER_WORKERS=4
 
 [Install]
 WantedBy=multi-user.target

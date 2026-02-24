@@ -40,6 +40,7 @@ StandardOutput=append:$STORAGE_DIR/logs/ginto.log
 StandardError=append:$STORAGE_DIR/logs/ginto-error.log
 Environment=PATH=/usr/bin:/usr/local/bin:/home/$GINTO_USER/.local/bin
 Environment=HOME=/home/$GINTO_USER
+Environment=PHP_CLI_SERVER_WORKERS=4
 
 [Install]
 WantedBy=multi-user.target

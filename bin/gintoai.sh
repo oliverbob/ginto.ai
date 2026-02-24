@@ -1783,6 +1783,7 @@ StandardError=append:$(dirname $PROJECT_DIR)/storage/logs/ginto-error.log
 Environment=PATH=$(dirname "$COMPOSER_BIN"):/usr/bin:/usr/local/bin:/home/$INSTALL_USER/.local/bin
 Environment=HOME=$INSTALL_USER_HOME
 Environment=COMPOSER_HOME=$INSTALL_USER_HOME/.composer
+Environment=PHP_CLI_SERVER_WORKERS=4
 
 [Install]
 WantedBy=multi-user.target
