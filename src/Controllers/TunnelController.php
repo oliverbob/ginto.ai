@@ -1490,7 +1490,7 @@ TOML;
                 try {
                     $extraSlots = (int)$this->db->count('user_addons', [
                         'user_id' => (int)$userId,
-                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y', 'serverless_key_3y', 'serverless_key_5y'],
+                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y'],
                         'status' => 'active',
                     ]);
                 } catch (\Throwable $_) {

@@ -261,10 +261,9 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   function addonTypeForMonths(months) {
     // Compute only in months, then map to pre-created PayPal addon plans.
     if (months <= 1) return 'serverless_key_1m';
-    if (months === 12) return 'serverless_key_1y';
-    if (months === 36) return 'serverless_key_3y';
-    if (months === 60) return 'serverless_key_5y';
-    // Fallback to monthly
+    // PayPal subscription plans do not support multi-year interval counts reliably;
+    // bill annually for any year-based TTL.
+    if (months >= 12) return 'serverless_key_1y';
     return 'serverless_key_1m';
   }
 
@@ -277,13 +276,9 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       el.textContent = '$105 / month per additional key';
       return;
     }
-    if (m % 12 === 0) {
-      const years = Math.max(1, Math.floor(m / 12));
-      if (years === 1) {
-        el.textContent = '$105 / month per additional key • billed yearly ($' + total + ' / year)';
-      } else {
-        el.textContent = '$105 / month per additional key • billed every ' + years + ' years ($' + total + ' / ' + years + 'y)';
-      }
+    if (m >= 12) {
+      // Year-based TTLs are billed yearly.
+      el.textContent = '$105 / month per additional key • billed yearly ($1260 / year)';
       return;
     }
     el.textContent = '$105 / month per additional key • billed for ' + m + ' months ($' + total + ')';

@@ -632,6 +632,8 @@ $router->req('/api/addon/activate', function() use ($db) {
     $subData = json_decode($subResp, true);
     $liveStatus = $subData['status'] ?? null;
     $livePlanId = $subData['plan_id'] ?? null;
+    $liveStart = $subData['start_time'] ?? null;
+    $liveNextBilling = $subData['billing_info']['next_billing_time'] ?? null;
 
     if (strtoupper((string)$liveStatus) !== 'ACTIVE') {
         echo json_encode(['success' => false, 'error' => 'PayPal subscription is not active: ' . ($liveStatus ?? 'unknown')]);
@@ -642,9 +644,14 @@ $router->req('/api/addon/activate', function() use ($db) {
         echo json_encode(['success' => false, 'error' => 'PayPal subscription plan ID does not match expected addon plan']);
         return;
     }
+
+    // Persist billing dates so we can stop counting slots if billing stops.
+    $startDateSql = $liveStart ? date('Y-m-d H:i:s', strtotime((string)$liveStart)) : date('Y-m-d H:i:s');
+    $nextBillingSql = $liveNextBilling ? date('Y-m-d H:i:s', strtotime((string)$liveNextBilling)) : null;
+    $billingInterval = (strpos($addonType, '_1y') !== false) ? 'YEAR' : 'MONTH';
     
     // Multi-quantity addon types: allow multiple active subscriptions per user (each adds 1 slot)
-    $multiQuantityAddons = ['serverless_key_1m', 'serverless_key_1y', 'serverless_key_3y', 'serverless_key_5y'];
+    $multiQuantityAddons = ['serverless_key_1m', 'serverless_key_1y'];
     $isMulti = in_array($addonType, $multiQuantityAddons, true);
 
     // Idempotency: if this exact PayPal subscription id is already recorded, treat as success
@@ -659,7 +666,9 @@ $router->req('/api/addon/activate', function() use ($db) {
         if (($existingBySub['status'] ?? '') !== 'active') {
             $db->update('user_addons', [
                 'status' => 'active',
-                'subscription_start_date' => date('Y-m-d H:i:s'),
+                'subscription_start_date' => $startDateSql,
+                'subscription_next_billing' => $nextBillingSql,
+                'billing_interval' => $billingInterval,
                 'updated_at' => date('Y-m-d H:i:s')
             ], ['id' => $existingBySub['id']]);
         }
@@ -671,9 +680,11 @@ $router->req('/api/addon/activate', function() use ($db) {
             'paypal_subscription_id' => $subscriptionId,
             'status' => 'active',
             'amount_usd' => $addon['amount_usd'],
-            'billing_interval' => 'MONTH',
-            'subscription_start_date' => date('Y-m-d H:i:s'),
-            'created_at' => date('Y-m-d H:i:s')
+            'billing_interval' => $billingInterval,
+            'subscription_start_date' => $startDateSql,
+            'subscription_next_billing' => $nextBillingSql,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
         ]);
     } else {
         // Single-addon types: update existing record if present, else insert
@@ -687,7 +698,9 @@ $router->req('/api/addon/activate', function() use ($db) {
             $db->update('user_addons', [
                 'paypal_subscription_id' => $subscriptionId,
                 'status' => 'active',
-                'subscription_start_date' => date('Y-m-d H:i:s'),
+                'subscription_start_date' => $startDateSql,
+                'subscription_next_billing' => $nextBillingSql,
+                'billing_interval' => $billingInterval,
                 'updated_at' => date('Y-m-d H:i:s')
             ], ['id' => $existing['id']]);
         } else {
@@ -697,9 +710,11 @@ $router->req('/api/addon/activate', function() use ($db) {
                 'paypal_subscription_id' => $subscriptionId,
                 'status' => 'active',
                 'amount_usd' => $addon['amount_usd'],
-                'billing_interval' => 'MONTH',
-                'subscription_start_date' => date('Y-m-d H:i:s'),
-                'created_at' => date('Y-m-d H:i:s')
+                'billing_interval' => $billingInterval,
+                'subscription_start_date' => $startDateSql,
+                'subscription_next_billing' => $nextBillingSql,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ]);
         }
     }

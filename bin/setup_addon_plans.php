@@ -169,22 +169,6 @@ $addonPlans = [
         'interval_unit' => 'YEAR',
         'interval_count' => 1,
     ],
-    [
-        'addon_type' => 'serverless_key_3y',
-        'name' => 'Serverless Subscription (3 Years)',
-        'description' => 'Additional web server tunnel key slot (billed every 3 years; 1 key per active subscription)',
-        'amount_usd' => '3780.00',
-        'interval_unit' => 'YEAR',
-        'interval_count' => 3,
-    ],
-    [
-        'addon_type' => 'serverless_key_5y',
-        'name' => 'Serverless Subscription (5 Years)',
-        'description' => 'Additional web server tunnel key slot (billed every 5 years; 1 key per active subscription)',
-        'amount_usd' => '6300.00',
-        'interval_unit' => 'YEAR',
-        'interval_count' => 5,
-    ],
 ];
 
 $column = ($environment === 'sandbox') ? 'paypal_plan_id_sandbox' : 'paypal_plan_id';
