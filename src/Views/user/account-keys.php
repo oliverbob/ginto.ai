@@ -105,6 +105,10 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <div class="mt-4">
         <div id="serverlessPaypalLoading" class="text-sm text-gray-500">Loading PayPal…</div>
         <div id="serverlessPaypalButtons" style="margin-top:10px;"></div>
+        <div id="serverlessOneTime" style="display:none; margin-top:10px;">
+          <button id="serverlessOneTimePay" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Pay with PayPal</button>
+          <div class="text-xs text-gray-500 mt-2">One-time payment. Grants 1 additional key slot until the selected TTL expires.</div>
+        </div>
       </div>
     </div>
   </div>
@@ -249,6 +253,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   let serverlessPaypalInit = false;
   let serverlessAddonType = 'serverless_key_1m';
   let serverlessTtlMonths = 1;
+  let serverlessPaymentMode = 'subscription'; // subscription | one_time
 
   function getSelectedTtlInfo() {
     const sel = document.getElementById('akTtl');
@@ -265,6 +270,12 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
     // bill annually for any year-based TTL.
     if (months >= 12) return 'serverless_key_1y';
     return 'serverless_key_1m';
+  }
+
+  function paymentModeForMonths(months) {
+    // Use one-time payments for 3 years or more.
+    if (months >= 36) return 'one_time';
+    return 'subscription';
   }
 
   function updateServerlessPriceLabel(months) {
@@ -285,9 +296,9 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   }
 
   async function initServerlessPaypalButtons() {
-    if (serverlessPaypalInit) return;
-    serverlessPaypalInit = true;
-
+    // One-time flow: show a simple PayPal redirect button instead of subscription SDK.
+    const oneTimeWrap = document.getElementById('serverlessOneTime');
+    const oneTimeBtn = document.getElementById('serverlessOneTimePay');
     const loading = document.getElementById('serverlessPaypalLoading');
     const buttons = document.getElementById('serverlessPaypalButtons');
     const errBox = document.getElementById('serverlessUpgradeError');
@@ -297,6 +308,42 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       errBox.className = 'mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 p-3 rounded';
       errBox.textContent = msg || 'Upgrade failed.';
     };
+
+    if (serverlessPaymentMode === 'one_time') {
+      if (buttons) buttons.innerHTML = '';
+      if (loading) loading.style.display = 'none';
+      if (oneTimeWrap) oneTimeWrap.style.display = 'block';
+
+      if (oneTimeBtn && !oneTimeBtn.dataset.bound) {
+        oneTimeBtn.dataset.bound = '1';
+        oneTimeBtn.addEventListener('click', async () => {
+          try {
+            oneTimeBtn.disabled = true;
+            oneTimeBtn.textContent = 'Redirecting…';
+            const res = await fetch('/api/addon/one-time/create-order', {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ months: serverlessTtlMonths, csrf_token: csrfToken })
+            });
+            const data = await res.json();
+            if (!data || !data.success) throw new Error(data?.error || 'Failed to start PayPal checkout');
+            window.location.href = data.approve_url;
+          } catch (e) {
+            showErr(e.message);
+            oneTimeBtn.disabled = false;
+            oneTimeBtn.textContent = 'Pay with PayPal';
+          }
+        });
+      }
+      return;
+    }
+
+    if (serverlessPaypalInit) return;
+    serverlessPaypalInit = true;
+
+    if (oneTimeWrap) oneTimeWrap.style.display = 'none';
+    if (loading) loading.style.display = 'block';
 
     try {
       const info = await loadAddonInfo(serverlessAddonType);
@@ -439,6 +486,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       if (!data.success) {
         if (data.code === 'KEY_LIMIT_REACHED') {
           serverlessTtlMonths = Math.max(1, ttlInfo.months || 1);
+          serverlessPaymentMode = paymentModeForMonths(serverlessTtlMonths);
           serverlessAddonType = addonTypeForMonths(serverlessTtlMonths);
           updateServerlessPriceLabel(serverlessTtlMonths);
           // Reset PayPal button render for a potentially different plan.
@@ -505,6 +553,36 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 
   const upgradeClose = document.getElementById('serverlessUpgradeClose');
   upgradeClose && upgradeClose.addEventListener('click', hideServerlessUpgradeModal);
+
+  // One-time PayPal return handling: PayPal redirects back with ?token=<ORDER_ID>&pp_term=1&state=...
+  (function handleOneTimeReturn(){
+    try {
+      const qs = new URLSearchParams(window.location.search || '');
+      if (qs.get('pp_term') !== '1') return;
+      const orderId = qs.get('token') || '';
+      const state = qs.get('state') || '';
+      if (!orderId || !state) return;
+
+      uiModal('Completing purchase…', 'Finalizing your PayPal payment.');
+      fetch('/api/addon/one-time/capture', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paypal_order_id: orderId, state, csrf_token: csrfToken })
+      })
+      .then(r => r.json())
+      .then(result => {
+        if (!result || !result.success) throw new Error(result?.error || 'Failed to complete purchase');
+        // Remove params so refresh doesn't re-capture.
+        const clean = window.location.pathname;
+        window.history.replaceState({}, '', clean);
+        loadKeys();
+      })
+      .catch(e => {
+        uiModal('Upgrade failed', e.message);
+      });
+    } catch (e) {}
+  })();
 
   loadKeys();
 </script>

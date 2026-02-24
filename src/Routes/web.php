@@ -823,6 +823,337 @@ $router->req('/api/addon/activate', function() use ($db) {
     ]);
 });
 
+// Create a one-time PayPal order for multi-year serverless key slots.
+// POST /api/addon/one-time/create-order
+$router->req('/api/addon/one-time/create-order', function() use ($db) {
+    header('Content-Type: application/json');
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        return;
+    }
+    if (empty($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Login required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $csrf = (string)($input['csrf_token'] ?? '');
+    $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+    if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+        return;
+    }
+
+    $months = (int)($input['months'] ?? 0);
+    // Supported one-time terms (in months)
+    if (!in_array($months, [36, 60], true)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid term']);
+        return;
+    }
+
+    $userId = (int)$_SESSION['user_id'];
+    $amount = 105 * $months; // $105 per month per key, charged as a one-time amount
+    $amountStr = number_format($amount, 2, '.', '');
+    $environment = getenv('PAYPAL_ENVIRONMENT') ?: ($_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox');
+    $environment = (strtolower((string)$environment) === 'live' || strtolower((string)$environment) === 'production') ? 'live' : 'sandbox';
+
+    $clientId = ($environment === 'sandbox')
+        ? (getenv('PAYPAL_CLIENT_ID_SANDBOX') ?: ($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? null))
+        : (getenv('PAYPAL_CLIENT_ID') ?: ($_ENV['PAYPAL_CLIENT_ID'] ?? null));
+    $clientSecret = ($environment === 'sandbox')
+        ? (getenv('PAYPAL_CLIENT_SECRET_SANDBOX') ?: ($_ENV['PAYPAL_CLIENT_SECRET_SANDBOX'] ?? null))
+        : (getenv('PAYPAL_CLIENT_SECRET') ?: ($_ENV['PAYPAL_CLIENT_SECRET'] ?? null));
+
+    if (empty($clientId) || empty($clientSecret)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Server configuration missing PayPal credentials']);
+        return;
+    }
+
+    $baseUrl = ($environment === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+    // Get access token
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+    curl_setopt($ch, CURLOPT_USERPWD, $clientId . ':' . $clientSecret);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'Accept-Language: en_US']);
+    $tokenResp = curl_exec($ch);
+    $tokenCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($tokenCode !== 200) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to authenticate with PayPal']);
+        return;
+    }
+    $tokenData = json_decode((string)$tokenResp, true) ?: [];
+    $accessToken = $tokenData['access_token'] ?? null;
+    if (empty($accessToken)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to obtain PayPal access token']);
+        return;
+    }
+
+    // Create a local pending order for idempotency + verification on capture
+    $state = bin2hex(random_bytes(16));
+    $now = date('Y-m-d H:i:s');
+    $meta = [
+        'purpose' => 'serverless_key_term',
+        'months' => $months,
+        'state' => $state,
+        'environment' => $environment,
+    ];
+    try {
+        $db->insert('orders', [
+            'user_id' => $userId,
+            'package' => 'Serverless Key Slot Term',
+            'amount' => $amount,
+            'currency' => 'USD',
+            'status' => 'pending',
+            'metadata' => json_encode($meta),
+            'created_at' => $now,
+        ]);
+        $localOrderId = (int)($db->id() ?: 0);
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to create local order']);
+        return;
+    }
+
+    $returnUrl = 'https://ginto.ai/account/keys?pp_term=1&state=' . urlencode($state);
+    $cancelUrl = 'https://ginto.ai/account/keys?pp_term=0';
+
+    $payload = [
+        'intent' => 'CAPTURE',
+        'purchase_units' => [
+            [
+                'custom_id' => $userId . '|serverless_key_term|' . $months,
+                'description' => 'Serverless key slot (' . $months . ' months)',
+                'amount' => [
+                    'currency_code' => 'USD',
+                    'value' => $amountStr,
+                ],
+            ],
+        ],
+        'application_context' => [
+            'brand_name' => 'Ginto AI',
+            'landing_page' => 'BILLING',
+            'user_action' => 'PAY_NOW',
+            'return_url' => $returnUrl,
+            'cancel_url' => $cancelUrl,
+        ],
+    ];
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v2/checkout/orders');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Authorization: Bearer ' . $accessToken]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    $data = json_decode((string)$resp, true) ?: [];
+    if ($code < 200 || $code >= 300) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to create PayPal order']);
+        return;
+    }
+
+    $paypalOrderId = $data['id'] ?? null;
+    $approveUrl = null;
+    foreach (($data['links'] ?? []) as $lnk) {
+        if (($lnk['rel'] ?? '') === 'approve') {
+            $approveUrl = $lnk['href'] ?? null;
+            break;
+        }
+    }
+    if (empty($paypalOrderId) || empty($approveUrl)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'PayPal order missing approval link']);
+        return;
+    }
+
+    // Store paypal order id in local order metadata
+    try {
+        $meta['paypal_order_id'] = $paypalOrderId;
+        $db->update('orders', [
+            'metadata' => json_encode($meta),
+        ], ['id' => $localOrderId, 'user_id' => $userId]);
+    } catch (\Throwable $e) {
+        // best-effort
+    }
+
+    echo json_encode([
+        'success' => true,
+        'paypal_order_id' => $paypalOrderId,
+        'approve_url' => $approveUrl,
+        'state' => $state,
+    ]);
+});
+
+// Capture a one-time PayPal order and activate the addon slot.
+// POST /api/addon/one-time/capture
+$router->req('/api/addon/one-time/capture', function() use ($db) {
+    header('Content-Type: application/json');
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed']);
+        return;
+    }
+    if (empty($_SESSION['user_id'])) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Login required']);
+        return;
+    }
+
+    $input = json_decode(file_get_contents('php://input'), true) ?: [];
+    $csrf = (string)($input['csrf_token'] ?? '');
+    $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+    if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+        return;
+    }
+
+    $paypalOrderId = trim((string)($input['paypal_order_id'] ?? ''));
+    $state = trim((string)($input['state'] ?? ''));
+    if ($paypalOrderId === '' || $state === '') {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Missing order id']);
+        return;
+    }
+
+    $userId = (int)$_SESSION['user_id'];
+
+    // Find local pending order
+    $local = $db->get('orders', ['id', 'amount', 'currency', 'status', 'metadata'], [
+        'user_id' => $userId,
+        'status' => 'pending',
+        'metadata[LIKE]' => '%' . $paypalOrderId . '%',
+        'ORDER' => ['id' => 'DESC'],
+    ]);
+    if (!$local) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Order not found']);
+        return;
+    }
+    $meta = [];
+    if (!empty($local['metadata'])) {
+        $meta = json_decode((string)$local['metadata'], true) ?: [];
+    }
+    if (($meta['state'] ?? '') !== $state) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid order state']);
+        return;
+    }
+    if (($local['status'] ?? '') === 'completed') {
+        echo json_encode(['success' => true]);
+        return;
+    }
+
+    $months = (int)($meta['months'] ?? 0);
+    if (!in_array($months, [36, 60], true)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid term']);
+        return;
+    }
+
+    $environment = getenv('PAYPAL_ENVIRONMENT') ?: ($_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox');
+    $environment = (strtolower((string)$environment) === 'live' || strtolower((string)$environment) === 'production') ? 'live' : 'sandbox';
+    $clientId = ($environment === 'sandbox')
+        ? (getenv('PAYPAL_CLIENT_ID_SANDBOX') ?: ($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? null))
+        : (getenv('PAYPAL_CLIENT_ID') ?: ($_ENV['PAYPAL_CLIENT_ID'] ?? null));
+    $clientSecret = ($environment === 'sandbox')
+        ? (getenv('PAYPAL_CLIENT_SECRET_SANDBOX') ?: ($_ENV['PAYPAL_CLIENT_SECRET_SANDBOX'] ?? null))
+        : (getenv('PAYPAL_CLIENT_SECRET') ?: ($_ENV['PAYPAL_CLIENT_SECRET'] ?? null));
+    if (empty($clientId) || empty($clientSecret)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Server configuration missing PayPal credentials']);
+        return;
+    }
+    $baseUrl = ($environment === 'live') ? 'https://api-m.paypal.com' : 'https://api-m.sandbox.paypal.com';
+
+    // Get access token
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v1/oauth2/token');
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+    curl_setopt($ch, CURLOPT_USERPWD, $clientId . ':' . $clientSecret);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'Accept-Language: en_US']);
+    $tokenResp = curl_exec($ch);
+    $tokenCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    if ($tokenCode !== 200) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to verify PayPal order (token)']);
+        return;
+    }
+    $tokenData = json_decode((string)$tokenResp, true) ?: [];
+    $accessToken = $tokenData['access_token'] ?? null;
+    if (empty($accessToken)) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Failed to obtain PayPal access token']);
+        return;
+    }
+
+    // Capture order
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $baseUrl . '/v2/checkout/orders/' . urlencode($paypalOrderId) . '/capture');
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, '{}');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json', 'Authorization: Bearer ' . $accessToken]);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+    $capResp = curl_exec($ch);
+    $capCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+    $cap = json_decode((string)$capResp, true) ?: [];
+    $paypalStatus = $cap['status'] ?? null;
+    if ($capCode < 200 || $capCode >= 300 || strtoupper((string)$paypalStatus) !== 'COMPLETED') {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'PayPal capture failed', 'status' => $paypalStatus]);
+        return;
+    }
+
+    // Mark local order as completed
+    $db->update('orders', ['status' => 'completed'], ['id' => (int)$local['id'], 'user_id' => $userId]);
+
+    // Activate addon slot for the promised term (months)
+    $start = date('Y-m-d H:i:s');
+    $expires = date('Y-m-d H:i:s', strtotime('+' . $months . ' months'));
+    $addonMeta = [
+        'paypal_order_id' => $paypalOrderId,
+        'months' => $months,
+    ];
+    $db->insert('user_addons', [
+        'user_id' => $userId,
+        'addon_type' => 'serverless_key_term',
+        'paypal_subscription_id' => null,
+        'status' => 'active',
+        'amount_usd' => (float)($local['amount'] ?? 0),
+        'billing_interval' => 'ONCE',
+        'subscription_start_date' => $start,
+        'subscription_next_billing' => $expires,
+        'metadata' => json_encode($addonMeta),
+        'created_at' => $start,
+        'updated_at' => $start,
+    ]);
+
+    echo json_encode(['success' => true, 'expires_at' => $expires]);
+});
+
 // Payment routes
 $router->req('/bank-payments', 'PaymentController@bankPayments');
 $router->req('/gcash-payments', 'PaymentController@gcashPayments');
