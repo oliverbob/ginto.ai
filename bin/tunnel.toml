@@ -1,0 +1,28 @@
+# Ginto FRP client tunnel config
+# Expected server settings:
+# - serverAddr: ginto.ai
+# - serverPort: 7000
+# - auth.method: token
+# - subdomain host: *.ginto.ai
+
+serverAddr = "ginto.ai"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "{{ .Envs.GINTO_FRP_TOKEN }}"
+
+transport.tls.enable = true
+transport.tls.disableCustomTLSFirstByte = true
+transport.poolCount = 3
+
+log.to = "/tmp/frpc-tunnel.log"
+log.level = "info"
+log.maxDays = 3
+
+[[proxies]]
+name = "az-tunnel"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8088
+subdomain = "az"
+hostHeaderRewrite = "127.0.0.1"

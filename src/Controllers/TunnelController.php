@@ -907,8 +907,71 @@ TOML;
             echo "OK - FRP tunnel";
             return;
         }
+
+        // 6. Check FRP dashboard API for an active proxy for this subdomain.
+        // This supports real FRP clients that run off-server (no local PID file).
+        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
+        if ($dashPwd === '') {
+            $envFile = '/etc/frp/frps.env';
+            if (file_exists($envFile) && is_readable($envFile)) {
+                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (is_array($lines)) {
+                    foreach ($lines as $line) {
+                        $line = trim((string)$line);
+                        if ($line === '' || str_starts_with($line, '#')) {
+                            continue;
+                        }
+                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
+                            continue;
+                        }
+                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($dashPwd !== '') {
+            foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
+                $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                curl_setopt($ch, CURLOPT_TIMEOUT, 2);
+                curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+                curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
+                $resp = curl_exec($ch);
+                $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($resp === false || $code < 200 || $code >= 300) {
+                    continue;
+                }
+
+                $decoded = json_decode((string)$resp, true);
+                $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+                if (!is_array($proxies)) {
+                    continue;
+                }
+
+                foreach ($proxies as $proxy) {
+                    if (!is_array($proxy)) {
+                        continue;
+                    }
+                    $status = (string)($proxy['status'] ?? '');
+                    if ($status !== 'online') {
+                        continue;
+                    }
+                    $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+                    $proxySubdomain = (string)($conf['subdomain'] ?? '');
+                    if ($proxySubdomain !== '' && strtolower($proxySubdomain) === $subdomain) {
+                        http_response_code(200);
+                        echo "OK - FRP dashboard";
+                        return;
+                    }
+                }
+            }
+        }
         
-        // 6. Check FRP tunnel registry (tracks registered tunnels)
+        // 7. Check FRP tunnel registry (tracks registered tunnels)
         $registryFile = '/var/lib/ginto/tunnel-registry.json';
         if (file_exists($registryFile)) {
             $registry = json_decode(file_get_contents($registryFile), true) ?: [];
