@@ -113,6 +113,9 @@ function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires 
         .'<meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">'
         .'<meta http-equiv="Pragma" content="no-cache">'
         .'<meta http-equiv="Expires" content="0">'
+        // Favicon: inline data URI so it only applies to the unauthorized page and doesn't require loading assets.
+        .'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%278%27%20fill%3D%27%230f172a%27/%3E%3Ctext%20x%3D%2716%27%20y%3D%2721%27%20text-anchor%3D%27middle%27%20font-family%3D%27system-ui%2C%20-apple-system%2C%20Segoe%20UI%2C%20Roboto%2C%20sans-serif%27%20font-size%3D%2716%27%20font-weight%3D%27700%27%20fill%3D%27%23ffffff%27%3EG%3C/text%3E%3C/svg%3E">'
+        .'<link rel="shortcut icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20viewBox%3D%270%200%2032%2032%27%3E%3Crect%20width%3D%2732%27%20height%3D%2732%27%20rx%3D%278%27%20fill%3D%27%230f172a%27/%3E%3Ctext%20x%3D%2716%27%20y%3D%2721%27%20text-anchor%3D%27middle%27%20font-family%3D%27system-ui%2C%20-apple-system%2C%20Segoe%20UI%2C%20Roboto%2C%20sans-serif%27%20font-size%3D%2716%27%20font-weight%3D%27700%27%20fill%3D%27%23ffffff%27%3EG%3C/text%3E%3C/svg%3E">'
         .'<title>Unauthorized</title>'
         .'</head>'
         .'<body style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#f1f5f9;min-height:100vh;margin:0;">'
