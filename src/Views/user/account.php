@@ -76,7 +76,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       </div>
 
       <div id="defaultKeyResult" style="display:none; margin-top:12px;">
-        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Copy this key now (shown only once):</div>
+        <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Default key (copy):</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input id="defaultApiKey" type="text" readonly value="" />
           <button id="copyDefaultApiKey">Copy</button>
@@ -130,6 +130,12 @@ button, a { user-select:none; }
       const el = document.getElementById('defaultKeyStatus');
       if (!data.success) { el.textContent = 'Unavailable'; return; }
       if (!data.has_key) { el.textContent = 'No key yet'; return; }
+      if (data.token) {
+        document.getElementById('defaultApiKey').value = data.token;
+        document.getElementById('defaultKeyResult').style.display = 'block';
+        el.textContent = 'Key ready';
+        return;
+      }
       el.textContent = 'Key exists' + (data.created_at ? (' (created ' + data.created_at + ')') : '');
     } catch (e) {
       const el = document.getElementById('defaultKeyStatus');

@@ -362,16 +362,99 @@ class UserController extends \Core\Controller
                 'LIMIT' => 1,
             ]);
             $row = (is_array($rows) && isset($rows[0]) && is_array($rows[0])) ? $rows[0] : null;
+
+            $tokenPlain = null;
+            if (is_array($row) && !empty($row['token_encrypted'])) {
+                $tokenPlain = $this->decryptApiTokenEncrypted((string)$row['token_encrypted']);
+            }
             echo json_encode([
                 'success' => true,
                 'has_key' => $row ? true : false,
                 'created_at' => $row['created_at'] ?? null,
                 'last_used_at' => $row['last_used_at'] ?? null,
+                'token' => $tokenPlain,
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'DB error']);
         }
+    }
+
+    private function getAppKeyBytes(): ?string
+    {
+        $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+        $appKey = trim($appKey);
+        if ($appKey === '') {
+            return null;
+        }
+
+        // If the key looks like 64 hex chars, treat it as raw 32 bytes.
+        if (preg_match('/^[A-Fa-f0-9]{64}$/', $appKey)) {
+            $bin = @hex2bin($appKey);
+            return is_string($bin) && strlen($bin) === 32 ? $bin : null;
+        }
+
+        // Fallback: derive a 32-byte key from the string.
+        return hash('sha256', $appKey, true);
+    }
+
+    private function encryptApiTokenPlain(string $plain): ?string
+    {
+        $key = $this->getAppKeyBytes();
+        if (!$key) {
+            return null;
+        }
+        if (!function_exists('openssl_encrypt')) {
+            return null;
+        }
+
+        $iv = random_bytes(12); // GCM nonce
+        $tag = '';
+        $ciphertext = openssl_encrypt($plain, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+        if ($ciphertext === false || !is_string($ciphertext) || $tag === '') {
+            return null;
+        }
+
+        $payload = json_encode([
+            'v' => 1,
+            'iv' => base64_encode($iv),
+            'tag' => base64_encode($tag),
+            'ct' => base64_encode($ciphertext),
+        ]);
+        if (!is_string($payload) || $payload === '') {
+            return null;
+        }
+        return base64_encode($payload);
+    }
+
+    private function decryptApiTokenEncrypted(string $payloadB64): ?string
+    {
+        $key = $this->getAppKeyBytes();
+        if (!$key) {
+            return null;
+        }
+        if (!function_exists('openssl_decrypt')) {
+            return null;
+        }
+
+        $json = base64_decode($payloadB64, true);
+        if (!is_string($json) || $json === '') {
+            return null;
+        }
+        $data = json_decode($json, true);
+        if (!is_array($data) || (int)($data['v'] ?? 0) !== 1) {
+            return null;
+        }
+
+        $iv = base64_decode((string)($data['iv'] ?? ''), true);
+        $tag = base64_decode((string)($data['tag'] ?? ''), true);
+        $ct = base64_decode((string)($data['ct'] ?? ''), true);
+        if (!is_string($iv) || strlen($iv) !== 12 || !is_string($tag) || $tag === '' || !is_string($ct) || $ct === '') {
+            return null;
+        }
+
+        $plain = openssl_decrypt($ct, 'aes-256-gcm', $key, OPENSSL_RAW_DATA, $iv, $tag);
+        return ($plain === false || !is_string($plain) || $plain === '') ? null : $plain;
     }
 
     /**
@@ -415,10 +498,18 @@ class UserController extends \Core\Controller
             $plain = 'ginto-' . bin2hex(random_bytes(32));
             $hash = hash('sha256', $plain);
 
+            $encrypted = $this->encryptApiTokenPlain($plain);
+            if ($encrypted === null) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Server missing APP_KEY for key storage']);
+                return;
+            }
+
             $this->db->insert('api_tokens', [
                 'user_id' => $userId,
                 'name' => 'default_api',
                 'token' => $hash,
+                'token_encrypted' => $encrypted,
                 'expires_at' => null,
                 'revoked' => 0,
                 'created_at' => date('Y-m-d H:i:s'),

@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS `api_tokens` (
   `user_id` INT UNSIGNED NOT NULL,
   `name` VARCHAR(64) NOT NULL,
   `token` CHAR(64) NOT NULL,
+  `token_encrypted` TEXT NULL,
   `expires_at` DATETIME NULL,
   `revoked` TINYINT(1) NOT NULL DEFAULT 0,
   `revoked_at` DATETIME NULL,
