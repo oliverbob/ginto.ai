@@ -141,7 +141,8 @@ button, a { user-select:none; }
     // Behave like typical API providers: create a default key automatically
     // the first time the user visits /account.
     try {
-      const flag = 'ginto_default_api_key_autocreated_v1';
+      // Bump flag version so we retry for users who hit earlier failures.
+      const flag = 'ginto_default_api_key_autocreated_v2';
       if (window.localStorage && localStorage.getItem(flag) === '1') {
         return;
       }
@@ -156,8 +157,8 @@ button, a { user-select:none; }
         return;
       }
 
-      await rotateDefaultKey();
-      if (window.localStorage) localStorage.setItem(flag, '1');
+      const ok = await rotateDefaultKey();
+      if (ok && window.localStorage) localStorage.setItem(flag, '1');
     } catch (e) {
       // Don't block page load; user can still click Generate/Rotate manually.
     }
@@ -174,13 +175,15 @@ button, a { user-select:none; }
       const data = await res.json();
       if (!data.success) {
         alert(data.error || 'Failed');
-        return;
+        return false;
       }
       document.getElementById('defaultApiKey').value = data.token;
       document.getElementById('defaultKeyResult').style.display = 'block';
       loadDefaultStatus();
+      return true;
     } catch (e) {
       alert('Error: ' + e.message);
+      return false;
     }
   }
 

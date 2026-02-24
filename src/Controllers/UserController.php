@@ -93,9 +93,15 @@ class UserController extends \Core\Controller
             // Ignore sandbox detection errors
         }
 
-        // Generate CSRF token
-        $csrfToken = bin2hex(random_bytes(32));
-        $_SESSION['csrf_token'] = $csrfToken;
+        // CSRF token: keep stable for the session.
+        // Regenerating it on every polling request (e.g. /chat) breaks other tabs
+        // that rely on the session token.
+        if (empty($_SESSION['csrf_token'])) {
+            $csrfToken = bin2hex(random_bytes(32));
+            $_SESSION['csrf_token'] = $csrfToken;
+        } else {
+            $csrfToken = (string)$_SESSION['csrf_token'];
+        }
 
         // Return user info
         echo json_encode([
