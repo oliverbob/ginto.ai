@@ -136,7 +136,7 @@ button, a { user-select:none; }
         el.textContent = 'Key ready';
         return;
       }
-      el.textContent = 'Key exists' + (data.created_at ? (' (created ' + data.created_at + ')') : '');
+      el.textContent = 'Key exists (rotate to display)' + (data.created_at ? (' (created ' + data.created_at + ')') : '');
     } catch (e) {
       const el = document.getElementById('defaultKeyStatus');
       el.textContent = 'Unavailable';
@@ -148,7 +148,7 @@ button, a { user-select:none; }
     // the first time the user visits /account.
     try {
       // Bump flag version so we retry for users who hit earlier failures.
-      const flag = 'ginto_default_api_key_autocreated_v2';
+      const flag = 'ginto_default_api_key_autocreated_v3';
       if (window.localStorage && localStorage.getItem(flag) === '1') {
         return;
       }
@@ -158,13 +158,17 @@ button, a { user-select:none; }
       if (!data || !data.success) {
         return;
       }
-      if (data.has_key) {
-        if (window.localStorage) localStorage.setItem(flag, '1');
+      // If there's no key, create one. If there's a legacy key but it's not
+      // displayable (no encrypted payload), rotate once to produce a showable key.
+      if (!data.has_key || (data.has_key && !data.token)) {
+        const ok = await rotateDefaultKey();
+        if (ok && window.localStorage) localStorage.setItem(flag, '1');
         return;
       }
 
-      const ok = await rotateDefaultKey();
-      if (ok && window.localStorage) localStorage.setItem(flag, '1');
+      if (data.has_key && data.token) {
+        if (window.localStorage) localStorage.setItem(flag, '1');
+      }
     } catch (e) {
       // Don't block page load; user can still click Generate/Rotate manually.
     }
