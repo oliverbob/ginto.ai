@@ -5,11 +5,18 @@
 # - auth.method: token
 # - subdomain host: *.ginto.ai
 
+# Fill this in before running:
+# - auth.token: your server FRP auth token (shared secret)
+#
+# Operator-key note:
+# FRP v0.66.0 does not accept proxy metadata fields in TOML.
+# If you need the operator-key feature, use an INI config (see bin/tunnel.ini).
+
 serverAddr = "ginto.ai"
 serverPort = 7000
 
 auth.method = "token"
-auth.token = "{{ .Envs.GINTO_FRP_TOKEN }}"
+auth.token = "PUT_YOUR_FRP_AUTH_TOKEN_HERE"
 
 transport.tls.enable = true
 transport.tls.disableCustomTLSFirstByte = true
@@ -27,6 +34,4 @@ localPort = 8088
 subdomain = "az"
 hostHeaderRewrite = "127.0.0.1"
 
-# Optional operator key: set/generate it via POST https://ginto.ai/api/frp/subdomain/key
-# and pass it to frpc using proxy metas. If enabled on the server, missing/wrong key will be denied.
-metas = { ginto_key = "{{ .Envs.GINTO_TUNNEL_KEY }}" }
+
