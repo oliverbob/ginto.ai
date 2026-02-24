@@ -179,6 +179,7 @@ $currentPage = 'tunnels';
     const csrfToken = '<?= $csrfToken ?>';
     let relayApi = { approveUrl: '/admin/hosting/tunnels/relay/approve', revokeUrl: '/admin/hosting/tunnels/relay/revoke', subdomain: 'vision' };
     const expiryUrl = '/admin/hosting/tunnels/expiry';
+    const accessKeyUrl = '/admin/hosting/tunnels/access-key';
 
     async function loadTunnels() {
       try {
@@ -356,6 +357,18 @@ $currentPage = 'tunnels';
                   <i class="fas fa-clock mr-1"></i>Set
                 </button>
               </div>
+              <div class="mt-2">
+                <div class="flex items-center gap-1">
+                  <input id="key-${subdomain}" type="password" placeholder="Access key" class="w-28 px-2 py-1 text-[11px] rounded bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600" />
+                  <button onclick="enableAccessKey('${subdomain}')" class="px-2 py-1 text-[11px] bg-purple-500/10 text-purple-500 hover:bg-purple-500/20 rounded transition-colors">
+                    <i class="fas fa-lock mr-1"></i>Enable
+                  </button>
+                  <button onclick="disableAccessKey('${subdomain}')" class="px-2 py-1 text-[11px] bg-gray-500/10 text-gray-500 hover:bg-gray-500/20 rounded transition-colors">
+                    <i class="fas fa-unlock mr-1"></i>Disable
+                  </button>
+                </div>
+                ${p.access_key_enabled ? '<div class="mt-1 text-[11px] text-purple-400">Key required</div>' : ''}
+              </div>
             </td>
           </tr>`;
         }).join('');
@@ -433,6 +446,43 @@ $currentPage = 'tunnels';
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subdomain, minutes, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadTunnels();
+          return;
+        }
+        alert('Failed: ' + (data.error || 'Unknown error'));
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function enableAccessKey(subdomain) {
+      const key = (document.getElementById(`key-${subdomain}`)?.value || '').trim();
+      try {
+        const res = await fetch(accessKeyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subdomain, access_key: key, enabled: true, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadTunnels();
+          return;
+        }
+        alert('Failed: ' + (data.error || 'Unknown error'));
+      } catch (e) {
+        alert('Error: ' + e.message);
+      }
+    }
+
+    async function disableAccessKey(subdomain) {
+      try {
+        const res = await fetch(accessKeyUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subdomain, enabled: false, csrf_token: csrfToken })
         });
         const data = await res.json();
         if (data.success) {

@@ -10,6 +10,20 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
 $hostNoPort = preg_replace('/:\\d+$/', '', $host);
 
+function ginto_resolve_tunnel_registry_read_path(): ?string {
+    $primary = '/var/lib/ginto/tunnel-registry.json';
+    $fallback = '/tmp/ginto-tunnel-registry.json';
+    if (file_exists($primary)) return $primary;
+    if (file_exists($fallback)) return $fallback;
+    return null;
+}
+
+function ginto_tunnel_access_denied(): void {
+    http_response_code(401);
+    header('Content-Type: text/html; charset=utf-8');
+    echo '<!doctype html><html><head><meta charset="utf-8"><title>Unauthorized</title></head><body style="font-family:sans-serif;padding:24px;"><h2>Unauthorized</h2><p>This tunnel requires an access key.</p></body></html>';
+}
+
 // Check if this is a subdomain request (*.ginto.ai but not ginto.ai itself)
 if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $subdomain = $matches[1];
@@ -43,6 +57,32 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     // FRP handles the tunnel routing
     $frpHost = '127.0.0.1';
     $frpPort = 7080;
+
+    // Optional security layer: require access key if enabled for this subdomain.
+    $regPath = ginto_resolve_tunnel_registry_read_path();
+    if ($regPath) {
+        $registry = json_decode((string)@file_get_contents($regPath), true);
+        if (is_array($registry) && isset($registry[$subdomain]) && is_array($registry[$subdomain])) {
+            $entry = $registry[$subdomain];
+            $enabled = !empty($entry['access_key_enabled']);
+            $hash = (string)($entry['access_key_hash'] ?? '');
+            if ($enabled && $hash !== '') {
+                $provided = '';
+                if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_KEY'])) {
+                    $provided = trim((string)$_SERVER['HTTP_X_GINTO_TUNNEL_KEY']);
+                } elseif (!empty($_GET['key'])) {
+                    $provided = trim((string)$_GET['key']);
+                } elseif (!empty($_GET['k'])) {
+                    $provided = trim((string)$_GET['k']);
+                }
+
+                if ($provided === '' || !hash_equals($hash, hash('sha256', $provided))) {
+                    ginto_tunnel_access_denied();
+                    return true;
+                }
+            }
+        }
+    }
     
     // Create a stream context for the proxy
     $ch = curl_init();

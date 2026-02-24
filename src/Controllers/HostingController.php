@@ -1142,6 +1142,12 @@ class HostingController
             
             // Check blocklist
             $p['blocked'] = in_array($subdomain, $blocklist);
+
+            // Optional access-key security layer
+            $reg = is_string($subdomain) && $subdomain !== '' && isset($registry[$subdomain]) && is_array($registry[$subdomain])
+                ? $registry[$subdomain]
+                : null;
+            $p['access_key_enabled'] = (bool)($reg['access_key_enabled'] ?? false);
         }
         unset($p);
         
@@ -1334,6 +1340,76 @@ class HostingController
             'never_expires' => $neverExpires,
             'minutes' => $neverExpires ? -1 : $minutes,
             'message' => $neverExpires ? 'Expiry set to never' : ('Expiry updated (' . $minutes . ' minutes)'),
+        ]);
+        exit;
+    }
+
+    /**
+     * Set or clear an access key for a tunnel subdomain.
+     * When set, requests to https://{subdomain}.ginto.ai must include:
+     *   - header: X-Ginto-Tunnel-Key: <key>
+     *   - OR query: ?key=<key> (or ?k=<key>)
+     *
+     * POST /admin/hosting/tunnels/access-key
+     * Body: { subdomain: string, access_key: string, enabled: bool, csrf_token: string }
+     */
+    public function tunnelsSetAccessKey(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        $input = $this->getRequestInput();
+        $subdomainInput = (string)($input['subdomain'] ?? '');
+        $subdomain = strtolower(preg_replace('/[^a-zA-Z0-9_\-]/', '', $subdomainInput));
+        if ($subdomain === '') {
+            echo json_encode(['success' => false, 'error' => 'Missing subdomain']);
+            exit;
+        }
+
+        $enabled = !empty($input['enabled']);
+        $accessKey = trim((string)($input['access_key'] ?? ''));
+
+        $registry = $this->getTunnelRegistry();
+        $existing = is_array($registry[$subdomain] ?? null) ? $registry[$subdomain] : [];
+
+        if ($enabled) {
+            if ($accessKey === '' || strlen($accessKey) < 8) {
+                echo json_encode(['success' => false, 'error' => 'Access key must be at least 8 characters']);
+                exit;
+            }
+            $existing['access_key_hash'] = hash('sha256', $accessKey);
+            $existing['access_key_enabled'] = true;
+        } else {
+            unset($existing['access_key_hash']);
+            $existing['access_key_enabled'] = false;
+        }
+
+        $existing['subdomain'] = $subdomain;
+        $existing['updated_at'] = date('Y-m-d H:i:s');
+        if (empty($existing['registered_at'])) {
+            $existing['registered_at'] = date('Y-m-d H:i:s');
+        }
+        if (empty($existing['started_at'])) {
+            $existing['started_at'] = time();
+        }
+        if (empty($existing['expires_at'])) {
+            $existing['expires_at'] = time() + 3600;
+        }
+
+        $registry[$subdomain] = $existing;
+        if (!$this->saveTunnelRegistry($registry)) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save tunnel registry']);
+            exit;
+        }
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'enabled' => (bool)($existing['access_key_enabled'] ?? false),
+            'has_key' => !empty($existing['access_key_hash']),
+            'message' => $enabled ? 'Access key enabled' : 'Access key disabled',
         ]);
         exit;
     }
