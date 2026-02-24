@@ -171,7 +171,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
   }
 
   async function revokeKey(id) {
-    if (!confirm('Revoke this key?')) return;
+    const doRevoke = () => (async () => {
     try {
       const res = await fetch('/api/tunnel/access-key/revoke', {
         method: 'POST',
@@ -187,6 +187,18 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       loadKeys();
     } catch (e) {
       uiModal('Network error', 'Error: ' + e.message);
+    }
+    })();
+
+    try {
+      if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal('Revoke key?', 'This key will stop working immediately.', doRevoke, null, 'Revoke');
+        return;
+      }
+    } catch (e) {}
+
+    if (confirm('Revoke this key?')) {
+      doRevoke();
     }
   }
 
