@@ -509,7 +509,7 @@ TOML;
             return;
         }
 
-        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'test', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
         if (in_array($subdomain, $reserved, true)) {
             http_response_code(403);
             echo json_encode(['success' => false, 'error' => 'Reserved subdomain']);

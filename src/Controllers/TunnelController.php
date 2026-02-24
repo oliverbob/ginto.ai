@@ -387,7 +387,7 @@ class TunnelController
             }
             
             // Check reserved
-            $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'test', 'staging', 'ginto'];
+            $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'staging', 'ginto'];
             if (in_array($subdomain, $reserved)) {
                 echo json_encode([
                     'success' => false,
@@ -875,7 +875,7 @@ TOML;
         }
         
         // Check reserved subdomains - deny certificate
-        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'test', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
         if (in_array($subdomain, $reserved)) {
             http_response_code(403);
             echo "Reserved subdomain";
