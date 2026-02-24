@@ -9,6 +9,14 @@ if (!defined('ROOT_PATH')) {
 
 if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
+if (empty($_SESSION['csrf_token'])) {
+  try {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+  } catch (\Throwable $e) {
+    $_SESSION['csrf_token'] = '';
+  }
+}
+
 include ROOT_PATH . '/src/Views/layout/header.php';
 include ROOT_PATH . '/src/Views/layout/sidebar.php';
 
@@ -117,7 +125,7 @@ button, a { user-select:none; }
 
   async function loadDefaultStatus() {
     try {
-      const res = await fetch('/api/account/default-key/status');
+      const res = await fetch('/api/account/default-key/status', { credentials: 'same-origin' });
       const data = await res.json();
       const el = document.getElementById('defaultKeyStatus');
       if (!data.success) { el.textContent = 'Unavailable'; return; }
@@ -133,6 +141,7 @@ button, a { user-select:none; }
     try {
       const res = await fetch('/api/account/default-key/rotate', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csrf_token: <?php echo json_encode($csrf); ?> })
       });
