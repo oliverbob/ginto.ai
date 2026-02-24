@@ -140,7 +140,7 @@ function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires 
         // readonly until focus also prevents many managers from auto-filling.
         .'<div style="position:relative;">'
         // Use type="text" + CSS text-security masking to avoid triggering browser password autofill UI.
-        .'<input id="gintoApiKey" name="ginto_key" type="text" readonly '
+        .'<input id="gintoApiKey" name="ginto_key" type="text" '
         .'autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" '
         .'data-lpignore="true" data-form-type="other" data-1p-ignore="true" '
         .'placeholder="Paste API key (gtnl-...)" '
@@ -181,7 +181,7 @@ function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires 
         .'t=setInterval(function(){remaining--; if(secEl) secEl.textContent=String(Math.max(0,remaining));'
         .'if(remaining<=0){clearInterval(t); t=null; input.value=""; setEnabled(false);} },1000);}'
         .'function onChange(){var v=(input.value||"").trim(); if(v.length>0){setEnabled(true); resetTimer();} else {setEnabled(false);}}'
-        .'input.addEventListener("focus", function(){ try{ input.removeAttribute("readonly"); }catch(e){} if((input.value||"").trim().length>0){resetTimer();}});'
+        .'input.addEventListener("focus", function(){ if((input.value||"").trim().length>0){resetTimer();}});'
         .'input.addEventListener("input", onChange);'
         .'form.addEventListener("submit", function(){ var v=(input.value||"").trim(); if(hidden){ hidden.value=v; } setTimeout(function(){ try{ input.value=""; }catch(e){} }, 50); });'
         .'eyeBtn.addEventListener("click", function(){'
@@ -348,7 +348,12 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
     $token = ginto_extract_tunnel_token();
     if ($token === '' || !str_starts_with($token, 'gtnl-')) {
-        ginto_tunnel_access_denied_key();
+        $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token']))) {
+            ginto_tunnel_access_denied_key('That key is not a tunnel key. Use a tunnel key that starts with gtnl- from /account/keys.');
+        } else {
+            ginto_tunnel_access_denied_key();
+        }
         return true;
     }
 
