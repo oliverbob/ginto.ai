@@ -48,7 +48,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       <label style="display:block;font-weight:600;margin-bottom:6px">Profile link</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="profileUrl" type="text" readonly value="<?php echo htmlspecialchars($profileUrl); ?>" />
-        <button id="copyProfileUrl">Copy</button>
+        <button id="copyProfileUrl" type="button">Copy</button>
       </div>
       <div id="copyProfileNotice" style="margin-top:6px;color:green;display:none">Copied to clipboard</div>
     </div>
@@ -57,7 +57,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       <label style="display:block;font-weight:600;margin-bottom:6px">Referral link</label>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="referralUrl" type="text" readonly value="<?php echo htmlspecialchars($referralUrl); ?>" />
-        <button id="copyReferralUrl">Copy</button>
+        <button id="copyReferralUrl" type="button">Copy</button>
       </div>
       <div id="copyReferralNotice" style="margin-top:6px;color:green;display:none">Copied to clipboard</div>
     </div>
@@ -71,7 +71,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         </div>
         <div style="display:flex; gap:8px; align-items:center;">
           <a href="/account/keys" style="padding:8px 10px; border-radius:6px; border:1px solid #cbd5e1; background:#ffffff; color:#0f1724; font-size:13px; text-decoration:none;">Tunnel Keys</a>
-          <button id="rotateDefaultKey" style="padding:8px 10px; border-radius:6px; cursor:pointer; border:1px solid #cbd5e1; background:#ffffff; color:#0f1724; font-size:13px;">Generate/Rotate</button>
+          <button id="rotateDefaultKey" type="button" style="padding:8px 10px; border-radius:6px; cursor:pointer; border:1px solid #cbd5e1; background:#ffffff; color:#0f1724; font-size:13px;">Generate/Rotate</button>
         </div>
       </div>
 
@@ -79,7 +79,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <div style="font-size:12px; color:#64748b; margin-bottom:6px;">Default key (copy):</div>
         <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
           <input id="defaultApiKey" type="text" readonly value="" />
-          <button id="copyDefaultApiKey">Copy</button>
+          <button id="copyDefaultApiKey" type="button">Copy</button>
         </div>
       </div>
     </div>
@@ -97,31 +97,64 @@ button, a { user-select:none; }
 
 <script>
 (function(){
-  function copyFrom(inputId, noticeId) {
-    var input = document.getElementById(inputId);
-    var notice = document.getElementById(noticeId);
-    if (!input) return;
+  function setTempButtonState(btn, text, ms) {
+    if (!btn) return;
+    var prev = btn.textContent;
+    btn.textContent = text;
+    setTimeout(function(){ btn.textContent = prev; }, ms || 1200);
+  }
+
+  async function copyTextToClipboard(text) {
+    if (!text) return false;
     try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(input.value).then(function(){
-          if (notice) { notice.style.display='block'; setTimeout(function(){ notice.style.display='none'; }, 2000); }
-        }, function(){
-          input.select(); document.execCommand('copy');
-          if (notice) { notice.style.display='block'; setTimeout(function(){ notice.style.display='none'; }, 2000); }
-        });
-      } else {
-        input.select(); input.setSelectionRange(0, 99999); document.execCommand('copy');
-        if (notice) { notice.style.display='block'; setTimeout(function(){ notice.style.display='none'; }, 2000); }
+      if (navigator.clipboard && navigator.clipboard.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(text);
+        return true;
       }
-    } catch (e) {}
+    } catch (e) {
+      // fall through to legacy method
+    }
+
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function copyFrom(inputId, noticeId, buttonId) {
+    var input = document.getElementById(inputId);
+    var notice = noticeId ? document.getElementById(noticeId) : null;
+    var btn = buttonId ? document.getElementById(buttonId) : null;
+    if (!input) return;
+
+    copyTextToClipboard(input.value).then(function(ok){
+      if (ok) {
+        if (notice) { notice.style.display='block'; setTimeout(function(){ notice.style.display='none'; }, 2000); }
+        setTempButtonState(btn, 'Copied', 1200);
+      } else {
+        setTempButtonState(btn, 'Copy failed', 1400);
+      }
+    });
   }
 
   var btn1 = document.getElementById('copyProfileUrl');
-  btn1 && btn1.addEventListener('click', function(){ copyFrom('profileUrl','copyProfileNotice'); });
+  btn1 && btn1.addEventListener('click', function(){ copyFrom('profileUrl','copyProfileNotice','copyProfileUrl'); });
   var btn2 = document.getElementById('copyReferralUrl');
-  btn2 && btn2.addEventListener('click', function(){ copyFrom('referralUrl','copyReferralNotice'); });
+  btn2 && btn2.addEventListener('click', function(){ copyFrom('referralUrl','copyReferralNotice','copyReferralUrl'); });
   var btn3 = document.getElementById('copyDefaultApiKey');
-  btn3 && btn3.addEventListener('click', function(){ copyFrom('defaultApiKey', null); });
+  btn3 && btn3.addEventListener('click', function(){ copyFrom('defaultApiKey', null, 'copyDefaultApiKey'); });
 
   async function loadDefaultStatus() {
     try {
