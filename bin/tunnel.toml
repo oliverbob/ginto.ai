@@ -26,3 +26,7 @@ localIP = "127.0.0.1"
 localPort = 8088
 subdomain = "az"
 hostHeaderRewrite = "127.0.0.1"
+
+# Optional operator key: set/generate it via POST https://ginto.ai/api/frp/subdomain/key
+# and pass it to frpc using proxy metas. If enabled on the server, missing/wrong key will be denied.
+metas = { ginto_key = "{{ .Envs.GINTO_TUNNEL_KEY }}" }

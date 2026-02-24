@@ -927,6 +927,7 @@ $router->req('/api/frp/token/generate', 'FrpController@generateToken', ['POST'])
 $router->req('/api/frp/token/revoke', 'FrpController@revokeToken', ['DELETE', 'POST']);
 $router->req('/api/frp/tunnels', 'FrpController@listTunnels');
 $router->req('/api/frp/validate', 'FrpController@validateToken', ['POST']);
+$router->req('/api/frp/subdomain/key', 'FrpController@setSubdomainKey', ['POST']);
 
 // LXC binary path helper
 function getLxcBin(): ?string {

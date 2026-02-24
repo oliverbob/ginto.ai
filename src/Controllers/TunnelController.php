@@ -855,6 +855,24 @@ TOML;
         }
         
         $subdomain = $matches[1];
+
+        // If an operator key is enabled for this subdomain, only approve if the currently-online
+        // FRP proxy presents the matching key via proxy metas.
+        $requiredOperatorKeyHash = '';
+        $registryFile = '/var/lib/ginto/tunnel-registry.json';
+        $registryFallback = '/tmp/ginto-tunnel-registry.json';
+        $registryPath = file_exists($registryFile) ? $registryFile : (file_exists($registryFallback) ? $registryFallback : null);
+        if ($registryPath !== null) {
+            $registry = json_decode((string)@file_get_contents($registryPath), true) ?: [];
+            if (is_array($registry) && isset($registry[$subdomain]) && is_array($registry[$subdomain])) {
+                $entry = $registry[$subdomain];
+                $enabled = !empty($entry['access_key_enabled']);
+                $hash = (string)($entry['access_key_hash'] ?? '');
+                if ($enabled && $hash !== '') {
+                    $requiredOperatorKeyHash = $hash;
+                }
+            }
+        }
         
         // Check reserved subdomains - deny certificate
         $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'test', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
@@ -913,7 +931,13 @@ TOML;
         // 6. Check FRP dashboard API for an active proxy for this subdomain.
         // This supports real FRP clients that run off-server (no local PID file).
         // Uses a small on-disk cache to avoid hammering frps during bot/scanner traffic.
-        if ($this->isFrpSubdomainOnline($subdomain)) {
+        if ($requiredOperatorKeyHash !== '') {
+            if ($this->isFrpSubdomainOnlineWithOperatorKey($subdomain, $requiredOperatorKeyHash)) {
+                http_response_code(200);
+                echo "OK - FRP dashboard + operator key";
+                return;
+            }
+        } elseif ($this->isFrpSubdomainOnline($subdomain)) {
             http_response_code(200);
             echo "OK - FRP dashboard";
             return;
@@ -1085,6 +1109,154 @@ TOML;
         }
 
         return array_values(array_unique($online));
+    }
+
+    private function isFrpSubdomainOnlineWithOperatorKey(string $subdomain, string $requiredHash): bool
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '' || $requiredHash === '') {
+            return false;
+        }
+
+        $cached = $this->readFrpOnlineKeyCache(2);
+        if ($cached !== null) {
+            $seen = (string)($cached[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $lockHandle = @fopen('/tmp/ginto-frp-online-keys.lock', 'c');
+        if ($lockHandle === false) {
+            $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($map[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $gotLock = @flock($lockHandle, LOCK_EX);
+        if (!$gotLock) {
+            @fclose($lockHandle);
+            $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($map[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $cached = $this->readFrpOnlineKeyCache(2);
+        if ($cached !== null) {
+            @flock($lockHandle, LOCK_UN);
+            @fclose($lockHandle);
+            $seen = (string)($cached[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+        $this->writeFrpOnlineKeyCache($map);
+
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+
+        $seen = (string)($map[$subdomain] ?? '');
+        return $seen !== '' && hash_equals($requiredHash, $seen);
+    }
+
+    private function readFrpOnlineKeyCache(int $maxAgeSeconds): ?array
+    {
+        $file = '/tmp/ginto-frp-online-keys.json';
+        if (!file_exists($file)) {
+            return null;
+        }
+        $mtime = @filemtime($file);
+        if (!is_int($mtime) || (time() - $mtime) > $maxAgeSeconds) {
+            return null;
+        }
+        $decoded = json_decode((string)@file_get_contents($file), true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $map = $decoded['keys'] ?? null;
+        return is_array($map) ? $map : null;
+    }
+
+    private function writeFrpOnlineKeyCache(array $keysBySubdomain): void
+    {
+        $payload = [
+            'updated_at' => time(),
+            'keys' => $keysBySubdomain,
+        ];
+        @file_put_contents('/tmp/ginto-frp-online-keys.json', json_encode($payload));
+    }
+
+    private function fetchFrpOnlineSubdomainKeyHashes(): array
+    {
+        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
+        if ($dashPwd === '') {
+            $envFile = '/etc/frp/frps.env';
+            if (file_exists($envFile) && is_readable($envFile)) {
+                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (is_array($lines)) {
+                    foreach ($lines as $line) {
+                        $line = trim((string)$line);
+                        if ($line === '' || str_starts_with($line, '#')) {
+                            continue;
+                        }
+                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
+                            continue;
+                        }
+                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($dashPwd === '') {
+            return [];
+        }
+
+        $out = [];
+        foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
+            $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
+            $resp = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($resp === false || $code < 200 || $code >= 300) {
+                continue;
+            }
+
+            $decoded = json_decode((string)$resp, true);
+            $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+            if (!is_array($proxies)) {
+                continue;
+            }
+
+            foreach ($proxies as $proxy) {
+                if (!is_array($proxy) || (string)($proxy['status'] ?? '') !== 'online') {
+                    continue;
+                }
+                $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+                $sd = strtolower(trim((string)($conf['subdomain'] ?? '')));
+                if ($sd === '') {
+                    continue;
+                }
+                $metas = $conf['metas'] ?? null;
+                $rawKey = '';
+                if (is_array($metas)) {
+                    $rawKey = trim((string)($metas['ginto_key'] ?? $metas['ginto-key'] ?? ''));
+                }
+                if ($rawKey === '' && isset($conf['meta_ginto_key'])) {
+                    $rawKey = trim((string)$conf['meta_ginto_key']);
+                }
+
+                if ($rawKey !== '') {
+                    $out[$sd] = hash('sha256', $rawKey);
+                }
+            }
+        }
+
+        return $out;
     }
     
     /**

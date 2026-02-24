@@ -420,6 +420,158 @@ name = "my-app"
 type = "http"
 localPort = 8088
 subdomain = "yourname"  # Change this!
+
+# Optional: per-subdomain operator key (server will deny if it doesn't match)
+# Set/generate it via POST /api/frp/subdomain/key, then put it here:
+# metas = { ginto_key = "YOUR_TUNNEL_KEY" }
 TOML;
+    }
+
+    private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
+    private const TUNNEL_REGISTRY_FALLBACK_FILE = '/tmp/ginto-tunnel-registry.json';
+
+    private function resolveTunnelDataReadPath(string $primary, string $fallback): ?string
+    {
+        if (file_exists($primary)) {
+            return $primary;
+        }
+        if (file_exists($fallback)) {
+            return $fallback;
+        }
+        return null;
+    }
+
+    private function resolveTunnelDataWritePath(string $primary, string $fallback): ?string
+    {
+        $primaryDir = dirname($primary);
+        if (!is_dir($primaryDir)) {
+            @mkdir($primaryDir, 0755, true);
+        }
+        if (is_dir($primaryDir) && is_writable($primaryDir)) {
+            return $primary;
+        }
+
+        $fallbackDir = dirname($fallback);
+        if (!is_dir($fallbackDir)) {
+            @mkdir($fallbackDir, 0755, true);
+        }
+        if (is_dir($fallbackDir) && is_writable($fallbackDir)) {
+            return $fallback;
+        }
+
+        return null;
+    }
+
+    private function getTunnelRegistry(): array
+    {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
+            return [];
+        }
+        $data = json_decode((string)@file_get_contents($path), true);
+        return is_array($data) ? $data : [];
+    }
+
+    private function saveTunnelRegistry(array $registry): bool
+    {
+        $path = $this->resolveTunnelDataWritePath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
+            return false;
+        }
+        return @file_put_contents($path, json_encode($registry, JSON_PRETTY_PRINT)) !== false;
+    }
+
+    /**
+     * Set or generate a per-subdomain operator key.
+     * POST /api/frp/subdomain/key
+     * Body JSON: {"subdomain":"az","access_key":"..."} OR {"subdomain":"az","generate":true} OR {"subdomain":"az","enabled":false}
+     */
+    public function setSubdomainKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+
+        $subdomain = strtolower(trim((string)($input['subdomain'] ?? '')));
+        $subdomain = preg_replace('/[^a-z0-9\-]/', '', $subdomain);
+
+        if ($subdomain === '' || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $subdomain)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            return;
+        }
+
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'test', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        if (in_array($subdomain, $reserved, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Reserved subdomain']);
+            return;
+        }
+
+        $enabled = $input['enabled'] ?? null;
+        $generate = !empty($input['generate']);
+        $providedKey = trim((string)($input['access_key'] ?? ''));
+
+        if ($enabled === null) {
+            $enabled = true;
+        }
+        $enabled = (bool)$enabled;
+
+        $registry = $this->getTunnelRegistry();
+        $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
+
+        $owner = (int)($entry['owner_user_id'] ?? 0);
+        if ($owner !== 0 && $owner !== (int)$userId) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Subdomain is owned by another user']);
+            return;
+        }
+
+        $plainKey = null;
+        if ($enabled) {
+            if ($generate || $providedKey === '') {
+                $plainKey = bin2hex(random_bytes(24));
+                $providedKey = $plainKey;
+            }
+            if ($providedKey === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Missing access_key']);
+                return;
+            }
+        }
+
+        $entry['owner_user_id'] = (int)$userId;
+        $entry['access_key_enabled'] = $enabled ? 1 : 0;
+        if ($enabled) {
+            $entry['access_key_hash'] = hash('sha256', $providedKey);
+        } else {
+            $entry['access_key_hash'] = '';
+        }
+        $entry['updated_at'] = time();
+
+        $registry[$subdomain] = $entry;
+        if (!$this->saveTunnelRegistry($registry)) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to save registry']);
+            return;
+        }
+
+        $out = [
+            'success' => true,
+            'subdomain' => $subdomain,
+            'enabled' => $enabled,
+        ];
+        if ($plainKey !== null) {
+            $out['access_key'] = $plainKey;
+        }
+        echo json_encode($out);
     }
 }
