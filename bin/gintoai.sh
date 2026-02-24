@@ -1509,7 +1509,7 @@ configure_caddy() {
         sudo tee /etc/caddy/Caddyfile > /dev/null << EOF
 {
     on_demand_tls {
-        ask http://localhost:8000/api/tunnel/verify
+        ask http://127.0.0.1:8000/api/tunnel/verify
     }
 }
 
@@ -1610,7 +1610,7 @@ $CADDY_DOMAIN {
     # WebSocket tunnel endpoint
     @tunnel_ws path /tunnel/ws
     handle @tunnel_ws {
-        reverse_proxy localhost:8765 {
+        reverse_proxy 127.0.0.1:8765 {
             flush_interval -1
             transport http {
                 read_timeout 0
@@ -1630,7 +1630,7 @@ $CADDY_DOMAIN {
     tls {
         on_demand
     }
-    reverse_proxy localhost:7080 {
+    reverse_proxy 127.0.0.1:7080 {
         header_up Host {host}
     }
 }

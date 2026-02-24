@@ -228,7 +228,7 @@ myapp.ginto.ai {
     tls {
         on_demand
     }
-    reverse_proxy localhost:8765 {
+  reverse_proxy 127.0.0.1:8765 {
         header_up X-Tunnel-Subdomain myapp
     }
 }
