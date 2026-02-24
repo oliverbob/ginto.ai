@@ -105,9 +105,6 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700" style="max-width: 860px;">
     <div class="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
       <h2 class="font-semibold">Your Keys</h2>
-  const paypalEnv = <?= json_encode($paypalEnv) ?>;
-  const paypalClientId = <?= json_encode($paypalClientId) ?>;
-  const currentUserId = <?= (int)$userId ?>;
       <button class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-800 text-white" onclick="loadKeys()">Refresh</button>
     </div>
     <div class="overflow-x-auto">
@@ -131,6 +128,11 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 </div>
 
 <script>
+  // PayPal config (client-id is public; never embed any PayPal secrets in HTML/JS)
+  const paypalEnv = <?= json_encode($paypalEnv) ?>;
+  const paypalClientId = <?= json_encode($paypalClientId) ?>;
+  const currentUserId = <?= (int)$userId ?>;
+
   const csrfToken = <?= json_encode($csrf) ?>;
   function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
 
