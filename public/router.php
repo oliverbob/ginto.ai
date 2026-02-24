@@ -123,18 +123,19 @@ function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires 
         // Decoy fields to discourage password managers from offering/saving autofill.
         .'<input type="text" name="username" autocomplete="username" style="position:absolute;left:-9999px;top:-9999px;height:0;width:0;opacity:0;" tabindex="-1" aria-hidden="true">'
         .'<input type="password" name="password" autocomplete="new-password" style="position:absolute;left:-9999px;top:-9999px;height:0;width:0;opacity:0;" tabindex="-1" aria-hidden="true">'
-        .'<div style="flex:1;min-width:240px;display:flex;align-items:center;gap:6px;">'
+        .'<div style="flex:1;min-width:240px;">'
         // Real POST field (hidden) the server reads.
         .'<input id="gintoApiKeyHidden" name="api_key" type="hidden" value="">'
         // Visible field: intentionally NOT named api_key to avoid password manager autofill.
         // readonly until focus also prevents many managers from auto-filling.
+        .'<div style="position:relative;">'
         .'<input id="gintoApiKey" name="ginto_key" type="password" readonly '
         .'autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" '
         .'data-lpignore="true" data-form-type="other" data-1p-ignore="true" '
         .'placeholder="Paste API key (gtnl-...)" '
-        .'style="flex:1;padding:10px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;" />'
+        .'style="width:100%;padding:10px 44px 10px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#f8fafc;" />'
         .'<button id="toggleEye" type="button" aria-label="Show/Hide" '
-        .'style="padding:10px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;cursor:pointer;display:flex;align-items:center;justify-content:center;">'
+        .'style="position:absolute;top:50%;right:10px;transform:translateY(-50%);padding:6px;border-radius:6px;border:0;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#64748b;">'
         .'<svg id="eyeOpen" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
         .'<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/>'
         .'<circle cx="12" cy="12" r="3"/>'
@@ -146,6 +147,7 @@ function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires 
         .'<path d="M14.12 14.12a3 3 0 0 1-4.24-4.24"/>'
         .'</svg>'
         .'</button>'
+        .'</div>'
         .'</div>'
         .'<button id="authorizeBtn" type="submit" disabled '
         .'style="padding:10px 12px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;cursor:pointer;opacity:0.6;">Authorize</button>'
