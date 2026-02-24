@@ -1405,8 +1405,9 @@ TOML;
             $ttl = 60;
         }
         // Cap TTL to reduce long-lived token risk while still being practical.
-        if ($ttl > (86400 * 365)) {
-            $ttl = 86400 * 365;
+        // UI allows up to 5 years.
+        if ($ttl > (86400 * 365 * 5)) {
+            $ttl = 86400 * 365 * 5;
         }
 
         // Prevent users from generating keys for subdomains owned by someone else.
@@ -1489,7 +1490,7 @@ TOML;
                 try {
                     $extraSlots = (int)$this->db->count('user_addons', [
                         'user_id' => (int)$userId,
-                        'addon_type' => 'serverless_key',
+                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y', 'serverless_key_3y', 'serverless_key_5y'],
                         'status' => 'active',
                     ]);
                 } catch (\Throwable $_) {
@@ -1505,7 +1506,7 @@ TOML;
                         'error' => 'Key limit reached. Upgrade to add more keys.',
                         'active_keys' => $activeKeys,
                         'limit' => $limit,
-                        'addon_type' => 'serverless_key',
+                        'addon_type' => 'serverless_key_1m',
                         'addon_price_usd' => 105,
                     ]);
                     return;

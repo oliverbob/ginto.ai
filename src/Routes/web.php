@@ -644,7 +644,7 @@ $router->req('/api/addon/activate', function() use ($db) {
     }
     
     // Multi-quantity addon types: allow multiple active subscriptions per user (each adds 1 slot)
-    $multiQuantityAddons = ['serverless_key'];
+    $multiQuantityAddons = ['serverless_key_1m', 'serverless_key_1y', 'serverless_key_3y', 'serverless_key_5y'];
     $isMulti = in_array($addonType, $multiQuantityAddons, true);
 
     // Idempotency: if this exact PayPal subscription id is already recorded, treat as success

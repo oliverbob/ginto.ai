@@ -149,12 +149,41 @@ $addonPlans = [
         'name' => 'ImageGen Pro',
         'description' => 'Professional AI Image Generation with GPU acceleration',
         'amount_usd' => '500.00',
+        'interval_unit' => 'MONTH',
+        'interval_count' => 1,
+    ],
+    // Serverless key slots are priced at $105/month per key, billed at different cadences.
+    [
+        'addon_type' => 'serverless_key_1m',
+        'name' => 'Serverless Subscription (Monthly)',
+        'description' => 'Additional web server tunnel key slot (billed monthly; 1 key per active subscription)',
+        'amount_usd' => '105.00',
+        'interval_unit' => 'MONTH',
+        'interval_count' => 1,
     ],
     [
-        'addon_type' => 'serverless_key',
-        'name' => 'Serverless Subscription',
-        'description' => 'Additional web server tunnel key slot (1 key per active subscription)',
-        'amount_usd' => '105.00',
+        'addon_type' => 'serverless_key_1y',
+        'name' => 'Serverless Subscription (Yearly)',
+        'description' => 'Additional web server tunnel key slot (billed yearly; 1 key per active subscription)',
+        'amount_usd' => '1260.00',
+        'interval_unit' => 'YEAR',
+        'interval_count' => 1,
+    ],
+    [
+        'addon_type' => 'serverless_key_3y',
+        'name' => 'Serverless Subscription (3 Years)',
+        'description' => 'Additional web server tunnel key slot (billed every 3 years; 1 key per active subscription)',
+        'amount_usd' => '3780.00',
+        'interval_unit' => 'YEAR',
+        'interval_count' => 3,
+    ],
+    [
+        'addon_type' => 'serverless_key_5y',
+        'name' => 'Serverless Subscription (5 Years)',
+        'description' => 'Additional web server tunnel key slot (billed every 5 years; 1 key per active subscription)',
+        'amount_usd' => '6300.00',
+        'interval_unit' => 'YEAR',
+        'interval_count' => 5,
     ],
 ];
 
@@ -162,6 +191,31 @@ $column = ($environment === 'sandbox') ? 'paypal_plan_id_sandbox' : 'paypal_plan
 
 foreach ($addonPlans as $addon) {
     echo "📋 Creating plan: {$addon['name']}...\n";
+
+    // Ensure addon_plans row exists so the plan ID update is persisted.
+    try {
+        $exists = $db->get('addon_plans', ['id'], ['addon_type' => $addon['addon_type']]);
+        if (!$exists) {
+            $db->insert('addon_plans', [
+                'addon_type' => $addon['addon_type'],
+                'name' => $addon['name'],
+                'description' => $addon['description'],
+                'amount_usd' => $addon['amount_usd'],
+                'features' => json_encode([
+                    'Create additional web server tunnel keys beyond the free limit',
+                    'Each active subscription adds 1 extra unrevoked key slot',
+                    'Instant activation after PayPal approval',
+                    'Cancel anytime',
+                ]),
+                'is_active' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+            echo "  \033[33m⚡ Inserted missing addon_plans row for {$addon['addon_type']}\033[0m\n";
+        }
+    } catch (\Throwable $e) {
+        // Non-fatal: continue; plan id may not persist.
+    }
     
     $planData = [
         'product_id' => $productId,
@@ -170,7 +224,7 @@ foreach ($addonPlans as $addon) {
         'status' => 'ACTIVE',
         'billing_cycles' => [
             [
-                'frequency' => ['interval_unit' => 'MONTH', 'interval_count' => 1],
+                'frequency' => ['interval_unit' => $addon['interval_unit'] ?? 'MONTH', 'interval_count' => (int)($addon['interval_count'] ?? 1)],
                 'tenure_type' => 'REGULAR',
                 'sequence' => 1,
                 'total_cycles' => 0, // Infinite

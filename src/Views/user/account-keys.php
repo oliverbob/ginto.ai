@@ -43,10 +43,17 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <div style="min-width:200px;">
         <label class="block text-sm text-gray-500 mb-1">TTL</label>
         <select id="akTtl" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900">
-          <option value="3600" selected>1 hour</option>
-          <option value="21600">6 hours</option>
-          <option value="86400">24 hours</option>
+          <option value="3600" data-months="0" selected>1 hour</option>
+          <option value="21600" data-months="0">6 hours</option>
+          <option value="86400" data-months="0">24 hours</option>
+          <option value="2592000" data-months="1">1 month</option>
+          <option value="31536000" data-months="12">1 year</option>
+          <option value="94608000" data-months="36">3 years</option>
+          <option value="157680000" data-months="60">5 years</option>
         </select>
+        <div class="text-xs text-gray-500 mt-1">
+          TTL = how long this access key remains valid. After TTL expires, the subdomain will show Unauthorized until you enter a new key.
+        </div>
       </div>
       <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
     </div>
@@ -78,7 +85,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-lg font-semibold">Serverless Subscription</div>
-          <div class="text-sm text-gray-500">$105 / month per additional key</div>
+          <div id="serverlessUpgradePrice" class="text-sm text-gray-500">$105 / month per additional key</div>
         </div>
         <button id="serverlessUpgradeClose" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Close</button>
       </div>
@@ -240,6 +247,48 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   }
 
   let serverlessPaypalInit = false;
+  let serverlessAddonType = 'serverless_key_1m';
+  let serverlessTtlMonths = 1;
+
+  function getSelectedTtlInfo() {
+    const sel = document.getElementById('akTtl');
+    const opt = sel && sel.options ? sel.options[sel.selectedIndex] : null;
+    const seconds = parseInt(sel?.value || '3600', 10);
+    const months = parseInt(opt?.getAttribute('data-months') || '0', 10);
+    return { seconds: Number.isFinite(seconds) ? seconds : 3600, months: Number.isFinite(months) ? months : 0 };
+  }
+
+  function addonTypeForMonths(months) {
+    // Compute only in months, then map to pre-created PayPal addon plans.
+    if (months <= 1) return 'serverless_key_1m';
+    if (months === 12) return 'serverless_key_1y';
+    if (months === 36) return 'serverless_key_3y';
+    if (months === 60) return 'serverless_key_5y';
+    // Fallback to monthly
+    return 'serverless_key_1m';
+  }
+
+  function updateServerlessPriceLabel(months) {
+    const el = document.getElementById('serverlessUpgradePrice');
+    if (!el) return;
+    const m = Math.max(1, parseInt(String(months || 1), 10) || 1);
+    const total = 105 * m;
+    if (m === 1) {
+      el.textContent = '$105 / month per additional key';
+      return;
+    }
+    if (m % 12 === 0) {
+      const years = Math.max(1, Math.floor(m / 12));
+      if (years === 1) {
+        el.textContent = '$105 / month per additional key • billed yearly ($' + total + ' / year)';
+      } else {
+        el.textContent = '$105 / month per additional key • billed every ' + years + ' years ($' + total + ' / ' + years + 'y)';
+      }
+      return;
+    }
+    el.textContent = '$105 / month per additional key • billed for ' + m + ' months ($' + total + ')';
+  }
+
   async function initServerlessPaypalButtons() {
     if (serverlessPaypalInit) return;
     serverlessPaypalInit = true;
@@ -255,7 +304,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
     };
 
     try {
-      const info = await loadAddonInfo('serverless_key');
+      const info = await loadAddonInfo(serverlessAddonType);
       const planId = info.paypal_plan_id;
       if (!planId) throw new Error('Serverless plan is not configured');
 
@@ -276,7 +325,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
             method: 'POST',
             credentials: 'same-origin',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ addon_type: 'serverless_key', subscription_id: data.subscriptionID })
+            body: JSON.stringify({ addon_type: serverlessAddonType, subscription_id: data.subscriptionID })
           })
           .then(r => r.json())
           .then(result => {
@@ -378,7 +427,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 
   async function generateKey() {
     const subdomain = (document.getElementById('akSubdomain').value || '').trim().toLowerCase();
-    const ttl = parseInt(document.getElementById('akTtl').value || '3600', 10);
+    const ttlInfo = getSelectedTtlInfo();
+    const ttl = ttlInfo.seconds;
     if (!subdomain) {
       uiModal('Missing subdomain', 'Enter a subdomain');
       return;
@@ -393,6 +443,15 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       const data = await res.json();
       if (!data.success) {
         if (data.code === 'KEY_LIMIT_REACHED') {
+          serverlessTtlMonths = Math.max(1, ttlInfo.months || 1);
+          serverlessAddonType = addonTypeForMonths(serverlessTtlMonths);
+          updateServerlessPriceLabel(serverlessTtlMonths);
+          // Reset PayPal button render for a potentially different plan.
+          serverlessPaypalInit = false;
+          const btn = document.getElementById('serverlessPaypalButtons');
+          if (btn) btn.innerHTML = '';
+          const loading = document.getElementById('serverlessPaypalLoading');
+          if (loading) loading.style.display = 'block';
           showServerlessUpgradeModal();
           return;
         }
