@@ -19,23 +19,23 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-<!-- Universal Modal (shared) -->
-<div id="universalModal" class="fixed inset-0 z-[100] hidden" aria-hidden="true">
-    <div class="absolute inset-0 bg-black/50" id="universalModalBackdrop"></div>
-    <div class="relative min-h-full flex items-center justify-center p-4">
-        <div class="w-full max-w-md rounded-xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 shadow-2xl">
-            <div class="p-5">
-                <div class="flex items-start gap-3">
-                    <div id="universalModalIconWrap" class="mt-0.5 text-yellow-500">
-                        <i id="universalModalIcon" class="fas fa-exclamation-circle text-xl"></i>
+<!-- Uses inline styles so it stays centered even if Tailwind build omits certain utility classes -->
+<div id="universalModal" aria-hidden="true" style="position:fixed; inset:0; z-index:9999; display:none;">
+    <div id="universalModalBackdrop" style="position:absolute; inset:0; background:rgba(0,0,0,0.55);"></div>
+    <div style="position:relative; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:16px;">
+        <div id="universalModalCard" style="width:100%; max-width:460px; border-radius:14px; border:1px solid rgba(148,163,184,0.35); background:#ffffff; box-shadow:0 20px 45px rgba(0,0,0,0.25);">
+            <div style="padding:18px 18px 16px 18px;">
+                <div style="display:flex; gap:12px; align-items:flex-start;">
+                    <div id="universalModalIconWrap" style="margin-top:2px; color:#f59e0b;">
+                        <i id="universalModalIcon" class="fas fa-exclamation-circle" style="font-size:20px;"></i>
                     </div>
-                    <div class="min-w-0">
-                        <div id="universalModalTitle" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Notice</div>
-                        <div id="universalModalMessage" class="mt-1 text-sm text-gray-600 dark:text-gray-300">&nbsp;</div>
+                    <div style="min-width:0; flex:1;">
+                        <div id="universalModalTitle" style="font-size:18px; font-weight:700; color:#0f172a;">Notice</div>
+                        <div id="universalModalMessage" style="margin-top:6px; font-size:14px; color:#475569;">&nbsp;</div>
                     </div>
                 </div>
-                <div class="mt-5 flex justify-end">
-                    <button id="universalModalOk" type="button" class="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium">OK</button>
+                <div style="margin-top:16px; display:flex; justify-content:flex-end;">
+                    <button id="universalModalOk" type="button" style="padding:9px 14px; border-radius:10px; border:1px solid #4f46e5; background:#4f46e5; color:#ffffff; font-size:14px; font-weight:600; cursor:pointer;">OK</button>
                 </div>
             </div>
         </div>
@@ -52,11 +52,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const msgEl = document.getElementById('universalModalMessage');
     const iconEl = document.getElementById('universalModalIcon');
     const iconWrap = document.getElementById('universalModalIconWrap');
+    const card = document.getElementById('universalModalCard');
 
     function hide() {
         if (!modal) return;
-        modal.classList.add('hidden');
-        modal.setAttribute('aria-hidden', 'true');
+            modal.style.display = 'none';
+            modal.setAttribute('aria-hidden', 'true');
         const cb = modal.__onClose;
         modal.__onClose = null;
         if (typeof cb === 'function') {
@@ -67,7 +68,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (backdrop) backdrop.addEventListener('click', hide);
     if (okBtn) okBtn.addEventListener('click', hide);
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && modal && !modal.classList.contains('hidden')) hide();
+        if (e.key === 'Escape' && modal && modal.style.display !== 'none') hide();
     });
 
     window.showModal = function(title, message, icon = 'fas fa-exclamation-circle', iconColor = 'text-yellow-500', onClose = null, buttonText = 'OK') {
@@ -78,13 +79,23 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         if (titleEl) titleEl.textContent = String(title || 'Notice');
         if (msgEl) msgEl.textContent = String(message || '');
-        if (iconEl) iconEl.className = String(icon || 'fas fa-exclamation-circle') + ' text-xl';
-        if (iconWrap) {
-            iconWrap.className = 'mt-0.5 ' + String(iconColor || 'text-yellow-500');
-        }
+            if (iconEl) iconEl.className = String(icon || 'fas fa-exclamation-circle');
+            if (iconWrap) iconWrap.style.color = String(iconColor || '#f59e0b').includes('text-') ? '#f59e0b' : String(iconColor || '#f59e0b');
         if (okBtn) okBtn.textContent = String(buttonText || 'OK');
+
+            // Basic dark-mode adaptation based on html.dark
+            try {
+                const isDark = document.documentElement && document.documentElement.classList.contains('dark');
+                if (card) {
+                    card.style.background = isDark ? '#0b1220' : '#ffffff';
+                    card.style.borderColor = isDark ? 'rgba(51,65,85,0.8)' : 'rgba(148,163,184,0.35)';
+                }
+                if (titleEl) titleEl.style.color = isDark ? '#e6eef8' : '#0f172a';
+                if (msgEl) msgEl.style.color = isDark ? '#cbd5e1' : '#475569';
+            } catch (e) {}
+
         modal.__onClose = onClose;
-        modal.classList.remove('hidden');
+            modal.style.display = 'block';
         modal.setAttribute('aria-hidden', 'false');
         setTimeout(() => { try { okBtn && okBtn.focus(); } catch(e) {} }, 0);
     };
