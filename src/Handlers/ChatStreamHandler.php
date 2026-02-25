@@ -876,9 +876,9 @@ class ChatStreamHandler
             }
 
             // Select API key and provider
-            $apiKey = null;
-            // Prefer session-selected cloud provider first (DB key then .env)
-            if ($sessionCloudProvider) {
+            // If a user-owned key was already selected above, preserve it.
+            // Otherwise, resolve from session/provider defaults.
+            if (!$apiKey && $sessionCloudProvider) {
                 $sessionKeyData = $keyManager->getAvailableKey($sessionCloudProvider);
                 if ($sessionKeyData) {
                     $apiKey = $sessionKeyData['api_key'];
