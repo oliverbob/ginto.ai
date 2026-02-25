@@ -104,6 +104,86 @@ function ginto_verify_jwt_hs256(string $jwt, string $secret): ?array {
     return is_array($payload) ? $payload : null;
 }
 
+function ginto_set_tunnel_auth_cookie(string $token, int $expiresAt): void {
+    if ($token === '' || $expiresAt <= time()) {
+        return;
+    }
+    $cookieName = 'ginto_tunnel_token';
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    @setcookie($cookieName, $token, [
+        'expires' => $expiresAt,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
+
+function ginto_get_active_tunnel_key_row_for_subdomain(\Medoo\Medoo $db, string $subdomain): ?array {
+    try {
+        $row = $db->get('tunnel_access_keys', [
+            'id',
+            'user_id',
+            'subdomain',
+            'jti',
+            'created_at',
+            'expires_at',
+            'revoked',
+        ], [
+            'subdomain' => $subdomain,
+            'revoked' => 0,
+            'ORDER' => ['id' => 'DESC'],
+        ]);
+        if (!is_array($row) || empty($row)) {
+            return null;
+        }
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) <= time()) {
+            return null;
+        }
+        return $row;
+    } catch (\Throwable $_) {
+        return null;
+    }
+}
+
+function ginto_build_tunnel_token_from_row(array $row): string {
+    $secret = ginto_get_tunnel_jwt_secret();
+    if ($secret === '') {
+        return '';
+    }
+
+    $subdomain = strtolower(trim((string)($row['subdomain'] ?? '')));
+    $jti = trim((string)($row['jti'] ?? ''));
+    $userId = (int)($row['user_id'] ?? 0);
+    $expTs = !empty($row['expires_at']) ? strtotime((string)$row['expires_at']) : false;
+    if ($subdomain === '' || $jti === '' || $userId <= 0 || !is_int($expTs) || $expTs <= time()) {
+        return '';
+    }
+
+    $iatTs = !empty($row['created_at']) ? strtotime((string)$row['created_at']) : false;
+    if (!is_int($iatTs) || $iatTs <= 0) {
+        $iatTs = max(1, $expTs - 60);
+    }
+
+    $header = ['alg' => 'HS256', 'typ' => 'JWT'];
+    $payload = [
+        'iss' => 'ginto.ai',
+        'sub' => $userId,
+        'sd' => $subdomain,
+        'jti' => $jti,
+        'iat' => $iatTs,
+        'exp' => $expTs,
+    ];
+
+    $h = rtrim(strtr(base64_encode(json_encode($header, JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+    $p = rtrim(strtr(base64_encode(json_encode($payload, JSON_UNESCAPED_SLASHES)), '+/', '-_'), '=');
+    $sig = hash_hmac('sha256', $h . '.' . $p, $secret, true);
+    $s = rtrim(strtr(base64_encode($sig), '+/', '-_'), '=');
+
+    return 'gtnl-' . $h . '.' . $p . '.' . $s;
+}
+
 function ginto_extract_tunnel_token(): string {
     $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
     if ($auth === '' && function_exists('getallheaders')) {
@@ -119,6 +199,9 @@ function ginto_extract_tunnel_token(): string {
     }
     if (preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) {
         return trim((string)$m[1]);
+    }
+    if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_KEY'])) {
+        return trim((string)$_SERVER['HTTP_X_GINTO_TUNNEL_KEY']);
     }
     if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN'])) {
         return trim((string)$_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN']);
@@ -161,6 +244,9 @@ function ginto_detect_tunnel_token_source(): string {
     }
     if ($auth !== '' && preg_match('/^Bearer\s+(.+)$/i', $auth)) {
         return 'bearer';
+    }
+    if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_KEY'])) {
+        return 'header';
     }
     if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN'])) {
         return 'header';
@@ -433,8 +519,30 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
 
     // Enforce MySQL-backed tunnel access key on every request.
     // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
+    $db = ginto_bootstrap_db();
+    if (!$db) {
+        http_response_code(503);
+        echo 'Tunnel key validation unavailable';
+        return true;
+    }
+
     $token = ginto_extract_tunnel_token();
     $tokenSource = ginto_detect_tunnel_token_source();
+    if ($token === '' || !str_starts_with($token, 'gtnl-')) {
+        // Cross-device / cross-client fallback: if a subdomain has an active key in DB,
+        // issue a deterministic token from the DB record and authorize this request.
+        $row = ginto_get_active_tunnel_key_row_for_subdomain($db, $subdomain);
+        $dbToken = $row ? ginto_build_tunnel_token_from_row($row) : '';
+        if ($dbToken !== '' && str_starts_with($dbToken, 'gtnl-')) {
+            $token = $dbToken;
+            $tokenSource = 'db';
+            $expTs = !empty($row['expires_at']) ? strtotime((string)$row['expires_at']) : false;
+            if (is_int($expTs) && $expTs > time()) {
+                ginto_set_tunnel_auth_cookie($dbToken, $expTs);
+            }
+        }
+    }
+
     if ($token === '' || !str_starts_with($token, 'gtnl-')) {
         if ($tokenSource === 'cookie') {
             ginto_clear_tunnel_auth_cookie();
@@ -472,21 +580,40 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
         return true;
     }
 
-    $db = ginto_bootstrap_db();
-    if (!$db) {
-        http_response_code(503);
-        echo 'Tunnel key validation unavailable';
-        return true;
-    }
-
-    // Verify token exists in DB (hashed) and is active.
+    // Verify token exists in DB and is active.
     $hash = hash('sha256', $token);
+    $jti = trim((string)($payload['jti'] ?? ''));
+    $subClaimUserId = (int)($payload['sub'] ?? 0);
     try {
-        $row = $db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], [
-            'subdomain' => $subdomain,
-            'token_hash' => $hash,
-            'revoked' => 0,
-        ]);
+        $row = null;
+        if ($jti !== '') {
+            $where = [
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'revoked' => 0,
+                'ORDER' => ['id' => 'DESC'],
+            ];
+            if ($subClaimUserId > 0) {
+                $where['user_id'] = $subClaimUserId;
+            }
+            $byJti = $db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], $where);
+            if (is_array($byJti) && !empty($byJti)) {
+                $row = $byJti;
+            }
+        }
+
+        if (!$row) {
+            $byHash = $db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], [
+                'subdomain' => $subdomain,
+                'token_hash' => $hash,
+                'revoked' => 0,
+                'ORDER' => ['id' => 'DESC'],
+            ]);
+            if (is_array($byHash) && !empty($byHash)) {
+                $row = $byHash;
+            }
+        }
+
         if (!$row) {
             if ($tokenSource === 'cookie') {
                 ginto_clear_tunnel_auth_cookie();
@@ -520,17 +647,8 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
 
     // If a key was provided by GET/POST/header, persist it in a secure cookie for
     // the remaining key lifetime on this subdomain.
-    if (in_array($tokenSource, ['get', 'post', 'bearer', 'header'], true) && $effectiveExpiry > time()) {
-        $cookieName = 'ginto_tunnel_token';
-        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-        @setcookie($cookieName, $token, [
-            'expires' => $effectiveExpiry,
-            'path' => '/',
-            'secure' => $isHttps,
-            'httponly' => true,
-            'samesite' => 'Lax',
-        ]);
+    if (in_array($tokenSource, ['get', 'post', 'bearer', 'header', 'db'], true) && $effectiveExpiry > time()) {
+        ginto_set_tunnel_auth_cookie($token, $effectiveExpiry);
     }
 
     // If the key was submitted via POST form, treat it as an auth handshake:
