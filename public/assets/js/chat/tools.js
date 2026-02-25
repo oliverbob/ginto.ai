@@ -382,31 +382,56 @@ try { startSandboxJobPoller(); } catch (e) { console.warn('Sandbox job poller in
   
   // generate_image
   if (toolName === 'generate_image') {
+    const normalizeImageEntry = (entry) => {
+      if (!entry) return null;
+      if (typeof entry === 'string') {
+        return { dataUrl: entry, url: entry };
+      }
+      if (typeof entry !== 'object') return null;
+
+      if (typeof entry.b64_json === 'string' && entry.b64_json) {
+        return {
+          dataUrl: `data:image/png;base64,${entry.b64_json}`,
+          url: `data:image/png;base64,${entry.b64_json}`,
+        };
+      }
+
+      const directUrl =
+        (typeof entry.url === 'string' && entry.url) ||
+        (typeof entry.image_url === 'string' && entry.image_url) ||
+        (typeof entry.imageUrl === 'string' && entry.imageUrl) ||
+        (typeof entry.dataUrl === 'string' && entry.dataUrl) ||
+        '';
+
+      if (directUrl) {
+        return { dataUrl: directUrl, url: directUrl };
+      }
+
+      return null;
+    };
+
     const directOpenAiImages = Array.isArray(data?.data)
       ? data.data
-          .map((entry) => {
-            if (!entry || typeof entry !== 'object') return null;
-            if (typeof entry.b64_json === 'string' && entry.b64_json) {
-              return {
-                dataUrl: `data:image/png;base64,${entry.b64_json}`,
-                url: `data:image/png;base64,${entry.b64_json}`,
-              };
-            }
-            if (typeof entry.url === 'string' && entry.url) {
-              return { dataUrl: entry.url, url: entry.url };
-            }
-            return null;
-          })
+          .map(normalizeImageEntry)
           .filter(Boolean)
       : [];
 
     const images = (Array.isArray(data?.images) && data.images.length > 0)
-      ? data.images
+      ? data.images.map(normalizeImageEntry).filter(Boolean)
       : directOpenAiImages;
 
     if (images.length > 0) {
       const prompt = data.prompt || 'AI Generated Image';
-      const model = data.model || 'Imagen';
+      const model =
+        data.model ||
+        data.image_model ||
+        data.generation_model ||
+        data?.request?.model ||
+        data?.request_body?.model ||
+        data?.metadata?.model ||
+        data?.meta?.model ||
+        data?.data?.[0]?.model ||
+        'Image Model';
       const text = data.text || '';
       
       return `<div class="p-4 bg-gradient-to-br from-slate-50 to-gray-100 dark:from-slate-800/50 dark:to-gray-900/50 border border-slate-200 dark:border-slate-600/30 rounded-xl shadow-sm">
