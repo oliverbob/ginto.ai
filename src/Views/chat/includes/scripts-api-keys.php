@@ -32,10 +32,13 @@
     const providerSelect = form.querySelector('select[name="provider"]');
     const wrapper = document.getElementById('ginto-tunnel-base-url-wrap');
     const baseUrlInput = form.querySelector('input[name="base_url"]');
+    const apiKeyInput = form.querySelector('input[name="api_key"]');
     if (!providerSelect || !wrapper || !baseUrlInput) return;
 
     const selectedProvider = (providerSelect.value || '').toLowerCase();
     const enabled = selectedProvider === 'ginto_tunnel';
+    const defaultApiKeyPlaceholder = 'gsk_... or csk-...';
+    const gintoTunnelApiKeyPlaceholder = 'ginto-67191c4f9bef5ea61fb198b4bca584cf2b8818682206917de67a3732ae116088';
     wrapper.classList.toggle('hidden', !enabled);
     if (enabled) {
       if (!baseUrlInput.value.trim()) {
@@ -43,9 +46,15 @@
       }
       baseUrlInput.value = normalizeTunnelDomain(baseUrlInput.value);
       baseUrlInput.setAttribute('required', 'required');
+      if (apiKeyInput) {
+        apiKeyInput.placeholder = gintoTunnelApiKeyPlaceholder;
+      }
     } else {
       baseUrlInput.removeAttribute('required');
       baseUrlInput.value = '';
+      if (apiKeyInput) {
+        apiKeyInput.placeholder = defaultApiKeyPlaceholder;
+      }
     }
   }
 
