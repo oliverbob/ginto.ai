@@ -550,9 +550,12 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
 
                 // Handle content delta (the actual answer)
                 if (isset($delta['content'])) {
-                    $content .= $delta['content'];
-                    if ($onChunk) {
-                        $onChunk($delta['content'], null);
+                    $deltaText = self::normalizeContentPayloadToText($delta['content']);
+                    if ($deltaText !== '') {
+                        $content .= $deltaText;
+                        if ($onChunk) {
+                            $onChunk($deltaText, null);
+                        }
                     }
                 }
                 
@@ -629,32 +632,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }
 
         $message = $choice['message'] ?? [];
-        $content = $message['content'] ?? '';
-        if (is_array($content)) {
-            $parts = [];
-            foreach ($content as $block) {
-                if (!is_array($block)) {
-                    continue;
-                }
-                $type = (string)($block['type'] ?? '');
-                if ($type === 'text' || $type === 'input_text') {
-                    $text = trim((string)($block['text'] ?? ''));
-                    if ($text !== '') {
-                        $parts[] = $text;
-                    }
-                    continue;
-                }
-                if ($type === 'image_url') {
-                    $url = trim((string)($block['image_url']['url'] ?? $block['url'] ?? ''));
-                    if ($url !== '') {
-                        $parts[] = "![Generated image](" . $url . ")";
-                    }
-                }
-            }
-            $content = implode("\n\n", $parts);
-        } elseif (!is_string($content)) {
-            $content = '';
-        }
+        $content = self::normalizeContentPayloadToText($message['content'] ?? '');
         $toolCalls = [];
         
         // Handle Groq's executed_tools (browser_search results) for non-streaming
@@ -718,5 +696,113 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
             usage: $response['usage'] ?? [],
             raw: $response
         );
+    }
+
+    /**
+     * Normalize OpenAI-compatible content payloads to plain text.
+     *
+     * Accepts:
+     * - string content
+     * - single content block object
+     * - array of content blocks (e.g. text/image_url/output_text)
+     */
+    private static function normalizeContentPayloadToText(mixed $content): string
+    {
+        if (is_string($content)) {
+            return $content;
+        }
+
+        if (!is_array($content)) {
+            return '';
+        }
+
+        $blocks = [];
+        if (array_key_exists('type', $content)) {
+            $blocks[] = $content;
+        } else {
+            foreach ($content as $block) {
+                $blocks[] = $block;
+            }
+        }
+
+        $parts = [];
+        foreach ($blocks as $block) {
+            if (is_string($block)) {
+                $text = trim($block);
+                if ($text !== '') {
+                    $parts[] = $text;
+                }
+                continue;
+            }
+
+            if (!is_array($block)) {
+                continue;
+            }
+
+            $type = strtolower((string)($block['type'] ?? ''));
+            if ($type === 'text' || $type === 'input_text' || $type === 'output_text' || $type === '') {
+                $text = trim(self::extractTextFromMixedContent(
+                    $block['text'] ?? $block['output_text'] ?? $block['content'] ?? ''
+                ));
+                if ($text !== '') {
+                    $parts[] = $text;
+                }
+                continue;
+            }
+
+            if ($type === 'image_url') {
+                $imageUrlPayload = $block['image_url'] ?? null;
+                $url = '';
+                if (is_array($imageUrlPayload) && isset($imageUrlPayload['url']) && is_string($imageUrlPayload['url'])) {
+                    $url = trim($imageUrlPayload['url']);
+                } elseif (isset($block['url']) && is_string($block['url'])) {
+                    $url = trim($block['url']);
+                }
+                if ($url !== '') {
+                    $parts[] = '![Generated image](' . $url . ')';
+                }
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * Extract plain text from nested OpenAI-compatible content payload values.
+     *
+     * This avoids array-to-string coercion warnings and prevents accidental
+     * "Array" text from leaking into streamed output.
+     */
+    private static function extractTextFromMixedContent(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+
+        if (is_int($value) || is_float($value)) {
+            return (string)$value;
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        if (isset($value['value']) && is_string($value['value'])) {
+            return $value['value'];
+        }
+
+        if (isset($value['text']) && is_string($value['text'])) {
+            return $value['text'];
+        }
+
+        $parts = [];
+        foreach ($value as $item) {
+            $extracted = self::extractTextFromMixedContent($item);
+            if ($extracted !== '') {
+                $parts[] = $extracted;
+            }
+        }
+
+        return implode('', $parts);
     }
 }
