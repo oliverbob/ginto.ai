@@ -1580,6 +1580,20 @@ class ChatStreamHandler
                                 flush();
                                 return;
                             }
+
+                            if (isset($event['openai_delta_content']) && is_array($event['openai_delta_content'])) {
+                                echo "data: " . json_encode([
+                                    'choices' => [[
+                                        'index' => 0,
+                                        'delta' => [
+                                            'content' => $event['openai_delta_content'],
+                                        ],
+                                        'finish_reason' => null,
+                                    ]],
+                                ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+                                flush();
+                                return;
+                            }
                             return;
                         }
 

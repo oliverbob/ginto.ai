@@ -550,7 +550,14 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
 
                 // Handle content delta (the actual answer)
                 if (isset($delta['content'])) {
-                    $deltaText = self::normalizeContentPayloadToText($delta['content']);
+                    $imageBlocks = self::extractImageContentBlocks($delta['content']);
+                    if (!empty($imageBlocks) && $onChunk) {
+                        $onChunk(null, [
+                            'openai_delta_content' => $imageBlocks,
+                        ]);
+                    }
+
+                    $deltaText = self::normalizeContentPayloadToText($delta['content'], false);
                     if ($deltaText !== '') {
                         $content .= $deltaText;
                         if ($onChunk) {
@@ -706,7 +713,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
      * - single content block object
      * - array of content blocks (e.g. text/image_url/output_text)
      */
-    private static function normalizeContentPayloadToText(mixed $content): string
+    private static function normalizeContentPayloadToText(mixed $content, bool $includeImageMarkdown = true): string
     {
         if (is_string($content)) {
             return $content;
@@ -751,6 +758,9 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
             }
 
             if ($type === 'image_url') {
+                if (!$includeImageMarkdown) {
+                    continue;
+                }
                 $imageUrlPayload = $block['image_url'] ?? null;
                 $url = '';
                 if (is_array($imageUrlPayload) && isset($imageUrlPayload['url']) && is_string($imageUrlPayload['url'])) {
@@ -804,5 +814,58 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }
 
         return implode('', $parts);
+    }
+
+    /**
+     * Extract image_url content blocks from OpenAI-compatible content payloads.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private static function extractImageContentBlocks(mixed $content): array
+    {
+        if (!is_array($content)) {
+            return [];
+        }
+
+        $blocks = [];
+        if (array_key_exists('type', $content)) {
+            $blocks[] = $content;
+        } else {
+            foreach ($content as $block) {
+                if (is_array($block)) {
+                    $blocks[] = $block;
+                }
+            }
+        }
+
+        $images = [];
+        foreach ($blocks as $block) {
+            $type = strtolower((string)($block['type'] ?? ''));
+            if ($type !== 'image_url') {
+                continue;
+            }
+
+            $imageUrlPayload = $block['image_url'] ?? null;
+            if (is_array($imageUrlPayload) && isset($imageUrlPayload['url']) && is_string($imageUrlPayload['url'])) {
+                $images[] = [
+                    'type' => 'image_url',
+                    'image_url' => [
+                        'url' => $imageUrlPayload['url'],
+                    ],
+                ];
+                continue;
+            }
+
+            if (isset($block['url']) && is_string($block['url']) && trim($block['url']) !== '') {
+                $images[] = [
+                    'type' => 'image_url',
+                    'image_url' => [
+                        'url' => trim($block['url']),
+                    ],
+                ];
+            }
+        }
+
+        return $images;
     }
 }
