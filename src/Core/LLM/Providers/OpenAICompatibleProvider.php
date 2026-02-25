@@ -445,8 +445,6 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         $payload = [
             'model' => $options['model'] ?? $this->model,
             'messages' => $this->formatMessages($messages),
-            'temperature' => $options['temperature'] ?? 0.2,
-            'max_tokens' => $options['max_tokens'] ?? 8192,
             'stream' => true,
         ];
 

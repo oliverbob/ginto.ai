@@ -254,22 +254,29 @@ class OllamaProvider extends AbstractLLMProvider
 
     public function chatStream(array $messages, array $tools = [], array $options = [], callable $onChunk = null): LLMResponse
     {
+        $ollamaOptions = [
+            'height' => (int) ($options['height'] ?? 1024),
+            'width' => (int) ($options['width'] ?? 1024),
+            'num_inference_steps' => (int) ($options['num_inference_steps'] ?? 8),
+            'guidance_scale' => (float) ($options['guidance_scale'] ?? 0.0),
+        ];
+
+        if (isset($options['options']) && is_array($options['options'])) {
+            foreach (['height', 'width', 'num_inference_steps', 'guidance_scale'] as $key) {
+                if (array_key_exists($key, $options['options'])) {
+                    $ollamaOptions[$key] = $key === 'guidance_scale'
+                        ? (float) $options['options'][$key]
+                        : (int) $options['options'][$key];
+                }
+            }
+        }
+
         $payload = [
             'model' => $options['model'] ?? $this->model,
             'messages' => $this->formatMessages($messages),
             'stream' => true,
+            'options' => $ollamaOptions,
         ];
-
-        $ollamaOptions = [];
-        if (isset($options['temperature'])) {
-            $ollamaOptions['temperature'] = $options['temperature'];
-        }
-        if (isset($options['max_tokens'])) {
-            $ollamaOptions['num_predict'] = $options['max_tokens'];
-        }
-        if (!empty($ollamaOptions)) {
-            $payload['options'] = $ollamaOptions;
-        }
 
         if (!empty($tools)) {
             $payload['tools'] = $this->formatTools($tools);
@@ -346,8 +353,19 @@ class OllamaProvider extends AbstractLLMProvider
                 'stream' => true,
             ]);
 
+            $contentType = strtolower(trim(explode(';', $response->getHeaderLine('Content-Type'))[0] ?? ''));
+            if ($contentType !== 'application/x-ndjson') {
+                throw new \RuntimeException(
+                    sprintf(
+                        'Streaming protocol mismatch: expected Content-Type application/x-ndjson for NDJSON, got %s',
+                        $contentType !== '' ? $contentType : '(empty)'
+                    )
+                );
+            }
+
             $body = $response->getBody();
             $buffer = '';
+            $debugLineCount = 0;
 
             while (!$body->eof()) {
                 $buffer .= $body->read(1024);
@@ -360,6 +378,11 @@ class OllamaProvider extends AbstractLLMProvider
                     $line = trim($line);
                     if ($line === '') {
                         continue;
+                    }
+
+                    if ($debugLineCount < 5) {
+                        $debugLineCount++;
+                        error_log("[postStreamOllama] Raw NDJSON line #{$debugLineCount}: " . $line);
                     }
 
                     $chunk = json_decode($line, true);

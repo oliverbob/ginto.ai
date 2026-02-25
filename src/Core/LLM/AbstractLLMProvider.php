@@ -125,10 +125,21 @@ abstract class AbstractLLMProvider implements LLMProviderInterface
                 'stream' => true,
             ]);
 
+            $contentType = strtolower(trim(explode(';', $response->getHeaderLine('Content-Type'))[0] ?? ''));
+            if ($contentType !== 'text/event-stream') {
+                throw new \RuntimeException(
+                    sprintf(
+                        'Streaming protocol mismatch: expected Content-Type text/event-stream for SSE, got %s',
+                        $contentType !== '' ? $contentType : '(empty)'
+                    )
+                );
+            }
+
             error_log("[postStream] Got response, status=" . $response->getStatusCode());
             $body = $response->getBody();
             $buffer = '';
             $chunkCount = 0;
+            $debugLineCount = 0;
 
             // Read smaller blocks to avoid coalescing many small SSE events
             while (!$body->eof()) {
@@ -141,8 +152,17 @@ abstract class AbstractLLMProvider implements LLMProviderInterface
                     $buffer = substr($buffer, $pos + 1);
 
                     $line = trim($line);
-                    if ($line === '' || $line === 'data: [DONE]') {
+                    if ($line === '') {
                         continue;
+                    }
+
+                    if ($debugLineCount < 5) {
+                        $debugLineCount++;
+                        error_log("[postStream] Raw SSE line #{$debugLineCount}: " . $line);
+                    }
+
+                    if ($line === 'data: [DONE]') {
+                        return;
                     }
 
                     if (str_starts_with($line, 'data: ')) {
