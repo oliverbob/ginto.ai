@@ -3984,6 +3984,40 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     return out;
   }
 
+  const MAX_STREAM_TEXT_CHUNK_CHARS = 12000;
+
+  function isLikelyImageGenerationPrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') return false;
+    const p = prompt.toLowerCase();
+    if (/\b(generate|create|make|draw|render|produce)\b[\s\S]{0,40}\b(image|picture|photo|illustration|art|logo|icon|poster|banner|avatar)\b/.test(p)) return true;
+    if (/\bimage\b[\s\S]{0,30}\b(of|for|with)\b/.test(p)) return true;
+    if (/\bb64_json\b|\bbase64\b/.test(p)) return true;
+    return false;
+  }
+
+  function shouldPreferNonStreamResponse(prompt, attached) {
+    if (attached && attached.attachmentType === 'image') return true;
+    return isLikelyImageGenerationPrompt(prompt);
+  }
+
+  function looksLikeLargeBase64Chunk(text) {
+    if (typeof text !== 'string') return false;
+    if (text.length < MAX_STREAM_TEXT_CHUNK_CHARS) return false;
+
+    const compact = text.replace(/\s+/g, '');
+    if (compact.length < MAX_STREAM_TEXT_CHUNK_CHARS) return false;
+
+    const base64ish = compact.match(/[A-Za-z0-9+/=]/g);
+    const ratio = base64ish ? (base64ish.length / compact.length) : 0;
+    return ratio > 0.97;
+  }
+
+  function sanitizeOpenAiTextChunk(text) {
+    if (typeof text !== 'string' || !text) return '';
+    if (looksLikeLargeBase64Chunk(text)) return '';
+    return text;
+  }
+
   function mergeAssistantTextAndImagesHtml(text, imageUrls) {
     const safeText = stripToolCallJson(text || '');
     let html = simpleMarkdownToHtml(safeText);
@@ -4066,6 +4100,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     const seenImageUrls = new Set();
     let citations = [];
     let toolResults = []; // Track tool results for persistence
+    let warnedLargeChunkSkipped = false;
     
     // Capture current attachment before clearing
     const attachedImage = currentAttachment;
@@ -4175,6 +4210,12 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       if (csrfToken) {
         bodyParams.append('csrf_token', csrfToken);
       }
+
+      const preferNonStream = shouldPreferNonStreamResponse(query, attachedImage);
+      bodyParams.append('stream', preferNonStream ? '0' : '1');
+      if (preferNonStream) {
+        bodyParams.append('prefer_non_stream', '1');
+      }
       
       const response = await fetch('/chat', {
         method: 'POST',
@@ -4205,6 +4246,60 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         currentCard.response.innerHTML = `<p class="text-red-400">${escapeHtml(visibleMessage)}</p>`;
         currentCard.responseLabel.classList.remove('hidden');
         return;
+      }
+
+      const contentType = (response.headers.get('content-type') || '').toLowerCase();
+      if (contentType.includes('application/json') || contentType.includes('text/json')) {
+        const data = await response.json().catch(() => null);
+        if (data) {
+          const messageParts = parseOpenAiContentParts(data?.choices?.[0]?.message?.content);
+          const deltaParts = parseOpenAiContentParts(data?.choices?.[0]?.delta?.content);
+          const mergedRaw = (deltaParts.text || '') + (messageParts.text || '') + (typeof data.text === 'string' ? data.text : '');
+          const mergedText = sanitizeOpenAiTextChunk(mergedRaw);
+
+          if (mergedRaw && !mergedText && !warnedLargeChunkSkipped) {
+            warnedLargeChunkSkipped = true;
+            console.warn('[streamWebSearch] Skipped oversized base64-like JSON chunk');
+          }
+
+          const imageCandidates = [...(deltaParts.images || []), ...(messageParts.images || [])];
+          for (const imageUrl of imageCandidates) {
+            if (!imageUrl || seenImageUrls.has(imageUrl)) continue;
+            seenImageUrls.add(imageUrl);
+            accumulatedImageUrls.push(imageUrl);
+          }
+
+          if (mergedText) {
+            accumulatedContent += mergedText;
+          }
+
+          if (accumulatedContent || accumulatedImageUrls.length > 0) {
+            contentStarted = true;
+            currentCard.responseLabel.classList.remove('hidden');
+            currentCard.body.classList.remove('collapsed');
+            const combinedHtml = mergeAssistantTextAndImagesHtml(accumulatedContent, accumulatedImageUrls);
+            currentCard.response.innerHTML = combinedHtml;
+            renderLatexInElement(currentCard.response);
+            enhanceCodeBlocks(currentCard.response);
+            initStickyCodeButtons();
+            lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
+            smartScrollToElement(currentCard.response, { behavior: 'smooth', block: 'end' });
+            return;
+          }
+
+          if (typeof data.html === 'string' && data.html.trim()) {
+            contentStarted = true;
+            currentCard.responseLabel.classList.remove('hidden');
+            currentCard.body.classList.remove('collapsed');
+            currentCard.response.innerHTML = ensureCodeBlockAttributes(stripToolCallJson(data.html));
+            renderLatexInElement(currentCard.response);
+            enhanceCodeBlocks(currentCard.response);
+            initStickyCodeButtons();
+            lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
+            smartScrollToElement(currentCard.response, { behavior: 'smooth', block: 'end' });
+            return;
+          }
+        }
       }
 
       const reader = response.body.getReader();
@@ -4638,7 +4733,13 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 contentStarted = true;
               }
 
-              const mergedText = (deltaParts.text || '') + (messageParts.text || '');
+              const mergedRawText = (deltaParts.text || '') + (messageParts.text || '');
+              const mergedText = sanitizeOpenAiTextChunk(mergedRawText);
+              if (mergedRawText && !mergedText && !warnedLargeChunkSkipped) {
+                warnedLargeChunkSkipped = true;
+                console.warn('[streamWebSearch] Skipped oversized base64-like stream chunk');
+              }
+
               if (mergedText) {
                 accumulatedContent += mergedText;
                 try {
@@ -6079,11 +6180,11 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         if (!jsonStr || jsonStr === '[DONE]') continue;
         try {
           const data = JSON.parse(jsonStr);
-          if (data.content) aiResponse += data.content;
-          else if (data.choices?.[0]?.delta?.content) aiResponse += data.choices[0].delta.content;
+          if (data.content) aiResponse += sanitizeOpenAiTextChunk(data.content);
+          else if (data.choices?.[0]?.delta?.content) aiResponse += sanitizeOpenAiTextChunk(data.choices[0].delta.content);
           else if (Array.isArray(data.choices?.[0]?.delta?.content)) aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
           else if (data.choices?.[0]?.message?.content) aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
-          else if (data.text) aiResponse += data.text;
+          else if (data.text) aiResponse += sanitizeOpenAiTextChunk(data.text);
         } catch (e) { /* ignore */ }
       }
     }
@@ -6243,17 +6344,17 @@ Have you finished the ORIGINAL REQUEST above?
             chunkCount++;
             // Handle content chunks - multiple formats
             if (data.content) {
-              aiResponse += data.content;
+              aiResponse += sanitizeOpenAiTextChunk(data.content);
             } else if (data.choices?.[0]?.delta?.content) {
-              aiResponse += data.choices[0].delta.content;
+              aiResponse += sanitizeOpenAiTextChunk(data.choices[0].delta.content);
             } else if (Array.isArray(data.choices?.[0]?.delta?.content)) {
               aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
             } else if (data.choices?.[0]?.message?.content) {
               aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
             } else if (data.delta?.content) {
-              aiResponse += data.delta.content;
+              aiResponse += sanitizeOpenAiTextChunk(data.delta.content);
             } else if (data.text) {
-              aiResponse += data.text;
+              aiResponse += sanitizeOpenAiTextChunk(data.text);
             }
           } catch (e) {
             console.log('[continueAgentPlan] Parse error on line:', line.substring(0, 100));
@@ -6419,7 +6520,7 @@ Is the ORIGINAL REQUEST complete? If not, output the next sandbox_delete. If don
   }
 
   function extractTextFromOpenAiContent(content) {
-    if (typeof content === 'string') return content;
+    if (typeof content === 'string') return sanitizeOpenAiTextChunk(content);
     if (!Array.isArray(content)) return '';
 
     const parts = [];
@@ -6438,7 +6539,7 @@ Is the ORIGINAL REQUEST complete? If not, output the next sandbox_delete. If don
       if (text) parts.push(text);
     }
 
-    return parts.join('');
+    return sanitizeOpenAiTextChunk(parts.join(''));
   }
 
       // STT client-side recording/processing has been removed.
