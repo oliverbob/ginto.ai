@@ -15,6 +15,7 @@ class FrpController
     protected ?\Medoo\Medoo $db;
     protected string $frpDir;
     protected string $baseDomain = 'ginto.ai';
+    private bool $identifierSchemaEnsured = false;
     
     public function __construct(?\Medoo\Medoo $db = null)
     {
@@ -99,17 +100,30 @@ class FrpController
             echo json_encode(['success' => false, 'error' => 'Database not available']);
             return;
         }
+
+        $this->ensureFrpIdentifierSchema();
         
         try {
             // Check if user already has an FRP token
-            $existingToken = $this->db->get('frp_tokens', ['id', 'token', 'created_at'], [
+            $existingToken = $this->db->get('frp_tokens', ['id', 'token', 'token_identifier', 'created_at'], [
                 'user_id' => $userId,
                 'revoked' => 0
             ]);
             
             if ($existingToken) {
+                $tokenIdentifier = trim((string)($existingToken['token_identifier'] ?? ''));
+                if ($tokenIdentifier === '') {
+                    $tokenIdentifier = $this->generateEntityIdentifier('frptok');
+                    $this->db->update('frp_tokens', [
+                        'token_identifier' => $tokenIdentifier,
+                    ], [
+                        'id' => (int)$existingToken['id'],
+                    ]);
+                }
                 echo json_encode([
                     'success' => true,
+                    'token_id' => (int)$existingToken['id'],
+                    'token_identifier' => $tokenIdentifier,
                     'token' => $existingToken['token'],
                     'created_at' => $existingToken['created_at'],
                     'message' => 'Using existing token'
@@ -119,17 +133,23 @@ class FrpController
             
             // Generate new token
             $token = $this->generateSecureToken();
+            $tokenIdentifier = $this->generateEntityIdentifier('frptok');
             
             $this->db->insert('frp_tokens', [
                 'user_id' => $userId,
                 'token' => $token,
+                'token_identifier' => $tokenIdentifier,
                 'created_at' => date('Y-m-d H:i:s'),
                 'expires_at' => date('Y-m-d H:i:s', strtotime('+1 year')),
                 'revoked' => 0
             ]);
+
+            $tokenId = (int)$this->db->id();
             
             echo json_encode([
                 'success' => true,
+                'token_id' => $tokenId,
+                'token_identifier' => $tokenIdentifier,
                 'token' => $token,
                 'expires_in' => 365 * 24 * 3600,
                 'server' => $this->baseDomain,
@@ -201,6 +221,8 @@ class FrpController
             echo json_encode(['success' => false, 'error' => 'Database not available']);
             return;
         }
+
+        $this->ensureFrpIdentifierSchema();
         
         try {
             $token = $this->db->get('frp_tokens', '*', [
@@ -219,6 +241,8 @@ class FrpController
             echo json_encode([
                 'success' => true,
                 'has_token' => true,
+                'token_id' => (int)($token['id'] ?? 0),
+                'token_identifier' => $token['token_identifier'] ?? null,
                 'token' => $token['token'],
                 'created_at' => $token['created_at'],
                 'expires_at' => $token['expires_at'],
@@ -328,9 +352,11 @@ class FrpController
             echo json_encode(['valid' => $token === $sharedToken]);
             return;
         }
+
+        $this->ensureFrpIdentifierSchema();
         
         try {
-            $tokenRecord = $this->db->get('frp_tokens', ['user_id', 'expires_at'], [
+            $tokenRecord = $this->db->get('frp_tokens', ['id', 'user_id', 'expires_at', 'token_identifier'], [
                 'token' => $token,
                 'revoked' => 0
             ]);
@@ -344,10 +370,36 @@ class FrpController
                 echo json_encode(['valid' => false, 'error' => 'Token expired']);
                 return;
             }
+
+            $this->db->update('frp_tokens', [
+                'last_used_at' => date('Y-m-d H:i:s'),
+            ], [
+                'id' => (int)$tokenRecord['id'],
+            ]);
+
+            $normalizedSubdomain = $this->normalizeSubdomain((string)($input['subdomain'] ?? $input['proxy_name'] ?? ''));
+            $domainIdentifier = null;
+            if ($normalizedSubdomain !== '') {
+                try {
+                    $binding = $this->db->get('frp_token_domains', ['domain_identifier'], [
+                        'token_id' => (int)$tokenRecord['id'],
+                        'user_id' => (int)$tokenRecord['user_id'],
+                        'subdomain' => $normalizedSubdomain,
+                        'revoked' => 0,
+                    ]);
+                    $domainIdentifier = $binding['domain_identifier'] ?? null;
+                } catch (\Throwable $_) {
+                    $domainIdentifier = null;
+                }
+            }
             
             echo json_encode([
                 'valid' => true,
-                'user_id' => $tokenRecord['user_id']
+                'user_id' => (int)$tokenRecord['user_id'],
+                'token_id' => (int)$tokenRecord['id'],
+                'token_identifier' => $tokenRecord['token_identifier'] ?? null,
+                'subdomain' => $normalizedSubdomain !== '' ? $normalizedSubdomain : null,
+                'domain_identifier' => $domainIdentifier,
             ]);
             
         } catch (\Exception $e) {
@@ -497,6 +549,8 @@ TOML;
             return;
         }
 
+        $this->ensureFrpIdentifierSchema();
+
         $raw = json_decode((string)file_get_contents('php://input'), true);
         $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
 
@@ -564,14 +618,214 @@ TOML;
             return;
         }
 
+        $bindingInfo = null;
+        if ($enabled) {
+            $activeToken = $this->getOrCreateActiveFrpToken($userId);
+            if ($activeToken) {
+                $bindingInfo = $this->upsertFrpDomainBinding(
+                    (int)$userId,
+                    (int)$activeToken['id'],
+                    (string)$activeToken['token_identifier'],
+                    $subdomain
+                );
+            }
+        } else {
+            $this->revokeFrpDomainBinding((int)$userId, $subdomain);
+        }
+
         $out = [
             'success' => true,
             'subdomain' => $subdomain,
             'enabled' => $enabled,
         ];
+        if (is_array($bindingInfo)) {
+            $out['token_id'] = $bindingInfo['token_id'];
+            $out['token_identifier'] = $bindingInfo['token_identifier'];
+            $out['domain_identifier'] = $bindingInfo['domain_identifier'];
+        }
         if ($plainKey !== null) {
             $out['access_key'] = $plainKey;
         }
         echo json_encode($out);
+    }
+
+    private function ensureFrpIdentifierSchema(): void
+    {
+        if (!$this->db || $this->identifierSchemaEnsured) {
+            return;
+        }
+
+        $this->identifierSchemaEnsured = true;
+        try {
+            $this->db->query("ALTER TABLE `frp_tokens` ADD COLUMN `token_identifier` VARCHAR(64) NULL AFTER `token`");
+        } catch (\Throwable $_) {
+        }
+        try {
+            $this->db->query("CREATE UNIQUE INDEX `idx_token_identifier` ON `frp_tokens` (`token_identifier`)");
+        } catch (\Throwable $_) {
+        }
+        try {
+            $this->db->query("CREATE TABLE IF NOT EXISTS `frp_token_domains` (
+                `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `user_id` INT UNSIGNED NOT NULL,
+                `token_id` INT UNSIGNED NOT NULL,
+                `token_identifier` VARCHAR(64) NOT NULL,
+                `subdomain` VARCHAR(63) NOT NULL,
+                `domain_identifier` VARCHAR(64) NOT NULL,
+                `revoked` TINYINT(1) NOT NULL DEFAULT 0,
+                `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                `revoked_at` DATETIME DEFAULT NULL,
+                UNIQUE KEY `idx_user_subdomain` (`user_id`, `subdomain`),
+                UNIQUE KEY `idx_domain_identifier` (`domain_identifier`),
+                KEY `idx_token_id` (`token_id`),
+                CONSTRAINT `fk_frp_token_domains_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
+                CONSTRAINT `fk_frp_token_domains_token` FOREIGN KEY (`token_id`) REFERENCES `frp_tokens` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        } catch (\Throwable $_) {
+        }
+    }
+
+    private function getOrCreateActiveFrpToken(int $userId): ?array
+    {
+        if (!$this->db) {
+            return null;
+        }
+
+        $token = $this->db->get('frp_tokens', ['id', 'token', 'token_identifier', 'expires_at'], [
+            'user_id' => $userId,
+            'revoked' => 0,
+            'ORDER' => ['id' => 'DESC'],
+        ]);
+
+        if ($token && !empty($token['expires_at']) && strtotime((string)$token['expires_at']) < time()) {
+            $token = null;
+        }
+
+        if ($token) {
+            $identifier = trim((string)($token['token_identifier'] ?? ''));
+            if ($identifier === '') {
+                $identifier = $this->generateEntityIdentifier('frptok');
+                $this->db->update('frp_tokens', ['token_identifier' => $identifier], ['id' => (int)$token['id']]);
+                $token['token_identifier'] = $identifier;
+            }
+            return $token;
+        }
+
+        $newToken = $this->generateSecureToken();
+        $identifier = $this->generateEntityIdentifier('frptok');
+        $this->db->insert('frp_tokens', [
+            'user_id' => $userId,
+            'token' => $newToken,
+            'token_identifier' => $identifier,
+            'created_at' => date('Y-m-d H:i:s'),
+            'expires_at' => date('Y-m-d H:i:s', strtotime('+1 year')),
+            'revoked' => 0,
+        ]);
+
+        return [
+            'id' => (int)$this->db->id(),
+            'token' => $newToken,
+            'token_identifier' => $identifier,
+        ];
+    }
+
+    private function upsertFrpDomainBinding(int $userId, int $tokenId, string $tokenIdentifier, string $subdomain): ?array
+    {
+        if (!$this->db) {
+            return null;
+        }
+
+        try {
+            $existing = $this->db->get('frp_token_domains', ['id', 'domain_identifier'], [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+            ]);
+
+            if ($existing) {
+                $domainIdentifier = trim((string)($existing['domain_identifier'] ?? ''));
+                if ($domainIdentifier === '') {
+                    $domainIdentifier = $this->generateEntityIdentifier('frpdom');
+                }
+                $this->db->update('frp_token_domains', [
+                    'token_id' => $tokenId,
+                    'token_identifier' => $tokenIdentifier,
+                    'domain_identifier' => $domainIdentifier,
+                    'revoked' => 0,
+                    'revoked_at' => null,
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ], [
+                    'id' => (int)$existing['id'],
+                ]);
+
+                return [
+                    'token_id' => $tokenId,
+                    'token_identifier' => $tokenIdentifier,
+                    'domain_identifier' => $domainIdentifier,
+                ];
+            }
+
+            $domainIdentifier = $this->generateEntityIdentifier('frpdom');
+            $this->db->insert('frp_token_domains', [
+                'user_id' => $userId,
+                'token_id' => $tokenId,
+                'token_identifier' => $tokenIdentifier,
+                'subdomain' => $subdomain,
+                'domain_identifier' => $domainIdentifier,
+                'revoked' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            return [
+                'token_id' => $tokenId,
+                'token_identifier' => $tokenIdentifier,
+                'domain_identifier' => $domainIdentifier,
+            ];
+        } catch (\Throwable $_) {
+            return null;
+        }
+    }
+
+    private function revokeFrpDomainBinding(int $userId, string $subdomain): void
+    {
+        if (!$this->db) {
+            return;
+        }
+
+        try {
+            $this->db->update('frp_token_domains', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'revoked' => 0,
+            ]);
+        } catch (\Throwable $_) {
+        }
+    }
+
+    private function normalizeSubdomain(string $raw): string
+    {
+        $value = strtolower(trim($raw));
+        if ($value === '') {
+            return '';
+        }
+        if (str_contains($value, '.')) {
+            $parts = explode('.', $value);
+            $value = $parts[0] ?? '';
+        }
+        $value = preg_replace('/[^a-z0-9\-]/', '', $value);
+        if (!preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $value)) {
+            return '';
+        }
+        return $value;
+    }
+
+    private function generateEntityIdentifier(string $prefix): string
+    {
+        return $prefix . '-' . bin2hex(random_bytes(12));
     }
 }

@@ -451,7 +451,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         const reactivateBtn = canReactivate
           ? `<button class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white" onclick="reactivateKey(${Number(k.id)}, '${esc(k.subdomain)}')">Reactivate</button>`
           : '';
-        const actionButtons = [reactivateBtn, revokeBtn].filter(Boolean).join(' ');
+        const deleteBtn = `<button class="px-3 py-1.5 rounded bg-gray-600 hover:bg-gray-700 text-white" onclick="deleteKey(${Number(k.id)})">Delete</button>`;
+        const actionButtons = [reactivateBtn, revokeBtn, deleteBtn].filter(Boolean).join(' ');
         return `
           <tr>
             <td class="px-4 py-3 font-mono">${esc(k.subdomain)}</td>
@@ -555,6 +556,38 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       loadKeys();
     } catch (e) {
       uiModal('Network error', 'Error: ' + e.message);
+    }
+  }
+
+  async function deleteKey(id) {
+    const doDelete = () => (async () => {
+      try {
+        const res = await fetch('/api/tunnel/access-key/delete', {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, csrf_token: csrfToken })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          uiModal('Delete failed', data.error || 'Failed to delete key');
+          return;
+        }
+        loadKeys();
+      } catch (e) {
+        uiModal('Network error', 'Error: ' + e.message);
+      }
+    })();
+
+    try {
+      if (typeof window.showConfirmModal === 'function') {
+        window.showConfirmModal('Delete key record?', 'This permanently removes this key row from history.', doDelete, null, 'Delete');
+        return;
+      }
+    } catch (e) {}
+
+    if (confirm('Delete this key record permanently?')) {
+      doDelete();
     }
   }
 

@@ -1530,7 +1530,7 @@ TOML;
 
         try {
             // Enforce one active key per user+subdomain.
-            // Expired keys are auto-revoked so users can re-issue from account keys.
+            // Re-use latest existing record for this subdomain to avoid duplicate history rows.
             if ($this->db) {
                 $nowSql = date('Y-m-d H:i:s');
                 $existingActive = $this->db->get('tunnel_access_keys', ['id', 'expires_at'], [
@@ -1547,13 +1547,19 @@ TOML;
                     http_response_code(409);
                     echo json_encode([
                         'success' => false,
-                        'error' => 'An active key already exists for this subdomain. Revoke it first.',
+                        'error' => 'An active key already exists for this subdomain. Revoke, delete, or keep using it.',
                     ]);
                     return;
                 }
 
-                // Revoke stale (expired) unrevoked keys for this subdomain so the user
-                // can reactivate cleanly without manual cleanup.
+                $latestRow = $this->db->get('tunnel_access_keys', ['id'], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                $rotateId = (int)($latestRow['id'] ?? 0);
+
+                // Revoke any active duplicates for this subdomain except the row we rotate.
                 $this->db->update('tunnel_access_keys', [
                     'revoked' => 1,
                     'revoked_at' => date('Y-m-d H:i:s'),
@@ -1561,11 +1567,11 @@ TOML;
                     'user_id' => (int)$userId,
                     'subdomain' => $subdomain,
                     'revoked' => 0,
-                    'expires_at[<=]' => $nowSql,
+                    'id[!]' => $rotateId > 0 ? $rotateId : -1,
                 ]);
             }
 
-            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl);
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl, isset($rotateId) ? (int)$rotateId : 0);
 
             echo json_encode([
                 'success' => true,
@@ -1762,7 +1768,7 @@ TOML;
                 return;
             }
 
-            // Revoke all stale keys on the subdomain for this user before issuing a new one.
+            // Revoke other active rows so only one row remains active after rotation.
             $this->db->update('tunnel_access_keys', [
                 'revoked' => 1,
                 'revoked_at' => date('Y-m-d H:i:s'),
@@ -1770,9 +1776,10 @@ TOML;
                 'user_id' => (int)$userId,
                 'subdomain' => $subdomain,
                 'revoked' => 0,
+                'id[!]' => $id,
             ]);
 
-            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl);
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl, $id);
 
             echo json_encode([
                 'success' => true,
@@ -1783,6 +1790,58 @@ TOML;
         } catch (\Exception $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to reactivate key']);
+        }
+    }
+
+    /**
+     * API: Delete a tunnel access key record.
+     * POST /api/tunnel/access-key/delete
+     * Body: {"id":123,"csrf_token":"..."}
+     */
+    public function deleteAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id'], ['id' => $id]);
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+
+            $this->db->delete('tunnel_access_keys', [
+                'id' => $id,
+                'user_id' => (int)$userId,
+            ]);
+
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to delete key']);
         }
     }
 
@@ -1800,9 +1859,9 @@ TOML;
     }
 
     /**
-     * @return array{subdomain:string,expires_at:int,token:string}
+     * @return array{subdomain:string,expires_at:int,token:string,id:int}
      */
-    private function createTunnelAccessKey(int $userId, string $subdomain, int $ttl): array
+    private function createTunnelAccessKey(int $userId, string $subdomain, int $ttl, int $rotateId = 0): array
     {
         if (!$this->db) {
             throw new \RuntimeException('Database not available');
@@ -1827,16 +1886,36 @@ TOML;
         $jwt = $this->jwtEncodeHs256($payload, $secret);
         $token = 'gtnl-' . $jwt;
 
-        $this->db->insert('tunnel_access_keys', [
-            'user_id' => $userId,
-            'subdomain' => $subdomain,
-            'jti' => $jti,
-            'token_hash' => hash('sha256', $token),
-            'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
-            'revoked' => 0,
-        ]);
+        if ($rotateId > 0) {
+            $this->db->update('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'created_at' => date('Y-m-d H:i:s', $now),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'last_used_at' => null,
+                'revoked' => 0,
+                'revoked_at' => null,
+            ], [
+                'id' => $rotateId,
+                'user_id' => $userId,
+            ]);
+            $keyId = $rotateId;
+        } else {
+            $this->db->insert('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'revoked' => 0,
+            ]);
+            $keyId = (int)$this->db->id();
+        }
 
         return [
+            'id' => $keyId,
             'subdomain' => $subdomain,
             'expires_at' => $now + $ttl,
             'token' => $token,

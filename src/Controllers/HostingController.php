@@ -1158,7 +1158,7 @@ class HostingController
                 ]);
 
                 try {
-                    $created = $this->createTunnelAccessKeyForUser($userId, $subdomain, $ttl);
+                    $created = $this->createTunnelAccessKeyForUser($userId, $subdomain, $ttl, (int)$id);
                     $createdCount++;
                     $results[] = [
                         'id' => $id,
@@ -1209,7 +1209,7 @@ class HostingController
     /**
      * @return array{subdomain:string,expires_at:int,token:string}
      */
-    private function createTunnelAccessKeyForUser(int $userId, string $subdomain, int $ttl): array
+    private function createTunnelAccessKeyForUser(int $userId, string $subdomain, int $ttl, int $rotateId = 0): array
     {
         if (!$this->db) {
             throw new \RuntimeException('Database not available');
@@ -1234,14 +1234,31 @@ class HostingController
         $jwt = $this->jwtEncodeHs256($payload, $secret);
         $token = 'gtnl-' . $jwt;
 
-        $this->db->insert('tunnel_access_keys', [
-            'user_id' => $userId,
-            'subdomain' => $subdomain,
-            'jti' => $jti,
-            'token_hash' => hash('sha256', $token),
-            'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
-            'revoked' => 0,
-        ]);
+        if ($rotateId > 0) {
+            $this->db->update('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'created_at' => date('Y-m-d H:i:s', $now),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'last_used_at' => null,
+                'revoked' => 0,
+                'revoked_at' => null,
+            ], [
+                'id' => $rotateId,
+                'user_id' => $userId,
+            ]);
+        } else {
+            $this->db->insert('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'revoked' => 0,
+            ]);
+        }
 
         return [
             'subdomain' => $subdomain,
