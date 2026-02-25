@@ -159,7 +159,7 @@
     });
   }
   
-  // Add Key button opens settings panel with admin (API Keys) tab
+  // + Add Ginto Tunnel button opens settings panel with API key tab and pre-fills provider
   if (addProviderBtn) {
     addProviderBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -168,6 +168,9 @@
       const ad = getActiveDropdown(); if (ad) ad.classList.add('hidden');
       // Open settings with admin (API Keys) tab
       openSettings('admin');
+      if (typeof window.prefillAddGintoTunnelForm === 'function') {
+        setTimeout(() => window.prefillAddGintoTunnelForm(), 0);
+      }
     });
   }
   

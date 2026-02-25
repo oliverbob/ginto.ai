@@ -156,6 +156,7 @@ class ProviderKeyManager
             'provider' => $provider,
             'is_active' => 1,
             'ORDER' => [
+                'is_default' => 'DESC',
                 'id' => 'ASC',
             ],
         ]);
@@ -299,7 +300,7 @@ class ProviderKeyManager
             'provider' => $provider,
             'user_id' => $userId,
             'is_active' => 1,
-            'ORDER' => ['id' => 'ASC'],
+            'ORDER' => ['is_default' => 'DESC', 'id' => 'ASC'],
         ]);
 
         if (empty($keys)) return null;

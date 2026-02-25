@@ -624,6 +624,11 @@ class ApiController extends Controller
         return 'llm_ginto_tunnel_base_url_user_' . (int)$userId;
     }
 
+    private function getTunnelBaseUrlPerKeySettingKey(int $keyId): string
+    {
+        return 'llm_ginto_tunnel_base_url_key_' . (int)$keyId;
+    }
+
     private function saveTunnelBaseUrl(?string $baseUrl, ?int $userId, bool $isAdmin): void
     {
         if (!$this->db) {
@@ -658,6 +663,40 @@ class ApiController extends Controller
         }
     }
 
+    private function saveTunnelBaseUrlForKey(?string $baseUrl, int $keyId): void
+    {
+        if (!$this->db || $keyId <= 0) {
+            return;
+        }
+
+        $value = $this->sanitizeOpenAiCompatibleBaseUrl($baseUrl);
+        if (empty($value)) {
+            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+        }
+        if (empty($value)) {
+            return;
+        }
+
+        $key = $this->getTunnelBaseUrlPerKeySettingKey($keyId);
+        $exists = $this->db->get('settings', 'id', ['key' => $key]);
+        if ($exists) {
+            $this->db->update('settings', [
+                'value' => $value,
+                'type' => 'string',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], ['key' => $key]);
+        } else {
+            $this->db->insert('settings', [
+                'key' => $key,
+                'value' => $value,
+                'type' => 'string',
+                'group_name' => 'system',
+                'description' => 'OpenAI-compatible base URL for a specific Ginto Tunnel key',
+                'is_public' => 0,
+            ]);
+        }
+    }
+
     private function resolveTunnelBaseUrl(?int $userId, bool $isAdmin): string
     {
         $fallback = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/')
@@ -684,6 +723,87 @@ class ApiController extends Controller
         }
 
         return $fallback;
+    }
+
+    private function resolveTunnelBaseUrlForKey(int $keyId, ?int $userId, bool $isAdmin): string
+    {
+        $fallback = $this->resolveTunnelBaseUrl($userId, $isAdmin);
+        if (!$this->db || $keyId <= 0) {
+            return $fallback;
+        }
+
+        $row = $this->db->get('settings', ['value'], ['key' => $this->getTunnelBaseUrlPerKeySettingKey($keyId)]);
+        $candidate = $this->sanitizeOpenAiCompatibleBaseUrl((string)($row['value'] ?? ''));
+        return !empty($candidate) ? $candidate : $fallback;
+    }
+
+    private function fetchOpenAiCompatibleModels(string $baseUrl, string $apiKey, string $provider = 'ginto_tunnel'): array
+    {
+        if (empty($apiKey) || empty($baseUrl)) {
+            return [];
+        }
+
+        $modelsUrl = rtrim($baseUrl, '/') . '/models';
+        $headers = [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $apiKey,
+        ];
+        if ($provider === 'ginto_tunnel') {
+            $headers[] = 'X-Ginto-Tunnel-Key: ' . $apiKey;
+        }
+
+        try {
+            $ch = curl_init($modelsUrl);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_HTTPHEADER => $headers,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || !$response) {
+                return [];
+            }
+
+            $decoded = json_decode((string)$response, true);
+            $items = [];
+            if (isset($decoded['data']) && is_array($decoded['data'])) {
+                $items = $decoded['data'];
+            } elseif (isset($decoded['models']) && is_array($decoded['models'])) {
+                $items = $decoded['models'];
+            } elseif (isset($decoded['data']['models']) && is_array($decoded['data']['models'])) {
+                $items = $decoded['data']['models'];
+            }
+
+            if (empty($items)) {
+                return [];
+            }
+
+            $models = [];
+            $registry = class_exists('\\App\\Core\\LLM\\ProviderRegistry')
+                ? \App\Core\LLM\ProviderRegistry::getInstance()->setDatabase($this->db)
+                : null;
+
+            foreach ($items as $item) {
+                $mid = (string)($item['id'] ?? ($item['name'] ?? ''));
+                if ($mid === '') {
+                    continue;
+                }
+                $models[] = [
+                    'id' => $mid,
+                    'name' => (string)($item['name'] ?? $mid),
+                    'capabilities' => $registry ? $registry->detectCapabilities($mid) : [],
+                ];
+            }
+
+            return $models;
+        } catch (\Throwable $_) {
+            return [];
+        }
     }
 
     private function isDuplicateKeyError(\Throwable $e): bool
@@ -844,6 +964,8 @@ class ApiController extends Controller
             }
         } catch (\Throwable $_) { /* ignore */ }
 
+        $currentUserId = $_SESSION['user_id'] ?? null;
+
         // Build providers list from DB-backed keys and .env keys so UI can show configured providers
         $providers = [];
         $db = $this->db;
@@ -979,6 +1101,62 @@ class ApiController extends Controller
                         // Ensure keys exist to avoid frontend errors
                         if (!isset($pdata['models'])) $pdata['models'] = [];
                         if (!isset($pdata['capabilities'])) $pdata['capabilities'] = [];
+                    }
+
+                    if ($pname === 'ginto_tunnel' && $db && !empty($pdata['db_keys']) && is_array($pdata['db_keys'])) {
+                        $composedModels = [];
+                        $composedCaps = [];
+
+                        foreach ($pdata['db_keys'] as $keyInfo) {
+                            $keyId = (int)($keyInfo['id'] ?? 0);
+                            $ownerId = isset($keyInfo['user_id']) ? (int)$keyInfo['user_id'] : null;
+
+                            if ($keyId <= 0) {
+                                continue;
+                            }
+
+                            if (!$isAdmin) {
+                                if ($currentUserId === null || $ownerId === null || $ownerId !== (int)$currentUserId) {
+                                    continue;
+                                }
+                            }
+
+                            $row = $db->get('provider_keys', ['id', 'api_key', 'provider', 'is_active', 'user_id'], ['id' => $keyId]);
+                            if (empty($row) || ($row['provider'] ?? '') !== 'ginto_tunnel' || (int)($row['is_active'] ?? 0) !== 1) {
+                                continue;
+                            }
+
+                            if (!$isAdmin && $currentUserId !== null && isset($row['user_id']) && (int)$row['user_id'] !== (int)$currentUserId) {
+                                continue;
+                            }
+
+                            $endpointBaseUrl = $this->resolveTunnelBaseUrlForKey($keyId, $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                            $domainLabel = preg_replace('#^https?://#i', '', rtrim((string)$endpointBaseUrl, '/'));
+                            $domainLabel = preg_replace('#/v1$#i', '', (string)$domainLabel) ?: 'ginto_tunnel';
+
+                            $perKeyModels = $this->fetchOpenAiCompatibleModels((string)$endpointBaseUrl, (string)($row['api_key'] ?? ''), 'ginto_tunnel');
+                            foreach ($perKeyModels as $modelEntry) {
+                                $rawModelId = (string)($modelEntry['id'] ?? '');
+                                if ($rawModelId === '') {
+                                    continue;
+                                }
+
+                                $encodedModelId = 'gtk_' . $keyId . '::' . $rawModelId;
+                                $displayName = (string)($modelEntry['name'] ?? $rawModelId) . ' (' . $domainLabel . ')';
+
+                                $composedModels[$encodedModelId] = [
+                                    'id' => $encodedModelId,
+                                    'name' => $displayName,
+                                ];
+                                $composedCaps[$encodedModelId] = $modelEntry['capabilities'] ?? [];
+                            }
+                        }
+
+                        if (!empty($composedModels)) {
+                            $pdata['models_with_names'] = array_values($composedModels);
+                            $pdata['models'] = array_map(static fn($m) => $m['id'], array_values($composedModels));
+                            $pdata['capabilities'] = $composedCaps;
+                        }
                     }
                 }
                 unset($pdata);
@@ -1471,6 +1649,12 @@ class ApiController extends Controller
                                 if ($this->isDuplicateKeyError($addErr)) {
                                     $id = $this->upsertExistingProviderKeyOnDuplicate($provider, $api_key, $key_name, $tier, $is_default, $currentUserId !== null ? (int)$currentUserId : null);
                                     if ($id) {
+                                        if ($provider === 'ginto_tunnel') {
+                                            try {
+                                                $this->saveTunnelBaseUrl($base_url, $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                                                $this->saveTunnelBaseUrlForKey((string)$base_url, (int)$id);
+                                            } catch (\Throwable $_) { /* ignore */ }
+                                        }
                                         echo json_encode(['success' => true, 'id' => $id, 'upserted' => true]);
                                         exit();
                                     }
@@ -1480,6 +1664,9 @@ class ApiController extends Controller
                             if ($provider === 'ginto_tunnel') {
                                 try {
                                     $this->saveTunnelBaseUrl($base_url, $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                                    if (!empty($id)) {
+                                        $this->saveTunnelBaseUrlForKey((string)$base_url, (int)$id);
+                                    }
                                 } catch (\Throwable $_) { /* ignore */ }
                             }
                             // Ensure owner recorded (fallback in case manager didn't persist user_id)
@@ -1511,6 +1698,12 @@ class ApiController extends Controller
                             if ($this->isDuplicateKeyError($insertErr)) {
                                 $id = $this->upsertExistingProviderKeyOnDuplicate($provider, $api_key, $key_name, $tier, $is_default, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
                                 if ($id) {
+                                    if ($provider === 'ginto_tunnel') {
+                                        try {
+                                            $this->saveTunnelBaseUrl($base_url, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $isAdmin);
+                                            $this->saveTunnelBaseUrlForKey((string)$base_url, (int)$id);
+                                        } catch (\Throwable $_) { /* ignore */ }
+                                    }
                                     echo json_encode(['success' => true, 'id' => $id, 'upserted' => true]);
                                     exit();
                                 }
@@ -1520,6 +1713,9 @@ class ApiController extends Controller
                         if ($provider === 'ginto_tunnel') {
                             try {
                                 $this->saveTunnelBaseUrl($base_url, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $isAdmin);
+                                if (!empty($id)) {
+                                    $this->saveTunnelBaseUrlForKey((string)$base_url, (int)$id);
+                                }
                             } catch (\Throwable $_) { /* ignore */ }
                         }
                         // Fallback: ensure user_id is set on the inserted row
@@ -1644,7 +1840,7 @@ class ApiController extends Controller
                             'updated_at' => $r['updated_at'] ?? null,
                         ];
                         if (($r['provider'] ?? '') === 'ginto_tunnel') {
-                            $keys[count($keys) - 1]['base_url'] = $this->resolveTunnelBaseUrl($currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                            $keys[count($keys) - 1]['base_url'] = $this->resolveTunnelBaseUrlForKey((int)($r['id'] ?? 0), $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
                         }
                     }
                 }

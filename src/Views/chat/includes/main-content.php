@@ -51,7 +51,7 @@
             </button>
             <!-- Inline compact Add Key for small screens (visible next to selector) -->
             <?php if ($isLoggedIn): ?>
-            <button id="add-provider-inline-mobile" class="ml-2 p-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white lg:hidden flex items-center justify-center" title="Add Key">
+            <button id="add-provider-inline-mobile" class="ml-2 p-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white lg:hidden flex items-center justify-center" title="+ Add Ginto Tunnel">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
               </svg>
@@ -77,11 +77,11 @@
                   <input type="text" id="model-search" placeholder="Search models..." class="w-full pl-9 pr-3 h-10 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
                 <?php if ($isLoggedIn): ?>
-                <button id="add-provider-btn" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 h-10 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap">
+                <button id="add-provider-btn" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 h-10 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap" title="+ Add Ginto Tunnel">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                   </svg>
-                  <span class="ml-2">Add Key</span>
+                  <span class="ml-2">+ Add Ginto Tunnel</span>
                 </button>
                 <?php else: ?>
                 <a href="/register" id="add-provider-register" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 h-10 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap">

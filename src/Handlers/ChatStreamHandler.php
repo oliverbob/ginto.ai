@@ -756,10 +756,16 @@ class ChatStreamHandler
         // Session-selected cloud provider
         $sessionCloudProvider = null;
         $sessionCloudModel = null;
+        $forcedGintoTunnelKeyId = null;
+        $forcedGintoTunnelBaseUrl = null;
         $cloudProviders = ['cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks', 'ginto_tunnel'];
         if ($sessionProvider && $sessionModel && in_array($sessionProvider, $cloudProviders, true)) {
             $sessionCloudProvider = $sessionProvider;
             $sessionCloudModel = $sessionModel;
+            if ($sessionCloudProvider === 'ginto_tunnel' && preg_match('/^gtk_(\d+)::(.+)$/', (string)$sessionCloudModel, $gm)) {
+                $forcedGintoTunnelKeyId = (int)($gm[1] ?? 0);
+                $sessionCloudModel = (string)($gm[2] ?? $sessionCloudModel);
+            }
         }
 
         // Debug: log session-selected provider/model for tracing
@@ -777,7 +783,32 @@ class ChatStreamHandler
             if (!empty($userIdSession)) {
                 // If user selected a provider explicitly, prefer their key for that provider
                 if (!empty($sessionCloudProvider)) {
-                    $userProvidedKey = $keyManager->getUserKey($sessionCloudProvider, (int)$userIdSession);
+                    if ($sessionCloudProvider === 'ginto_tunnel' && !empty($forcedGintoTunnelKeyId) && $db) {
+                        try {
+                            $forcedRow = $db->get('provider_keys', ['id', 'provider', 'api_key', 'user_id', 'is_active'], [
+                                'id' => (int)$forcedGintoTunnelKeyId,
+                                'provider' => 'ginto_tunnel',
+                            ]);
+                            if (is_array($forcedRow)
+                                && !empty($forcedRow['api_key'])
+                                && (int)($forcedRow['is_active'] ?? 0) === 1
+                                && (int)($forcedRow['user_id'] ?? 0) === (int)$userIdSession
+                            ) {
+                                $userProvidedKey = [
+                                    'id' => (int)$forcedRow['id'],
+                                    'provider' => 'ginto_tunnel',
+                                    'api_key' => (string)$forcedRow['api_key'],
+                                ];
+                                $forcedGintoTunnelBaseUrl = $this->resolveOpenAiCompatibleProviderBaseUrlForKeyId('ginto_tunnel', $db, (int)$forcedGintoTunnelKeyId, $userIdSession, $isAdminUser);
+                            }
+                        } catch (\Throwable $_) {
+                            $userProvidedKey = null;
+                        }
+                    }
+
+                    if (!$userProvidedKey) {
+                        $userProvidedKey = $keyManager->getUserKey($sessionCloudProvider, (int)$userIdSession);
+                    }
                 }
                 // Otherwise try any user-owned key
                 if (!$userProvidedKey) {
@@ -1083,7 +1114,9 @@ class ChatStreamHandler
             }
 
             // Create provider instance
-            $selectedProviderBaseUrl = $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
+            $selectedProviderBaseUrl = (!empty($forcedGintoTunnelBaseUrl) && $selectedProvider === 'ginto_tunnel')
+                ? $forcedGintoTunnelBaseUrl
+                : $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
             if ($useLocalVision && $hasImage) {
                 $config = $localLlmConfig->getVisionProviderConfig();
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider('local', [
@@ -1162,7 +1195,9 @@ class ChatStreamHandler
                 $selectedProvider = $mainProviderName;
                 $apiKey = $mainApiKey;
                 $modelName = $mainModelName;
-                $selectedProviderBaseUrl = $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
+                $selectedProviderBaseUrl = (!empty($forcedGintoTunnelBaseUrl) && $selectedProvider === 'ginto_tunnel')
+                    ? $forcedGintoTunnelBaseUrl
+                    : $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
                 $mainProviderConfig = [
                     'api_key' => $apiKey,
                     'model' => $modelName,
@@ -2316,6 +2351,28 @@ class ChatStreamHandler
         }
 
         return $fallback;
+    }
+
+    private function resolveOpenAiCompatibleProviderBaseUrlForKeyId(string $provider, $db, int $keyId, ?int $userIdSession, bool $isAdminUser): ?string
+    {
+        if ($provider !== 'ginto_tunnel' || !$db || $keyId <= 0) {
+            return $this->resolveOpenAiCompatibleProviderBaseUrl($provider, $db, $userIdSession, $isAdminUser);
+        }
+
+        try {
+            $row = $db->get('settings', ['value'], ['key' => 'llm_ginto_tunnel_base_url_key_' . (int)$keyId]);
+            $candidate = trim((string)($row['value'] ?? ''));
+            if ($candidate !== '') {
+                $normalized = $this->normalizeGintoTunnelDomainToBaseUrl($candidate);
+                if (!empty($normalized)) {
+                    return $normalized;
+                }
+            }
+        } catch (\Throwable $_) {
+            // ignore and fall back
+        }
+
+        return $this->resolveOpenAiCompatibleProviderBaseUrl($provider, $db, $userIdSession, $isAdminUser);
     }
 
     private function normalizeGintoTunnelDomainToBaseUrl(string $value): ?string

@@ -249,11 +249,18 @@
   document.getElementById('tab-mcp')?.addEventListener('click', () => switchTab('mcp'));
   document.getElementById('tab-admin')?.addEventListener('click', () => switchTab('admin'));
 
-  // Inline mobile Add Key handler: open settings admin tab for logged-in users
+  // Inline mobile + Add Ginto Tunnel handler
   document.addEventListener('click', function(e) {
     if (e.target && (e.target.id === 'add-provider-inline-mobile' || e.target.closest('#add-provider-inline-mobile'))) {
       e.preventDefault(); e.stopPropagation();
-      try { openSettings('admin'); } catch (_) { window.location.href = '/settings'; }
+      try {
+        openSettings('admin');
+        if (typeof window.prefillAddGintoTunnelForm === 'function') {
+          setTimeout(() => window.prefillAddGintoTunnelForm(), 0);
+        }
+      } catch (_) {
+        window.location.href = '/settings';
+      }
     }
   });
 

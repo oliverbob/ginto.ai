@@ -49,6 +49,31 @@
     }
   }
 
+  window.prefillAddGintoTunnelForm = function(domain = '') {
+    const form = document.getElementById('add-api-key-form');
+    if (!form) return;
+
+    const providerSelect = form.querySelector('select[name="provider"]');
+    const keyNameInput = form.querySelector('input[name="key_name"]');
+    const baseUrlInput = form.querySelector('input[name="base_url"]');
+
+    if (providerSelect) {
+      providerSelect.value = 'ginto_tunnel';
+    }
+    toggleGintoTunnelFields(form);
+
+    const normalized = normalizeTunnelDomain(domain || '');
+    if (baseUrlInput) {
+      baseUrlInput.value = normalized || baseUrlInput.value || 'ollama.ginto.ai';
+      baseUrlInput.focus();
+      baseUrlInput.select();
+    }
+
+    if (keyNameInput && !keyNameInput.value.trim()) {
+      keyNameInput.value = normalized ? `Ginto Tunnel - ${normalized}` : 'Ginto Tunnel Key';
+    }
+  };
+
   const addApiKeyForm = document.getElementById('add-api-key-form');
   const providerSelectEl = addApiKeyForm?.querySelector('select[name="provider"]');
   const gintoTunnelDomainInput = addApiKeyForm?.querySelector('input[name="base_url"]');

@@ -632,6 +632,31 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
 
         $message = $choice['message'] ?? [];
         $content = $message['content'] ?? '';
+        if (is_array($content)) {
+            $parts = [];
+            foreach ($content as $block) {
+                if (!is_array($block)) {
+                    continue;
+                }
+                $type = (string)($block['type'] ?? '');
+                if ($type === 'text' || $type === 'input_text') {
+                    $text = trim((string)($block['text'] ?? ''));
+                    if ($text !== '') {
+                        $parts[] = $text;
+                    }
+                    continue;
+                }
+                if ($type === 'image_url') {
+                    $url = trim((string)($block['image_url']['url'] ?? $block['url'] ?? ''));
+                    if ($url !== '') {
+                        $parts[] = "![Generated image](" . $url . ")";
+                    }
+                }
+            }
+            $content = implode("\n\n", $parts);
+        } elseif (!is_string($content)) {
+            $content = '';
+        }
         $toolCalls = [];
         
         // Handle Groq's executed_tools (browser_search results) for non-streaming
