@@ -159,7 +159,7 @@
     });
   }
   
-  // + Add Ginto Tunnel button opens settings panel with API key tab and pre-fills provider
+  // + Add API Key button opens settings panel with API key tab
   if (addProviderBtn) {
     addProviderBtn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -168,8 +168,10 @@
       const ad = getActiveDropdown(); if (ad) ad.classList.add('hidden');
       // Open settings with admin (API Keys) tab
       openSettings('admin');
-      if (typeof window.prefillAddGintoTunnelForm === 'function') {
-        setTimeout(() => window.prefillAddGintoTunnelForm(), 0);
+      if (typeof window.prefillAddApiKeyForm === 'function') {
+        const currentProvider = String(modelsData?.current_provider || '').toLowerCase();
+        const preferredProvider = currentProvider === 'ginto_tunnel' ? 'ginto_tunnel' : '';
+        setTimeout(() => window.prefillAddApiKeyForm(preferredProvider), 0);
       }
     });
   }
