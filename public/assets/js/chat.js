@@ -3984,6 +3984,59 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     return out;
   }
 
+  function mergeOpenAiContentParts(target, source) {
+    if (!target || !source) return target;
+    if (source.text) target.text += source.text;
+    if (Array.isArray(source.images) && source.images.length > 0) {
+      target.images.push(...source.images);
+    }
+    return target;
+  }
+
+  function extractOpenAiContentPartsFromPayload(data) {
+    const out = { text: '', images: [] };
+
+    if (!data) return out;
+
+    // Direct array payload (OpenAI content blocks)
+    if (Array.isArray(data)) {
+      return parseOpenAiContentParts(data);
+    }
+
+    if (typeof data !== 'object') return out;
+
+    // OpenAI-compatible priority
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.choices?.[0]?.delta?.content));
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.choices?.[0]?.message?.content));
+
+    // Generic/common fallbacks
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.delta?.content));
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.message?.content));
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.content));
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.reply));
+    mergeOpenAiContentParts(out, parseOpenAiContentParts(data?.response));
+
+    // Common single-image fields
+    if (typeof data?.imageUrl === 'string' && data.imageUrl) {
+      out.images.push(data.imageUrl);
+    }
+    if (typeof data?.image_url === 'string' && data.image_url) {
+      out.images.push(data.image_url);
+    }
+    if (Array.isArray(data?.images)) {
+      for (const img of data.images) {
+        if (typeof img === 'string' && img) out.images.push(img);
+        else if (img && typeof img === 'object') {
+          if (typeof img.url === 'string' && img.url) out.images.push(img.url);
+          else if (typeof img.imageUrl === 'string' && img.imageUrl) out.images.push(img.imageUrl);
+          else if (typeof img.dataUrl === 'string' && img.dataUrl) out.images.push(img.dataUrl);
+        }
+      }
+    }
+
+    return out;
+  }
+
   const MAX_STREAM_TEXT_CHUNK_CHARS = 12000;
 
   function isLikelyImageGenerationPrompt(prompt) {
@@ -4252,9 +4305,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       if (contentType.includes('application/json') || contentType.includes('text/json')) {
         const data = await response.json().catch(() => null);
         if (data) {
-          const messageParts = parseOpenAiContentParts(data?.choices?.[0]?.message?.content);
-          const deltaParts = parseOpenAiContentParts(data?.choices?.[0]?.delta?.content);
-          const mergedRaw = (deltaParts.text || '') + (messageParts.text || '') + (typeof data.text === 'string' ? data.text : '');
+          const payloadParts = extractOpenAiContentPartsFromPayload(data);
+          const mergedRaw = (payloadParts.text || '') + (typeof data.text === 'string' ? data.text : '');
           const mergedText = sanitizeOpenAiTextChunk(mergedRaw);
 
           if (mergedRaw && !mergedText && !warnedLargeChunkSkipped) {
@@ -4262,7 +4314,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             console.warn('[streamWebSearch] Skipped oversized base64-like JSON chunk');
           }
 
-          const imageCandidates = [...(deltaParts.images || []), ...(messageParts.images || [])];
+          const imageCandidates = [...(payloadParts.images || [])];
           for (const imageUrl of imageCandidates) {
             if (!imageUrl || seenImageUrls.has(imageUrl)) continue;
             seenImageUrls.add(imageUrl);
@@ -4713,15 +4765,11 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               continue;
             }
 
-            // Handle OpenAI-compatible chunks where content is in choices[*].delta/content
-            // Supports both plain strings and block arrays with text/image_url.
-            const messageParts = parseOpenAiContentParts(data?.choices?.[0]?.message?.content);
-            const deltaParts = parseOpenAiContentParts(data?.choices?.[0]?.delta?.content);
+            // Handle OpenAI-compatible chunks including root arrays and reply/response arrays
+            const payloadParts = extractOpenAiContentPartsFromPayload(data);
             const hasOpenAiContent =
-              (messageParts.text && messageParts.text.length > 0) ||
-              (Array.isArray(messageParts.images) && messageParts.images.length > 0) ||
-              (deltaParts.text && deltaParts.text.length > 0) ||
-              (Array.isArray(deltaParts.images) && deltaParts.images.length > 0);
+              (payloadParts.text && payloadParts.text.length > 0) ||
+              (Array.isArray(payloadParts.images) && payloadParts.images.length > 0);
 
             if (hasOpenAiContent) {
               if (!contentStarted) {
@@ -4733,7 +4781,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 contentStarted = true;
               }
 
-              const mergedRawText = (deltaParts.text || '') + (messageParts.text || '');
+              const mergedRawText = payloadParts.text || '';
               const mergedText = sanitizeOpenAiTextChunk(mergedRawText);
               if (mergedRawText && !mergedText && !warnedLargeChunkSkipped) {
                 warnedLargeChunkSkipped = true;
@@ -4750,7 +4798,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 } catch (_) {}
               }
 
-              const imageCandidates = [...(deltaParts.images || []), ...(messageParts.images || [])];
+              const imageCandidates = [...(payloadParts.images || [])];
               for (const imageUrl of imageCandidates) {
                 if (!imageUrl || seenImageUrls.has(imageUrl)) continue;
                 seenImageUrls.add(imageUrl);
@@ -6180,10 +6228,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         if (!jsonStr || jsonStr === '[DONE]') continue;
         try {
           const data = JSON.parse(jsonStr);
-          if (data.content) aiResponse += sanitizeOpenAiTextChunk(data.content);
-          else if (data.choices?.[0]?.delta?.content) aiResponse += sanitizeOpenAiTextChunk(data.choices[0].delta.content);
-          else if (Array.isArray(data.choices?.[0]?.delta?.content)) aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
-          else if (data.choices?.[0]?.message?.content) aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
+          const parts = extractOpenAiContentPartsFromPayload(data);
+          if (parts.text) aiResponse += sanitizeOpenAiTextChunk(parts.text);
           else if (data.text) aiResponse += sanitizeOpenAiTextChunk(data.text);
         } catch (e) { /* ignore */ }
       }
@@ -6343,16 +6389,9 @@ Have you finished the ORIGINAL REQUEST above?
             const data = JSON.parse(jsonStr);
             chunkCount++;
             // Handle content chunks - multiple formats
-            if (data.content) {
-              aiResponse += sanitizeOpenAiTextChunk(data.content);
-            } else if (data.choices?.[0]?.delta?.content) {
-              aiResponse += sanitizeOpenAiTextChunk(data.choices[0].delta.content);
-            } else if (Array.isArray(data.choices?.[0]?.delta?.content)) {
-              aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
-            } else if (data.choices?.[0]?.message?.content) {
-              aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
-            } else if (data.delta?.content) {
-              aiResponse += sanitizeOpenAiTextChunk(data.delta.content);
+            const parts = extractOpenAiContentPartsFromPayload(data);
+            if (parts.text) {
+              aiResponse += sanitizeOpenAiTextChunk(parts.text);
             } else if (data.text) {
               aiResponse += sanitizeOpenAiTextChunk(data.text);
             }
