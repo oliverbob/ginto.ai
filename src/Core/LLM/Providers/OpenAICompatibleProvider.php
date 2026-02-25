@@ -128,6 +128,20 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         return getenv($envKey) ?: ($_ENV[$envKey] ?? null);
     }
 
+    protected function getDefaultHeaders(): array
+    {
+        $headers = [
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Content-Type' => 'application/json',
+        ];
+
+        if ($this->providerName === 'ginto_tunnel' && !empty($this->apiKey)) {
+            $headers['X-Ginto-Tunnel-Key'] = $this->apiKey;
+        }
+
+        return $headers;
+    }
+
     protected function getDefaultBaseUrl(): string
     {
         return self::$baseUrls[$this->providerName] ?? self::$baseUrls['openai'];

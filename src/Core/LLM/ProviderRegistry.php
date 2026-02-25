@@ -540,6 +540,9 @@ class ProviderRegistry
             $headers = ['Content-Type: application/json'];
             if ($apiKey) {
                 $headers[] = 'Authorization: Bearer ' . $apiKey;
+                if ($provider === 'ginto_tunnel') {
+                    $headers[] = 'X-Ginto-Tunnel-Key: ' . $apiKey;
+                }
             }
             
             $ch = curl_init($modelsUrl);
@@ -559,14 +562,22 @@ class ProviderRegistry
             }
             
             $data = json_decode($response, true);
-            if (!isset($data['data']) || !is_array($data['data'])) {
+            $items = [];
+            if (isset($data['data']) && is_array($data['data'])) {
+                $items = $data['data'];
+            } elseif (isset($data['models']) && is_array($data['models'])) {
+                // Common Ollama/OpenWebUI-like model list shape
+                $items = $data['models'];
+            } elseif (isset($data['data']['models']) && is_array($data['data']['models'])) {
+                $items = $data['data']['models'];
+            } else {
                 return [];
             }
             
             // Parse models with capabilities
             $models = [];
-            foreach ($data['data'] as $model) {
-                $modelId = $model['id'] ?? '';
+            foreach ($items as $model) {
+                $modelId = $model['id'] ?? ($model['name'] ?? '');
                 if (!$modelId) continue;
                 
                 $models[] = [
