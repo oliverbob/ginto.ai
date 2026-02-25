@@ -67,10 +67,11 @@ $currentPage = 'tunnels';
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Expires</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Used</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
             <tbody id="keys-list" class="divide-y divide-gray-200 dark:divide-gray-700">
-              <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+              <tr><td colspan="10" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -145,14 +146,14 @@ $currentPage = 'tunnels';
 
     async function loadKeys() {
       const tbody = document.getElementById('keys-list');
-      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
       try {
         const res = await fetch('/admin/hosting/tunnels/keys/api');
         const data = await res.json();
         const keys = Array.isArray(data.keys) ? data.keys : [];
         document.getElementById('keys-count').textContent = `Showing ${keys.length}`;
         if (!keys.length) {
-          tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">No keys found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-gray-500">No keys found</td></tr>';
           return;
         }
         tbody.innerHTML = keys.map(k => {
@@ -165,6 +166,7 @@ $currentPage = 'tunnels';
                 ? '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-600">Expired</span>'
                 : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Active</span>'
               );
+          const releaseBtn = `<button type="button" onclick="releaseSubdomain('${esc(k.subdomain)}')" class="px-2 py-1 text-xs rounded bg-red-600 hover:bg-red-700 text-white transition-colors">Release</button>`;
           return `
             <tr>
               <td class="px-4 py-3 text-xs"><input class="key-select" type="checkbox" value="${esc(k.id)}" ${eligible ? '' : 'disabled'} /></td>
@@ -176,11 +178,43 @@ $currentPage = 'tunnels';
               <td class="px-4 py-3 text-xs">${esc(k.expires_at || '')}</td>
               <td class="px-4 py-3 text-xs">${esc(k.last_used_at || '')}</td>
               <td class="px-4 py-3 text-xs">${status}</td>
+              <td class="px-4 py-3 text-xs">${releaseBtn}</td>
             </tr>
           `;
         }).join('');
       } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-red-500">Failed to load keys</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" class="px-4 py-8 text-center text-red-500">Failed to load keys</td></tr>';
+      }
+    }
+
+    async function releaseSubdomain(rawSubdomain) {
+      const subdomain = String(rawSubdomain || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      if (!subdomain) {
+        alert('Invalid subdomain');
+        return;
+      }
+
+      if (!confirm(`Release ${subdomain}.ginto.ai for everyone? This deletes all key records for this subdomain.`)) {
+        return;
+      }
+
+      try {
+        const res = await fetch('/admin/hosting/tunnels/keys/release-subdomain', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({ subdomain, csrf_token: csrfToken }),
+        });
+        const data = await res.json();
+        if (!data || !data.success) {
+          alert(data?.error || 'Failed to release subdomain');
+          return;
+        }
+
+        alert(`${subdomain}.ginto.ai is now released and available.`);
+        loadKeys();
+      } catch (e) {
+        alert('Failed to release subdomain');
       }
     }
 

@@ -162,6 +162,7 @@ $req('/hosting/tunnels/api', 'HostingController@tunnelsApi');
 $req('/hosting/tunnels/keys', 'HostingController@tunnelKeys');
 $req('/hosting/tunnels/keys/api', 'HostingController@tunnelKeysApi');
 $req('/hosting/tunnels/keys/reactivate-bulk', 'HostingController@tunnelKeysBulkReactivate', ['POST']);
+$req('/hosting/tunnels/keys/release-subdomain', 'HostingController@tunnelKeysReleaseSubdomain', ['POST']);
 $req('/hosting/tunnels/register', 'HostingController@tunnelsRegister', ['POST']);
 $req('/hosting/tunnels/disconnect', 'HostingController@tunnelsDisconnect', ['POST']);
 $req('/hosting/tunnels/unblock', 'HostingController@tunnelsUnblock', ['POST']);

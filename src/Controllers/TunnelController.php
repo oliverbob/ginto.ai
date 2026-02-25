@@ -1408,18 +1408,43 @@ TOML;
             $registry = $this->readRegistry();
             $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
             $owner = (int)($entry['owner_user_id'] ?? 0);
+            $expiresAt = (int)($entry['expires_at'] ?? 0);
+
+            // Owner lock is enforced only while ownership is still active.
+            // If the owner has no active key and no active registry lease, allow reclaim.
             if ($owner !== 0 && $owner !== (int)$userId) {
-                http_response_code(409);
-                echo json_encode([
-                    'success' => false,
-                    'code' => 'DOMAIN_NOT_AVAILABLE',
-                    'error' => 'Domain is not available.',
-                ]);
-                return;
+                $ownerHasActiveClaim = $expiresAt > time();
+
+                if (!$ownerHasActiveClaim && $this->db) {
+                    try {
+                        $ownerActiveKey = $this->db->get('tunnel_access_keys', ['id'], [
+                            'user_id' => $owner,
+                            'subdomain' => $subdomain,
+                            'revoked' => 0,
+                            'OR' => [
+                                'expires_at' => null,
+                                'expires_at[>]' => date('Y-m-d H:i:s'),
+                            ],
+                            'ORDER' => ['id' => 'DESC'],
+                        ]);
+                        $ownerHasActiveClaim = is_array($ownerActiveKey) && !empty($ownerActiveKey);
+                    } catch (\Throwable $_) {
+                        $ownerHasActiveClaim = true;
+                    }
+                }
+
+                if ($ownerHasActiveClaim) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'DOMAIN_NOT_AVAILABLE',
+                        'error' => 'Domain is not available.',
+                    ]);
+                    return;
+                }
             }
 
             // If the subdomain is currently registered/active but the owner is unknown, treat it as taken.
-            $expiresAt = (int)($entry['expires_at'] ?? 0);
             if ($owner === 0 && $expiresAt > time()) {
                 http_response_code(409);
                 echo json_encode([

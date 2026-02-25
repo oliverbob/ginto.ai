@@ -1193,6 +1193,71 @@ class HostingController
         }
     }
 
+    /**
+     * Admin API: release a tunnel subdomain so it becomes available for everyone.
+     * POST /admin/hosting/tunnels/keys/release-subdomain
+     * Body: { subdomain: string, csrf_token: string }
+     */
+    public function tunnelKeysReleaseSubdomain(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            exit;
+        }
+
+        $input = $this->getRequestInput();
+        $subdomainInput = (string)($input['subdomain'] ?? '');
+        $subdomain = strtolower(preg_replace('/[^a-zA-Z0-9\-]/', '', trim($subdomainInput)));
+        if ($subdomain === '' || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $subdomain)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            exit;
+        }
+
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        if (in_array($subdomain, $reserved, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Reserved subdomain cannot be released']);
+            exit;
+        }
+
+        try {
+            $this->db->delete('tunnel_access_keys', [
+                'subdomain' => $subdomain,
+            ]);
+
+            $registry = $this->getTunnelRegistry();
+            if (isset($registry[$subdomain])) {
+                unset($registry[$subdomain]);
+                $this->saveTunnelRegistry($registry);
+            }
+
+            $blocklist = $this->getTunnelBlocklist();
+            $nextBlocklist = array_values(array_filter((array)$blocklist, static function ($entry) use ($subdomain) {
+                return strtolower((string)$entry) !== $subdomain;
+            }));
+            if ($nextBlocklist !== $blocklist) {
+                $this->saveTunnelBlocklist($nextBlocklist);
+            }
+
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $subdomain,
+                'message' => 'Subdomain released and now available for new keys',
+            ]);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to release subdomain']);
+            exit;
+        }
+    }
+
     private function normalizeTunnelTtlSeconds($ttlInput): int
     {
         $ttl = (int)$ttlInput;
