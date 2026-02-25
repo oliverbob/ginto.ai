@@ -179,9 +179,9 @@ try {
           </select>
         </div>
         <div id="ginto-tunnel-base-url-wrap" class="hidden">
-          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Endpoint URL (OpenAI-compatible)</label>
-          <input type="url" name="base_url" placeholder="https://ollama.ginto.ai/v1/" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200">
-          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for Ginto Tunnel or any public OpenAI-compatible API endpoint.</p>
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Endpoint Domain (OpenAI-compatible)</label>
+          <input type="text" name="base_url" placeholder="ollama.ginto.ai" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200" autocapitalize="off" spellcheck="false" inputmode="url">
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Place your Ginto Tunnel address here or your openai compatible api link.</p>
         </div>
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Key Name</label>

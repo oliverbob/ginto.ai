@@ -5,10 +5,26 @@
 ?>
 <script>
   // ============= API Keys Management =============
-  function normalizeBaseUrl(url) {
-    const raw = (url || '').trim();
+  function normalizeTunnelDomain(rawInput) {
+    let raw = (rawInput || '').trim();
     if (!raw) return '';
-    return raw.endsWith('/') ? raw : raw + '/';
+
+    raw = raw.replace(/^https?:\/\//i, '');
+    raw = raw.replace(/^\/\//, '');
+    raw = raw.split('/')[0].split('?')[0].split('#')[0].trim();
+    raw = raw.replace(/\s+/g, '');
+
+    return raw.toLowerCase();
+  }
+
+  function isValidTunnelDomain(domain) {
+    if (!domain) return false;
+    return /^[a-z0-9.-]+\.[a-z0-9-]{2,}(?::\d{2,5})?$/i.test(domain);
+  }
+
+  function extractDomainFromBaseUrl(url) {
+    const normalized = normalizeTunnelDomain(url);
+    return normalized;
   }
 
   function toggleGintoTunnelFields(form) {
@@ -23,8 +39,9 @@
     wrapper.classList.toggle('hidden', !enabled);
     if (enabled) {
       if (!baseUrlInput.value.trim()) {
-        baseUrlInput.value = 'https://ollama.ginto.ai/v1/';
+        baseUrlInput.value = 'ollama.ginto.ai';
       }
+      baseUrlInput.value = normalizeTunnelDomain(baseUrlInput.value);
       baseUrlInput.setAttribute('required', 'required');
     } else {
       baseUrlInput.removeAttribute('required');
@@ -34,8 +51,14 @@
 
   const addApiKeyForm = document.getElementById('add-api-key-form');
   const providerSelectEl = addApiKeyForm?.querySelector('select[name="provider"]');
+  const gintoTunnelDomainInput = addApiKeyForm?.querySelector('input[name="base_url"]');
   if (providerSelectEl) {
     providerSelectEl.addEventListener('change', () => toggleGintoTunnelFields(addApiKeyForm));
+  }
+  if (gintoTunnelDomainInput) {
+    gintoTunnelDomainInput.addEventListener('blur', () => {
+      gintoTunnelDomainInput.value = normalizeTunnelDomain(gintoTunnelDomainInput.value);
+    });
   }
   toggleGintoTunnelFields(addApiKeyForm);
 
@@ -69,7 +92,7 @@
             </div>
           </div>
           <div class="text-xs font-mono text-gray-500 dark:text-gray-400 mb-1 break-all">${escapeHtml(key.api_key_masked)}</div>
-          ${key.base_url ? `<div class="text-xs text-blue-500 dark:text-blue-300 mb-1 break-all">${escapeHtml(normalizeBaseUrl(key.base_url))}</div>` : ''}
+          ${key.base_url ? `<div class="text-xs text-blue-500 dark:text-blue-300 mb-1 break-all">${escapeHtml(extractDomainFromBaseUrl(key.base_url))}</div>` : ''}
           <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <span>${key.provider}</span>
             <span class="text-gray-400">•</span>
@@ -142,7 +165,12 @@
     }
     
     const provider = String(formData.get('provider') || '').toLowerCase();
-    const baseUrl = normalizeBaseUrl(String(formData.get('base_url') || ''));
+    const baseUrl = normalizeTunnelDomain(String(formData.get('base_url') || ''));
+
+    if (provider === 'ginto_tunnel' && !isValidTunnelDomain(baseUrl)) {
+      showToast('Enter a valid domain like ollama.ginto.ai (no https://).', 'error');
+      return;
+    }
 
     try {
       const res = await fetch('/api/provider-keys', {

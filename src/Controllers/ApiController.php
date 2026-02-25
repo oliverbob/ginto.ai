@@ -599,40 +599,21 @@ class ApiController extends Controller
 
     private function sanitizeOpenAiCompatibleBaseUrl(?string $baseUrl): ?string
     {
-        $baseUrl = trim(strip_tags((string)$baseUrl));
-        if ($baseUrl === '') {
+        $raw = trim(strip_tags((string)$baseUrl));
+        if ($raw === '') {
             return null;
         }
 
-        if (!preg_match('#^https?://#i', $baseUrl)) {
-            $baseUrl = 'https://' . ltrim($baseUrl, '/');
-        }
+        $raw = preg_replace('#^https?://#i', '', $raw) ?? $raw;
+        $raw = ltrim($raw, '/');
+        $domain = preg_split('/[\/?#]/', $raw, 2)[0] ?? '';
+        $domain = strtolower(trim($domain));
 
-        $parts = parse_url($baseUrl);
-        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+        if ($domain === '' || !preg_match('/^[a-z0-9.-]+(?::\d{2,5})?$/i', $domain) || !str_contains($domain, '.')) {
             return null;
         }
 
-        $scheme = strtolower((string)$parts['scheme']);
-        if (!in_array($scheme, ['http', 'https'], true)) {
-            return null;
-        }
-
-        $normalized = $scheme . '://' . strtolower((string)$parts['host']);
-        if (!empty($parts['port'])) {
-            $normalized .= ':' . (int)$parts['port'];
-        }
-
-        $path = isset($parts['path']) ? rtrim((string)$parts['path'], '/') : '';
-        if ($path === '') {
-            $path = '/v1';
-        }
-        if (!str_starts_with($path, '/')) {
-            $path = '/' . $path;
-        }
-
-        $normalized .= $path . '/';
-        return $normalized;
+        return 'https://' . $domain . '/v1/';
     }
 
     private function getTunnelBaseUrlSettingKey(?int $userId, bool $isAdmin): string

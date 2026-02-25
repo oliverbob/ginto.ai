@@ -2286,11 +2286,8 @@ class ChatStreamHandler
             return null;
         }
 
-        $envBase = trim((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? 'https://ollama.ginto.ai/v1/')));
-        if ($envBase !== '' && !preg_match('#^https?://#i', $envBase)) {
-            $envBase = 'https://' . ltrim($envBase, '/');
-        }
-        $fallback = rtrim($envBase, '/') . '/';
+        $fallback = $this->normalizeGintoTunnelDomainToBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? 'ollama.ginto.ai')))
+            ?: 'https://ollama.ginto.ai/v1/';
 
         if (!$db) {
             return $fallback;
@@ -2309,16 +2306,35 @@ class ChatStreamHandler
                 if ($candidate === '') {
                     continue;
                 }
-                if (!preg_match('#^https?://#i', $candidate)) {
-                    $candidate = 'https://' . ltrim($candidate, '/');
+                $normalized = $this->normalizeGintoTunnelDomainToBaseUrl($candidate);
+                if (!empty($normalized)) {
+                    return $normalized;
                 }
-                return rtrim($candidate, '/') . '/';
             } catch (\Throwable $_) {
                 continue;
             }
         }
 
         return $fallback;
+    }
+
+    private function normalizeGintoTunnelDomainToBaseUrl(string $value): ?string
+    {
+        $raw = trim($value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $raw = preg_replace('#^https?://#i', '', $raw) ?? $raw;
+        $raw = ltrim($raw, '/');
+        $domain = preg_split('/[\/?#]/', $raw, 2)[0] ?? '';
+        $domain = strtolower(trim($domain));
+
+        if ($domain === '' || !preg_match('/^[a-z0-9.-]+(?::\d{2,5})?$/i', $domain) || !str_contains($domain, '.')) {
+            return null;
+        }
+
+        return 'https://' . $domain . '/v1/';
     }
 
     /**

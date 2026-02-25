@@ -291,7 +291,7 @@ class ProviderRegistry
             return $default;
         }
 
-        $env = $this->sanitizeBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? '')));
+        $env = $this->sanitizeTunnelBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? '')));
         $fallback = $env ?: $default;
 
         if (!$this->db) {
@@ -315,7 +315,7 @@ class ProviderRegistry
         foreach ($keys as $settingKey) {
             try {
                 $row = $this->db->get('settings', ['value'], ['key' => $settingKey]);
-                $candidate = isset($row['value']) ? $this->sanitizeBaseUrl((string)$row['value']) : null;
+                $candidate = isset($row['value']) ? $this->sanitizeTunnelBaseUrl((string)$row['value']) : null;
                 if (!empty($candidate)) {
                     return $candidate;
                 }
@@ -323,6 +323,25 @@ class ProviderRegistry
         }
 
         return $fallback;
+    }
+
+    private function sanitizeTunnelBaseUrl(string $value): ?string
+    {
+        $raw = trim($value);
+        if ($raw === '') {
+            return null;
+        }
+
+        $raw = preg_replace('#^https?://#i', '', $raw) ?? $raw;
+        $raw = ltrim($raw, '/');
+        $domain = preg_split('/[\/?#]/', $raw, 2)[0] ?? '';
+        $domain = strtolower(trim($domain));
+
+        if ($domain === '' || !preg_match('/^[a-z0-9.-]+(?::\d{2,5})?$/i', $domain) || !str_contains($domain, '.')) {
+            return null;
+        }
+
+        return 'https://' . $domain . '/v1/';
     }
     
     /**
