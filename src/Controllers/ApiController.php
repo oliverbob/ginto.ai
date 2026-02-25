@@ -686,6 +686,51 @@ class ApiController extends Controller
         return $fallback;
     }
 
+    private function isDuplicateKeyError(\Throwable $e): bool
+    {
+        $msg = strtolower($e->getMessage());
+        return str_contains($msg, 'sqlstate[23000]')
+            || str_contains($msg, 'duplicate entry')
+            || str_contains($msg, '1062');
+    }
+
+    private function upsertExistingProviderKeyOnDuplicate(string $provider, string $apiKey, ?string $keyName, string $tier, int $isDefault, ?int $currentUserId): ?int
+    {
+        if (!$this->db) {
+            return null;
+        }
+
+        $row = $this->db->get('provider_keys', ['id'], [
+            'provider' => $provider,
+            'api_key' => $apiKey,
+        ]);
+
+        if (empty($row['id'])) {
+            return null;
+        }
+
+        $id = (int)$row['id'];
+
+        if ($isDefault) {
+            $this->db->update('provider_keys', ['is_default' => 0], ['provider' => $provider]);
+        }
+
+        $update = [
+            'key_name' => $keyName,
+            'tier' => $tier,
+            'is_active' => 1,
+        ];
+        if ($isDefault) {
+            $update['is_default'] = 1;
+        }
+        if ($currentUserId !== null) {
+            $update['user_id'] = $currentUserId;
+        }
+
+        $this->db->update('provider_keys', $update, ['id' => $id]);
+        return $id;
+    }
+
     private function parseDotEnv(string $path): array
     {
         $data = [];
@@ -1420,7 +1465,18 @@ class ApiController extends Controller
                                 'is_default' => $is_default,
                             ];
                             if ($currentUserId !== null) $payload['user_id'] = $currentUserId;
-                            $id = $manager->addKey($payload);
+                            try {
+                                $id = $manager->addKey($payload);
+                            } catch (\Throwable $addErr) {
+                                if ($this->isDuplicateKeyError($addErr)) {
+                                    $id = $this->upsertExistingProviderKeyOnDuplicate($provider, $api_key, $key_name, $tier, $is_default, $currentUserId !== null ? (int)$currentUserId : null);
+                                    if ($id) {
+                                        echo json_encode(['success' => true, 'id' => $id, 'upserted' => true]);
+                                        exit();
+                                    }
+                                }
+                                throw $addErr;
+                            }
                             if ($provider === 'ginto_tunnel') {
                                 try {
                                     $this->saveTunnelBaseUrl($base_url, $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
@@ -1448,8 +1504,19 @@ class ApiController extends Controller
                             $insert['user_id'] = $_SESSION['user_id'];
                         }
 
-                        $res = $db->insert('provider_keys', $insert);
-                        $id = $db->id() ?? null;
+                        try {
+                            $res = $db->insert('provider_keys', $insert);
+                            $id = $db->id() ?? null;
+                        } catch (\Throwable $insertErr) {
+                            if ($this->isDuplicateKeyError($insertErr)) {
+                                $id = $this->upsertExistingProviderKeyOnDuplicate($provider, $api_key, $key_name, $tier, $is_default, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null);
+                                if ($id) {
+                                    echo json_encode(['success' => true, 'id' => $id, 'upserted' => true]);
+                                    exit();
+                                }
+                            }
+                            throw $insertErr;
+                        }
                         if ($provider === 'ginto_tunnel') {
                             try {
                                 $this->saveTunnelBaseUrl($base_url, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $isAdmin);
