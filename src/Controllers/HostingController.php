@@ -1048,6 +1048,232 @@ class HostingController
         }
     }
 
+    /**
+     * Admin API: bulk reactivate selected tunnel access keys.
+     * POST /admin/hosting/tunnels/keys/reactivate-bulk
+     */
+    public function tunnelKeysBulkReactivate(): void
+    {
+        header('Content-Type: application/json');
+        $this->requireAdmin();
+        $this->validateCsrf();
+
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            exit;
+        }
+
+        $input = $this->getRequestInput();
+        $idsInput = $input['ids'] ?? [];
+        if (is_string($idsInput)) {
+            $idsInput = array_map('trim', explode(',', $idsInput));
+        }
+        if (!is_array($idsInput)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid ids']);
+            exit;
+        }
+
+        $ids = [];
+        foreach ($idsInput as $rawId) {
+            $id = (int)$rawId;
+            if ($id > 0) {
+                $ids[] = $id;
+            }
+        }
+        $ids = array_values(array_unique($ids));
+        if (empty($ids)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'No keys selected']);
+            exit;
+        }
+
+        $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
+
+        try {
+            $rows = $this->db->select('tunnel_access_keys', [
+                'id',
+                'user_id',
+                'subdomain',
+                'revoked',
+                'expires_at',
+            ], [
+                'id' => $ids,
+            ]);
+
+            $byId = [];
+            foreach ((array)$rows as $row) {
+                if (isset($row['id'])) {
+                    $byId[(int)$row['id']] = $row;
+                }
+            }
+
+            $results = [];
+            $createdCount = 0;
+            foreach ($ids as $id) {
+                $row = $byId[$id] ?? null;
+                if (!is_array($row)) {
+                    $results[] = [
+                        'id' => $id,
+                        'status' => 'not_found',
+                        'message' => 'Key not found',
+                    ];
+                    continue;
+                }
+
+                $userId = (int)($row['user_id'] ?? 0);
+                $subdomain = strtolower(trim((string)($row['subdomain'] ?? '')));
+                if ($userId <= 0 || $subdomain === '' || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $subdomain)) {
+                    $results[] = [
+                        'id' => $id,
+                        'status' => 'invalid',
+                        'message' => 'Invalid key record',
+                    ];
+                    continue;
+                }
+
+                $isRevoked = (int)($row['revoked'] ?? 0) === 1;
+                $expTs = !empty($row['expires_at']) ? strtotime((string)$row['expires_at']) : false;
+                $isExpired = is_int($expTs) && $expTs > 0 ? ($expTs <= time()) : false;
+                if (!$isRevoked && !$isExpired) {
+                    $results[] = [
+                        'id' => $id,
+                        'user_id' => $userId,
+                        'subdomain' => $subdomain,
+                        'status' => 'active',
+                        'message' => 'Key is already active',
+                    ];
+                    continue;
+                }
+
+                $nowSql = date('Y-m-d H:i:s');
+                $this->db->update('tunnel_access_keys', [
+                    'revoked' => 1,
+                    'revoked_at' => $nowSql,
+                ], [
+                    'user_id' => $userId,
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                ]);
+
+                try {
+                    $created = $this->createTunnelAccessKeyForUser($userId, $subdomain, $ttl);
+                    $createdCount++;
+                    $results[] = [
+                        'id' => $id,
+                        'user_id' => $userId,
+                        'subdomain' => $subdomain,
+                        'status' => 'reactivated',
+                        'expires_at' => $created['expires_at'],
+                        'token' => $created['token'],
+                    ];
+                } catch (\Throwable $e) {
+                    $results[] = [
+                        'id' => $id,
+                        'user_id' => $userId,
+                        'subdomain' => $subdomain,
+                        'status' => 'error',
+                        'message' => 'Failed to issue new key',
+                    ];
+                }
+            }
+
+            echo json_encode([
+                'success' => true,
+                'processed' => count($ids),
+                'reactivated' => $createdCount,
+                'results' => $results,
+            ]);
+            exit;
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Bulk reactivation failed']);
+            exit;
+        }
+    }
+
+    private function normalizeTunnelTtlSeconds($ttlInput): int
+    {
+        $ttl = (int)$ttlInput;
+        if ($ttl < 60) {
+            $ttl = 60;
+        }
+        $max = 86400 * 365 * 5;
+        if ($ttl > $max) {
+            $ttl = $max;
+        }
+        return $ttl;
+    }
+
+    /**
+     * @return array{subdomain:string,expires_at:int,token:string}
+     */
+    private function createTunnelAccessKeyForUser(int $userId, string $subdomain, int $ttl): array
+    {
+        if (!$this->db) {
+            throw new \RuntimeException('Database not available');
+        }
+
+        $jti = bin2hex(random_bytes(16));
+        $now = time();
+        $payload = [
+            'iss' => 'ginto.ai',
+            'sub' => $userId,
+            'sd' => $subdomain,
+            'jti' => $jti,
+            'iat' => $now,
+            'exp' => $now + $ttl,
+        ];
+
+        $secret = $this->getTunnelKeySigningSecret();
+        if ($secret === '') {
+            throw new \RuntimeException('Signing secret not configured');
+        }
+
+        $jwt = $this->jwtEncodeHs256($payload, $secret);
+        $token = 'gtnl-' . $jwt;
+
+        $this->db->insert('tunnel_access_keys', [
+            'user_id' => $userId,
+            'subdomain' => $subdomain,
+            'jti' => $jti,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+            'revoked' => 0,
+        ]);
+
+        return [
+            'subdomain' => $subdomain,
+            'expires_at' => $now + $ttl,
+            'token' => $token,
+        ];
+    }
+
+    private function getTunnelKeySigningSecret(): string
+    {
+        $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+        if ($appKey === '') {
+            return '';
+        }
+        return hash('sha256', $appKey . '|tunnel_access_keys', true);
+    }
+
+    private function jwtEncodeHs256(array $payload, string $secret): string
+    {
+        $header = ['alg' => 'HS256', 'typ' => 'JWT'];
+        $h = $this->base64UrlEncode((string)json_encode($header, JSON_UNESCAPED_SLASHES));
+        $p = $this->base64UrlEncode((string)json_encode($payload, JSON_UNESCAPED_SLASHES));
+        $sig = hash_hmac('sha256', $h . '.' . $p, $secret, true);
+        $s = $this->base64UrlEncode($sig);
+        return $h . '.' . $p . '.' . $s;
+    }
+
+    private function base64UrlEncode(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
+
     public function tunnelsApi(): void
     {
         header('Content-Type: application/json');

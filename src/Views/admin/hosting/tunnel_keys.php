@@ -26,6 +26,18 @@ $currentPage = 'tunnels';
           <p class="text-gray-500">Admin view of generated keys (tokens are not displayed)</p>
         </div>
         <div class="flex gap-2">
+          <select id="bulkTtl" class="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+            <option value="3600">1 hour</option>
+            <option value="21600">6 hours</option>
+            <option value="86400">24 hours</option>
+            <option value="2592000">30 days</option>
+            <option value="31536000" selected>1 year</option>
+            <option value="94608000">3 years</option>
+            <option value="157680000">5 years</option>
+          </select>
+          <button onclick="bulkReactivate()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
+            <i class="fas fa-bolt mr-2"></i>Bulk Reactivate
+          </button>
           <a href="/admin/hosting/tunnels" class="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors">
             <i class="fas fa-arrow-left mr-2"></i>Back
           </a>
@@ -44,6 +56,9 @@ $currentPage = 'tunnels';
           <table class="w-full">
             <thead class="bg-gray-50 dark:bg-gray-700/50">
               <tr>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  <input id="select-all" type="checkbox" onclick="toggleAll(this.checked)" />
+                </th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subdomain</th>
@@ -55,7 +70,7 @@ $currentPage = 'tunnels';
               </tr>
             </thead>
             <tbody id="keys-list" class="divide-y divide-gray-200 dark:divide-gray-700">
-              <tr><td colspan="8" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+              <tr><td colspan="9" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -64,27 +79,95 @@ $currentPage = 'tunnels';
   </div>
 
   <script>
+    const csrfToken = <?= json_encode($csrfToken) ?>;
     function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c])); }
+
+    function isKeyExpired(k) {
+      if (!k || !k.expires_at) return false;
+      const exp = Date.parse(String(k.expires_at).replace(' ', 'T') + 'Z');
+      return Number.isFinite(exp) && exp <= Date.now();
+    }
+
+    function canReactivate(k) {
+      return Number(k?.revoked || 0) === 1 || isKeyExpired(k);
+    }
+
+    function toggleAll(checked) {
+      document.querySelectorAll('.key-select').forEach(el => {
+        if (!el.disabled) {
+          el.checked = !!checked;
+        }
+      });
+    }
+
+    function getSelectedKeyIds() {
+      const ids = [];
+      document.querySelectorAll('.key-select:checked').forEach(el => {
+        const id = Number(el.value || 0);
+        if (id > 0) ids.push(id);
+      });
+      return ids;
+    }
+
+    async function bulkReactivate() {
+      const ids = getSelectedKeyIds();
+      if (!ids.length) {
+        alert('Select at least one expired/revoked key.');
+        return;
+      }
+
+      const ttl = Number(document.getElementById('bulkTtl')?.value || 31536000);
+      const res = await fetch('/admin/hosting/tunnels/keys/reactivate-bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ ids, ttl_seconds: ttl, csrf_token: csrfToken })
+      });
+      const data = await res.json();
+      if (!data || !data.success) {
+        alert(data?.error || 'Bulk reactivation failed');
+        return;
+      }
+
+      const reactivated = Array.isArray(data.results)
+        ? data.results.filter(r => r && r.status === 'reactivated')
+        : [];
+
+      if (reactivated.length) {
+        const lines = reactivated.map(r => `${r.subdomain} (user ${r.user_id}): ${r.token}`);
+        alert(`Reactivated ${reactivated.length} key(s). Save these new tokens now:\n\n${lines.join('\n')}`);
+      } else {
+        alert('No keys were reactivated (selected keys may already be active).');
+      }
+
+      loadKeys();
+    }
 
     async function loadKeys() {
       const tbody = document.getElementById('keys-list');
-      tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
       try {
         const res = await fetch('/admin/hosting/tunnels/keys/api');
         const data = await res.json();
         const keys = Array.isArray(data.keys) ? data.keys : [];
         document.getElementById('keys-count').textContent = `Showing ${keys.length}`;
         if (!keys.length) {
-          tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-gray-500">No keys found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-gray-500">No keys found</td></tr>';
           return;
         }
         tbody.innerHTML = keys.map(k => {
           const revoked = Number(k.revoked || 0) === 1;
+          const expired = !revoked && isKeyExpired(k);
+          const eligible = canReactivate(k);
           const status = revoked
             ? '<span class="px-2 py-1 text-xs rounded bg-gray-500/10 text-gray-500">Revoked</span>'
-            : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Active</span>';
+            : (expired
+                ? '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-600">Expired</span>'
+                : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">Active</span>'
+              );
           return `
             <tr>
+              <td class="px-4 py-3 text-xs"><input class="key-select" type="checkbox" value="${esc(k.id)}" ${eligible ? '' : 'disabled'} /></td>
               <td class="px-4 py-3 font-mono text-xs">${esc(k.id)}</td>
               <td class="px-4 py-3 font-mono text-xs">${esc(k.user_id)}</td>
               <td class="px-4 py-3 font-mono text-xs">${esc(k.subdomain)}</td>
@@ -97,7 +180,7 @@ $currentPage = 'tunnels';
           `;
         }).join('');
       } catch (e) {
-        tbody.innerHTML = '<tr><td colspan="8" class="px-4 py-8 text-center text-red-500">Failed to load keys</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="px-4 py-8 text-center text-red-500">Failed to load keys</td></tr>';
       }
     }
 
