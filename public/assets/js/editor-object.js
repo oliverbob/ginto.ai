@@ -1507,6 +1507,30 @@
     }
   }
 
+  function extractTextFromOpenAiContent(content) {
+    if (typeof content === 'string') return content;
+    if (!Array.isArray(content)) return '';
+
+    const parts = [];
+    for (let i = 0; i < content.length; i++) {
+      const block = content[i];
+      if (typeof block === 'string') {
+        if (block) parts.push(block);
+        continue;
+      }
+      if (!block || typeof block !== 'object') continue;
+
+      const text =
+        (typeof block.text === 'string' && block.text) ||
+        (typeof block.output_text === 'string' && block.output_text) ||
+        (typeof block.content === 'string' && block.content) ||
+        '';
+      if (text) parts.push(text);
+    }
+
+    return parts.join('');
+  }
+
   function extractToolCallFromText(s) {
     if (!s || typeof s !== 'string') return null;
     const trimmed = s.trim();
@@ -3933,7 +3957,7 @@
                     }
                     if (obj.text && typeof obj.text === 'string') extracted = obj.text;
                     // Common LLM shape: choices[0].message.content
-                    else if (Array.isArray(obj.choices) && obj.choices[0] && obj.choices[0].message && typeof obj.choices[0].message.content === 'string') extracted = obj.choices[0].message.content;
+                    else if (Array.isArray(obj.choices) && obj.choices[0] && obj.choices[0].message && obj.choices[0].message.content !== undefined) extracted = extractTextFromOpenAiContent(obj.choices[0].message.content);
                     // Other common shape: choices[0].text
                     else if (Array.isArray(obj.choices) && obj.choices[0] && typeof obj.choices[0].text === 'string') extracted = obj.choices[0].text;
                     // Some providers put 'result.content' as string

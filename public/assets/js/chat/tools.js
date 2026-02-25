@@ -382,8 +382,29 @@ try { startSandboxJobPoller(); } catch (e) { console.warn('Sandbox job poller in
   
   // generate_image
   if (toolName === 'generate_image') {
-    if (data?.success && data?.images?.length > 0) {
-      const images = data.images;
+    const directOpenAiImages = Array.isArray(data?.data)
+      ? data.data
+          .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            if (typeof entry.b64_json === 'string' && entry.b64_json) {
+              return {
+                dataUrl: `data:image/png;base64,${entry.b64_json}`,
+                url: `data:image/png;base64,${entry.b64_json}`,
+              };
+            }
+            if (typeof entry.url === 'string' && entry.url) {
+              return { dataUrl: entry.url, url: entry.url };
+            }
+            return null;
+          })
+          .filter(Boolean)
+      : [];
+
+    const images = (Array.isArray(data?.images) && data.images.length > 0)
+      ? data.images
+      : directOpenAiImages;
+
+    if (images.length > 0) {
       const prompt = data.prompt || 'AI Generated Image';
       const model = data.model || 'Imagen';
       const text = data.text || '';

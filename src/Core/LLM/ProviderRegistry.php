@@ -563,13 +563,18 @@ class ProviderRegistry
             
             $data = json_decode($response, true);
             $items = [];
-            if (isset($data['data']) && is_array($data['data'])) {
+
+            if (is_array($data) && array_is_list($data)) {
+                $items = $data;
+            } elseif (isset($data['data']) && is_array($data['data'])) {
                 $items = $data['data'];
             } elseif (isset($data['models']) && is_array($data['models'])) {
                 // Common Ollama/OpenWebUI-like model list shape
                 $items = $data['models'];
             } elseif (isset($data['data']['models']) && is_array($data['data']['models'])) {
                 $items = $data['data']['models'];
+            } elseif (isset($data['result']['data']) && is_array($data['result']['data'])) {
+                $items = $data['result']['data'];
             } else {
                 return [];
             }
@@ -577,7 +582,26 @@ class ProviderRegistry
             // Parse models with capabilities
             $models = [];
             foreach ($items as $model) {
-                $modelId = $model['id'] ?? ($model['name'] ?? '');
+                if (is_string($model)) {
+                    $modelId = trim($model);
+                    if ($modelId === '') {
+                        continue;
+                    }
+                    $models[] = [
+                        'id' => $modelId,
+                        'name' => $modelId,
+                        'owned_by' => $provider,
+                        'created' => null,
+                        'capabilities' => $this->detectCapabilities($modelId),
+                    ];
+                    continue;
+                }
+
+                if (!is_array($model)) {
+                    continue;
+                }
+
+                $modelId = $model['id'] ?? ($model['name'] ?? ($model['model'] ?? ''));
                 if (!$modelId) continue;
                 
                 $models[] = [

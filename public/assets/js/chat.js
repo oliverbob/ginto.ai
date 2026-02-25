@@ -3946,6 +3946,59 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     return cleaned.trim();
   }
 
+  function parseOpenAiContentParts(content) {
+    const out = { text: '', images: [] };
+    if (typeof content === 'string') {
+      out.text = content;
+      return out;
+    }
+    if (!Array.isArray(content)) return out;
+
+    for (const block of content) {
+      if (typeof block === 'string') {
+        if (block) out.text += block;
+        continue;
+      }
+      if (!block || typeof block !== 'object') continue;
+
+      const type = String(block.type || '').toLowerCase();
+      if (type === 'text' || type === 'input_text' || type === 'output_text' || type === '') {
+        const text =
+          (typeof block.text === 'string' && block.text) ||
+          (typeof block.output_text === 'string' && block.output_text) ||
+          (typeof block.content === 'string' && block.content) ||
+          '';
+        if (text) out.text += text;
+        continue;
+      }
+
+      if (type === 'image_url') {
+        const imageUrl =
+          (typeof block.image_url?.url === 'string' && block.image_url.url) ||
+          (typeof block.url === 'string' && block.url) ||
+          '';
+        if (imageUrl) out.images.push(imageUrl);
+      }
+    }
+
+    return out;
+  }
+
+  function mergeAssistantTextAndImagesHtml(text, imageUrls) {
+    const safeText = stripToolCallJson(text || '');
+    let html = simpleMarkdownToHtml(safeText);
+
+    if (Array.isArray(imageUrls) && imageUrls.length > 0) {
+      const imagesHtml = imageUrls.map((url) => {
+        const safeUrl = escapeHtml(url);
+        return `<img src="${safeUrl}" alt="Generated image" class="max-w-full md:max-w-md rounded-lg border border-gray-600 cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="window.showImageModal && window.showImageModal('${safeUrl}')">`;
+      }).join('');
+      html += `<div class="mt-4 flex flex-wrap gap-3">${imagesHtml}</div>`;
+    }
+
+    return html;
+  }
+
   // Websearch-style streaming to /chat endpoint
   async function streamWebSearch(query) {
     // Check install, login and model setup before allowing chat
@@ -4009,6 +4062,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     let accumulatedContent = '';
     let lastAssistantHtml = null;
     let lastAssistantContent = '';
+    let accumulatedImageUrls = [];
+    const seenImageUrls = new Set();
     let citations = [];
     let toolResults = []; // Track tool results for persistence
     
@@ -4130,6 +4185,27 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         body: bodyParams.toString(),
         signal: abortController.signal
       });
+
+      if (!response.ok) {
+        let errorMessage = '';
+        try {
+          const raw = await response.text();
+          try {
+            const parsed = JSON.parse(raw);
+            errorMessage = parsed?.detail || parsed?.error?.message || parsed?.error || parsed?.message || '';
+          } catch (_) {
+            errorMessage = raw || '';
+          }
+        } catch (_) {
+          errorMessage = '';
+        }
+
+        const fallbackText = 'Backend is temporarily unavailable. Please try again.';
+        const visibleMessage = (errorMessage && String(errorMessage).trim()) ? String(errorMessage).trim() : fallbackText;
+        currentCard.response.innerHTML = `<p class="text-red-400">${escapeHtml(visibleMessage)}</p>`;
+        currentCard.responseLabel.classList.remove('hidden');
+        return;
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -4542,6 +4618,66 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               continue;
             }
 
+            // Handle OpenAI-compatible chunks where content is in choices[*].delta/content
+            // Supports both plain strings and block arrays with text/image_url.
+            const messageParts = parseOpenAiContentParts(data?.choices?.[0]?.message?.content);
+            const deltaParts = parseOpenAiContentParts(data?.choices?.[0]?.delta?.content);
+            const hasOpenAiContent =
+              (messageParts.text && messageParts.text.length > 0) ||
+              (Array.isArray(messageParts.images) && messageParts.images.length > 0) ||
+              (deltaParts.text && deltaParts.text.length > 0) ||
+              (Array.isArray(deltaParts.images) && deltaParts.images.length > 0);
+
+            if (hasOpenAiContent) {
+              if (!contentStarted) {
+                if (!currentCard.hasToolResults) {
+                  currentCard.response.innerHTML = '';
+                }
+                currentCard.responseLabel.classList.remove('hidden');
+                currentCard.body.classList.remove('collapsed');
+                contentStarted = true;
+              }
+
+              const mergedText = (deltaParts.text || '') + (messageParts.text || '');
+              if (mergedText) {
+                accumulatedContent += mergedText;
+                try {
+                  if (window.__gintoAudio && typeof window.__gintoAudio.queueFragment === 'function') {
+                    const cleanText = sanitizeForTTS(mergedText);
+                    if (cleanText) window.__gintoAudio.queueFragment(cleanText);
+                  }
+                } catch (_) {}
+              }
+
+              const imageCandidates = [...(deltaParts.images || []), ...(messageParts.images || [])];
+              for (const imageUrl of imageCandidates) {
+                if (!imageUrl || seenImageUrls.has(imageUrl)) continue;
+                seenImageUrls.add(imageUrl);
+                accumulatedImageUrls.push(imageUrl);
+              }
+
+              const combinedHtml = mergeAssistantTextAndImagesHtml(accumulatedContent, accumulatedImageUrls);
+
+              if (currentCard.hasToolResults) {
+                let textResponse = currentCard.response.querySelector('.text-response-after-tools');
+                if (!textResponse) {
+                  textResponse = document.createElement('div');
+                  textResponse.className = 'text-response-after-tools mt-4';
+                  currentCard.response.appendChild(textResponse);
+                }
+                textResponse.innerHTML = combinedHtml;
+              } else {
+                currentCard.response.innerHTML = combinedHtml;
+              }
+
+              renderLatexInElement(currentCard.response);
+              enhanceCodeBlocks(currentCard.response);
+              initStickyCodeButtons();
+              lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
+              smartScrollToElement(currentCard.response, { behavior: 'smooth', block: 'end' });
+              continue;
+            }
+
 
             // Handle text chunks - render markdown client-side with markdown-it + KaTeX
             // IMPORTANT: Check for data.final BEFORE this - final message also has html but we don't want to re-render
@@ -4647,6 +4783,14 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 // Just ensure code blocks are enhanced (idempotent operation)
                 enhanceCodeBlocks(currentCard.response);
                 setTimeout(() => initStickyCodeButtons(), 100);
+              } else if (accumulatedImageUrls.length > 0) {
+                const combinedHtml = mergeAssistantTextAndImagesHtml('', accumulatedImageUrls);
+                currentCard.response.innerHTML = combinedHtml;
+                lastAssistantHtml = ensureCodeBlockAttributes(combinedHtml);
+                lastAssistantContent = '';
+                renderLatexInElement(currentCard.response);
+                enhanceCodeBlocks(currentCard.response);
+                setTimeout(() => initStickyCodeButtons(), 100);
               } else if (data.html) {
                 // Fallback: Use server-rendered HTML only if no streaming happened
                 let cleanedHtml = stripToolCallJson(data.html);
@@ -4713,7 +4857,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         }
         accumulatedContent = ''; // Clear so finally doesn't add empty response
       } else {
-        currentCard.response.innerHTML = `<p class="text-red-400">Error: ${err.message}</p>`;
+        currentCard.response.innerHTML = '<p class="text-red-400">Backend is temporarily unavailable. Please try again.</p>';
         // Remove the user message from history on error
         if (history.length > 0 && history[history.length - 1].role === 'user') {
           history.pop();
@@ -5625,8 +5769,29 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     
     // generate_image - show generated AI images
     if (toolName === 'generate_image') {
-      if (data?.success && data?.images?.length > 0) {
-        const images = data.images;
+      const directOpenAiImages = Array.isArray(data?.data)
+        ? data.data
+            .map((entry) => {
+              if (!entry || typeof entry !== 'object') return null;
+              if (typeof entry.b64_json === 'string' && entry.b64_json) {
+                return {
+                  dataUrl: `data:image/png;base64,${entry.b64_json}`,
+                  url: `data:image/png;base64,${entry.b64_json}`,
+                };
+              }
+              if (typeof entry.url === 'string' && entry.url) {
+                return { dataUrl: entry.url, url: entry.url };
+              }
+              return null;
+            })
+            .filter(Boolean)
+        : [];
+
+      const images = (Array.isArray(data?.images) && data.images.length > 0)
+        ? data.images
+        : directOpenAiImages;
+
+      if (images.length > 0) {
         const prompt = data.prompt || 'AI Generated Image';
         const model = data.model || 'Imagen';
         const text = data.text || '';
@@ -5916,6 +6081,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
           const data = JSON.parse(jsonStr);
           if (data.content) aiResponse += data.content;
           else if (data.choices?.[0]?.delta?.content) aiResponse += data.choices[0].delta.content;
+          else if (Array.isArray(data.choices?.[0]?.delta?.content)) aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
+          else if (data.choices?.[0]?.message?.content) aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
           else if (data.text) aiResponse += data.text;
         } catch (e) { /* ignore */ }
       }
@@ -6079,8 +6246,10 @@ Have you finished the ORIGINAL REQUEST above?
               aiResponse += data.content;
             } else if (data.choices?.[0]?.delta?.content) {
               aiResponse += data.choices[0].delta.content;
+            } else if (Array.isArray(data.choices?.[0]?.delta?.content)) {
+              aiResponse += extractTextFromOpenAiContent(data.choices[0].delta.content);
             } else if (data.choices?.[0]?.message?.content) {
-              aiResponse += data.choices[0].message.content;
+              aiResponse += extractTextFromOpenAiContent(data.choices[0].message.content);
             } else if (data.delta?.content) {
               aiResponse += data.delta.content;
             } else if (data.text) {
@@ -6247,6 +6416,29 @@ Is the ORIGINAL REQUEST complete? If not, output the next sandbox_delete. If don
         return JSON.parse(fixed);
       } catch (e2) { return null; }
     }
+  }
+
+  function extractTextFromOpenAiContent(content) {
+    if (typeof content === 'string') return content;
+    if (!Array.isArray(content)) return '';
+
+    const parts = [];
+    for (const block of content) {
+      if (typeof block === 'string') {
+        if (block) parts.push(block);
+        continue;
+      }
+      if (!block || typeof block !== 'object') continue;
+
+      const text =
+        (typeof block.text === 'string' && block.text) ||
+        (typeof block.output_text === 'string' && block.output_text) ||
+        (typeof block.content === 'string' && block.content) ||
+        '';
+      if (text) parts.push(text);
+    }
+
+    return parts.join('');
   }
 
       // STT client-side recording/processing has been removed.

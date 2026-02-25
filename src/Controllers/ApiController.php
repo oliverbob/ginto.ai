@@ -771,12 +771,17 @@ class ApiController extends Controller
 
             $decoded = json_decode((string)$response, true);
             $items = [];
-            if (isset($decoded['data']) && is_array($decoded['data'])) {
+
+            if (is_array($decoded) && array_is_list($decoded)) {
+                $items = $decoded;
+            } elseif (isset($decoded['data']) && is_array($decoded['data'])) {
                 $items = $decoded['data'];
             } elseif (isset($decoded['models']) && is_array($decoded['models'])) {
                 $items = $decoded['models'];
             } elseif (isset($decoded['data']['models']) && is_array($decoded['data']['models'])) {
                 $items = $decoded['data']['models'];
+            } elseif (isset($decoded['result']['data']) && is_array($decoded['result']['data'])) {
+                $items = $decoded['result']['data'];
             }
 
             if (empty($items)) {
@@ -789,7 +794,24 @@ class ApiController extends Controller
                 : null;
 
             foreach ($items as $item) {
-                $mid = (string)($item['id'] ?? ($item['name'] ?? ''));
+                if (is_string($item)) {
+                    $mid = trim($item);
+                    if ($mid === '') {
+                        continue;
+                    }
+                    $models[] = [
+                        'id' => $mid,
+                        'name' => $mid,
+                        'capabilities' => $registry ? $registry->detectCapabilities($mid) : [],
+                    ];
+                    continue;
+                }
+
+                if (!is_array($item)) {
+                    continue;
+                }
+
+                $mid = (string)($item['id'] ?? ($item['name'] ?? ($item['model'] ?? '')));
                 if ($mid === '') {
                     continue;
                 }
