@@ -522,6 +522,166 @@ class UserController extends \Core\Controller
         }
     }
 
+    public function accountApiKeysList(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            $rows = $this->db->select('api_tokens', [
+                'id',
+                'name',
+                'created_at',
+                'last_used_at',
+                'expires_at',
+                'revoked',
+                'revoked_at',
+            ], [
+                'user_id' => $userId,
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => 200,
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'keys' => is_array($rows) ? $rows : [],
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'DB error']);
+        }
+    }
+
+    public function createAccountApiKey(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $csrf = (string)($input['csrf_token'] ?? '');
+        $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+        if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $nameRaw = strip_tags((string)($input['name'] ?? ''));
+        $name = trim(preg_replace('/[^a-zA-Z0-9_\-\s]/', '', $nameRaw));
+        if ($name === '') {
+            $name = 'api_key_' . date('Ymd_His');
+        }
+        if (strlen($name) > 64) {
+            $name = substr($name, 0, 64);
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            $plain = 'ginto-' . bin2hex(random_bytes(32));
+            $hash = hash('sha256', $plain);
+
+            $encrypted = $this->encryptApiTokenPlain($plain);
+            if ($encrypted === null) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Server missing APP_KEY for key storage']);
+                return;
+            }
+
+            $this->db->insert('api_tokens', [
+                'user_id' => $userId,
+                'name' => $name,
+                'token' => $hash,
+                'token_encrypted' => $encrypted,
+                'expires_at' => null,
+                'revoked' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            echo json_encode([
+                'success' => true,
+                'token' => $plain,
+                'name' => $name,
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to create key']);
+        }
+    }
+
+    public function revokeAccountApiKey(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Unauthorized']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $csrf = (string)($input['csrf_token'] ?? '');
+        $sessionCsrf = (string)($_SESSION['csrf_token'] ?? '');
+        if ($csrf === '' || $sessionCsrf === '' || !hash_equals($sessionCsrf, $csrf)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid key id']);
+            return;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            $row = $this->db->get('api_tokens', ['id', 'user_id', 'revoked'], ['id' => $id]);
+            if (!is_array($row) || (int)($row['user_id'] ?? 0) !== $userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+
+            if ((int)($row['revoked'] ?? 0) === 1) {
+                echo json_encode(['success' => true]);
+                return;
+            }
+
+            $this->db->update('api_tokens', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'id' => $id,
+                'user_id' => $userId,
+            ]);
+
+            echo json_encode(['success' => true]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to revoke key']);
+        }
+    }
+
     /**
      * User network tree view (GET /user/network-tree)
      */

@@ -1172,6 +1172,9 @@ $router->req('/account/keys', 'UserController@accountKeys');
 
 $router->req('/api/account/default-key/status', 'UserController@defaultApiKeyStatus', ['GET']);
 $router->req('/api/account/default-key/rotate', 'UserController@rotateDefaultApiKey', ['POST']);
+$router->req('/api/account/keys/list', 'UserController@accountApiKeysList', ['GET']);
+$router->req('/api/account/keys/create', 'UserController@createAccountApiKey', ['POST']);
+$router->req('/api/account/keys/revoke', 'UserController@revokeAccountApiKey', ['POST']);
 
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');
