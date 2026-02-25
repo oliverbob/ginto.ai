@@ -756,7 +756,7 @@ class ChatStreamHandler
         // Session-selected cloud provider
         $sessionCloudProvider = null;
         $sessionCloudModel = null;
-        $cloudProviders = ['cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks'];
+        $cloudProviders = ['cerebras', 'groq', 'openai', 'anthropic', 'together', 'fireworks', 'ginto_tunnel'];
         if ($sessionProvider && $sessionModel && in_array($sessionProvider, $cloudProviders, true)) {
             $sessionCloudProvider = $sessionProvider;
             $sessionCloudModel = $sessionModel;
@@ -1083,6 +1083,7 @@ class ChatStreamHandler
             }
 
             // Create provider instance
+            $selectedProviderBaseUrl = $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
             if ($useLocalVision && $hasImage) {
                 $config = $localLlmConfig->getVisionProviderConfig();
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider('local', [
@@ -1161,10 +1162,15 @@ class ChatStreamHandler
                 $selectedProvider = $mainProviderName;
                 $apiKey = $mainApiKey;
                 $modelName = $mainModelName;
-                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
+                $selectedProviderBaseUrl = $this->resolveOpenAiCompatibleProviderBaseUrl($selectedProvider, $db, $userIdSession, $isAdminUser);
+                $mainProviderConfig = [
                     'api_key' => $apiKey,
                     'model' => $modelName,
-                ]);
+                ];
+                if (!empty($selectedProviderBaseUrl)) {
+                    $mainProviderConfig['base_url'] = $selectedProviderBaseUrl;
+                }
+                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, $mainProviderConfig);
             } elseif ($useLocalLlm) {
                 $config = $localLlmConfig->getReasoningProviderConfig();
                 $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider('local', [
@@ -1173,10 +1179,14 @@ class ChatStreamHandler
                     'base_url' => $config['base_url'],
                 ]);
             } else {
-                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, [
+                $providerConfig = [
                     'api_key' => $apiKey,
                     'model' => $modelName,
-                ]);
+                ];
+                if (!empty($selectedProviderBaseUrl)) {
+                    $providerConfig['base_url'] = $selectedProviderBaseUrl;
+                }
+                $provider = new \App\Core\LLM\Providers\OpenAICompatibleProvider($selectedProvider, $providerConfig);
             }
 
             // Prepare SSE
@@ -2268,6 +2278,47 @@ class ChatStreamHandler
 
         echo str_repeat(' ', 1024) . "\n\n";
         flush();
+    }
+
+    private function resolveOpenAiCompatibleProviderBaseUrl(string $provider, $db, ?int $userIdSession, bool $isAdminUser): ?string
+    {
+        if ($provider !== 'ginto_tunnel') {
+            return null;
+        }
+
+        $envBase = trim((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? 'https://ollama.ginto.ai/v1/')));
+        if ($envBase !== '' && !preg_match('#^https?://#i', $envBase)) {
+            $envBase = 'https://' . ltrim($envBase, '/');
+        }
+        $fallback = rtrim($envBase, '/') . '/';
+
+        if (!$db) {
+            return $fallback;
+        }
+
+        $settingKeys = [];
+        if (!$isAdminUser && !empty($userIdSession)) {
+            $settingKeys[] = 'llm_ginto_tunnel_base_url_user_' . (int)$userIdSession;
+        }
+        $settingKeys[] = 'llm_ginto_tunnel_base_url';
+
+        foreach ($settingKeys as $settingKey) {
+            try {
+                $row = $db->get('settings', ['value'], ['key' => $settingKey]);
+                $candidate = trim((string)($row['value'] ?? ''));
+                if ($candidate === '') {
+                    continue;
+                }
+                if (!preg_match('#^https?://#i', $candidate)) {
+                    $candidate = 'https://' . ltrim($candidate, '/');
+                }
+                return rtrim($candidate, '/') . '/';
+            } catch (\Throwable $_) {
+                continue;
+            }
+        }
+
+        return $fallback;
     }
 
     /**

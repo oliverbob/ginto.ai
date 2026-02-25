@@ -22,6 +22,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         'openai' => 'gpt-4o',
         'groq' => 'llama-3.3-70b-versatile',
         'cerebras' => 'gpt-oss-120b',
+        'ginto_tunnel' => 'gpt-oss-120b',
         'together' => 'meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo',
         'fireworks' => 'accounts/fireworks/models/llama-v3p1-70b-instruct',
         'local' => 'ginto-default',
@@ -42,6 +43,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         'openai' => 'https://api.openai.com/v1/',
         'groq' => 'https://api.groq.com/openai/v1/',
         'cerebras' => 'https://api.cerebras.ai/v1/',
+        'ginto_tunnel' => 'https://ollama.ginto.ai/v1/',
         'together' => 'https://api.together.xyz/v1/',
         'fireworks' => 'https://api.fireworks.ai/inference/v1/',
         'local' => 'http://127.0.0.1:8034/v1/',
@@ -51,6 +53,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         'openai' => 'OPENAI_API_KEY',
         'groq' => 'GROQ_API_KEY',
         'cerebras' => 'CEREBRAS_API_KEY',
+        'ginto_tunnel' => 'GINTO_TUNNEL_API_KEY',
         'together' => 'TOGETHER_API_KEY',
         'fireworks' => 'FIREWORKS_API_KEY',
         'local' => 'LOCAL_LLM_API_KEY', // Not used, but needed for consistency

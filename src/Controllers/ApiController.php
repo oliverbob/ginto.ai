@@ -591,6 +591,120 @@ class ApiController extends Controller
         return null;
     }
 
+    private function sanitizeProviderName(?string $provider): string
+    {
+        $provider = strtolower(trim((string)$provider));
+        return preg_replace('/[^a-z0-9_\-]/', '', $provider) ?: '';
+    }
+
+    private function sanitizeOpenAiCompatibleBaseUrl(?string $baseUrl): ?string
+    {
+        $baseUrl = trim(strip_tags((string)$baseUrl));
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        if (!preg_match('#^https?://#i', $baseUrl)) {
+            $baseUrl = 'https://' . ltrim($baseUrl, '/');
+        }
+
+        $parts = parse_url($baseUrl);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower((string)$parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $normalized = $scheme . '://' . strtolower((string)$parts['host']);
+        if (!empty($parts['port'])) {
+            $normalized .= ':' . (int)$parts['port'];
+        }
+
+        $path = isset($parts['path']) ? rtrim((string)$parts['path'], '/') : '';
+        if ($path === '') {
+            $path = '/v1';
+        }
+        if (!str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+
+        $normalized .= $path . '/';
+        return $normalized;
+    }
+
+    private function getTunnelBaseUrlSettingKey(?int $userId, bool $isAdmin): string
+    {
+        if ($isAdmin || empty($userId)) {
+            return 'llm_ginto_tunnel_base_url';
+        }
+        return 'llm_ginto_tunnel_base_url_user_' . (int)$userId;
+    }
+
+    private function saveTunnelBaseUrl(?string $baseUrl, ?int $userId, bool $isAdmin): void
+    {
+        if (!$this->db) {
+            return;
+        }
+
+        $value = $this->sanitizeOpenAiCompatibleBaseUrl($baseUrl);
+        if (empty($value)) {
+            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+        }
+        if (empty($value)) {
+            return;
+        }
+
+        $key = $this->getTunnelBaseUrlSettingKey($userId, $isAdmin);
+        $exists = $this->db->get('settings', 'id', ['key' => $key]);
+        if ($exists) {
+            $this->db->update('settings', [
+                'value' => $value,
+                'type' => 'string',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], ['key' => $key]);
+        } else {
+            $this->db->insert('settings', [
+                'key' => $key,
+                'value' => $value,
+                'type' => 'string',
+                'group_name' => 'system',
+                'description' => 'OpenAI-compatible base URL for Ginto Tunnel provider',
+                'is_public' => 0,
+            ]);
+        }
+    }
+
+    private function resolveTunnelBaseUrl(?int $userId, bool $isAdmin): string
+    {
+        $fallback = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/')
+            ?: 'https://ollama.ginto.ai/v1/';
+
+        if (!$this->db) {
+            return $fallback;
+        }
+
+        $keys = [];
+        if (!$isAdmin && !empty($userId)) {
+            $keys[] = $this->getTunnelBaseUrlSettingKey($userId, false);
+        }
+        $keys[] = $this->getTunnelBaseUrlSettingKey(null, true);
+
+        foreach ($keys as $k) {
+            $row = $this->db->get('settings', ['value'], ['key' => $k]);
+            if (!empty($row['value'])) {
+                $candidate = $this->sanitizeOpenAiCompatibleBaseUrl((string)$row['value']);
+                if (!empty($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $fallback;
+    }
+
     private function parseDotEnv(string $path): array
     {
         $data = [];
@@ -756,6 +870,7 @@ class ApiController extends Controller
             'TOGETHER_API_KEY' => 'together',
             'FIREWORKS_API_KEY' => 'fireworks',
             'OLLAMA_API_KEY' => 'ollama',
+            'GINTO_TUNNEL_API_KEY' => 'ginto_tunnel',
             'NOVITA_API_KEY' => 'novita'
         ];
 
@@ -775,6 +890,11 @@ class ApiController extends Controller
                 }
                 $providers[$providerName]['env_key_masked'] = self::maskKey($val);
             }
+        }
+
+        if (isset($providers['ginto_tunnel'])) {
+            $providers['ginto_tunnel']['display_name'] = 'Ginto Tunnel';
+            $providers['ginto_tunnel']['base_url'] = $this->resolveTunnelBaseUrl(isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $isAdmin);
         }
 
         // Admin-only local Ollama detection toggle from /live MCP Configuration
@@ -1101,8 +1221,8 @@ class ApiController extends Controller
             $input = $_POST;
         }
 
-        $provider = $input['provider'] ?? null;
-        $model = $input['model'] ?? null;
+        $provider = $this->sanitizeProviderName($input['provider'] ?? null);
+        $model = trim(strip_tags((string)($input['model'] ?? '')));
 
         // Validate that the requesting user may select this provider.
         // If the user is an admin, allow any provider.
@@ -1144,6 +1264,7 @@ class ApiController extends Controller
                     'TOGETHER_API_KEY' => 'together',
                     'FIREWORKS_API_KEY' => 'fireworks',
                     'OLLAMA_API_KEY' => 'ollama',
+                    'GINTO_TUNNEL_API_KEY' => 'ginto_tunnel',
                     'NOVITA_API_KEY' => 'novita'
                 ];
                 foreach ($envCandidates as $envKey => $pname) {
@@ -1263,11 +1384,12 @@ class ApiController extends Controller
             $action = $input['action'] ?? $input['a'] ?? null;
 
             if ($action === 'add') {
-                $provider = $input['provider'] ?? null;
+                $provider = $this->sanitizeProviderName($input['provider'] ?? null);
                 $api_key = $input['api_key'] ?? null;
                 $key_name = $input['key_name'] ?? null;
                 $tier = $input['tier'] ?? 'basic';
                 $is_default = !empty($input['is_default']) ? 1 : 0;
+                $base_url = $input['base_url'] ?? null;
 
                 if (empty($provider) || empty($api_key)) {
                     http_response_code(400);
@@ -1290,6 +1412,19 @@ class ApiController extends Controller
                     exit();
                 }
 
+                if ($provider === 'ginto_tunnel') {
+                    $sanitizedBaseUrl = $this->sanitizeOpenAiCompatibleBaseUrl($base_url);
+                    if (empty($sanitizedBaseUrl)) {
+                        $sanitizedBaseUrl = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+                    }
+                    if (empty($sanitizedBaseUrl)) {
+                        http_response_code(400);
+                        echo json_encode(['success' => false, 'error' => 'Invalid endpoint URL for Ginto Tunnel']);
+                        exit();
+                    }
+                    $base_url = $sanitizedBaseUrl;
+                }
+
                 try {
                     if ($db) {
                         $currentUserId = $_SESSION['user_id'] ?? null;
@@ -1305,6 +1440,11 @@ class ApiController extends Controller
                             ];
                             if ($currentUserId !== null) $payload['user_id'] = $currentUserId;
                             $id = $manager->addKey($payload);
+                            if ($provider === 'ginto_tunnel') {
+                                try {
+                                    $this->saveTunnelBaseUrl($base_url, $currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                                } catch (\Throwable $_) { /* ignore */ }
+                            }
                             // Ensure owner recorded (fallback in case manager didn't persist user_id)
                             try {
                                 if ($currentUserId !== null && $this->db && $id) {
@@ -1329,6 +1469,11 @@ class ApiController extends Controller
 
                         $res = $db->insert('provider_keys', $insert);
                         $id = $db->id() ?? null;
+                        if ($provider === 'ginto_tunnel') {
+                            try {
+                                $this->saveTunnelBaseUrl($base_url, isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null, $isAdmin);
+                            } catch (\Throwable $_) { /* ignore */ }
+                        }
                         // Fallback: ensure user_id is set on the inserted row
                         try {
                             if (isset($_SESSION['user_id']) && $_SESSION['user_id'] !== null && $id) {
@@ -1450,6 +1595,9 @@ class ApiController extends Controller
                             'created_at' => $r['created_at'] ?? null,
                             'updated_at' => $r['updated_at'] ?? null,
                         ];
+                        if (($r['provider'] ?? '') === 'ginto_tunnel') {
+                            $keys[count($keys) - 1]['base_url'] = $this->resolveTunnelBaseUrl($currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                        }
                     }
                 }
             } catch (\Throwable $e) {
@@ -1469,6 +1617,7 @@ class ApiController extends Controller
             'TOGETHER_API_KEY' => 'together',
             'FIREWORKS_API_KEY' => 'fireworks',
             'OLLAMA_API_KEY' => 'ollama',
+            'GINTO_TUNNEL_API_KEY' => 'ginto_tunnel',
             'NOVITA_API_KEY' => 'novita'
         ];
         // Only include env keys in the response for admin users.
@@ -1488,6 +1637,9 @@ class ApiController extends Controller
                         'error_count' => 0,
                         'rate_limit_reset_at' => null,
                     ];
+                    if ($providerName === 'ginto_tunnel') {
+                        $keys[count($keys) - 1]['base_url'] = $this->resolveTunnelBaseUrl($currentUserId !== null ? (int)$currentUserId : null, $isAdmin);
+                    }
                 }
             }
         }

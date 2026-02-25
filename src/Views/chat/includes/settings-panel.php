@@ -170,12 +170,18 @@ try {
           <select name="provider" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200">
             <option value="cerebras">Cerebras</option>
             <option value="groq">Groq</option>
+            <option value="ginto_tunnel">Ginto Tunnel</option>
             <option value="ollama">Ollama</option>
             <option value="openai">OpenAI</option>
             <option value="anthropic">Anthropic</option>
             <option value="together">Together</option>
             <option value="fireworks">Fireworks</option>
           </select>
+        </div>
+        <div id="ginto-tunnel-base-url-wrap" class="hidden">
+          <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Endpoint URL (OpenAI-compatible)</label>
+          <input type="url" name="base_url" placeholder="https://ollama.ginto.ai/v1/" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Used for Ginto Tunnel or any public OpenAI-compatible API endpoint.</p>
         </div>
         <div>
           <label class="block text-xs text-gray-500 dark:text-gray-400 mb-1">Key Name</label>

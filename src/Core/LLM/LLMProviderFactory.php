@@ -48,6 +48,7 @@ class LLMProviderFactory
             'openai' => new OpenAICompatibleProvider('openai', $config),
             'groq' => new OpenAICompatibleProvider('groq', $config),
             'cerebras' => new OpenAICompatibleProvider('cerebras', $config),
+            'ginto_tunnel' => new OpenAICompatibleProvider('ginto_tunnel', $config),
             'together' => new OpenAICompatibleProvider('together', $config),
             'fireworks' => new OpenAICompatibleProvider('fireworks', $config),
             'local', 'ginto' => new OpenAICompatibleProvider('local', $config),
@@ -119,7 +120,7 @@ class LLMProviderFactory
      */
     public static function getAvailableProviders(): array
     {
-        return ['local', 'openai', 'groq', 'cerebras', 'anthropic', 'together', 'fireworks', 'ollama'];
+        return ['local', 'openai', 'groq', 'cerebras', 'ginto_tunnel', 'anthropic', 'together', 'fireworks', 'ollama'];
     }
 
     /**

@@ -5,6 +5,40 @@
 ?>
 <script>
   // ============= API Keys Management =============
+  function normalizeBaseUrl(url) {
+    const raw = (url || '').trim();
+    if (!raw) return '';
+    return raw.endsWith('/') ? raw : raw + '/';
+  }
+
+  function toggleGintoTunnelFields(form) {
+    if (!form) return;
+    const providerSelect = form.querySelector('select[name="provider"]');
+    const wrapper = document.getElementById('ginto-tunnel-base-url-wrap');
+    const baseUrlInput = form.querySelector('input[name="base_url"]');
+    if (!providerSelect || !wrapper || !baseUrlInput) return;
+
+    const selectedProvider = (providerSelect.value || '').toLowerCase();
+    const enabled = selectedProvider === 'ginto_tunnel';
+    wrapper.classList.toggle('hidden', !enabled);
+    if (enabled) {
+      if (!baseUrlInput.value.trim()) {
+        baseUrlInput.value = 'https://ollama.ginto.ai/v1/';
+      }
+      baseUrlInput.setAttribute('required', 'required');
+    } else {
+      baseUrlInput.removeAttribute('required');
+      baseUrlInput.value = '';
+    }
+  }
+
+  const addApiKeyForm = document.getElementById('add-api-key-form');
+  const providerSelectEl = addApiKeyForm?.querySelector('select[name="provider"]');
+  if (providerSelectEl) {
+    providerSelectEl.addEventListener('change', () => toggleGintoTunnelFields(addApiKeyForm));
+  }
+  toggleGintoTunnelFields(addApiKeyForm);
+
   async function loadApiKeys() {
     const list = document.getElementById('api-keys-list');
     if (!list) return;
@@ -35,6 +69,7 @@
             </div>
           </div>
           <div class="text-xs font-mono text-gray-500 dark:text-gray-400 mb-1 break-all">${escapeHtml(key.api_key_masked)}</div>
+          ${key.base_url ? `<div class="text-xs text-blue-500 dark:text-blue-300 mb-1 break-all">${escapeHtml(normalizeBaseUrl(key.base_url))}</div>` : ''}
           <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
             <span>${key.provider}</span>
             <span class="text-gray-400">•</span>
@@ -106,6 +141,9 @@
       return;
     }
     
+    const provider = String(formData.get('provider') || '').toLowerCase();
+    const baseUrl = normalizeBaseUrl(String(formData.get('base_url') || ''));
+
     try {
       const res = await fetch('/api/provider-keys', {
         method: 'POST',
@@ -115,9 +153,10 @@
         },
         body: JSON.stringify({
           action: 'add',
-          provider: formData.get('provider'),
+          provider,
           key_name: formData.get('key_name'),
           api_key: formData.get('api_key'),
+          base_url: provider === 'ginto_tunnel' ? baseUrl : '',
           tier: formData.get('tier'),
           is_default: formData.get('is_default') === 'on'
         }),
@@ -127,6 +166,7 @@
       console.log('Add API key response:', data);
       if (data.success) {
         form.reset();
+        toggleGintoTunnelFields(form);
         loadApiKeys();
         
         // Refresh the models list to show newly available models

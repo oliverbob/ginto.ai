@@ -39,6 +39,12 @@ class ProviderRegistry
             'display_name' => 'Cerebras',
             'supports_tools' => true,
         ],
+        'ginto_tunnel' => [
+            'base_url' => 'https://ollama.ginto.ai/v1/',
+            'env_key' => 'GINTO_TUNNEL_API_KEY',
+            'display_name' => 'Ginto Tunnel',
+            'supports_tools' => true,
+        ],
         'novita' => [
             'base_url' => 'https://api.novita.ai/v3/openai/',
             'env_key' => 'NOVITA_API_KEY',
@@ -230,7 +236,93 @@ class ProviderRegistry
      */
     public function getProviderConfig(string $provider): ?array
     {
-        return self::PROVIDER_CONFIG[$provider] ?? null;
+        $config = self::PROVIDER_CONFIG[$provider] ?? null;
+        if (!is_array($config)) {
+            return null;
+        }
+        $config['base_url'] = $this->resolveProviderBaseUrl($provider, $config);
+        return $config;
+    }
+
+    private function sanitizeBaseUrl(string $baseUrl): ?string
+    {
+        $baseUrl = trim($baseUrl);
+        if ($baseUrl === '') {
+            return null;
+        }
+
+        if (!preg_match('#^https?://#i', $baseUrl)) {
+            $baseUrl = 'https://' . ltrim($baseUrl, '/');
+        }
+
+        $parts = parse_url($baseUrl);
+        if (!is_array($parts) || empty($parts['scheme']) || empty($parts['host'])) {
+            return null;
+        }
+
+        $scheme = strtolower((string)$parts['scheme']);
+        if (!in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+
+        $normalized = $scheme . '://' . strtolower((string)$parts['host']);
+        if (!empty($parts['port'])) {
+            $normalized .= ':' . (int)$parts['port'];
+        }
+
+        $path = isset($parts['path']) ? rtrim((string)$parts['path'], '/') : '';
+        if ($path === '') {
+            $path = '/v1';
+        }
+        if (!str_starts_with($path, '/')) {
+            $path = '/' . $path;
+        }
+        $normalized .= $path . '/';
+
+        return $normalized;
+    }
+
+    private function resolveProviderBaseUrl(string $provider, ?array $providerConfig = null): string
+    {
+        $config = $providerConfig ?? (self::PROVIDER_CONFIG[$provider] ?? []);
+        $default = $this->sanitizeBaseUrl((string)($config['base_url'] ?? '')) ?: 'https://api.openai.com/v1/';
+
+        if ($provider !== 'ginto_tunnel') {
+            return $default;
+        }
+
+        $env = $this->sanitizeBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? '')));
+        $fallback = $env ?: $default;
+
+        if (!$this->db) {
+            return $fallback;
+        }
+
+        $isAdmin = false;
+        try {
+            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                $isAdmin = true;
+            }
+        } catch (\Throwable $_) { /* ignore */ }
+
+        $userId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        $keys = [];
+        if (!$isAdmin && !empty($userId)) {
+            $keys[] = 'llm_ginto_tunnel_base_url_user_' . $userId;
+        }
+        $keys[] = 'llm_ginto_tunnel_base_url';
+
+        foreach ($keys as $settingKey) {
+            try {
+                $row = $this->db->get('settings', ['value'], ['key' => $settingKey]);
+                $candidate = isset($row['value']) ? $this->sanitizeBaseUrl((string)$row['value']) : null;
+                if (!empty($candidate)) {
+                    return $candidate;
+                }
+            } catch (\Throwable $_) { /* ignore */ }
+        }
+
+        return $fallback;
     }
     
     /**
@@ -252,7 +344,7 @@ class ProviderRegistry
         }
         
         // 2. Fall back to environment variable
-        $config = self::PROVIDER_CONFIG[$provider] ?? null;
+        $config = $this->getProviderConfig($provider);
         if ($config) {
             $envKey = $config['env_key'];
             $value = getenv($envKey) ?: ($_ENV[$envKey] ?? null);
@@ -402,7 +494,7 @@ class ProviderRegistry
      */
     private function fetchModelsFromApi(string $provider): array
     {
-        $config = self::PROVIDER_CONFIG[$provider] ?? null;
+        $config = $this->getProviderConfig($provider);
         if (!$config) {
             return [];
         }
@@ -699,7 +791,7 @@ class ProviderRegistry
      */
     public function createProvider(string $provider, array $configOverride = []): LLMProviderInterface
     {
-        $providerConfig = self::PROVIDER_CONFIG[$provider] ?? null;
+        $providerConfig = $this->getProviderConfig($provider);
         if (!$providerConfig) {
             throw new \InvalidArgumentException("Unknown provider: $provider");
         }
@@ -790,6 +882,6 @@ class ProviderRegistry
      */
     public static function getProviderPriority(): array
     {
-        return ['local', 'ollama', 'cerebras', 'groq', 'openai', 'anthropic', 'novita', 'together', 'fireworks'];
+        return ['local', 'ollama', 'ginto_tunnel', 'cerebras', 'groq', 'openai', 'anthropic', 'novita', 'together', 'fireworks'];
     }
 }

@@ -25,7 +25,7 @@
   if (btnEls.length === 0) return;
   
   // Provider priority order (groq and cerebras first)
-  const PROVIDER_PRIORITY = ['local', 'ollama', 'cerebras', 'groq', 'openai', 'anthropic', 'novita', 'together', 'fireworks'];
+  const PROVIDER_PRIORITY = ['local', 'ollama', 'ginto_tunnel', 'cerebras', 'groq', 'openai', 'anthropic', 'novita', 'together', 'fireworks'];
   
   // Helper to update both desktop and mobile displays
   function updateModelDisplay(model, dotClass) {
