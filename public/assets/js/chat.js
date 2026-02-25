@@ -3973,10 +3973,11 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       }
 
       if (type === 'image_url') {
-        const imageUrl =
+        const imageUrlRaw =
           (typeof block.image_url?.url === 'string' && block.image_url.url) ||
           (typeof block.url === 'string' && block.url) ||
           '';
+        const imageUrl = normalizeImageResponseUrl(imageUrlRaw);
         if (imageUrl) out.images.push(imageUrl);
       }
     }
@@ -4018,18 +4019,32 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
 
     // Common single-image fields
     if (typeof data?.imageUrl === 'string' && data.imageUrl) {
-      out.images.push(data.imageUrl);
+      const normalized = normalizeImageResponseUrl(data.imageUrl);
+      if (normalized) out.images.push(normalized);
     }
     if (typeof data?.image_url === 'string' && data.image_url) {
-      out.images.push(data.image_url);
+      const normalized = normalizeImageResponseUrl(data.image_url);
+      if (normalized) out.images.push(normalized);
     }
     if (Array.isArray(data?.images)) {
       for (const img of data.images) {
-        if (typeof img === 'string' && img) out.images.push(img);
+        if (typeof img === 'string' && img) {
+          const normalized = normalizeImageResponseUrl(img);
+          if (normalized) out.images.push(normalized);
+        }
         else if (img && typeof img === 'object') {
-          if (typeof img.url === 'string' && img.url) out.images.push(img.url);
-          else if (typeof img.imageUrl === 'string' && img.imageUrl) out.images.push(img.imageUrl);
-          else if (typeof img.dataUrl === 'string' && img.dataUrl) out.images.push(img.dataUrl);
+          if (typeof img.url === 'string' && img.url) {
+            const normalized = normalizeImageResponseUrl(img.url);
+            if (normalized) out.images.push(normalized);
+          }
+          else if (typeof img.imageUrl === 'string' && img.imageUrl) {
+            const normalized = normalizeImageResponseUrl(img.imageUrl);
+            if (normalized) out.images.push(normalized);
+          }
+          else if (typeof img.dataUrl === 'string' && img.dataUrl) {
+            const normalized = normalizeImageResponseUrl(img.dataUrl);
+            if (normalized) out.images.push(normalized);
+          }
         }
       }
     }
@@ -4038,6 +4053,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
   }
 
   const MAX_STREAM_TEXT_CHUNK_CHARS = 12000;
+  const MAX_IMAGE_INLINE_DATA_URL_CHARS = 4096;
 
   function isLikelyImageGenerationPrompt(prompt) {
     if (!prompt || typeof prompt !== 'string') return false;
@@ -4065,6 +4081,32 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     return ratio > 0.97;
   }
 
+  function normalizeImageResponseUrl(url) {
+    if (typeof url !== 'string') return '';
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('data:image/')) {
+      if (trimmed.length > MAX_IMAGE_INLINE_DATA_URL_CHARS) {
+        console.warn('[chat] Ignoring oversized inline data:image URL in response');
+      }
+      return '';
+    }
+
+    if (
+      lower.startsWith('http://') ||
+      lower.startsWith('https://') ||
+      lower.startsWith('/') ||
+      lower.startsWith('./') ||
+      lower.startsWith('../')
+    ) {
+      return trimmed;
+    }
+
+    return '';
+  }
+
   function sanitizeOpenAiTextChunk(text) {
     if (typeof text !== 'string' || !text) return '';
     if (looksLikeLargeBase64Chunk(text)) return '';
@@ -4076,11 +4118,16 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     let html = simpleMarkdownToHtml(safeText);
 
     if (Array.isArray(imageUrls) && imageUrls.length > 0) {
-      const imagesHtml = imageUrls.map((url) => {
+      const safeImageUrls = imageUrls
+        .map((url) => normalizeImageResponseUrl(url))
+        .filter(Boolean);
+      const imagesHtml = safeImageUrls.map((url) => {
         const safeUrl = escapeHtml(url);
         return `<img src="${safeUrl}" alt="Generated image" class="max-w-full md:max-w-md rounded-lg border border-gray-600 cursor-pointer hover:opacity-90 transition-opacity" loading="lazy" onclick="window.showImageModal && window.showImageModal('${safeUrl}')">`;
       }).join('');
-      html += `<div class="mt-4 flex flex-wrap gap-3">${imagesHtml}</div>`;
+      if (imagesHtml) {
+        html += `<div class="mt-4 flex flex-wrap gap-3">${imagesHtml}</div>`;
+      }
     }
 
     return html;
@@ -4305,6 +4352,22 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       if (contentType.includes('application/json') || contentType.includes('text/json')) {
         const data = await response.json().catch(() => null);
         if (data) {
+          try { updateAdminConsole(data); } catch (_) {}
+
+          const payloadError =
+            (typeof data?.detail === 'string' && data.detail.trim()) ||
+            (typeof data?.message === 'string' && data.message.trim()) ||
+            (typeof data?.error === 'string' && data.error.trim()) ||
+            (typeof data?.error?.message === 'string' && data.error.message.trim()) ||
+            '';
+
+          if (payloadError) {
+            currentCard.response.innerHTML = `<p class="text-red-400">${escapeHtml(payloadError)}</p>`;
+            currentCard.responseLabel.classList.remove('hidden');
+            currentCard.body.classList.remove('collapsed');
+            return;
+          }
+
           const payloadParts = extractOpenAiContentPartsFromPayload(data);
           const mergedRaw = (payloadParts.text || '') + (typeof data.text === 'string' ? data.text : '');
           const mergedText = sanitizeOpenAiTextChunk(mergedRaw);
@@ -4335,6 +4398,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             enhanceCodeBlocks(currentCard.response);
             initStickyCodeButtons();
             lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
+            lastAssistantContent = accumulatedContent || (typeof data.raw_content === 'string' ? data.raw_content : '');
             smartScrollToElement(currentCard.response, { behavior: 'smooth', block: 'end' });
             return;
           }
@@ -4348,6 +4412,9 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             enhanceCodeBlocks(currentCard.response);
             initStickyCodeButtons();
             lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
+            lastAssistantContent = (typeof data.raw_content === 'string' && data.raw_content.trim())
+              ? data.raw_content
+              : (data.html || '').replace(/<[^>]+>/g, '').trim();
             smartScrollToElement(currentCard.response, { behavior: 'smooth', block: 'end' });
             return;
           }
@@ -4891,6 +4958,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
 
             // Handle final HTML response
             if (data.final) {
+              const finalRawContent = (typeof data.raw_content === 'string') ? data.raw_content : '';
               // Clean up any lingering image progress UI on final event.
               const lingeringProgress = currentCard.response.querySelector('.image-gen-progress');
               if (lingeringProgress && lingeringProgress.parentNode) {
@@ -4917,7 +4985,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               // If we have tool results, preserve them - just save for persistence
               if (currentCard.hasToolResults) {
                 lastAssistantHtml = ensureCodeBlockAttributes(currentCard.response.innerHTML);
-                lastAssistantContent = accumulatedContent || '';
+                lastAssistantContent = accumulatedContent || finalRawContent || '';
                 enhanceCodeBlocks(currentCard.response);
                 setTimeout(() => initStickyCodeButtons(), 100);
               } else if (accumulatedContent) {
@@ -4936,7 +5004,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 const combinedHtml = mergeAssistantTextAndImagesHtml('', accumulatedImageUrls);
                 currentCard.response.innerHTML = combinedHtml;
                 lastAssistantHtml = ensureCodeBlockAttributes(combinedHtml);
-                lastAssistantContent = '';
+                lastAssistantContent = finalRawContent || '';
                 renderLatexInElement(currentCard.response);
                 enhanceCodeBlocks(currentCard.response);
                 setTimeout(() => initStickyCodeButtons(), 100);
@@ -4946,8 +5014,16 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
                 cleanedHtml = ensureCodeBlockAttributes(cleanedHtml);
                 currentCard.response.innerHTML = cleanedHtml;
                 lastAssistantHtml = cleanedHtml;
-                lastAssistantContent = (cleanedHtml || '').replace(/<[^>]+>/g, '').trim();
+                lastAssistantContent = finalRawContent || (cleanedHtml || '').replace(/<[^>]+>/g, '').trim();
                 
+                renderLatexInElement(currentCard.response);
+                enhanceCodeBlocks(currentCard.response);
+                setTimeout(() => initStickyCodeButtons(), 100);
+              } else if (finalRawContent) {
+                const finalTextHtml = ensureCodeBlockAttributes(simpleMarkdownToHtml(stripToolCallJson(finalRawContent)));
+                currentCard.response.innerHTML = finalTextHtml;
+                lastAssistantHtml = finalTextHtml;
+                lastAssistantContent = finalRawContent;
                 renderLatexInElement(currentCard.response);
                 enhanceCodeBlocks(currentCard.response);
                 setTimeout(() => initStickyCodeButtons(), 100);
