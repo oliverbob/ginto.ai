@@ -444,10 +444,14 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
               ? '<span class="px-2 py-1 text-xs rounded bg-amber-500/10 text-amber-600">expired</span>'
               : '<span class="px-2 py-1 text-xs rounded bg-emerald-500/10 text-emerald-500">active</span>'
             );
-        // Keep revoke available for all unrevoked keys (including expired) so users can free slots.
-        const btn = revoked
+        const canReactivate = revoked || expired;
+        const revokeBtn = revoked
           ? ''
           : `<button class="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white" onclick="revokeKey(${Number(k.id)})">Revoke</button>`;
+        const reactivateBtn = canReactivate
+          ? `<button class="px-3 py-1.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white" onclick="reactivateKey(${Number(k.id)}, '${esc(k.subdomain)}')">Reactivate</button>`
+          : '';
+        const actionButtons = [reactivateBtn, revokeBtn].filter(Boolean).join(' ');
         return `
           <tr>
             <td class="px-4 py-3 font-mono">${esc(k.subdomain)}</td>
@@ -455,13 +459,25 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
             <td class="px-4 py-3">${esc(k.expires_at || '')}</td>
             <td class="px-4 py-3">${esc(k.last_used_at || '')}</td>
             <td class="px-4 py-3">${statusBadge}</td>
-            <td class="px-4 py-3">${btn}</td>
+            <td class="px-4 py-3">${actionButtons}</td>
           </tr>
         `;
       }).join('');
     } catch (e) {
       tbody.innerHTML = '<tr><td colspan="6" class="px-4 py-6 text-center text-red-500">Failed to load keys</td></tr>';
     }
+  }
+
+  function showGeneratedToken(subdomain, token) {
+    const link = `https://${subdomain}.ginto.ai/?token=${encodeURIComponent(token)}`;
+    setMaskedValue(document.getElementById('akToken'), token, false);
+    setEyeIcon(false);
+    const linkEl = document.getElementById('akLink');
+    if (linkEl) {
+      linkEl.dataset.full = link;
+      linkEl.value = link;
+    }
+    document.getElementById('akResult').style.display = 'block';
   }
 
   async function revokeKey(id) {
@@ -535,16 +551,43 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         uiModal('Generate failed', data.error || 'Failed to generate');
         return;
       }
-      const token = data.token;
-      const link = `https://${subdomain}.ginto.ai/?token=${encodeURIComponent(token)}`;
-      setMaskedValue(document.getElementById('akToken'), token, false);
-      setEyeIcon(false);
-      const linkEl = document.getElementById('akLink');
-      if (linkEl) {
-        linkEl.dataset.full = link;
-        linkEl.value = link;
+      showGeneratedToken(subdomain, data.token);
+      loadKeys();
+    } catch (e) {
+      uiModal('Network error', 'Error: ' + e.message);
+    }
+  }
+
+  async function reactivateKey(id, subdomain) {
+    const ttlInfo = getSelectedTtlInfo();
+    const ttl = ttlInfo.seconds;
+    try {
+      const res = await fetch('/api/tunnel/access-key/reactivate', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ttl_seconds: ttl, csrf_token: csrfToken })
+      });
+      const data = await res.json();
+      if (!data.success) {
+        if (data.code === 'KEY_LIMIT_REACHED') {
+          serverlessTtlMonths = Math.max(1, ttlInfo.months || 1);
+          serverlessPaymentMode = paymentModeForMonths(serverlessTtlMonths);
+          serverlessAddonType = addonTypeForMonths(serverlessTtlMonths);
+          updateServerlessPriceLabel(serverlessTtlMonths);
+          updateServerlessModeLabel(serverlessTtlMonths, serverlessPaymentMode);
+          serverlessPaypalInit = false;
+          const btn = document.getElementById('serverlessPaypalButtons');
+          if (btn) btn.innerHTML = '';
+          const loading = document.getElementById('serverlessPaypalLoading');
+          if (loading) loading.style.display = 'block';
+          showServerlessUpgradeModal();
+          return;
+        }
+        uiModal('Reactivate failed', data.error || 'Failed to reactivate');
+        return;
       }
-      document.getElementById('akResult').style.display = 'block';
+      showGeneratedToken(subdomain, data.token);
       loadKeys();
     } catch (e) {
       uiModal('Network error', 'Error: ' + e.message);

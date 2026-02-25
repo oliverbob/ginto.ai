@@ -105,7 +105,18 @@ function ginto_verify_jwt_hs256(string $jwt, string $secret): ?array {
 }
 
 function ginto_extract_tunnel_token(): string {
-    $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? '');
+    $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if ($auth === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (is_array($headers)) {
+            foreach ($headers as $name => $value) {
+                if (strtolower((string)$name) === 'authorization') {
+                    $auth = (string)$value;
+                    break;
+                }
+            }
+        }
+    }
     if (preg_match('/^Bearer\s+(.+)$/i', $auth, $m)) {
         return trim((string)$m[1]);
     }
@@ -133,6 +144,50 @@ function ginto_extract_tunnel_token(): string {
         return trim((string)$_GET['t']);
     }
     return '';
+}
+
+function ginto_detect_tunnel_token_source(): string {
+    $auth = (string)($_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? ''));
+    if ($auth === '' && function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (is_array($headers)) {
+            foreach ($headers as $name => $value) {
+                if (strtolower((string)$name) === 'authorization') {
+                    $auth = (string)$value;
+                    break;
+                }
+            }
+        }
+    }
+    if ($auth !== '' && preg_match('/^Bearer\s+(.+)$/i', $auth)) {
+        return 'bearer';
+    }
+    if (!empty($_SERVER['HTTP_X_GINTO_TUNNEL_TOKEN'])) {
+        return 'header';
+    }
+    if (!empty($_COOKIE['ginto_tunnel_token'])) {
+        return 'cookie';
+    }
+    if (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token'])) {
+        return 'post';
+    }
+    if (!empty($_GET['token']) || !empty($_GET['t'])) {
+        return 'get';
+    }
+    return 'none';
+}
+
+function ginto_clear_tunnel_auth_cookie(): void {
+    $cookieName = 'ginto_tunnel_token';
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+    @setcookie($cookieName, '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => $isHttps,
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
 }
 
 function ginto_tunnel_access_denied_key(string $message = 'This tunnel requires a valid access token.'): void {
@@ -379,7 +434,11 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     // Enforce MySQL-backed tunnel access key on every request.
     // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
     $token = ginto_extract_tunnel_token();
+    $tokenSource = ginto_detect_tunnel_token_source();
     if ($token === '' || !str_starts_with($token, 'gtnl-')) {
+        if ($tokenSource === 'cookie') {
+            ginto_clear_tunnel_auth_cookie();
+        }
         $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
         if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token']))) {
             ginto_tunnel_access_denied_key('That key is not a tunnel key. Use a tunnel key that starts with gtnl- from /account/keys.');
@@ -406,6 +465,9 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $sd = strtolower((string)($payload['sd'] ?? ''));
     $exp = (int)($payload['exp'] ?? 0);
     if ($sd !== $subdomain || $exp <= time()) {
+        if ($tokenSource === 'cookie') {
+            ginto_clear_tunnel_auth_cookie();
+        }
         ginto_tunnel_access_denied_key('API key expired or not valid for this subdomain.');
         return true;
     }
@@ -426,11 +488,17 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
             'revoked' => 0,
         ]);
         if (!$row) {
+            if ($tokenSource === 'cookie') {
+                ginto_clear_tunnel_auth_cookie();
+            }
             ginto_tunnel_access_denied_key('API key not found or revoked.');
             return true;
         }
         // Also enforce DB expires_at if present.
         if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            if ($tokenSource === 'cookie') {
+                ginto_clear_tunnel_auth_cookie();
+            }
             ginto_tunnel_access_denied_key('API key expired.');
             return true;
         }
@@ -442,23 +510,33 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
         return true;
     }
 
-    // If the key was submitted via POST form, treat it as an auth handshake:
-    // set an HttpOnly cookie and redirect to GET so the original POST is not proxied upstream.
-    $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-    if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token']))) {
-        $cookieValue = $token;
+    $effectiveExpiry = $exp;
+    if (!empty($row['expires_at'])) {
+        $dbExp = strtotime((string)$row['expires_at']);
+        if (is_int($dbExp) && $dbExp > 0) {
+            $effectiveExpiry = min($effectiveExpiry, $dbExp);
+        }
+    }
+
+    // If a key was provided by GET/POST/header, persist it in a secure cookie for
+    // the remaining key lifetime on this subdomain.
+    if (in_array($tokenSource, ['get', 'post', 'bearer', 'header'], true) && $effectiveExpiry > time()) {
         $cookieName = 'ginto_tunnel_token';
         $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
             || ((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-        $cookieParams = [
-            'expires' => time() + 86400 * 7,
+        @setcookie($cookieName, $token, [
+            'expires' => $effectiveExpiry,
             'path' => '/',
             'secure' => $isHttps,
             'httponly' => true,
             'samesite' => 'Lax',
-        ];
-        @setcookie($cookieName, $cookieValue, $cookieParams);
+        ]);
+    }
 
+    // If the key was submitted via POST form, treat it as an auth handshake:
+    // redirect to GET so the original POST is not proxied upstream.
+    $method = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if ($method === 'POST' && (!empty($_POST['api_key']) || !empty($_POST['ginto_key']) || !empty($_POST['tunnel_token']))) {
         // Redirect back to the same path (without leaking token in query strings).
         $redirectTo = (string)($_SERVER['REQUEST_URI'] ?? '/');
         // If someone posted to a URL that already had token=..., strip it.

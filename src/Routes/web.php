@@ -1301,6 +1301,7 @@ $router->req('/api/tunnel/time', 'TunnelController@tunnelTime');
 $router->req('/api/tunnel/access-key/generate', 'TunnelController@generateAccessKey', ['POST']);
 $router->req('/api/tunnel/access-keys', 'TunnelController@listAccessKeys', ['GET']);
 $router->req('/api/tunnel/access-key/revoke', 'TunnelController@revokeAccessKey', ['POST']);
+$router->req('/api/tunnel/access-key/reactivate', 'TunnelController@reactivateAccessKey', ['POST']);
 
 // Member Messenger routes (Facebook-like chat between members)
 $router->req('/messenger', 'MessengerController@index');

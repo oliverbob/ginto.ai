@@ -1400,15 +1400,7 @@ TOML;
 
         // Default TTL should be long enough that subdomains don't randomly flip back
         // to unauthorized during normal usage. Revocation remains the primary control.
-        $ttl = (int)($input['ttl_seconds'] ?? (86400 * 30));
-        if ($ttl < 60) {
-            $ttl = 60;
-        }
-        // Cap TTL to reduce long-lived token risk while still being practical.
-        // UI allows up to 5 years.
-        if ($ttl > (86400 * 365 * 5)) {
-            $ttl = 86400 * 365 * 5;
-        }
+        $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
 
         // Prevent users from generating keys for subdomains owned by someone else.
         // Ownership is tracked in the tunnel registry (written during tunnel registration / FRP key setup).
@@ -1449,8 +1441,11 @@ TOML;
                 $other = $this->db->get('tunnel_access_keys', ['id'], [
                     'subdomain' => $subdomain,
                     'revoked' => 0,
-                    'expires_at[>]' => $nowSql,
                     'user_id[!]' => (int)$userId,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => $nowSql,
+                    ],
                     'ORDER' => ['id' => 'DESC'],
                 ]);
                 if ($other) {
@@ -1479,11 +1474,14 @@ TOML;
 
         if (!$isAdmin && $this->db) {
             try {
-                // Limit is based on *unrevoked* keys (not "unexpired").
-                // Users must revoke old keys to free up slots.
+                // Limit is based on active keys (unrevoked and unexpired).
                 $activeKeys = (int)$this->db->count('tunnel_access_keys', [
                     'user_id' => (int)$userId,
                     'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => date('Y-m-d H:i:s'),
+                    ],
                 ]);
 
                 $extraSlots = 0;
@@ -1531,66 +1529,49 @@ TOML;
         }
 
         try {
-            // Enforce one key per user+subdomain.
-            // User must revoke the existing key before generating a new one (even if expired).
+            // Enforce one active key per user+subdomain.
+            // Expired keys are auto-revoked so users can re-issue from account keys.
             if ($this->db) {
+                $nowSql = date('Y-m-d H:i:s');
                 $existingActive = $this->db->get('tunnel_access_keys', ['id', 'expires_at'], [
                     'user_id' => (int)$userId,
                     'subdomain' => $subdomain,
                     'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => $nowSql,
+                    ],
                     'ORDER' => ['id' => 'DESC'],
                 ]);
                 if ($existingActive) {
                     http_response_code(409);
                     echo json_encode([
                         'success' => false,
-                        'error' => 'Key already exists for this subdomain. Revoke it first.',
+                        'error' => 'An active key already exists for this subdomain. Revoke it first.',
                     ]);
                     return;
                 }
+
+                // Revoke stale (expired) unrevoked keys for this subdomain so the user
+                // can reactivate cleanly without manual cleanup.
+                $this->db->update('tunnel_access_keys', [
+                    'revoked' => 1,
+                    'revoked_at' => date('Y-m-d H:i:s'),
+                ], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'expires_at[<=]' => $nowSql,
+                ]);
             }
 
-            $jti = bin2hex(random_bytes(16));
-            $now = time();
-            $payload = [
-                'iss' => 'ginto.ai',
-                'sub' => (int)$userId,
-                'sd' => $subdomain,
-                'jti' => $jti,
-                'iat' => $now,
-                'exp' => $now + $ttl,
-            ];
-
-            $secret = $this->getTunnelKeySigningSecret();
-            if ($secret === '') {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Signing secret not configured']);
-                return;
-            }
-
-            $jwt = $this->jwtEncodeHs256($payload, $secret);
-            $token = 'gtnl-' . $jwt;
-
-            if (!$this->db) {
-                http_response_code(500);
-                echo json_encode(['success' => false, 'error' => 'Database not available']);
-                return;
-            }
-
-            $this->db->insert('tunnel_access_keys', [
-                'user_id' => (int)$userId,
-                'subdomain' => $subdomain,
-                'jti' => $jti,
-                'token_hash' => hash('sha256', $token),
-                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
-                'revoked' => 0,
-            ]);
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl);
 
             echo json_encode([
                 'success' => true,
-                'subdomain' => $subdomain,
-                'expires_at' => $now + $ttl,
-                'token' => $token,
+                'subdomain' => $created['subdomain'],
+                'expires_at' => $created['expires_at'],
+                'token' => $created['token'],
             ]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -1695,6 +1676,171 @@ TOML;
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => 'Failed to revoke key']);
         }
+    }
+
+    /**
+     * API: Reactivate an expired or revoked key by issuing a new token for the same subdomain.
+     * POST /api/tunnel/access-key/reactivate
+     * Body: {"id":123,"ttl_seconds":31536000,"csrf_token":"..."}
+     */
+    public function reactivateAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', [
+                'id',
+                'user_id',
+                'subdomain',
+                'revoked',
+                'expires_at',
+            ], [
+                'id' => $id,
+            ]);
+
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+
+            $subdomain = strtolower(trim((string)($row['subdomain'] ?? '')));
+            if ($subdomain === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid key subdomain']);
+                return;
+            }
+
+            $rowRevoked = (int)($row['revoked'] ?? 0) === 1;
+            $rowExpiresAt = isset($row['expires_at']) ? strtotime((string)$row['expires_at']) : false;
+            $rowExpired = is_int($rowExpiresAt) && $rowExpiresAt > 0 ? ($rowExpiresAt <= time()) : false;
+            if (!$rowRevoked && !$rowExpired) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'Key is already active.']);
+                return;
+            }
+
+            $nowSql = date('Y-m-d H:i:s');
+            $existingActive = $this->db->get('tunnel_access_keys', ['id'], [
+                'user_id' => (int)$userId,
+                'subdomain' => $subdomain,
+                'revoked' => 0,
+                'OR' => [
+                    'expires_at' => null,
+                    'expires_at[>]' => $nowSql,
+                ],
+                'ORDER' => ['id' => 'DESC'],
+            ]);
+            if ($existingActive && (int)($existingActive['id'] ?? 0) !== $id) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'An active key already exists for this subdomain.']);
+                return;
+            }
+
+            // Revoke all stale keys on the subdomain for this user before issuing a new one.
+            $this->db->update('tunnel_access_keys', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'user_id' => (int)$userId,
+                'subdomain' => $subdomain,
+                'revoked' => 0,
+            ]);
+
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl);
+
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $created['subdomain'],
+                'expires_at' => $created['expires_at'],
+                'token' => $created['token'],
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to reactivate key']);
+        }
+    }
+
+    private function normalizeTunnelTtlSeconds($ttlInput): int
+    {
+        $ttl = (int)$ttlInput;
+        if ($ttl < 60) {
+            $ttl = 60;
+        }
+        $max = 86400 * 365 * 5;
+        if ($ttl > $max) {
+            $ttl = $max;
+        }
+        return $ttl;
+    }
+
+    /**
+     * @return array{subdomain:string,expires_at:int,token:string}
+     */
+    private function createTunnelAccessKey(int $userId, string $subdomain, int $ttl): array
+    {
+        if (!$this->db) {
+            throw new \RuntimeException('Database not available');
+        }
+
+        $jti = bin2hex(random_bytes(16));
+        $now = time();
+        $payload = [
+            'iss' => 'ginto.ai',
+            'sub' => $userId,
+            'sd' => $subdomain,
+            'jti' => $jti,
+            'iat' => $now,
+            'exp' => $now + $ttl,
+        ];
+
+        $secret = $this->getTunnelKeySigningSecret();
+        if ($secret === '') {
+            throw new \RuntimeException('Signing secret not configured');
+        }
+
+        $jwt = $this->jwtEncodeHs256($payload, $secret);
+        $token = 'gtnl-' . $jwt;
+
+        $this->db->insert('tunnel_access_keys', [
+            'user_id' => $userId,
+            'subdomain' => $subdomain,
+            'jti' => $jti,
+            'token_hash' => hash('sha256', $token),
+            'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+            'revoked' => 0,
+        ]);
+
+        return [
+            'subdomain' => $subdomain,
+            'expires_at' => $now + $ttl,
+            'token' => $token,
+        ];
     }
 
     private function getAuthenticatedUserId(): ?int
