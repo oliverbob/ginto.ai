@@ -137,25 +137,29 @@ class ChatStreamHandler
         $hadImageInHistory = $this->checkImageInHistory($history);
 
         // Handle session-selected Ollama provider
-        // Prefer global admin selection (settings.llm_global_selection), then legacy session keys, then UI keys set by /api/models/set
+        // For non-admin users, prefer their own session selection first.
+        // Global admin selection is only a fallback when no user/session selection exists.
         $sessionProvider = null;
         $sessionModel = null;
+        $globalSelection = null;
         try {
             if ($this->db) {
                 $row = $this->db->get('settings', ['value'], ['key' => 'llm_global_selection']);
                 if ($row && !empty($row['value'])) {
                     $decoded = json_decode($row['value'], true);
                     if (is_array($decoded) && !empty($decoded['provider'])) {
-                        $sessionProvider = $decoded['provider'];
-                        $sessionModel = $decoded['model'] ?? null;
+                        $globalSelection = $decoded;
                     }
                 }
             }
         } catch (\Throwable $_) { /* ignore */ }
 
-        if (empty($sessionProvider)) {
-            $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
-            $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+        $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
+        $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+
+        if ((empty($sessionProvider) || empty($sessionModel)) && !empty($globalSelection['provider'])) {
+            $sessionProvider = $globalSelection['provider'];
+            $sessionModel = $globalSelection['model'] ?? null;
         }
 
         if ($sessionProvider === 'ollama' && $sessionModel) {
@@ -742,7 +746,7 @@ class ChatStreamHandler
         $adminLogEvents = [];
 
         // Resolve effective selection the same way /api/models does:
-        // prefer global admin selection when present, otherwise session selection.
+        // prefer explicit session selection first, then global default fallback.
         $globalSelection = null;
         try {
             if ($db) {
@@ -758,8 +762,13 @@ class ChatStreamHandler
             $globalSelection = null;
         }
 
-        $sessionProvider = $globalSelection['provider'] ?? ($_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null));
-        $sessionModel = $globalSelection['model'] ?? ($_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null));
+        $sessionProvider = $_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null);
+        $sessionModel = $_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null);
+
+        if ((empty($sessionProvider) || empty($sessionModel)) && !empty($globalSelection['provider'])) {
+            $sessionProvider = $globalSelection['provider'];
+            $sessionModel = $globalSelection['model'] ?? null;
+        }
 
         // Check for local LLM preference
         $forceLocalLlm = false;

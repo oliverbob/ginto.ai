@@ -1280,8 +1280,13 @@ class ApiController extends Controller
             }
         }
 
-        $effectiveCurrentProvider = $globalSelection['provider'] ?? ($_SESSION['current_provider'] ?? null);
-        $effectiveCurrentModel = $globalSelection['model'] ?? ($_SESSION['current_model'] ?? null);
+        $effectiveCurrentProvider = $_SESSION['current_provider'] ?? null;
+        $effectiveCurrentModel = $_SESSION['current_model'] ?? null;
+
+        if ((empty($effectiveCurrentProvider) || empty($effectiveCurrentModel)) && !empty($globalSelection['provider'])) {
+            $effectiveCurrentProvider = $globalSelection['provider'];
+            $effectiveCurrentModel = $globalSelection['model'] ?? null;
+        }
 
         $currentCapabilities = null;
         if (!empty($effectiveCurrentProvider) && !empty($effectiveCurrentModel)) {
