@@ -2995,18 +2995,20 @@ class ChatStreamHandler
         $requestSize = (int)$generationConfig['width'] . 'x' . (int)$generationConfig['height'];
 
         $sourceImageBase64 = $this->resolveImageEditSourceBase64($sourceImageInput);
-        if (!is_string($sourceImageBase64) || $sourceImageBase64 === '') {
-            return ['success' => false, 'error' => 'Image edit requires a source image'];
-        }
+        $sourceImageBinary = null;
+        $tmpImagePath = null;
+        $isImageEdit = is_string($sourceImageBase64) && $sourceImageBase64 !== '';
 
-        $sourceImageBinary = base64_decode($sourceImageBase64, true);
-        if ($sourceImageBinary === false || $sourceImageBinary === '') {
-            return ['success' => false, 'error' => 'Invalid source image data'];
-        }
+        if ($isImageEdit) {
+            $sourceImageBinary = base64_decode($sourceImageBase64, true);
+            if ($sourceImageBinary === false || $sourceImageBinary === '') {
+                return ['success' => false, 'error' => 'Invalid source image data'];
+            }
 
-        $tmpImagePath = @tempnam(sys_get_temp_dir(), 'imgedit_');
-        if (!is_string($tmpImagePath) || $tmpImagePath === '' || @file_put_contents($tmpImagePath, $sourceImageBinary) === false) {
-            return ['success' => false, 'error' => 'Failed to prepare source image file'];
+            $tmpImagePath = @tempnam(sys_get_temp_dir(), 'imgedit_');
+            if (!is_string($tmpImagePath) || $tmpImagePath === '' || @file_put_contents($tmpImagePath, $sourceImageBinary) === false) {
+                return ['success' => false, 'error' => 'Failed to prepare source image file'];
+            }
         }
 
         $modelId = $this->resolveImageGenModelId();
@@ -3015,23 +3017,27 @@ class ChatStreamHandler
         }
 
         $proxyBaseUrl = rtrim((string)($this->imageGenRaw('IMAGEGEN_PROXY_BASE_URL') ?: 'https://az.ginto.ai'), '/');
-        $editEndpoint = $proxyBaseUrl . '/v1/images/edits';
+        $endpoint = $isImageEdit
+            ? ($proxyBaseUrl . '/v1/images/edits')
+            : ($proxyBaseUrl . '/v1/images/generations');
 
         $multipartFields = [
             'model' => $modelId,
             'prompt' => $promptPayload['prompt'],
-            'image' => new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg'),
             'n' => '1',
             'size' => $requestSize,
             'response_format' => 'b64_json',
             'num_inference_steps' => (string)$generationConfig['num_inference_steps'],
             'guidance_scale' => (string)$generationConfig['guidance_scale'],
-            'strength' => '0.65',
         ];
+        if ($isImageEdit && is_string($tmpImagePath) && $tmpImagePath !== '') {
+            $multipartFields['image'] = new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg');
+            $multipartFields['strength'] = '0.65';
+        }
         
         // Send multipart edit request to OpenAI-compatible proxy endpoint.
-        $emitProgress(25, 'Submitting image edit request...');
-        $ch = curl_init($editEndpoint);
+        $emitProgress(25, $isImageEdit ? 'Submitting image edit request...' : 'Submitting image generation request...');
+        $ch = curl_init($endpoint);
         $finalResult = null;
         
         curl_setopt_array($ch, [
@@ -3047,7 +3053,9 @@ class ChatStreamHandler
         $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlError = (string)curl_error($ch);
         curl_close($ch);
-        @unlink($tmpImagePath);
+        if (is_string($tmpImagePath) && $tmpImagePath !== '') {
+            @unlink($tmpImagePath);
+        }
 
         $decoded = @json_decode((string)$response, true);
         $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
@@ -3058,9 +3066,11 @@ class ChatStreamHandler
             $multipartFields['response_format'] = 'url';
 
             $tmpImagePath2 = @tempnam(sys_get_temp_dir(), 'imgedit_');
-            if (is_string($tmpImagePath2) && $tmpImagePath2 !== '' && @file_put_contents($tmpImagePath2, $sourceImageBinary) !== false) {
-                $multipartFields['image'] = new \CURLFile($tmpImagePath2, 'image/jpeg', 'input.jpg');
-                $retry = curl_init($editEndpoint);
+            if (!$isImageEdit || (is_string($tmpImagePath2) && $tmpImagePath2 !== '' && is_string($sourceImageBinary) && @file_put_contents($tmpImagePath2, $sourceImageBinary) !== false)) {
+                if ($isImageEdit) {
+                    $multipartFields['image'] = new \CURLFile($tmpImagePath2, 'image/jpeg', 'input.jpg');
+                }
+                $retry = curl_init($endpoint);
                 curl_setopt_array($retry, [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $multipartFields,
@@ -3073,7 +3083,9 @@ class ChatStreamHandler
                 $retryHttpCode = (int)curl_getinfo($retry, CURLINFO_HTTP_CODE);
                 $retryErr = (string)curl_error($retry);
                 curl_close($retry);
-                @unlink($tmpImagePath2);
+                if (is_string($tmpImagePath2) && $tmpImagePath2 !== '') {
+                    @unlink($tmpImagePath2);
+                }
 
                 if ($retryErr === '' && $retryHttpCode >= 200 && $retryHttpCode < 300) {
                     $retryDecoded = @json_decode((string)$retryResponse, true);
