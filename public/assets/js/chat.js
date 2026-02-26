@@ -2918,6 +2918,9 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         } else {
           responseContent = toolResultHtml;
         }
+      } else if (assistantMsg?.html && /<img\b/i.test(assistantMsg.html)) {
+        // Image-only/mostly-image responses should prefer persisted HTML to retain rendered images.
+        responseContent = ensureCodeBlockAttributes(assistantMsg.html);
       } else if (assistantMsg?.content) {
         responseContent = simpleMarkdownToHtml(assistantMsg.content);
       } else if (assistantMsg?.html) {
@@ -3186,7 +3189,9 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
           // Update the response content
           if (responseEl) {
             let newContent = '';
-            if (version.content) {
+            if (version.html && /<img\b/i.test(version.html)) {
+              newContent = ensureCodeBlockAttributes(version.html);
+            } else if (version.content) {
               newContent = simpleMarkdownToHtml(version.content);
             } else if (version.html) {
               newContent = ensureCodeBlockAttributes(version.html);
