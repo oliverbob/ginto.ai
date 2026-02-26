@@ -1517,9 +1517,11 @@ class ApiController extends Controller
 
         if ($provider) {
             $_SESSION['current_provider'] = $provider;
+            $_SESSION['llm_provider_name'] = $provider;
         }
         if ($model) {
             $_SESSION['current_model'] = $model;
+            $_SESSION['llm_model'] = $model;
         }
 
         // Also persist selection to a cookie so it remains available across requests

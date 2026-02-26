@@ -741,9 +741,10 @@ class ChatStreamHandler
     ): void {
         $adminLogEvents = [];
 
-        // Respect both legacy llm_* session keys and the UI's current_* keys
-        $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
-        $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+        // Respect both UI current_* keys and legacy llm_* session keys.
+        // Prefer current_* because model selector writes these in real time.
+        $sessionProvider = $_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null);
+        $sessionModel = $_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null);
 
         // Check for local LLM preference
         $forceLocalLlm = false;
