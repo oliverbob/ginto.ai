@@ -1091,7 +1091,7 @@ class ChatStreamHandler
                 }
             } elseif ($useLocalLlm) {
                 $modelName = $localLlmConfig->getReasoningModel();
-            } elseif ($sessionCloudProvider && $sessionCloudModel) {
+            } elseif ($sessionCloudProvider && $sessionCloudModel && $selectedProvider === $sessionCloudProvider) {
                 $modelName = $sessionCloudModel;
             } else {
                 // Default model based on provider
@@ -1135,7 +1135,9 @@ class ChatStreamHandler
                 $mainApiKey = $apiKey;
                 $mainModelName = $useLocalLlm
                     ? $localLlmConfig->getReasoningModel()
-                    : ($sessionCloudModel ?? $defaultModel ?? ($selectedProvider === 'cerebras' ? 'gpt-oss-120b' : ($selectedProvider === 'groq' ? 'llama-3.3-70b-versatile' : 'llama-3.3-70b-versatile')));
+                    : ((($sessionCloudProvider && $sessionCloudModel && $selectedProvider === $sessionCloudProvider) ? $sessionCloudModel : null)
+                        ?? $defaultModel
+                        ?? ($selectedProvider === 'cerebras' ? 'gpt-oss-120b' : ($selectedProvider === 'groq' ? 'llama-3.3-70b-versatile' : 'llama-3.3-70b-versatile')));
 
                 // Vision model (already computed into $modelName) and Groq key
                 $visionModelName = $modelName;
