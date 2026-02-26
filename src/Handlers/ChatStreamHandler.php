@@ -1592,6 +1592,8 @@ class ChatStreamHandler
                 error_log('[ChatStream] Payload sizing error: ' . $e->getMessage());
             }
 
+            $inlineDeltaImageCache = [];
+
             while ($iteration < $maxIterations) {
                 $iteration++;
                 
@@ -1603,7 +1605,7 @@ class ChatStreamHandler
                     messages: $messages,
                     tools: $tools,
                     options: ['max_tokens' => $maxTokens, 'tool_choice' => 'auto'],
-                    onChunk: function($chunk, $event = null) use (&$accumulatedContent, &$accumulatedReasoning, $parsedown) {
+                    onChunk: function($chunk, $event = null) use (&$accumulatedContent, &$accumulatedReasoning, $parsedown, &$inlineDeltaImageCache, $userIdSession) {
                         if ($event !== null) {
                             if (isset($event['activity'])) {
                                 $payload = array_filter([
@@ -1628,11 +1630,12 @@ class ChatStreamHandler
                             }
 
                             if (isset($event['openai_delta_content']) && is_array($event['openai_delta_content'])) {
+                                $normalizedDeltaContent = $this->normalizeOpenAiDeltaContentImages($event['openai_delta_content'], $inlineDeltaImageCache, $userIdSession);
                                 echo "data: " . json_encode([
                                     'choices' => [[
                                         'index' => 0,
                                         'delta' => [
-                                            'content' => $event['openai_delta_content'],
+                                            'content' => $normalizedDeltaContent,
                                         ],
                                         'finish_reason' => null,
                                     ]],
@@ -3177,6 +3180,102 @@ class ChatStreamHandler
             'generation_time_ms' => $finalResult['generation_time_ms'] ?? null,
             'seed' => $finalResult['seed'] ?? null,
         ];
+    }
+
+    /**
+     * Replace inline data:image blocks in OpenAI-style delta content with persisted storage URLs.
+     *
+     * @param array<int, array<string, mixed>> $contentBlocks
+     * @param array<string, string> $cache
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeOpenAiDeltaContentImages(array $contentBlocks, array &$cache, ?int $userIdSession = null): array
+    {
+        $normalized = [];
+
+        foreach ($contentBlocks as $block) {
+            if (!is_array($block)) {
+                $normalized[] = $block;
+                continue;
+            }
+
+            $type = strtolower((string)($block['type'] ?? ''));
+            if ($type !== 'image_url') {
+                $normalized[] = $block;
+                continue;
+            }
+
+            $url = '';
+            if (isset($block['image_url']) && is_array($block['image_url']) && isset($block['image_url']['url']) && is_string($block['image_url']['url'])) {
+                $url = trim((string)$block['image_url']['url']);
+            } elseif (isset($block['url']) && is_string($block['url'])) {
+                $url = trim((string)$block['url']);
+            }
+
+            if ($url === '' || !str_starts_with($url, 'data:image/')) {
+                $normalized[] = $block;
+                continue;
+            }
+
+            $cacheKey = sha1($url);
+            $persistedUrl = $cache[$cacheKey] ?? $this->persistInlineDataImageUrl($url, $userIdSession);
+            if (is_string($persistedUrl) && $persistedUrl !== '') {
+                $cache[$cacheKey] = $persistedUrl;
+                $block['image_url'] = ['url' => $persistedUrl];
+                if (isset($block['url'])) {
+                    $block['url'] = $persistedUrl;
+                }
+            }
+
+            $normalized[] = $block;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * Persist inline data:image content as a file under storage/imagegen and return web URL.
+     */
+    private function persistInlineDataImageUrl(string $dataUrl, ?int $userIdSession = null): ?string
+    {
+        if (!preg_match('/^data:image\/(png|jpe?g|gif|webp);base64,(.+)$/i', $dataUrl, $matches)) {
+            return null;
+        }
+
+        $ext = strtolower((string)$matches[1]);
+        if ($ext === 'jpeg') {
+            $ext = 'jpg';
+        }
+
+        $base64Data = preg_replace('/\s+/', '', (string)$matches[2]);
+        if (!is_string($base64Data) || $base64Data === '') {
+            return null;
+        }
+
+        $binary = base64_decode($base64Data, true);
+        if ($binary === false || strlen($binary) < 100) {
+            return null;
+        }
+
+        if (strlen($binary) > 25 * 1024 * 1024) {
+            error_log('[ChatStream] inline delta image too large, skipping persist');
+            return null;
+        }
+
+        $storageDir = defined('STORAGE_PATH') ? STORAGE_PATH . '/imagegen' : dirname(__DIR__, 2) . '/../storage/imagegen';
+        if (!is_dir($storageDir) && !@mkdir($storageDir, 0755, true)) {
+            return null;
+        }
+
+        $userPrefix = $userIdSession ? ('u' . (int)$userIdSession . '_') : 'guest_';
+        $filename = date('Y-m-d_His') . '_delta_' . $userPrefix . substr(sha1($binary), 0, 12) . '.' . $ext;
+        $outputPath = rtrim($storageDir, '/') . '/' . $filename;
+
+        if (@file_put_contents($outputPath, $binary) === false) {
+            return null;
+        }
+
+        return '/storage/imagegen/' . $filename;
     }
 
     /**
