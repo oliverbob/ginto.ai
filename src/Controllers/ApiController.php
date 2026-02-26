@@ -27,6 +27,28 @@ class ApiController extends Controller
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
     }
 
+    private function isCurrentUserAdminStrict(): bool
+    {
+        $userId = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if ($userId <= 0 || !$this->db) {
+            return false;
+        }
+
+        try {
+            $user = $this->db->get('users', ['role_id', 'is_admin'], ['id' => $userId]);
+            if (!is_array($user)) {
+                return false;
+            }
+
+            $roleId = (int)($user['role_id'] ?? 0);
+            $isAdminFlag = (int)($user['is_admin'] ?? 0) === 1;
+
+            return $isAdminFlag || in_array($roleId, [1, 2], true);
+        } catch (\Throwable $_) {
+            return false;
+        }
+    }
+
     private function ensureStorage(): void
     {
         $dir = dirname($this->storageFile);
@@ -978,13 +1000,7 @@ class ApiController extends Controller
     {
         header('Content-Type: application/json');
 
-        // Flag whether current user is admin (if UserController available)
-        $isAdmin = false;
-        try {
-            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
-                $isAdmin = true;
-            }
-        } catch (\Throwable $_) { /* ignore */ }
+        $isAdmin = $this->isCurrentUserAdminStrict();
 
         $currentUserId = $_SESSION['user_id'] ?? null;
 
@@ -1462,12 +1478,7 @@ class ApiController extends Controller
         // - Non-admin users can only override when they have their own active key
         //   for the selected provider.
         $currentUserId = $_SESSION['user_id'] ?? null;
-        $isAdmin = false;
-        try {
-            if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
-                $isAdmin = true;
-            }
-        } catch (\Throwable $_) { /* ignore */ }
+        $isAdmin = $this->isCurrentUserAdminStrict();
 
         if (!$isAdmin && $provider) {
             $db = $this->db;
