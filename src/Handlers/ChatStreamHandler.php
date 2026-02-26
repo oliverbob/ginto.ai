@@ -1370,24 +1370,30 @@ class ChatStreamHandler
                 }
             }
 
+            $isZImageModel = $this->isZImageInstructionLightModel($selectedProvider, $modelName);
+
             // Build system prompt - pass search provider flag
-            $systemPrompt = $this->buildSystemPrompt($hasImage, $hadImageInHistory, false, $isAdminUser, false);
-            
+            // For z-image models, skip heavy system instructions entirely.
+            $systemPrompt = $isZImageModel
+                ? ''
+                : $this->buildSystemPrompt($hasImage, $hadImageInHistory, false, $isAdminUser, false);
+
             // If we have web search context, append it to system prompt with explicit instruction
-            if (!empty($webSearchContext)) {
+            if (!$isZImageModel && !empty($webSearchContext)) {
                 $systemPrompt .= "\n\n## Web Search Results\n"
                     . "The following information was found from web search. Use this to answer the user's question.\n"
-                    . "IMPORTANT: Do NOT use web_fetch or any web tools to re-fetch these URLs - the content is already provided below.\n\n" 
+                    . "IMPORTANT: Do NOT use web_fetch or any web tools to re-fetch these URLs - the content is already provided below.\n\n"
                     . $webSearchContext;
             }
 
             // Inject RAG document context if user has uploaded documents
-            if (!empty($userIdSession)) {
+            // Skip for z-image models to keep prompt compact and image-focused.
+            if (!$isZImageModel && !empty($userIdSession)) {
                 $ragService = new DocumentRagService($db);
-                
+
                 // Determine max context size based on model's context window
                 $ragMaxLength = $this->getModelRagLimit($modelName, $selectedProvider);
-                
+
                 // If a specific document was attached to this message, prioritize it
                 if ($documentId !== null && $documentId > 0) {
                     $docText = $ragService->getDocumentText((int)$userIdSession, $documentId, $ragMaxLength);
@@ -1406,7 +1412,10 @@ class ChatStreamHandler
             }
 
             // Build messages
-            $messages = [['role' => 'system', 'content' => $systemPrompt]];
+            $messages = [];
+            if (!$isZImageModel && $systemPrompt !== '') {
+                $messages[] = ['role' => 'system', 'content' => $systemPrompt];
+            }
             foreach ($history as $hm) {
                 if (!empty($hm['role']) && isset($hm['content'])) {
                     // Exclude image markers from history sent to the chat model
@@ -1415,6 +1424,11 @@ class ChatStreamHandler
                     }
                     $messages[] = ['role' => $hm['role'], 'content' => $hm['content']];
                 }
+            }
+
+            // Keep z-image history compact to reduce token usage and avoid prompt contamination.
+            if ($isZImageModel) {
+                $messages = $this->compactImageModelHistory($messages, 4);
             }
 
             // Add user message
@@ -1452,9 +1466,12 @@ class ChatStreamHandler
             // Get tools in OpenAI format if user has sandbox access
             $tools = [];
             $hasSandboxAccess = !empty($_SESSION['sandbox_id']) && !empty($_SESSION['user_id']);
+            if ($isZImageModel) {
+                $hasSandboxAccess = false;
+            }
             
             // Always add generate_image tool for all logged-in users
-            if (!empty($_SESSION['user_id'])) {
+            if (!empty($_SESSION['user_id']) && !$isZImageModel) {
                 $mcpUnifier = new \App\Core\McpUnifier();
                 $tools = $mcpUnifier->getToolsAsOpenAI(['generate_image']);
                 error_log("[ChatStream] Image gen tool loaded");
@@ -2426,6 +2443,40 @@ class ChatStreamHandler
         }
 
         return 'https://' . $domain . '/v1/';
+    }
+
+    private function isZImageInstructionLightModel(string $provider, string $model): bool
+    {
+        $providerName = strtolower(trim($provider));
+        $modelName = strtolower(trim($model));
+
+        if ($providerName !== 'ginto_tunnel') {
+            return false;
+        }
+
+        return str_contains($modelName, 'z-image-turbo') || str_contains($modelName, 'z_image_turbo') || str_contains($modelName, 'z-image');
+    }
+
+    private function compactImageModelHistory(array $messages, int $maxMessages = 4): array
+    {
+        if ($maxMessages <= 0 || empty($messages)) {
+            return [];
+        }
+
+        $filtered = [];
+        foreach ($messages as $message) {
+            $role = strtolower((string)($message['role'] ?? ''));
+            if (!in_array($role, ['user', 'assistant'], true)) {
+                continue;
+            }
+            $filtered[] = $message;
+        }
+
+        if (count($filtered) <= $maxMessages) {
+            return $filtered;
+        }
+
+        return array_slice($filtered, -$maxMessages);
     }
 
     /**
