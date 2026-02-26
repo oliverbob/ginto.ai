@@ -1479,8 +1479,9 @@ class ChatStreamHandler
                 $hasSandboxAccess = false;
             }
             
-            // Always add generate_image tool for all logged-in users
-            if (!empty($_SESSION['user_id']) && !$isZImageModel) {
+            // Always add generate_image tool for all logged-in users,
+            // including z-image models (needed for explicit img2img editing flow).
+            if (!empty($_SESSION['user_id'])) {
                 $mcpUnifier = new \App\Core\McpUnifier();
                 $tools = $mcpUnifier->getToolsAsOpenAI(['generate_image']);
                 error_log("[ChatStream] Image gen tool loaded");
@@ -1695,7 +1696,17 @@ class ChatStreamHandler
                     try {
                         // Special handling for generate_image with progress streaming
                         if ($toolName === 'generate_image') {
-                            $result = $this->executeImageGeneration($toolArgs['prompt'] ?? '');
+                            $sourceImageInput = null;
+                            if (!empty($toolArgs['image']) && is_string($toolArgs['image'])) {
+                                $sourceImageInput = (string)$toolArgs['image'];
+                            } elseif (!empty($toolArgs['image_url']) && is_string($toolArgs['image_url'])) {
+                                $sourceImageInput = (string)$toolArgs['image_url'];
+                            } elseif (!empty($hasImage) && !empty($imageDataUrl) && is_string($imageDataUrl)) {
+                                // If user attached an image this turn, use it automatically for img2img edits.
+                                $sourceImageInput = (string)$imageDataUrl;
+                            }
+
+                            $result = $this->executeImageGeneration($toolArgs['prompt'] ?? '', $sourceImageInput);
                         } elseif (in_array($toolName, ['web_fetch', 'web_extract_links'])) {
                             // Special handling for Lightpanda web tools with activity streaming
                             $result = $this->executeWebTool($toolName, $toolArgs);
@@ -2896,7 +2907,7 @@ class ChatStreamHandler
         return $summary;
     }
 
-    private function executeImageGeneration(string $prompt): array
+    private function executeImageGeneration(string $prompt, ?string $sourceImageInput = null): array
     {
         if (empty(trim($prompt))) {
             return ['success' => false, 'error' => 'Prompt is required'];
@@ -2996,6 +3007,17 @@ class ChatStreamHandler
             'guidance_scale' => $generationConfig['guidance_scale'],
             'num_images' => 1,
         ];
+
+        $sourceImageBase64 = $this->resolveImageEditSourceBase64($sourceImageInput);
+        if (is_string($sourceImageBase64) && $sourceImageBase64 !== '') {
+            // Provide multiple common keys for compatibility across imagegen backends.
+            $requestData['image'] = $sourceImageBase64;
+            $requestData['init_image'] = $sourceImageBase64;
+            $requestData['source_image'] = $sourceImageBase64;
+            $requestData['mode'] = 'img2img';
+            $requestData['strength'] = 0.72;
+            $requestData['denoise_strength'] = 0.72;
+        }
         $modelId = $this->resolveImageGenModelId();
         if ($modelId !== null) {
             $requestData['model'] = $modelId;
@@ -3169,6 +3191,7 @@ class ChatStreamHandler
             'success' => true,
             'prompt' => $prompt,
             'tunneled' => $sdcpuTunnel,
+            'used_source_image' => is_string($sourceImageBase64) && $sourceImageBase64 !== '',
             'model' => 'Ginto AI ImageGen 1.0',
             'images' => [
                 [
@@ -3180,6 +3203,35 @@ class ChatStreamHandler
             'generation_time_ms' => $finalResult['generation_time_ms'] ?? null,
             'seed' => $finalResult['seed'] ?? null,
         ];
+    }
+
+    /**
+     * Resolve user-provided source image input into raw base64 for img2img requests.
+     */
+    private function resolveImageEditSourceBase64(?string $sourceImageInput): ?string
+    {
+        if (!is_string($sourceImageInput) || trim($sourceImageInput) === '') {
+            return null;
+        }
+
+        $input = trim($sourceImageInput);
+
+        if (preg_match('/^data:image\/(?:png|jpe?g|gif|webp);base64,(.+)$/i', $input, $m)) {
+            $b64 = preg_replace('/\s+/', '', (string)($m[1] ?? ''));
+            return $b64 !== '' ? $b64 : null;
+        }
+
+        if (str_starts_with($input, '/')) {
+            $localPath = $this->localPathFromPublicImagePath($input);
+            if ($localPath && is_file($localPath)) {
+                $binary = @file_get_contents($localPath);
+                if ($binary !== false && $binary !== '') {
+                    return base64_encode($binary);
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
