@@ -50,6 +50,128 @@
       return null;
     }
   }
+
+  function isInlineDataImageUrl(url) {
+    return typeof url === 'string' && url.trim().toLowerCase().startsWith('data:image/');
+  }
+
+  function extractInlineDataImageUrlFromEntry(entry) {
+    if (!entry) return '';
+
+    if (typeof entry === 'string') {
+      return isInlineDataImageUrl(entry) ? entry : '';
+    }
+
+    if (typeof entry !== 'object') return '';
+
+    if (typeof entry.b64_json === 'string' && entry.b64_json.trim()) {
+      return `data:image/png;base64,${entry.b64_json.trim()}`;
+    }
+
+    const candidates = [entry.url, entry.image_url, entry.imageUrl, entry.dataUrl, entry.image];
+    for (const candidate of candidates) {
+      if (isInlineDataImageUrl(candidate)) {
+        return candidate;
+      }
+    }
+
+    return '';
+  }
+
+  async function persistGeneratedImageEntry(entry) {
+    const inlineUrl = extractInlineDataImageUrlFromEntry(entry);
+    if (!inlineUrl) {
+      return entry;
+    }
+
+    const uploadedUrl = await uploadImageToServer(inlineUrl);
+    if (!uploadedUrl) {
+      return entry;
+    }
+
+    if (typeof entry === 'string') {
+      return uploadedUrl;
+    }
+
+    if (!entry || typeof entry !== 'object') {
+      return entry;
+    }
+
+    const normalized = { ...entry };
+    if (Object.prototype.hasOwnProperty.call(normalized, 'b64_json')) {
+      delete normalized.b64_json;
+    }
+    normalized.url = uploadedUrl;
+    normalized.image_url = uploadedUrl;
+    normalized.imageUrl = uploadedUrl;
+    normalized.dataUrl = uploadedUrl;
+    if (typeof normalized.image === 'string' && isInlineDataImageUrl(normalized.image)) {
+      normalized.image = uploadedUrl;
+    }
+
+    return normalized;
+  }
+
+  async function persistGenerateImageResultPayload(resultPayload) {
+    if (!resultPayload || typeof resultPayload !== 'object') {
+      return resultPayload;
+    }
+
+    const next = { ...resultPayload };
+
+    if (Array.isArray(next.images) && next.images.length > 0) {
+      next.images = await Promise.all(next.images.map(persistGeneratedImageEntry));
+    }
+
+    if (Array.isArray(next.data) && next.data.length > 0) {
+      next.data = await Promise.all(next.data.map(persistGeneratedImageEntry));
+    }
+
+    if (typeof next.image === 'string' && isInlineDataImageUrl(next.image)) {
+      const uploaded = await uploadImageToServer(next.image);
+      if (uploaded) {
+        next.image = uploaded;
+      }
+    }
+
+    return next;
+  }
+
+  function sanitizePersistenceValue(value, parentKey = '') {
+    if (typeof value === 'string') {
+      const key = String(parentKey || '').toLowerCase();
+      if (isInlineDataImageUrl(value)) {
+        return '';
+      }
+      if (key === 'b64_json' && value.length > 256) {
+        return '';
+      }
+      if ((key === 'html' || key === 'content') && value.includes('data:image/')) {
+        let sanitized = value.replace(/src\s*=\s*"data:image\/[^"]*"/gi, 'src=""');
+        sanitized = sanitized.replace(/src\s*=\s*'data:image\/[^"]*'/gi, "src=''");
+        sanitized = sanitized.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/gi, '');
+        return sanitized;
+      }
+      if (looksLikeLargeBase64Chunk(value)) {
+        return '';
+      }
+      return value;
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((item) => sanitizePersistenceValue(item, parentKey));
+    }
+
+    if (value && typeof value === 'object') {
+      const out = {};
+      for (const [key, child] of Object.entries(value)) {
+        out[key] = sanitizePersistenceValue(child, key);
+      }
+      return out;
+    }
+
+    return value;
+  }
   
   // Auto-scroll state: only scroll if user hasn't scrolled up
   let userHasScrolledUp = false;
@@ -1795,7 +1917,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     // Deep copy messages, but strip large base64 imageUrl data to avoid localStorage quota issues
     // Keep server URLs (they start with /) as they are small and needed for display
     allConvos[activeConvoId].messages = history.map(m => {
-      const copy = {...m};
+      const copy = sanitizePersistenceValue({ ...m });
       // Keep imageUrl if it's a server URL (starts with /), delete if it's base64
       if (copy.imageUrl && copy.imageUrl.startsWith('data:')) {
         delete copy.imageUrl;
@@ -4773,16 +4895,24 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
             }
 
             if (data.tool_result) {
+              let toolEventData = data;
+              if (data.tool_name === 'generate_image' && data.result && typeof data.result === 'object') {
+                const persistedImageResult = await persistGenerateImageResultPayload(data.result);
+                if (persistedImageResult) {
+                  toolEventData = { ...data, result: persistedImageResult };
+                }
+              }
+
               // Server finished executing a tool - replace spinner with result
               currentCard.hasToolResults = true;
 
-              if (data.tool_name === 'generate_image') {
+              if (toolEventData.tool_name === 'generate_image') {
                 const progressContainer = currentCard.response.querySelector('.image-gen-progress');
                 if (progressContainer) {
                   const bar = progressContainer.querySelector('.image-gen-bar');
                   const status = progressContainer.querySelector('.image-gen-status');
                   const percentLabel = progressContainer.querySelector('.image-gen-percent');
-                  const success = !!(data.result && data.result.success);
+                  const success = !!(toolEventData.result && toolEventData.result.success);
                   if (bar) bar.style.width = '100%';
                   if (percentLabel) percentLabel.textContent = '100%';
                   if (status) status.textContent = success ? 'Complete!' : 'Failed';
@@ -4795,37 +4925,38 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               }
               
               // Collect for persistence - but truncate large results like lightpanda_search
-              let persistData = data;
-              if (data.tool_name === 'lightpanda_search' && data.result?.content) {
+              let persistData = toolEventData;
+              if (toolEventData.tool_name === 'lightpanda_search' && toolEventData.result?.content) {
                 // For web search, just save a summary not the full content (which can be huge)
                 const sources = [];
                 const sourceRegex = /### Source \d+: (.+?)\nURL: (https?:\/\/[^\n]+)/g;
                 let match;
-                while ((match = sourceRegex.exec(data.result.content)) !== null) {
+                while ((match = sourceRegex.exec(toolEventData.result.content)) !== null) {
                   sources.push({ title: match[1], url: match[2] });
                 }
                 persistData = {
-                  ...data,
+                  ...toolEventData,
                   result: {
-                    success: data.result.success,
+                    success: toolEventData.result.success,
                     sources: sources,
                     sourcesCount: sources.length,
                     truncated: true
                   }
                 };
               }
+              persistData = sanitizePersistenceValue(persistData);
               toolResults.push({ name: data.tool_name, result: persistData });
               
               const toolClass = 'tool-exec-' + (data.tool_name || 'unknown').replace(/[^a-zA-Z0-9]/g, '_');
               const existingNote = currentCard.response.querySelector('.' + toolClass);
               if (existingNote) {
                 existingNote.className = 'mt-3 tool-result-formatted';
-                existingNote.innerHTML = formatToolResult(data.tool_name, data);
+                existingNote.innerHTML = formatToolResult(toolEventData.tool_name, toolEventData);
               } else {
                 // No spinner found, just append result
                 const resultNote = document.createElement('div');
                 resultNote.className = 'mt-3 tool-result-formatted';
-                resultNote.innerHTML = formatToolResult(data.tool_name, data);
+                resultNote.innerHTML = formatToolResult(toolEventData.tool_name, toolEventData);
                 currentCard.response.appendChild(resultNote);
               }
               smartScrollToElement(currentCard.response.lastChild, { behavior: 'smooth', block: 'end' });
