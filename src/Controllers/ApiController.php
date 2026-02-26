@@ -1454,12 +1454,13 @@ class ApiController extends Controller
 
         $provider = $this->sanitizeProviderName($input['provider'] ?? null);
         $model = trim(strip_tags((string)($input['model'] ?? '')));
+        $setGlobalDefault = !empty($input['set_global_default']) || !empty($input['set_default']);
 
         // Validate that the requesting user may select this provider.
-        // If the user is an admin, allow any provider.
-        // If the user has at least one user-scoped key, only allow providers
-        // where they have a key or where an env key exists. If they have no
-        // user keys, preserve prior behavior (allow env or any DB keys).
+        // Rules:
+        // - Admins can select any provider/model.
+        // - Non-admin users can only override when they have their own active key
+        //   for the selected provider.
         $currentUserId = $_SESSION['user_id'] ?? null;
         $isAdmin = false;
         try {
@@ -1470,13 +1471,6 @@ class ApiController extends Controller
 
         if (!$isAdmin && $provider) {
             $db = $this->db;
-            $userHasAnyKey = false;
-            try {
-                if ($db && $currentUserId !== null) {
-                    $userHasAnyKey = (bool)($db->count('provider_keys', ['user_id' => $currentUserId]) > 0);
-                }
-            } catch (\Throwable $_) { /* ignore */ }
-
             // If the user is not logged in and not admin, they cannot set a provider
             if ($currentUserId === null && !$isAdmin) {
                 http_response_code(403);
@@ -1484,39 +1478,25 @@ class ApiController extends Controller
                 exit();
             }
 
-            if ($userHasAnyKey) {
-                // Check provider-specific access: env key OR a DB key owned by user
-                $hasEnv = false;
-                $envCandidates = [
-                    'GROQ_API_KEY' => 'groq',
-                    'CEREBRAS_API_KEY' => 'cerebras',
-                    'OPENAI_API_KEY' => 'openai',
-                    'ANTHROPIC_API_KEY' => 'anthropic',
-                    'TOGETHER_API_KEY' => 'together',
-                    'FIREWORKS_API_KEY' => 'fireworks',
-                    'OLLAMA_API_KEY' => 'ollama',
-                    'GINTO_TUNNEL_API_KEY' => 'ginto_tunnel',
-                    'NOVITA_API_KEY' => 'novita'
-                ];
-                foreach ($envCandidates as $envKey => $pname) {
-                    if ($pname === $provider) {
-                        $val = $this->getEnvVar($envKey);
-                        if (!empty($val)) { $hasEnv = true; break; }
-                    }
+            $hasUserDbKey = false;
+            try {
+                if ($db && $currentUserId !== null) {
+                    $hasUserDbKey = (bool)($db->count('provider_keys', [
+                        'provider' => $provider,
+                        'user_id' => $currentUserId,
+                        'is_active' => 1,
+                    ]) > 0);
                 }
+            } catch (\Throwable $_) { /* ignore */ }
 
-                $hasUserDbKey = false;
-                try {
-                    if ($db && $currentUserId !== null) {
-                        $hasUserDbKey = (bool)($db->count('provider_keys', ['provider' => $provider, 'user_id' => $currentUserId]) > 0);
-                    }
-                } catch (\Throwable $_) { /* ignore */ }
-
-                if (!($hasEnv || $hasUserDbKey)) {
-                    http_response_code(403);
-                    echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Provider not available for your account']);
-                    exit();
-                }
+            if (!$hasUserDbKey) {
+                http_response_code(403);
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'forbidden',
+                    'message' => 'You need your own provider key to override model selection'
+                ]);
+                exit();
             }
         }
 
@@ -1566,9 +1546,11 @@ class ApiController extends Controller
             }
         }
 
-        // If caller is an admin, persist the selection globally in settings
+        $globalDefaultUpdated = false;
+
+        // Persist global default only for explicit admin requests.
         try {
-                if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+                if ($setGlobalDefault && $isAdmin) {
                 $val = json_encode(['provider' => $provider, 'model' => $model]);
                 if ($this->db) {
                     $exists = $this->db->get('settings', 'id', ['key' => 'llm_global_selection']);
@@ -1577,6 +1559,7 @@ class ApiController extends Controller
                     } else {
                         $this->db->insert('settings', ['key' => 'llm_global_selection', 'value' => $val, 'type' => 'json', 'group_name' => 'system', 'description' => 'Global LLM provider/model selection', 'is_public' => 1]);
                     }
+                    $globalDefaultUpdated = true;
                 }
             }
         } catch (\Throwable $_) { /* ignore errors */ }
@@ -1595,6 +1578,7 @@ class ApiController extends Controller
             'success' => true,
             'provider' => $_SESSION['current_provider'] ?? null,
             'model' => $_SESSION['current_model'] ?? null,
+            'global_default_updated' => $globalDefaultUpdated,
             'capabilities' => $capabilities,
         ]);
         exit();
