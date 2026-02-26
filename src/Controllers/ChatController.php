@@ -103,17 +103,23 @@ class ChatController
             exit;
         }
         
-        // Parse base64 data URL
-        if (!preg_match('/^data:image\/(jpeg|jpg|png|gif|webp);base64,(.+)$/i', $imageData, $matches)) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Invalid image format']);
-            exit;
+        $ext = 'png';
+        $base64Data = '';
+
+        if (preg_match('/^data:image\/(jpeg|jpg|png|gif|webp);base64,(.+)$/i', $imageData, $matches)) {
+            $ext = strtolower($matches[1]);
+            if ($ext === 'jpeg') $ext = 'jpg';
+            $base64Data = $matches[2];
+        } else {
+            $rawType = strtolower(trim((string)($_POST['image_type'] ?? 'png')));
+            if (in_array($rawType, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)) {
+                $ext = $rawType === 'jpeg' ? 'jpg' : $rawType;
+            }
+            $base64Data = trim($imageData);
         }
-        
-        $ext = strtolower($matches[1]);
-        if ($ext === 'jpeg') $ext = 'jpg';
-        $base64Data = $matches[2];
-        $binary = base64_decode($base64Data);
+
+        $base64Data = preg_replace('/\s+/', '', $base64Data);
+        $binary = base64_decode($base64Data, true);
         
         if ($binary === false || strlen($binary) < 100) {
             http_response_code(400);
@@ -121,10 +127,10 @@ class ChatController
             exit;
         }
         
-        // Limit image size to 5MB
-        if (strlen($binary) > 5 * 1024 * 1024) {
+        // Limit image size to 25MB
+        if (strlen($binary) > 25 * 1024 * 1024) {
             http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'Image too large (max 5MB)']);
+            echo json_encode(['success' => false, 'error' => 'Image too large (max 25MB)']);
             exit;
         }
         

@@ -21,21 +21,24 @@
   async function uploadImageToServer(base64DataUrl) {
     try {
       const csrfToken = window.CSRF_TOKEN || document.getElementById('csrf_token')?.value || '';
-      const formData = new URLSearchParams();
+      const formData = new FormData();
       formData.append('image', base64DataUrl);
       formData.append('csrf_token', csrfToken);
       
       const response = await fetch('/chat/upload-image', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
           'X-CSRF-Token': csrfToken
         },
-        body: formData.toString()
+        body: formData
       });
       
       if (!response.ok) {
         console.warn('[uploadImageToServer] Upload failed:', response.status);
+        try {
+          const body = await response.text();
+          console.warn('[uploadImageToServer] Error body:', body?.slice?.(0, 400));
+        } catch (_) {}
         return null;
       }
       
@@ -141,7 +144,10 @@
     if (typeof value === 'string') {
       const key = String(parentKey || '').toLowerCase();
       if (isInlineDataImageUrl(value)) {
-        return '';
+        if (isUserLoggedIn()) {
+          return value;
+        }
+        return value.length > 900000 ? '' : value;
       }
       if (key === 'b64_json' && value.length > 256) {
         return '';
