@@ -143,22 +143,34 @@
   function sanitizePersistenceValue(value, parentKey = '') {
     if (typeof value === 'string') {
       const key = String(parentKey || '').toLowerCase();
+      const loggedIn = isUserLoggedIn();
+
+      if (key === 'b64_json') {
+        if (loggedIn) {
+          return value;
+        }
+        return value.length > 256 ? '' : value;
+      }
+
       if (isInlineDataImageUrl(value)) {
-        if (isUserLoggedIn()) {
+        if (loggedIn) {
           return value;
         }
         return value.length > 900000 ? '' : value;
       }
-      if (key === 'b64_json' && value.length > 256) {
-        return '';
-      }
       if ((key === 'html' || key === 'content') && value.includes('data:image/')) {
+        if (loggedIn) {
+          return value;
+        }
         let sanitized = value.replace(/src\s*=\s*"data:image\/[^"]*"/gi, 'src=""');
         sanitized = sanitized.replace(/src\s*=\s*'data:image\/[^"]*'/gi, "src=''");
         sanitized = sanitized.replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=\s]+/gi, '');
         return sanitized;
       }
       if (looksLikeLargeBase64Chunk(value)) {
+        if (loggedIn && (key === 'content' || key === 'html' || key === 'image' || key === 'dataurl')) {
+          return value;
+        }
         return '';
       }
       return value;
