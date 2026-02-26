@@ -2693,7 +2693,7 @@ class ChatStreamHandler
     {
         $modelId = trim($this->imageGenRaw('IMAGEGEN_MODEL_ID'));
         if ($modelId === '') {
-            return null;
+            return 'Z-image-turbo';
         }
         return $modelId;
     }
@@ -2844,6 +2844,7 @@ class ChatStreamHandler
         }
 
         $imageValue = $result['image'] ?? null;
+        $imageUrl = isset($result['url']) && is_string($result['url']) ? trim((string)$result['url']) : null;
 
         if (!is_string($imageValue) || trim($imageValue) === '') {
             $images = $result['images'] ?? null;
@@ -2852,6 +2853,9 @@ class ChatStreamHandler
                     $imageValue = $images[0];
                 } elseif (is_array($images[0])) {
                     $imageValue = $images[0]['image'] ?? ($images[0]['b64_json'] ?? null);
+                    if ((!is_string($imageUrl) || $imageUrl === '') && !empty($images[0]['url']) && is_string($images[0]['url'])) {
+                        $imageUrl = trim((string)$images[0]['url']);
+                    }
                 }
             }
         }
@@ -2861,29 +2865,39 @@ class ChatStreamHandler
             if (is_array($data)) {
                 if (isset($data[0]) && is_array($data[0])) {
                     $imageValue = $data[0]['b64_json'] ?? ($data[0]['image'] ?? null);
+                    if ((!is_string($imageUrl) || $imageUrl === '') && !empty($data[0]['url']) && is_string($data[0]['url'])) {
+                        $imageUrl = trim((string)$data[0]['url']);
+                    }
                 } elseif (isset($data['image']) && is_string($data['image'])) {
                     $imageValue = $data['image'];
+                } elseif ((!is_string($imageUrl) || $imageUrl === '') && isset($data['url']) && is_string($data['url'])) {
+                    $imageUrl = trim((string)$data['url']);
                 }
             }
         }
 
-        if (!is_string($imageValue) || trim($imageValue) === '') {
+        if ((!is_string($imageValue) || trim($imageValue) === '') && (!is_string($imageUrl) || $imageUrl === '')) {
             return null;
         }
 
-        $imageValue = trim($imageValue);
-        if (str_starts_with($imageValue, 'data:image/')) {
-            $commaPos = strpos($imageValue, 'base64,');
-            if ($commaPos !== false) {
-                $imageValue = substr($imageValue, $commaPos + 7);
+        if (is_string($imageValue) && trim($imageValue) !== '') {
+            $imageValue = trim($imageValue);
+            if (str_starts_with($imageValue, 'data:image/')) {
+                $commaPos = strpos($imageValue, 'base64,');
+                if ($commaPos !== false) {
+                    $imageValue = substr($imageValue, $commaPos + 7);
+                }
+            }
+
+            if ($imageValue !== '') {
+                $result['image'] = $imageValue;
             }
         }
 
-        if ($imageValue === '') {
-            return null;
+        if (is_string($imageUrl) && $imageUrl !== '') {
+            $result['image_url'] = $imageUrl;
         }
 
-        $result['image'] = $imageValue;
         return $result;
     }
 
@@ -2915,9 +2929,6 @@ class ChatStreamHandler
 
         // SDCPU_ACTIVE=true bypasses the subscription gate entirely
         $sdcpuActive = strtolower(trim($_ENV['SDCPU_ACTIVE'] ?? getenv('SDCPU_ACTIVE') ?? 'false')) === 'true';
-        $sdcpuBaseUrl = $this->resolveImageGenBaseUrl($sdcpuActive);
-        $sdcpuTunnel = $sdcpuBaseUrl !== 'http://127.0.0.1:8888';
-        $streamUrl = $sdcpuBaseUrl . '/api/generate-stream';
 
         // Check if user has ImageGen subscription
         $userId = $_SESSION['user_id'] ?? null;
@@ -2976,194 +2987,111 @@ class ChatStreamHandler
             flush();
         };
 
-        $emitProgress(0, $sdcpuTunnel ? 'Connecting to FastSD tunnel relay...' : 'Connecting to FastSD CPU server...');
-
-        // Check health
-        $healthCheckUrl = $sdcpuBaseUrl . '/api/health';
-        $healthCurl = curl_init($healthCheckUrl);
-        curl_setopt_array($healthCurl, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 8,
-            CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-        $healthCheck = curl_exec($healthCurl);
-        $healthHttpCode = (int) curl_getinfo($healthCurl, CURLINFO_HTTP_CODE);
-        curl_close($healthCurl);
-
-        if ($healthCheck === false || $healthHttpCode < 200 || $healthHttpCode >= 300) {
-            return ['success' => false, 'error' => 'Image generation server is not available'];
-        }
-
-        $emitProgress(5, 'Server ready, starting generation...');
+        $emitProgress(0, 'Connecting to image generation proxy...');
+        $emitProgress(5, 'Proxy connected, preparing image edit request...');
         
         $generationConfig = $this->resolveImageGenerationConfig();
         $promptPayload = $this->buildImagePromptPayload($prompt);
-        $requestData = [
-            'prompt' => $promptPayload['prompt'],
-            'width' => $generationConfig['width'],
-            'height' => $generationConfig['height'],
-            'num_inference_steps' => $generationConfig['num_inference_steps'],
-            'guidance_scale' => $generationConfig['guidance_scale'],
-            'num_images' => 1,
-        ];
+        $requestSize = (int)$generationConfig['width'] . 'x' . (int)$generationConfig['height'];
 
         $sourceImageBase64 = $this->resolveImageEditSourceBase64($sourceImageInput);
-        if (is_string($sourceImageBase64) && $sourceImageBase64 !== '') {
-            // Provide multiple common keys for compatibility across imagegen backends.
-            $requestData['image'] = $sourceImageBase64;
-            $requestData['init_image'] = $sourceImageBase64;
-            $requestData['source_image'] = $sourceImageBase64;
-            $requestData['mode'] = 'img2img';
-            $requestData['strength'] = 0.72;
-            $requestData['denoise_strength'] = 0.72;
+        if (!is_string($sourceImageBase64) || $sourceImageBase64 === '') {
+            return ['success' => false, 'error' => 'Image edit requires a source image'];
         }
+
+        $sourceImageBinary = base64_decode($sourceImageBase64, true);
+        if ($sourceImageBinary === false || $sourceImageBinary === '') {
+            return ['success' => false, 'error' => 'Invalid source image data'];
+        }
+
+        $tmpImagePath = @tempnam(sys_get_temp_dir(), 'imgedit_');
+        if (!is_string($tmpImagePath) || $tmpImagePath === '' || @file_put_contents($tmpImagePath, $sourceImageBinary) === false) {
+            return ['success' => false, 'error' => 'Failed to prepare source image file'];
+        }
+
         $modelId = $this->resolveImageGenModelId();
-        if ($modelId !== null) {
-            $requestData['model'] = $modelId;
+        if ($modelId === null || trim($modelId) === '') {
+            $modelId = 'Z-image-turbo';
         }
-        if (!empty($promptPayload['negative_prompt'])) {
-            $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
-        }
+
+        $proxyBaseUrl = rtrim((string)($this->imageGenRaw('IMAGEGEN_PROXY_BASE_URL') ?: 'https://az.ginto.ai'), '/');
+        $editEndpoint = $proxyBaseUrl . '/v1/images/edits';
+
+        $multipartFields = [
+            'model' => $modelId,
+            'prompt' => $promptPayload['prompt'],
+            'image' => new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg'),
+            'n' => '1',
+            'size' => $requestSize,
+            'response_format' => 'b64_json',
+            'num_inference_steps' => (string)$generationConfig['num_inference_steps'],
+            'guidance_scale' => (string)$generationConfig['guidance_scale'],
+            'strength' => '0.65',
+        ];
         
-        // Use streaming endpoint for real-time progress
-        $ch = curl_init($streamUrl);
-        $responseBuffer = '';
-        $lastProgress = 0;
+        // Send multipart edit request to OpenAI-compatible proxy endpoint.
+        $emitProgress(25, 'Submitting image edit request...');
+        $ch = curl_init($editEndpoint);
         $finalResult = null;
-        $streamApiError = null;
         
         curl_setopt_array($ch, [
             CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => json_encode($requestData),
-            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: text/event-stream'],
-            CURLOPT_RETURNTRANSFER => false,
+            CURLOPT_POSTFIELDS => $multipartFields,
+            CURLOPT_HTTPHEADER => ['Accept: application/json'],
+            CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 120,
             CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_WRITEFUNCTION => function($ch, $data) use (&$responseBuffer, &$lastProgress, &$finalResult, &$streamApiError, $emitProgress) {
-                $responseBuffer .= $data;
-                
-                // Parse SSE events (supports both \n\n and \r\n\r\n separators)
-                while (($chunk = $this->imageGenConsumeSseEventFromBuffer($responseBuffer)) !== null) {
-                    $event = $this->imageGenDecodeSsePayload($chunk);
-                    if (!$event) {
-                        continue;
-                    }
-
-                    if (!empty($event['error']) && is_string($event['error'])) {
-                        $streamApiError = $event['error'];
-                    }
-
-                    if (isset($event['step']) && isset($event['total_steps'])) {
-                        // Real step progress from server
-                        $step = $event['step'];
-                        $total = $event['total_steps'];
-                        $progress = 10 + (80 * $step / $total); // 10-90% range for steps
-                        if ($progress > $lastProgress) {
-                            $lastProgress = $progress;
-                            $emitProgress(
-                                round($progress),
-                                "Step {$step}/{$total}",
-                                $step,
-                                $total
-                            );
-                        }
-                    } else {
-                        $normalizedEvent = $this->normalizeImageGenResult($event);
-                        if ($normalizedEvent && isset($normalizedEvent['image'])) {
-                        // Final result with image
-                            $finalResult = $normalizedEvent;
-                            $emitProgress(90, 'Processing image...');
-                        }
-                    }
-                }
-                
-                return strlen($data);
-            }
         ]);
         
-        $success = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = (string)curl_error($ch);
         curl_close($ch);
+        @unlink($tmpImagePath);
 
-        if (!$finalResult && trim($responseBuffer) !== '') {
-            $tail = trim($responseBuffer);
-            $tailEvent = $this->imageGenDecodeSsePayload($tail);
-            $normalizedTailEvent = $this->normalizeImageGenResult(is_array($tailEvent) ? $tailEvent : null);
-            if (is_array($normalizedTailEvent) && isset($normalizedTailEvent['image'])) {
-                $finalResult = $normalizedTailEvent;
-            } else {
-                $tailJson = @json_decode($tail, true);
-                $normalizedTailJson = $this->normalizeImageGenResult(is_array($tailJson) ? $tailJson : null);
-                if (is_array($normalizedTailJson) && isset($normalizedTailJson['image'])) {
-                    $finalResult = $normalizedTailJson;
-                }
-            }
-        }
-        
-        if (!$success || ($httpCode !== 200 && $httpCode !== 0) || !$finalResult || !isset($finalResult['image'])) {
-            // Fallback to non-streaming endpoint
-            $emitProgress(20, 'Fallback to standard generation...');
-            
-            $ch = curl_init($sdcpuBaseUrl . '/api/generate');
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => json_encode($requestData),
-                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 60,
-            ]);
-            
-            $response = curl_exec($ch);
-            $fallbackHttpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $fallbackCurlError = curl_error($ch);
-            curl_close($ch);
-            
-            $decoded = @json_decode((string)$response, true);
-            $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
+        $decoded = @json_decode((string)$response, true);
+        $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
 
-            $needsCompatRetry = $fallbackCurlError !== '' || $fallbackHttpCode !== 200 || !$finalResult || !isset($finalResult['image']);
-            if ($needsCompatRetry) {
-                $emitProgress(25, 'Retrying with compatibility payload...');
+        // Retry once requesting URL response when b64_json isn't available.
+        if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
+            $emitProgress(35, 'Retrying with URL response format...');
+            $multipartFields['response_format'] = 'url';
 
-                $compatRequestData = $requestData;
-                unset($compatRequestData['negative_prompt'], $compatRequestData['model'], $compatRequestData['num_images']);
-
-                $compatCh = curl_init($sdcpuBaseUrl . '/api/generate');
-                curl_setopt_array($compatCh, [
+            $tmpImagePath2 = @tempnam(sys_get_temp_dir(), 'imgedit_');
+            if (is_string($tmpImagePath2) && $tmpImagePath2 !== '' && @file_put_contents($tmpImagePath2, $sourceImageBinary) !== false) {
+                $multipartFields['image'] = new \CURLFile($tmpImagePath2, 'image/jpeg', 'input.jpg');
+                $retry = curl_init($editEndpoint);
+                curl_setopt_array($retry, [
                     CURLOPT_POST => true,
-                    CURLOPT_POSTFIELDS => json_encode($compatRequestData),
-                    CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                    CURLOPT_POSTFIELDS => $multipartFields,
+                    CURLOPT_HTTPHEADER => ['Accept: application/json'],
                     CURLOPT_RETURNTRANSFER => true,
-                    CURLOPT_TIMEOUT => 60,
+                    CURLOPT_TIMEOUT => 120,
+                    CURLOPT_CONNECTTIMEOUT => 10,
                 ]);
+                $retryResponse = curl_exec($retry);
+                $retryHttpCode = (int)curl_getinfo($retry, CURLINFO_HTTP_CODE);
+                $retryErr = (string)curl_error($retry);
+                curl_close($retry);
+                @unlink($tmpImagePath2);
 
-                $compatResponse = curl_exec($compatCh);
-                $compatHttpCode = (int)curl_getinfo($compatCh, CURLINFO_HTTP_CODE);
-                $compatCurlError = curl_error($compatCh);
-                curl_close($compatCh);
-
-                $compatDecoded = @json_decode((string)$compatResponse, true);
-                $compatResult = $this->normalizeImageGenResult(is_array($compatDecoded) ? $compatDecoded : null);
-
-                if ($compatCurlError === '' && $compatHttpCode === 200 && $compatResult && isset($compatResult['image'])) {
-                    $finalResult = $compatResult;
-                } else {
-                    if (is_array($compatDecoded)) {
-                        $decoded = $compatDecoded;
-                    }
-                    if ($compatCurlError !== '') {
-                        $streamApiError = trim(($streamApiError ? ($streamApiError . ' | ') : '') . $compatCurlError);
+                if ($retryErr === '' && $retryHttpCode >= 200 && $retryHttpCode < 300) {
+                    $retryDecoded = @json_decode((string)$retryResponse, true);
+                    $retryResult = $this->normalizeImageGenResult(is_array($retryDecoded) ? $retryDecoded : null);
+                    if (is_array($retryResult)) {
+                        $finalResult = $retryResult;
+                        $decoded = is_array($retryDecoded) ? $retryDecoded : $decoded;
+                        $curlError = '';
+                        $httpCode = $retryHttpCode;
                     }
                 }
             }
         }
         
-        if (!$finalResult || !isset($finalResult['image'])) {
+        if (!$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url']))) {
             $debugSummary = $this->summarizeImageGenApiResultForDebug(is_array($finalResult) ? $finalResult : null);
-            if ($streamApiError) {
-                $debugSummary .= ' stream_error=' . substr($streamApiError, 0, 180);
+            if ($curlError !== '') {
+                $debugSummary .= ' curl_error=' . substr($curlError, 0, 180);
             }
             return ['success' => false, 'error' => 'Failed to generate image (' . $debugSummary . ')'];
         }
@@ -3179,8 +3107,39 @@ class ChatStreamHandler
         $safePrompt = preg_replace('/[^a-zA-Z0-9]/', '_', substr($prompt, 0, 30));
         $outputFile = date('Y-m-d_His') . '_sdcpu_' . $safePrompt . '_' . substr(md5(uniqid()), 0, 8) . '.png';
         $outputPath = $storageDir . '/' . $outputFile;
-        
-        $imageData = base64_decode($finalResult['image']);
+
+        $imageData = null;
+        if (!empty($finalResult['image']) && is_string($finalResult['image'])) {
+            $decodedImage = base64_decode($finalResult['image'], true);
+            if ($decodedImage !== false && $decodedImage !== '') {
+                $imageData = $decodedImage;
+            }
+        }
+
+        if ($imageData === null && !empty($finalResult['image_url']) && is_string($finalResult['image_url'])) {
+            $imageUrl = trim((string)$finalResult['image_url']);
+            if (preg_match('#^https?://#i', $imageUrl)) {
+                $imgCurl = curl_init($imageUrl);
+                curl_setopt_array($imgCurl, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT => 60,
+                    CURLOPT_CONNECTTIMEOUT => 8,
+                    CURLOPT_FOLLOWLOCATION => true,
+                ]);
+                $remoteBinary = curl_exec($imgCurl);
+                $remoteHttp = (int)curl_getinfo($imgCurl, CURLINFO_HTTP_CODE);
+                $remoteErr = (string)curl_error($imgCurl);
+                curl_close($imgCurl);
+                if ($remoteErr === '' && $remoteHttp >= 200 && $remoteHttp < 300 && is_string($remoteBinary) && $remoteBinary !== '') {
+                    $imageData = $remoteBinary;
+                }
+            }
+        }
+
+        if (!is_string($imageData) || $imageData === '') {
+            return ['success' => false, 'error' => 'Image API did not return usable image content'];
+        }
+
         file_put_contents($outputPath, $imageData);
         
         $webUrl = '/storage/imagegen/' . $outputFile;
@@ -3190,9 +3149,9 @@ class ChatStreamHandler
         return [
             'success' => true,
             'prompt' => $prompt,
-            'tunneled' => $sdcpuTunnel,
+            'tunneled' => true,
             'used_source_image' => is_string($sourceImageBase64) && $sourceImageBase64 !== '',
-            'model' => 'Ginto AI ImageGen 1.0',
+            'model' => $modelId,
             'images' => [
                 [
                     'url' => $webUrl,
