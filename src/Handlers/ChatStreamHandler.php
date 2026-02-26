@@ -741,10 +741,25 @@ class ChatStreamHandler
     ): void {
         $adminLogEvents = [];
 
-        // Respect both UI current_* keys and legacy llm_* session keys.
-        // Prefer current_* because model selector writes these in real time.
-        $sessionProvider = $_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null);
-        $sessionModel = $_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null);
+        // Resolve effective selection the same way /api/models does:
+        // prefer global admin selection when present, otherwise session selection.
+        $globalSelection = null;
+        try {
+            if ($db) {
+                $row = $db->get('settings', ['value'], ['key' => 'llm_global_selection']);
+                if ($row && !empty($row['value'])) {
+                    $decoded = json_decode((string)$row['value'], true);
+                    if (is_array($decoded)) {
+                        $globalSelection = $decoded;
+                    }
+                }
+            }
+        } catch (\Throwable $_) {
+            $globalSelection = null;
+        }
+
+        $sessionProvider = $globalSelection['provider'] ?? ($_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null));
+        $sessionModel = $globalSelection['model'] ?? ($_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null));
 
         // Check for local LLM preference
         $forceLocalLlm = false;
@@ -811,8 +826,10 @@ class ChatStreamHandler
                         $userProvidedKey = $keyManager->getUserKey($sessionCloudProvider, (int)$userIdSession);
                     }
                 }
-                // Otherwise try any user-owned key
-                if (!$userProvidedKey) {
+                // Otherwise try any user-owned key only when there is no explicit session provider.
+                // If a provider/model is explicitly selected, defer to provider-resolution logic below
+                // so the selected provider can still use env/available keys.
+                if (!$userProvidedKey && empty($sessionCloudProvider)) {
                     $userProvidedKey = $keyManager->getUserFirstKey((int)$userIdSession);
                 }
                 if ($userProvidedKey) {
