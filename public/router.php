@@ -819,10 +819,14 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     curl_setopt($ch, CURLOPT_HEADER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
     curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD'] ?? 'GET');
+    $requestMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $requestMethod);
+    if ($requestMethod === 'HEAD') {
+        curl_setopt($ch, CURLOPT_NOBODY, true);
+    }
     
     // Forward request body
-    if (in_array($_SERVER['REQUEST_METHOD'] ?? '', ['POST', 'PUT', 'PATCH'])) {
+    if (in_array($requestMethod, ['POST', 'PUT', 'PATCH'], true)) {
         curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
     }
     
