@@ -558,9 +558,15 @@ function ginto_get_frp_upstream_for_subdomain(string $subdomain, ?array $state =
     $hasHttps = !empty($state['https']);
     $hasHttp = !empty($state['http']);
 
-    if ($preferHttps && $hasHttps) {
-        return ['host' => $frpHost, 'port' => $httpsPort, 'scheme' => 'https'];
+    if ($preferHttps) {
+        if ($hasHttps || (!$hasHttp && !$hasHttps)) {
+            return ['host' => $frpHost, 'port' => $httpsPort, 'scheme' => 'https'];
+        }
+        if ($hasHttp) {
+            return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+        }
     }
+
     if ($hasHttp) {
         return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
     }
@@ -568,7 +574,7 @@ function ginto_get_frp_upstream_for_subdomain(string $subdomain, ?array $state =
         return ['host' => $frpHost, 'port' => $httpsPort, 'scheme' => 'https'];
     }
 
-    return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+    return ['host' => $frpHost, 'port' => ($preferHttps ? $httpsPort : $httpPort), 'scheme' => ($preferHttps ? 'https' : 'http')];
 }
 
 function ginto_frp_read_key_cache(int $maxAgeSeconds): ?array {
