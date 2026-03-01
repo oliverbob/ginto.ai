@@ -440,6 +440,135 @@ function ginto_frp_fetch_online_key_hashes(): array {
     return $out;
 }
 
+function ginto_frp_fetch_online_proxy_types(): array {
+    $pwd = ginto_frp_dashboard_pwd();
+    if ($pwd === '') return [];
+
+    $out = [];
+    $endpointTypeMap = [
+        '/api/proxy/http' => 'http',
+        '/api/proxy/https' => 'https',
+    ];
+
+    foreach ($endpointTypeMap as $endpoint => $type) {
+        $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $pwd);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($resp === false || $code < 200 || $code >= 300) continue;
+
+        $decoded = json_decode((string)$resp, true);
+        $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+        if (!is_array($proxies)) continue;
+
+        foreach ($proxies as $proxy) {
+            if (!is_array($proxy) || (string)($proxy['status'] ?? '') !== 'online') continue;
+            $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+            $sd = strtolower(trim((string)($conf['subdomain'] ?? '')));
+            if ($sd === '') continue;
+            if (!isset($out[$sd])) {
+                $out[$sd] = ['http' => false, 'https' => false];
+            }
+            $out[$sd][$type] = true;
+        }
+    }
+
+    return $out;
+}
+
+function ginto_frp_read_proxy_type_cache(int $maxAgeSeconds): ?array {
+    $file = '/tmp/ginto-frp-online-proxy-types.json';
+    if (!file_exists($file)) return null;
+    $mtime = @filemtime($file);
+    if (!is_int($mtime) || (time() - $mtime) > $maxAgeSeconds) return null;
+    $decoded = json_decode((string)@file_get_contents($file), true);
+    if (!is_array($decoded)) return null;
+    $types = $decoded['types'] ?? null;
+    return is_array($types) ? $types : null;
+}
+
+function ginto_frp_write_proxy_type_cache(array $typesBySubdomain): void {
+    @file_put_contents('/tmp/ginto-frp-online-proxy-types.json', json_encode([
+        'updated_at' => time(),
+        'types' => $typesBySubdomain,
+    ]));
+}
+
+function ginto_frp_get_online_proxy_types_cached(int $ttlSeconds = 2): array {
+    $cached = ginto_frp_read_proxy_type_cache($ttlSeconds);
+    if ($cached !== null) return $cached;
+
+    $lock = @fopen('/tmp/ginto-frp-online-proxy-types.lock', 'c');
+    if ($lock === false) {
+        return ginto_frp_fetch_online_proxy_types();
+    }
+    if (@flock($lock, LOCK_EX)) {
+        $cached = ginto_frp_read_proxy_type_cache($ttlSeconds);
+        if ($cached !== null) {
+            @flock($lock, LOCK_UN);
+            @fclose($lock);
+            return $cached;
+        }
+        $fresh = ginto_frp_fetch_online_proxy_types();
+        ginto_frp_write_proxy_type_cache($fresh);
+        @flock($lock, LOCK_UN);
+        @fclose($lock);
+        return $fresh;
+    }
+    @fclose($lock);
+    return ginto_frp_fetch_online_proxy_types();
+}
+
+function ginto_is_https_request(): bool {
+    if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+        return true;
+    }
+    return strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
+}
+
+function ginto_get_frp_upstream_for_subdomain(string $subdomain): array {
+    $frpHost = ginto_env('FRP_VHOST_HOST');
+    if ($frpHost === '') {
+        $frpHost = '127.0.0.1';
+    }
+
+    $httpPort = (int)(ginto_env('FRP_VHOST_HTTP_PORT') ?: '7080');
+    if ($httpPort < 1 || $httpPort > 65535) {
+        $httpPort = 7080;
+    }
+
+    $httpsPort = (int)(ginto_env('FRP_VHOST_HTTPS_PORT') ?: '7443');
+    if ($httpsPort < 1 || $httpsPort > 65535) {
+        $httpsPort = 7443;
+    }
+
+    $proxyTypes = ginto_frp_get_online_proxy_types_cached();
+    $state = is_array($proxyTypes[$subdomain] ?? null)
+        ? $proxyTypes[$subdomain]
+        : ['http' => false, 'https' => false];
+
+    $preferHttps = ginto_is_https_request();
+    $hasHttps = !empty($state['https']);
+    $hasHttp = !empty($state['http']);
+
+    if ($preferHttps && $hasHttps) {
+        return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+    }
+    if ($hasHttp) {
+        return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+    }
+    if ($hasHttps) {
+        return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+    }
+
+    return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+}
+
 function ginto_frp_read_key_cache(int $maxAgeSeconds): ?array {
     $file = '/tmp/ginto-frp-online-keys.json';
     if (!file_exists($file)) return null;
@@ -514,8 +643,10 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     
     // Not a cloud subdomain - proxy to FRP server
     // FRP handles the tunnel routing
-    $frpHost = '127.0.0.1';
-    $frpPort = 7080;
+    $frpUpstream = ginto_get_frp_upstream_for_subdomain($subdomain);
+    $frpHost = (string)($frpUpstream['host'] ?? '127.0.0.1');
+    $frpPort = (int)($frpUpstream['port'] ?? 7080);
+    $frpScheme = (string)($frpUpstream['scheme'] ?? 'http');
 
     // Enforce MySQL-backed tunnel access key on every request.
     // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
@@ -675,7 +806,15 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     
     // Create a stream context for the proxy
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, "http://{$frpHost}:{$frpPort}{$uri}");
+    if ($frpScheme === 'https') {
+        $upstreamHost = $hostNoPort;
+        curl_setopt($ch, CURLOPT_URL, "https://{$upstreamHost}:{$frpPort}{$uri}");
+        curl_setopt($ch, CURLOPT_RESOLVE, ["{$upstreamHost}:{$frpPort}:{$frpHost}"]);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+    } else {
+        curl_setopt($ch, CURLOPT_URL, "http://{$frpHost}:{$frpPort}{$uri}");
+    }
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_HEADER, true);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);

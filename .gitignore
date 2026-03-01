@@ -26,3 +26,6 @@ tools/sdcpu/venv/
 
 # Agent instruction file
 agents.do
+
+# Local nested gntl repo used for testing
+gntl/
