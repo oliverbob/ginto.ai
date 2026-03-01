@@ -531,7 +531,7 @@ function ginto_is_https_request(): bool {
     return strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')) === 'https';
 }
 
-function ginto_get_frp_upstream_for_subdomain(string $subdomain): array {
+function ginto_get_frp_upstream_for_subdomain(string $subdomain, ?array $state = null): array {
     $frpHost = ginto_env('FRP_VHOST_HOST');
     if ($frpHost === '') {
         $frpHost = '127.0.0.1';
@@ -547,10 +547,12 @@ function ginto_get_frp_upstream_for_subdomain(string $subdomain): array {
         $httpsPort = 7443;
     }
 
-    $proxyTypes = ginto_frp_get_online_proxy_types_cached();
-    $state = is_array($proxyTypes[$subdomain] ?? null)
-        ? $proxyTypes[$subdomain]
-        : ['http' => false, 'https' => false];
+    if (!is_array($state)) {
+        $proxyTypes = ginto_frp_get_online_proxy_types_cached();
+        $state = is_array($proxyTypes[$subdomain] ?? null)
+            ? $proxyTypes[$subdomain]
+            : ['http' => false, 'https' => false];
+    }
 
     $preferHttps = ginto_is_https_request();
     $hasHttps = !empty($state['https']);
@@ -641,9 +643,22 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
         }
     }
     
-    // Not a cloud subdomain - proxy to FRP server
-    // FRP handles the tunnel routing
-    $frpUpstream = ginto_get_frp_upstream_for_subdomain($subdomain);
+    $proxyTypes = ginto_frp_get_online_proxy_types_cached();
+    $proxyState = is_array($proxyTypes[$subdomain] ?? null)
+        ? $proxyTypes[$subdomain]
+        : ['http' => false, 'https' => false];
+
+    // If HTTPS tunnel is online, enforce HTTPS for this subdomain.
+    // This mirrors ngrok-style behavior where http://subdomain upgrades to https://subdomain.
+    if (!ginto_is_https_request() && !empty($proxyState['https'])) {
+        $location = 'https://' . $hostNoPort . (string)($_SERVER['REQUEST_URI'] ?? '/');
+        header('Location: ' . $location, true, 308);
+        return true;
+    }
+
+    // Not a cloud subdomain - proxy to FRP server.
+    // FRP handles tunnel routing, with TLS upstream prioritized when available.
+    $frpUpstream = ginto_get_frp_upstream_for_subdomain($subdomain, $proxyState);
     $frpHost = (string)($frpUpstream['host'] ?? '127.0.0.1');
     $frpPort = (int)($frpUpstream['port'] ?? 7080);
     $frpScheme = (string)($frpUpstream['scheme'] ?? 'http');
