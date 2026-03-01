@@ -577,6 +577,17 @@ function ginto_get_frp_upstream_for_subdomain(string $subdomain, ?array $state =
     return ['host' => $frpHost, 'port' => ($preferHttps ? $httpsPort : $httpPort), 'scheme' => ($preferHttps ? 'https' : 'http')];
 }
 
+function ginto_is_tunnel_not_found_response(int $httpCode, string $responseBody): bool {
+    if ($httpCode !== 404) {
+        return false;
+    }
+    $body = strtolower(trim($responseBody));
+    if ($body === '') {
+        return false;
+    }
+    return str_contains($body, 'tunnel not found') || str_contains($body, 'notunnel') || str_contains($body, 'proxy not found');
+}
+
 function ginto_frp_read_key_cache(int $maxAgeSeconds): ?array {
     $file = '/tmp/ginto-frp-online-keys.json';
     if (!file_exists($file)) return null;
@@ -668,6 +679,14 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $frpHost = (string)($frpUpstream['host'] ?? '127.0.0.1');
     $frpPort = (int)($frpUpstream['port'] ?? 7080);
     $frpScheme = (string)($frpUpstream['scheme'] ?? 'http');
+    $frpHttpPort = (int)(ginto_env('FRP_VHOST_HTTP_PORT') ?: '7080');
+    if ($frpHttpPort < 1 || $frpHttpPort > 65535) {
+        $frpHttpPort = 7080;
+    }
+    $frpHttpsPort = (int)(ginto_env('FRP_VHOST_HTTPS_PORT') ?: '7443');
+    if ($frpHttpsPort < 1 || $frpHttpsPort > 65535) {
+        $frpHttpsPort = 7443;
+    }
 
     // Enforce MySQL-backed tunnel access key on every request.
     // Even if frpc is connected/authenticated to frps, do not serve until a valid token is presented.
@@ -825,32 +844,13 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
         return true;
     }
     
-    // Create a stream context for the proxy
-    $ch = curl_init();
-    if ($frpScheme === 'https') {
-        $upstreamHost = $hostNoPort;
-        curl_setopt($ch, CURLOPT_URL, "https://{$upstreamHost}:{$frpPort}{$uri}");
-        curl_setopt($ch, CURLOPT_RESOLVE, ["{$upstreamHost}:{$frpPort}:{$frpHost}"]);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
-    } else {
-        curl_setopt($ch, CURLOPT_URL, "http://{$frpHost}:{$frpPort}{$uri}");
-    }
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HEADER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
     $requestMethod = strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET'));
-    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $requestMethod);
-    if ($requestMethod === 'HEAD') {
-        curl_setopt($ch, CURLOPT_NOBODY, true);
-    }
-    
+    $requestBody = null;
     // Forward request body
     if (in_array($requestMethod, ['POST', 'PUT', 'PATCH'], true)) {
-        curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+        $requestBody = file_get_contents('php://input');
     }
-    
+
     // Forward headers
     $headers = [];
     foreach (getallheaders() as $name => $value) {
@@ -868,24 +868,90 @@ if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
             $headers[] = "{$name}: {$value}";
         }
     }
-    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+    $proxyRequest = function (string $scheme, int $port) use ($frpHost, $hostNoPort, $uri, $requestMethod, $requestBody, $headers) {
+        $ch = curl_init();
+        if ($scheme === 'https') {
+            $upstreamHost = $hostNoPort;
+            curl_setopt($ch, CURLOPT_URL, "https://{$upstreamHost}:{$port}{$uri}");
+            curl_setopt($ch, CURLOPT_RESOLVE, ["{$upstreamHost}:{$port}:{$frpHost}"]);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        } else {
+            curl_setopt($ch, CURLOPT_URL, "http://{$frpHost}:{$port}{$uri}");
+        }
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $requestMethod);
+        if ($requestMethod === 'HEAD') {
+            curl_setopt($ch, CURLOPT_NOBODY, true);
+        }
+        if ($requestBody !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $requestBody);
+        }
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        if ($response === false) {
+            return [
+                'ok' => false,
+                'httpCode' => 502,
+                'headers' => '',
+                'body' => '',
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'httpCode' => $httpCode,
+            'headers' => substr($response, 0, $headerSize),
+            'body' => substr($response, $headerSize),
+        ];
+    };
+
+    $result = $proxyRequest($frpScheme, $frpPort);
+
+    $fallbackScheme = null;
+    $fallbackPort = 0;
+    if ($frpScheme === 'https') {
+        $fallbackScheme = 'http';
+        $fallbackPort = $frpHttpPort;
+    } elseif ($frpScheme === 'http') {
+        $fallbackScheme = 'https';
+        $fallbackPort = $frpHttpsPort;
+    }
+
+    $shouldFallback = false;
+    if (!$result['ok']) {
+        $shouldFallback = $fallbackScheme !== null;
+    } elseif (ginto_is_tunnel_not_found_response((int)$result['httpCode'], (string)$result['body']) && $fallbackScheme !== null) {
+        $shouldFallback = true;
+    }
+
+    if ($shouldFallback) {
+        $fallbackResult = $proxyRequest($fallbackScheme, $fallbackPort);
+        if ($fallbackResult['ok']) {
+            $result = $fallbackResult;
+        }
+    }
     
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    curl_close($ch);
-    
-    if ($response === false) {
+    if (!$result['ok']) {
         http_response_code(502);
         include __DIR__ . '/../tools/tunnel/frp/404.html';
         return true;
     }
-    
+
     // Parse and output response
-    $responseHeaders = substr($response, 0, $headerSize);
-    $responseBody = substr($response, $headerSize);
+    $responseHeaders = (string)$result['headers'];
+    $responseBody = (string)$result['body'];
     
-    http_response_code($httpCode);
+    http_response_code((int)$result['httpCode']);
     foreach (explode("\r\n", $responseHeaders) as $line) {
         if (empty($line) || preg_match('/^HTTP\//', $line)) continue;
         $colonPos = strpos($line, ':');
