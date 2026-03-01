@@ -557,13 +557,13 @@ function ginto_get_frp_upstream_for_subdomain(string $subdomain): array {
     $hasHttp = !empty($state['http']);
 
     if ($preferHttps && $hasHttps) {
-        return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+        return ['host' => $frpHost, 'port' => $httpsPort, 'scheme' => 'https'];
     }
     if ($hasHttp) {
         return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
     }
     if ($hasHttps) {
-        return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
+        return ['host' => $frpHost, 'port' => $httpsPort, 'scheme' => 'https'];
     }
 
     return ['host' => $frpHost, 'port' => $httpPort, 'scheme' => 'http'];
