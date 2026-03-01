@@ -1403,45 +1403,44 @@ TOML;
         $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
 
         // Prevent users from generating keys for subdomains owned by someone else.
-        // Ownership is tracked in the tunnel registry (written during tunnel registration / FRP key setup).
+        // Ownership is sticky: once claimed by a user, other users cannot take it.
+        if ($this->db) {
+            try {
+                $claimed = $this->db->get('tunnel_access_keys', ['user_id'], [
+                    'subdomain' => $subdomain,
+                    'ORDER' => ['id' => 'ASC'],
+                    'LIMIT' => 1,
+                ]);
+                $claimedBy = (int)($claimed['user_id'] ?? 0);
+                if ($claimedBy > 0 && $claimedBy !== (int)$userId) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'DOMAIN_NOT_AVAILABLE',
+                        'error' => 'Domain is owned by another user.',
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // ignore DB read failures for ownership lookup
+            }
+        }
+
+        // Secondary owner lock from registry (if present).
         try {
             $registry = $this->readRegistry();
             $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
             $owner = (int)($entry['owner_user_id'] ?? 0);
             $expiresAt = (int)($entry['expires_at'] ?? 0);
 
-            // Owner lock is enforced only while ownership is still active.
-            // If the owner has no active key and no active registry lease, allow reclaim.
             if ($owner !== 0 && $owner !== (int)$userId) {
-                $ownerHasActiveClaim = $expiresAt > time();
-
-                if (!$ownerHasActiveClaim && $this->db) {
-                    try {
-                        $ownerActiveKey = $this->db->get('tunnel_access_keys', ['id'], [
-                            'user_id' => $owner,
-                            'subdomain' => $subdomain,
-                            'revoked' => 0,
-                            'OR' => [
-                                'expires_at' => null,
-                                'expires_at[>]' => date('Y-m-d H:i:s'),
-                            ],
-                            'ORDER' => ['id' => 'DESC'],
-                        ]);
-                        $ownerHasActiveClaim = is_array($ownerActiveKey) && !empty($ownerActiveKey);
-                    } catch (\Throwable $_) {
-                        $ownerHasActiveClaim = true;
-                    }
-                }
-
-                if ($ownerHasActiveClaim) {
-                    http_response_code(409);
-                    echo json_encode([
-                        'success' => false,
-                        'code' => 'DOMAIN_NOT_AVAILABLE',
-                        'error' => 'Domain is not available.',
-                    ]);
-                    return;
-                }
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'DOMAIN_NOT_AVAILABLE',
+                    'error' => 'Domain is owned by another user.',
+                ]);
+                return;
             }
 
             // If the subdomain is currently registered/active but the owner is unknown, treat it as taken.
@@ -1488,8 +1487,8 @@ TOML;
         }
 
         // Enforce user key limits (admins unlimited).
-        // Rule: non-admins can have 3 active (unrevoked, unexpired) keys for free.
-        // Additional keys require an active "serverless_key" addon subscription ($105/mo per key).
+        // Rule: non-admins can have 1 active (unrevoked, unexpired) key for free.
+        // Additional keys require paid slots ($10/month equivalent per additional key).
         $isAdmin = false;
         try {
             $isAdmin = UserController::isAdmin();
@@ -1534,7 +1533,7 @@ TOML;
                     $extraSlots = 0;
                 }
 
-                $limit = 3 + max(0, $extraSlots);
+                $limit = 1 + max(0, $extraSlots);
                 if ($activeKeys >= $limit) {
                     http_response_code(402);
                     echo json_encode([
@@ -1544,7 +1543,7 @@ TOML;
                         'active_keys' => $activeKeys,
                         'limit' => $limit,
                         'addon_type' => 'serverless_key_1m',
-                        'addon_price_usd' => 105,
+                        'addon_price_usd' => 10,
                     ]);
                     return;
                 }

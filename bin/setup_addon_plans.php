@@ -152,12 +152,12 @@ $addonPlans = [
         'interval_unit' => 'MONTH',
         'interval_count' => 1,
     ],
-    // Serverless key slots are priced at $105/month per key, billed at different cadences.
+    // Serverless key slots are priced at $10/month per key, billed at different cadences.
     [
         'addon_type' => 'serverless_key_1m',
         'name' => 'Serverless Subscription (Monthly)',
         'description' => 'Additional web server tunnel key slot (billed monthly; 1 key per active subscription)',
-        'amount_usd' => '105.00',
+        'amount_usd' => '10.00',
         'interval_unit' => 'MONTH',
         'interval_count' => 1,
     ],
@@ -165,7 +165,7 @@ $addonPlans = [
         'addon_type' => 'serverless_key_1y',
         'name' => 'Serverless Subscription (Yearly)',
         'description' => 'Additional web server tunnel key slot (billed yearly; 1 key per active subscription)',
-        'amount_usd' => '1260.00',
+        'amount_usd' => '120.00',
         'interval_unit' => 'YEAR',
         'interval_count' => 1,
     ],

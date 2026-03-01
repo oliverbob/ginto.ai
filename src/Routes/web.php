@@ -823,7 +823,7 @@ $router->req('/api/addon/activate', function() use ($db) {
     ]);
 });
 
-// Create a one-time PayPal order for multi-year serverless key slots.
+// Create a one-time PayPal order for serverless key slots.
 // POST /api/addon/one-time/create-order
 $router->req('/api/addon/one-time/create-order', function() use ($db) {
     header('Content-Type: application/json');
@@ -850,14 +850,14 @@ $router->req('/api/addon/one-time/create-order', function() use ($db) {
 
     $months = (int)($input['months'] ?? 0);
     // Supported one-time terms (in months)
-    if (!in_array($months, [36, 60], true)) {
+    if (!in_array($months, [1, 12, 36, 60], true)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid term']);
         return;
     }
 
     $userId = (int)$_SESSION['user_id'];
-    $amount = 105 * $months; // $105 per month per key, charged as a one-time amount
+    $amount = 10 * $months; // $10 per month per key, charged as a one-time amount
     $amountStr = number_format($amount, 2, '.', '');
     $environment = getenv('PAYPAL_ENVIRONMENT') ?: ($_ENV['PAYPAL_ENVIRONMENT'] ?? 'sandbox');
     $environment = (strtolower((string)$environment) === 'live' || strtolower((string)$environment) === 'production') ? 'live' : 'sandbox';
@@ -1063,7 +1063,7 @@ $router->req('/api/addon/one-time/capture', function() use ($db) {
     }
 
     $months = (int)($meta['months'] ?? 0);
-    if (!in_array($months, [36, 60], true)) {
+    if (!in_array($months, [1, 12, 36, 60], true)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid term']);
         return;

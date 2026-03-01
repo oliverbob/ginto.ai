@@ -29,13 +29,83 @@ $paypalClientId = ($paypalEnv === 'sandbox')
 $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
 ?>
 
+<style>
+  .ak-generate-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: end;
+  }
+  .ak-generate-btn {
+    width: 100%;
+    min-height: 42px;
+  }
+  .ak-action-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  @media (max-width: 767px) {
+    .ak-table-wrap table,
+    .ak-table-wrap thead,
+    .ak-table-wrap tbody,
+    .ak-table-wrap th,
+    .ak-table-wrap td,
+    .ak-table-wrap tr {
+      display: block;
+      width: 100%;
+    }
+    .ak-table-wrap thead {
+      display: none;
+    }
+    .ak-table-wrap tr {
+      border-top: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 10px 12px;
+    }
+    .ak-table-wrap td {
+      border: 0;
+      padding: 6px 0;
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+    .ak-table-wrap td::before {
+      content: attr(data-label);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      color: #64748b;
+      flex: 0 0 92px;
+    }
+    .ak-table-wrap td[data-label="Action"] {
+      align-items: flex-start;
+    }
+    .ak-table-wrap td[data-label="Action"]::before {
+      padding-top: 6px;
+    }
+  }
+
+  @media (min-width: 768px) {
+    .ak-generate-grid {
+      grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    }
+    .ak-generate-btn {
+      min-width: 130px;
+      width: auto;
+    }
+  }
+</style>
+
 <div id="mainContent" class="p-6">
   <h1 class="text-2xl font-bold mb-2">Account Keys</h1>
-  <p class="text-gray-500 mb-6">Generate and manage tunnel access tokens (required to view tunneled pages).</p>
+  <p class="text-gray-500 mb-6">Generate and manage tunnel access tokens. First active key is free; additional active key slots are $10/month each.</p>
 
   <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mb-6" style="max-width: 860px;">
     <h2 class="font-semibold mb-3">Generate Key</h2>
-    <div style="display:grid; grid-template-columns:minmax(220px, 1fr) minmax(220px, 1fr) auto; gap:10px; align-items:end;">
+    <div class="ak-generate-grid">
       <div>
         <label class="block text-sm text-gray-500 mb-1">Subdomain</label>
         <input id="akSubdomain" type="text" placeholder="test" class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900" />
@@ -52,7 +122,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
           <option value="157680000" data-months="60">5 years</option>
         </select>
       </div>
-      <button id="akGenerate" type="button" class="px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white" style="height:42px; min-width:130px;">Generate</button>
+      <button id="akGenerate" type="button" class="ak-generate-btn px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white">Generate</button>
     </div>
     <div class="text-xs text-gray-500 mt-2" style="line-height:1.35; max-width:720px;">
       TTL controls how long this key remains valid. After it expires, the subdomain will show Unauthorized until you provide a new key.
@@ -85,8 +155,8 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <div class="flex items-start justify-between gap-3">
         <div>
           <div class="text-lg font-semibold">Serverless Subscription</div>
-          <div id="serverlessUpgradePrice" class="text-sm text-gray-500">$105 / month per additional key</div>
-          <div id="serverlessUpgradeMode" class="text-xs text-gray-500 mt-1">Billing mode: Monthly subscription</div>
+          <div id="serverlessUpgradePrice" class="text-sm text-gray-500">$10 / month per additional key</div>
+          <div id="serverlessUpgradeMode" class="text-xs text-gray-500 mt-1">Billing mode: One-time payment for 1 month</div>
         </div>
         <button id="serverlessUpgradeClose" type="button" class="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700">Close</button>
       </div>
@@ -94,7 +164,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <div class="mt-4 text-sm text-gray-600 dark:text-gray-300">
         <div class="font-semibold mb-2">Benefits</div>
         <ul class="list-disc" style="padding-left:18px;">
-          <li>Create additional web server tunnel keys beyond the free limit</li>
+          <li>Create additional web server tunnel keys beyond the 1 free active key</li>
           <li>Each completed payment adds 1 extra unrevoked key slot for the selected term</li>
           <li>Instant activation after PayPal approval/capture</li>
           <li>Cancel anytime</li>
@@ -119,7 +189,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
       <h2 class="font-semibold">Your Keys</h2>
       <button class="px-3 py-1.5 rounded bg-gray-700 hover:bg-gray-800 text-white" onclick="loadKeys()">Refresh</button>
     </div>
-    <div class="overflow-x-auto">
+    <div class="ak-table-wrap overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="bg-gray-50 dark:bg-gray-700/50">
           <tr>
@@ -237,8 +307,12 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
     if (!el) return;
     const m = Math.max(1, parseInt(String(months || 1), 10) || 1);
     if (mode === 'one_time') {
-      const years = Math.max(1, Math.floor(m / 12));
-      el.textContent = 'Billing mode: One-time payment for ' + years + ' year' + (years > 1 ? 's' : '');
+      if (m < 12) {
+        el.textContent = 'Billing mode: One-time payment for ' + m + ' month' + (m > 1 ? 's' : '');
+      } else {
+        const years = Math.max(1, Math.floor(m / 12));
+        el.textContent = 'Billing mode: One-time payment for ' + years + ' year' + (years > 1 ? 's' : '');
+      }
       return;
     }
     if (m >= 12) {
@@ -297,31 +371,28 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   }
 
   function paymentModeForMonths(months) {
-    // Use one-time payments for 3 years or more.
-    if (months >= 36) return 'one_time';
-    return 'subscription';
+    return 'one_time';
   }
 
   function updateServerlessPriceLabel(months) {
     const el = document.getElementById('serverlessUpgradePrice');
     if (!el) return;
     const m = Math.max(1, parseInt(String(months || 1), 10) || 1);
-    const total = 105 * m;
+    const total = 10 * m;
     if (m === 1) {
-      el.textContent = '$105 / month per additional key';
+      el.textContent = '$10 / month per additional key';
       return;
     }
     if (m >= 36) {
       const years = Math.floor(m / 12);
-      el.textContent = '$105 / month per additional key • one-time payment ($' + total + ' for ' + years + ' years)';
+      el.textContent = '$10 / month per additional key • one-time payment ($' + total + ' for ' + years + ' years)';
       return;
     }
     if (m >= 12) {
-      // Year-based TTLs are billed yearly.
-      el.textContent = '$105 / month per additional key • billed yearly ($1260 / year)';
+      el.textContent = '$10 / month per additional key • billed yearly ($120 / year)';
       return;
     }
-    el.textContent = '$105 / month per additional key • billed for ' + m + ' months ($' + total + ')';
+    el.textContent = '$10 / month per additional key • billed for ' + m + ' months ($' + total + ')';
   }
 
   async function initServerlessPaypalButtons() {
@@ -455,12 +526,12 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
         const actionButtons = [reactivateBtn, revokeBtn, deleteBtn].filter(Boolean).join(' ');
         return `
           <tr>
-            <td class="px-4 py-3 font-mono">${esc(k.subdomain)}</td>
-            <td class="px-4 py-3">${esc(k.created_at)}</td>
-            <td class="px-4 py-3">${esc(k.expires_at || '')}</td>
-            <td class="px-4 py-3">${esc(k.last_used_at || '')}</td>
-            <td class="px-4 py-3">${statusBadge}</td>
-            <td class="px-4 py-3">${actionButtons}</td>
+            <td class="px-4 py-3 font-mono" data-label="Subdomain">${esc(k.subdomain)}</td>
+            <td class="px-4 py-3" data-label="Created">${esc(k.created_at)}</td>
+            <td class="px-4 py-3" data-label="Expires">${esc(k.expires_at || '')}</td>
+            <td class="px-4 py-3" data-label="Last used">${esc(k.last_used_at || '')}</td>
+            <td class="px-4 py-3" data-label="Status">${statusBadge}</td>
+            <td class="px-4 py-3" data-label="Action"><div class="ak-action-wrap">${actionButtons}</div></td>
           </tr>
         `;
       }).join('');
