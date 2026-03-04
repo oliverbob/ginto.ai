@@ -2693,7 +2693,7 @@ class ChatStreamHandler
     {
         $modelId = trim($this->imageGenRaw('IMAGEGEN_MODEL_ID'));
         if ($modelId === '') {
-            return 'Z-image-turbo';
+            return null;
         }
         return $modelId;
     }
@@ -2974,6 +2974,9 @@ class ChatStreamHandler
             ];
         }
 
+        $generationConfig = $this->resolveImageGenerationConfig();
+        $totalSteps = max(1, (int)($generationConfig['num_inference_steps'] ?? 1));
+
         // SDCPU is active — proceed with generation
         $emitProgress = function($progress, $message, $step = null, $totalSteps = null) {
             $data = [
@@ -2987,10 +2990,20 @@ class ChatStreamHandler
             flush();
         };
 
-        $emitProgress(0, 'Connecting to image generation proxy...');
-        $emitProgress(5, 'Proxy connected, preparing image edit request...');
-        
-        $generationConfig = $this->resolveImageGenerationConfig();
+        $emitProgressFromPercent = function(int $progress, string $message) use ($emitProgress, $totalSteps): void {
+            $step = (int)ceil(($progress / 100) * $totalSteps);
+            if ($step < 1) {
+                $step = 1;
+            }
+            if ($step > $totalSteps) {
+                $step = $totalSteps;
+            }
+            $emitProgress($progress, $message, $step, $totalSteps);
+        };
+
+        $emitProgressFromPercent(0, 'Connecting to image generation proxy...');
+        $emitProgressFromPercent(5, 'Proxy connected, preparing image edit request...');
+
         $promptPayload = $this->buildImagePromptPayload($prompt);
         $requestSize = (int)$generationConfig['width'] . 'x' . (int)$generationConfig['height'];
 
@@ -3012,9 +3025,6 @@ class ChatStreamHandler
         }
 
         $modelId = $this->resolveImageGenModelId();
-        if ($modelId === null || trim($modelId) === '') {
-            $modelId = 'Z-image-turbo';
-        }
 
         $baseUrl = rtrim($this->resolveImageGenBaseUrl($sdcpuActive), '/');
         $localRelayBaseUrl = rtrim($this->resolveLocalImageGenTunnelBaseUrl(), '/');
@@ -3028,8 +3038,10 @@ class ChatStreamHandler
             'num_inference_steps' => $generationConfig['num_inference_steps'],
             'guidance_scale' => $generationConfig['guidance_scale'],
             'num_images' => 1,
-            'model' => $modelId,
         ];
+        if (is_string($modelId) && trim($modelId) !== '') {
+            $requestData['model'] = $modelId;
+        }
         if (!empty($promptPayload['negative_prompt'])) {
             $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
         }
@@ -3038,7 +3050,7 @@ class ChatStreamHandler
             $requestData['strength'] = 0.65;
         }
 
-        $emitProgress(25, $isImageEdit ? 'Submitting image edit request...' : 'Submitting image generation request...');
+        $emitProgressFromPercent(25, $isImageEdit ? 'Submitting image edit request...' : 'Submitting image generation request...');
         $finalResult = null;
         $decoded = null;
         $curlError = '';
@@ -3067,7 +3079,7 @@ class ChatStreamHandler
         $finalResult = $callJsonImageApi($sdcpuEndpoint, $requestData);
 
         if ($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url']))) {
-            $emitProgress(35, 'Retrying with compatibility payload...');
+            $emitProgressFromPercent(35, 'Retrying with compatibility payload...');
             $compatPayload = $requestData;
             unset($compatPayload['negative_prompt'], $compatPayload['model'], $compatPayload['num_images']);
             $compatResult = $callJsonImageApi($sdcpuEndpoint, $compatPayload);
@@ -3079,7 +3091,7 @@ class ChatStreamHandler
         if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
             $shouldTryLocalRelay = str_starts_with($baseUrl, 'https://vision.ginto.ai') && $localRelayBaseUrl !== '';
             if ($shouldTryLocalRelay) {
-                $emitProgress(45, 'Retrying through local tunnel relay...');
+                $emitProgressFromPercent(45, 'Retrying through local tunnel relay...');
                 $relayResult = $callJsonImageApi($localRelayBaseUrl . '/api/generate', $requestData);
                 if (is_array($relayResult)) {
                     $finalResult = $relayResult;
@@ -3090,14 +3102,13 @@ class ChatStreamHandler
         if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
             $hasLegacyProxy = $configuredProxyBaseUrl !== '';
             if ($hasLegacyProxy) {
-                $emitProgress(55, 'Retrying via legacy image proxy...');
+                $emitProgressFromPercent(55, 'Retrying via legacy image proxy...');
 
                 $legacyEndpoint = $isImageEdit
                     ? ($configuredProxyBaseUrl . '/v1/images/edits')
                     : ($configuredProxyBaseUrl . '/v1/images/generations');
 
                 $multipartFields = [
-                    'model' => $modelId,
                     'prompt' => $promptPayload['prompt'],
                     'n' => '1',
                     'size' => $requestSize,
@@ -3105,6 +3116,9 @@ class ChatStreamHandler
                     'num_inference_steps' => (string)$generationConfig['num_inference_steps'],
                     'guidance_scale' => (string)$generationConfig['guidance_scale'],
                 ];
+                if (is_string($modelId) && trim($modelId) !== '') {
+                    $multipartFields['model'] = $modelId;
+                }
 
                 if ($isImageEdit && is_string($tmpImagePath) && $tmpImagePath !== '') {
                     $multipartFields['image'] = new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg');
@@ -3147,7 +3161,7 @@ class ChatStreamHandler
             return ['success' => false, 'error' => 'Failed to generate image (' . $debugSummary . ')'];
         }
         
-        $emitProgress(95, 'Saving image...');
+        $emitProgressFromPercent(95, 'Saving image...');
         
         // Save image (filesystem storage located one level above the repo)
         $storageDir = defined('STORAGE_PATH') ? STORAGE_PATH . '/imagegen' : dirname(__DIR__, 2) . '/../storage/imagegen';
@@ -3195,14 +3209,16 @@ class ChatStreamHandler
         
         $webUrl = '/storage/imagegen/' . $outputFile;
         
-        $emitProgress(100, 'Complete!');
+        $emitProgress(100, 'Complete!', $totalSteps, $totalSteps);
         
         return [
             'success' => true,
             'prompt' => $prompt,
             'tunneled' => true,
             'used_source_image' => is_string($sourceImageBase64) && $sourceImageBase64 !== '',
-            'model' => $modelId,
+            'model' => 'Ginto ImageGen 1.0',
+            'image_model' => (is_string($modelId) && trim($modelId) !== '') ? $modelId : (($finalResult['model'] ?? null) ?: 'service-default'),
+            'steps' => $totalSteps,
             'images' => [
                 [
                     'url' => $webUrl,
