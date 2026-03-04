@@ -4899,9 +4899,12 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               const stepLabel = progressContainer.querySelector('.image-gen-step');
               const percentLabel = progressContainer.querySelector('.image-gen-percent');
               
-              if (bar) bar.style.width = (data.progress || 0) + '%';
+              const stepPct = (data.step && data.total_steps)
+                ? Math.round((data.step / data.total_steps) * 100)
+                : (data.progress || 0);
+              if (bar) bar.style.width = stepPct + '%';
               if (status) status.textContent = data.message || '';
-              if (percentLabel) percentLabel.textContent = Math.round(data.progress || 0) + '%';
+              if (percentLabel) percentLabel.textContent = stepPct + '%';
               if (stepLabel && data.step && data.total_steps) {
                 stepLabel.textContent = `Step ${data.step}/${data.total_steps}`;
               }
