@@ -3016,62 +3016,103 @@ class ChatStreamHandler
             $modelId = 'Z-image-turbo';
         }
 
-        $proxyBaseUrl = rtrim((string)($this->imageGenRaw('IMAGEGEN_PROXY_BASE_URL') ?: 'https://az.ginto.ai'), '/');
-        $endpoint = $isImageEdit
-            ? ($proxyBaseUrl . '/v1/images/edits')
-            : ($proxyBaseUrl . '/v1/images/generations');
+        $baseUrl = rtrim($this->resolveImageGenBaseUrl($sdcpuActive), '/');
+        $localRelayBaseUrl = rtrim($this->resolveLocalImageGenTunnelBaseUrl(), '/');
+        $configuredProxyBaseUrl = rtrim((string)$this->imageGenRaw('IMAGEGEN_PROXY_BASE_URL'), '/');
+        $sdcpuEndpoint = $baseUrl . '/api/generate';
 
-        $multipartFields = [
-            'model' => $modelId,
+        $requestData = [
             'prompt' => $promptPayload['prompt'],
-            'n' => '1',
-            'size' => $requestSize,
-            'response_format' => 'b64_json',
-            'num_inference_steps' => (string)$generationConfig['num_inference_steps'],
-            'guidance_scale' => (string)$generationConfig['guidance_scale'],
+            'width' => $generationConfig['width'],
+            'height' => $generationConfig['height'],
+            'num_inference_steps' => $generationConfig['num_inference_steps'],
+            'guidance_scale' => $generationConfig['guidance_scale'],
+            'num_images' => 1,
+            'model' => $modelId,
         ];
-        if ($isImageEdit && is_string($tmpImagePath) && $tmpImagePath !== '') {
-            $multipartFields['image'] = new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg');
-            $multipartFields['strength'] = '0.65';
+        if (!empty($promptPayload['negative_prompt'])) {
+            $requestData['negative_prompt'] = $promptPayload['negative_prompt'];
         }
-        
-        // Send multipart edit request to OpenAI-compatible proxy endpoint.
+        if ($isImageEdit && is_string($sourceImageBase64) && $sourceImageBase64 !== '') {
+            $requestData['init_image'] = $sourceImageBase64;
+            $requestData['strength'] = 0.65;
+        }
+
         $emitProgress(25, $isImageEdit ? 'Submitting image edit request...' : 'Submitting image generation request...');
-        $ch = curl_init($endpoint);
         $finalResult = null;
-        
-        curl_setopt_array($ch, [
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $multipartFields,
-            CURLOPT_HTTPHEADER => ['Accept: application/json'],
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 120,
-            CURLOPT_CONNECTTIMEOUT => 10,
-        ]);
-        
-        $response = curl_exec($ch);
-        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = (string)curl_error($ch);
-        curl_close($ch);
-        if (is_string($tmpImagePath) && $tmpImagePath !== '') {
-            @unlink($tmpImagePath);
+        $decoded = null;
+        $curlError = '';
+        $httpCode = 0;
+
+        $callJsonImageApi = function(string $endpoint, array $payload) use (&$curlError, &$httpCode, &$decoded): ?array {
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode($payload),
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 120,
+                CURLOPT_CONNECTTIMEOUT => 10,
+            ]);
+
+            $response = curl_exec($ch);
+            $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $curlError = (string)curl_error($ch);
+            curl_close($ch);
+
+            $decoded = @json_decode((string)$response, true);
+            return is_array($decoded) ? $this->normalizeImageGenResult($decoded) : null;
+        };
+
+        $finalResult = $callJsonImageApi($sdcpuEndpoint, $requestData);
+
+        if ($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url']))) {
+            $emitProgress(35, 'Retrying with compatibility payload...');
+            $compatPayload = $requestData;
+            unset($compatPayload['negative_prompt'], $compatPayload['model'], $compatPayload['num_images']);
+            $compatResult = $callJsonImageApi($sdcpuEndpoint, $compatPayload);
+            if (is_array($compatResult)) {
+                $finalResult = $compatResult;
+            }
         }
 
-        $decoded = @json_decode((string)$response, true);
-        $finalResult = $this->normalizeImageGenResult(is_array($decoded) ? $decoded : null);
-
-        // Retry once requesting URL response when b64_json isn't available.
         if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
-            $emitProgress(35, 'Retrying with URL response format...');
-            $multipartFields['response_format'] = 'url';
-
-            $tmpImagePath2 = @tempnam(sys_get_temp_dir(), 'imgedit_');
-            if (!$isImageEdit || (is_string($tmpImagePath2) && $tmpImagePath2 !== '' && is_string($sourceImageBinary) && @file_put_contents($tmpImagePath2, $sourceImageBinary) !== false)) {
-                if ($isImageEdit) {
-                    $multipartFields['image'] = new \CURLFile($tmpImagePath2, 'image/jpeg', 'input.jpg');
+            $shouldTryLocalRelay = str_starts_with($baseUrl, 'https://vision.ginto.ai') && $localRelayBaseUrl !== '';
+            if ($shouldTryLocalRelay) {
+                $emitProgress(45, 'Retrying through local tunnel relay...');
+                $relayResult = $callJsonImageApi($localRelayBaseUrl . '/api/generate', $requestData);
+                if (is_array($relayResult)) {
+                    $finalResult = $relayResult;
                 }
-                $retry = curl_init($endpoint);
-                curl_setopt_array($retry, [
+            }
+        }
+
+        if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
+            $hasLegacyProxy = $configuredProxyBaseUrl !== '';
+            if ($hasLegacyProxy) {
+                $emitProgress(55, 'Retrying via legacy image proxy...');
+
+                $legacyEndpoint = $isImageEdit
+                    ? ($configuredProxyBaseUrl . '/v1/images/edits')
+                    : ($configuredProxyBaseUrl . '/v1/images/generations');
+
+                $multipartFields = [
+                    'model' => $modelId,
+                    'prompt' => $promptPayload['prompt'],
+                    'n' => '1',
+                    'size' => $requestSize,
+                    'response_format' => 'b64_json',
+                    'num_inference_steps' => (string)$generationConfig['num_inference_steps'],
+                    'guidance_scale' => (string)$generationConfig['guidance_scale'],
+                ];
+
+                if ($isImageEdit && is_string($tmpImagePath) && $tmpImagePath !== '') {
+                    $multipartFields['image'] = new \CURLFile($tmpImagePath, 'image/jpeg', 'input.jpg');
+                    $multipartFields['strength'] = '0.65';
+                }
+
+                $legacyCh = curl_init($legacyEndpoint);
+                curl_setopt_array($legacyCh, [
                     CURLOPT_POST => true,
                     CURLOPT_POSTFIELDS => $multipartFields,
                     CURLOPT_HTTPHEADER => ['Accept: application/json'],
@@ -3079,25 +3120,23 @@ class ChatStreamHandler
                     CURLOPT_TIMEOUT => 120,
                     CURLOPT_CONNECTTIMEOUT => 10,
                 ]);
-                $retryResponse = curl_exec($retry);
-                $retryHttpCode = (int)curl_getinfo($retry, CURLINFO_HTTP_CODE);
-                $retryErr = (string)curl_error($retry);
-                curl_close($retry);
-                if (is_string($tmpImagePath2) && $tmpImagePath2 !== '') {
-                    @unlink($tmpImagePath2);
-                }
 
-                if ($retryErr === '' && $retryHttpCode >= 200 && $retryHttpCode < 300) {
-                    $retryDecoded = @json_decode((string)$retryResponse, true);
-                    $retryResult = $this->normalizeImageGenResult(is_array($retryDecoded) ? $retryDecoded : null);
-                    if (is_array($retryResult)) {
-                        $finalResult = $retryResult;
-                        $decoded = is_array($retryDecoded) ? $retryDecoded : $decoded;
-                        $curlError = '';
-                        $httpCode = $retryHttpCode;
-                    }
+                $legacyResponse = curl_exec($legacyCh);
+                $httpCode = (int)curl_getinfo($legacyCh, CURLINFO_HTTP_CODE);
+                $curlError = (string)curl_error($legacyCh);
+                curl_close($legacyCh);
+
+                $decodedLegacy = @json_decode((string)$legacyResponse, true);
+                $legacyResult = $this->normalizeImageGenResult(is_array($decodedLegacy) ? $decodedLegacy : null);
+                if (is_array($legacyResult)) {
+                    $finalResult = $legacyResult;
+                    $decoded = is_array($decodedLegacy) ? $decodedLegacy : $decoded;
                 }
             }
+        }
+
+        if (is_string($tmpImagePath) && $tmpImagePath !== '') {
+            @unlink($tmpImagePath);
         }
         
         if (!$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url']))) {
