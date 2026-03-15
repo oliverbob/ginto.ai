@@ -856,6 +856,7 @@ try {
               <div class="tier-card p-6 relative" data-tier-id="4" data-tier-name="Gold" 
                    data-tier-first-php="10000" data-tier-first-usd="199" 
                    data-tier-recurring-php="10000" data-tier-recurring-usd="199">
+                <img src="/assets/images/gold-solar.png" alt="Gold Solar Package" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
                 <div class="tier-badge" style="background: linear-gradient(135deg, var(--accent-500), var(--accent-600));">Gold</div>
                 <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Gold</h4>
                 <p class="mb-4" style="color: var(--text-secondary);">Advanced package for serious earners.</p>
