@@ -885,6 +885,7 @@ try {
               <div class="tier-card p-6 relative" data-tier-id="5" data-tier-name="Platinum" 
                    data-tier-first-php="50000" data-tier-first-usd="999" 
                    data-tier-recurring-php="50000" data-tier-recurring-usd="999">
+                <img src="/assets/images/solar.png" alt="Solar System Deployment" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
                 <div class="tier-badge" style="background: linear-gradient(135deg, #E5E4E2, #B0C4DE);">Platinum</div>
                 <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Platinum</h4>
                 <p class="mb-4" style="color: var(--text-secondary);">Top-tier package with VIP treatment.</p>
