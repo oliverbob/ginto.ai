@@ -823,6 +823,7 @@ try {
             <div class="tier-card p-6 relative" data-tier-id="3" data-tier-name="Executive" 
                  data-tier-first-php="5000" data-tier-first-usd="99" 
                  data-tier-recurring-php="5000" data-tier-recurring-usd="99">
+              <img src="/assets/images/smartfi.png" alt="SmartFi Device" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
               <div class="tier-badge">Elite</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Executive</h4>
               <p class="mb-4" style="color: var(--text-secondary);">Maximum earning potential with elite training.</p>
@@ -833,6 +834,8 @@ try {
                 </div>
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One SmartFi 360 Device every 3 months of subscription</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> SmartFi Masterclass</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to all 8 levels</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Elite training program</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Personal mentor</li>
