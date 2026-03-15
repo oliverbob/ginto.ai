@@ -795,6 +795,7 @@ try {
             <div class="tier-card p-6 relative" data-tier-id="2" data-tier-name="Professional" 
                  data-tier-first-php="1000" data-tier-first-usd="20" 
                  data-tier-recurring-php="1000" data-tier-recurring-usd="20">
+              <img src="/assets/images/build-pro.png" alt="Build Pro Package" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
               <div class="tier-badge">Recommended</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Professional</h4>
               <p class="mb-4" style="color: var(--text-secondary);">For serious earners with advanced training.</p>
@@ -805,6 +806,8 @@ try {
                 </div>
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Build Pro kit given free every 6 months</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Optional P3000.00 (PH only) for the multivitamin kit</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to Level 1-6 commissions</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced training</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Marketing materials</li>
