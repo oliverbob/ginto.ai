@@ -870,7 +870,8 @@ try {
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Hands on tutorial for solar panel installation</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to 5 tier system</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced Multi-Tier Business Framework</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Subdomain & Trainee Tech Support</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Subdomain</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Trinee Tech Support</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Premium AI tools</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Custom business backend</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Serverless Premium Hands on</li>
