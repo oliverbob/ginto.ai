@@ -895,11 +895,21 @@ try {
                   </div>
                 </div>
                 <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Personal onboarding</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> VIP events & mentorship</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Marketing concierge</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Full AI suite access</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Ginto subdomain</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Staggered full solar system deployment</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Ginto Decentralized Datacenter Masterclass</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> VIP events, mentorship and tech workshops</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Ginto Serverless Hyperscaling</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Ginto Multi-tier concierge server farm framework</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Full AI suite early access and latest updates</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Inclusion to AI dev community</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Offline AI Home Framework</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Market share to 10km radius</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Managed Serverless Mall</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Ginto Marketplace Listing (with KYC)</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Ginto subdomain + one fully available domain</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Scalable hyperscaler infrastructure</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free access to up to 50% of Ginto AI Farm power</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Full Tech Support</li>
                 </ul>
                 <button type="button" class="w-full font-semibold py-2 px-4 rounded-lg transition-colors select-tier" style="background-color: var(--bg-secondary); color: var(--primary-500); border: 1px solid var(--primary-500);">
                   Select Plan
