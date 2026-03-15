@@ -30,6 +30,31 @@ $envFileExists = file_exists(ROOT_PATH . '/.env');
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($requestUri, PHP_URL_PATH);
 
+// CORS: Allow *.ginto.ai subdomains and local dev origins to call API endpoints directly.
+// This enables the gntl codex frontend to call /api and /api/code-token cross-origin without
+// routing inference streams back through the frp tunnel.
+$_gntl_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (
+    $_gntl_origin
+    && (
+        preg_match('#^https://[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.ginto\.ai$#', $_gntl_origin)
+        || preg_match('#^https?://localhost(?::\d{1,5})?$#', $_gntl_origin)
+        || preg_match('#^https?://127\.0\.0\.1(?::\d{1,5})?$#', $_gntl_origin)
+    )
+) {
+    header('Access-Control-Allow-Origin: ' . $_gntl_origin);
+    header('Access-Control-Allow-Credentials: true');
+    header('Vary: Origin');
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, Accept');
+        header('Access-Control-Max-Age: 86400');
+        http_response_code(204);
+        exit;
+    }
+}
+unset($_gntl_origin);
+
 // V2 Install Flow: /live is accessible when .installed is missing (setup mode)
 // No auto-redirect - users see /chat first (hook them with UI), click Live manually when ready
 if (!$installedMarkerExists) {

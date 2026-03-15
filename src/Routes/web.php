@@ -36,6 +36,53 @@ $router->req('/api/debug/ip-headers', 'DebugController@ipHeaders');
 // Simple PHP-based API endpoints (replacement for saichat/nodejs API)
 $router->get('/api', 'ApiController@index');
 $router->post('/api', 'ApiController@post');
+
+// CSRF + session bootstrap for cross-origin callers (gntl and other *.ginto.ai submodules).
+// Returns a one-hour CSRF token and re-issues the session cookie with SameSite=None so the
+// browser can include it in cross-origin POSTs to /api without routing through the frp tunnel.
+$router->get('/api/code-token', function() {
+    if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+    $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+
+    // Re-issue the session cookie with SameSite=None; Secure so the browser can send it
+    // in cross-origin fetch requests (credentials:'include') from *.ginto.ai subdomains.
+    if ($isSecure) {
+        $lifetime = 3600;
+        if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+            setcookie(session_name(), session_id(), [
+                'expires'  => time() + $lifetime,
+                'path'     => '/',
+                'domain'   => '.ginto.ai',
+                'secure'   => true,
+                'httponly' => true,
+                'samesite' => 'None',
+            ]);
+        } else {
+            header(
+                'Set-Cookie: ' . session_name() . '=' . rawurlencode(session_id())
+                . '; Path=/; Domain=.ginto.ai; Expires=' . gmdate('D, d-M-Y H:i:s T', time() + $lifetime)
+                . '; Secure; HttpOnly; SameSite=None',
+                false
+            );
+        }
+    }
+
+    $csrf = function_exists('generateCsrfToken') ? generateCsrfToken(true) : '';
+    if ($csrf === '' && !empty($_SESSION['csrf_token'])) {
+        $csrf = $_SESSION['csrf_token'];
+    }
+    if ($csrf === '') {
+        try { $csrf = bin2hex(random_bytes(32)); } catch (\Throwable $_) { $csrf = md5(uniqid('', true)); }
+        $_SESSION['csrf_token'] = $csrf;
+    }
+
+    header('Content-Type: application/json');
+    header('Cache-Control: no-store');
+    echo json_encode(['csrf_token' => $csrf]);
+    exit;
+});
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');

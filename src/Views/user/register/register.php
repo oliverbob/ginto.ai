@@ -866,11 +866,15 @@ try {
                   </div>
                 </div>
                 <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to all 8 levels</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Elite marketing kit</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Dedicated support</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One piece of solar panel (Free)</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Hands on tutorial for solar panel installation</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to 5 tier system</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced Multi-Tier Business Framework</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Subdomain & Trainee Tech Support</li>
                   <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Premium AI tools</li>
-                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Custom backend</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Custom business backend</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Serverless Premium Hands on</li>
+                  <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Proprietary Serverless Backend Training Technology Certification program</li>
                 </ul>
                 <button type="button" class="w-full font-semibold py-2 px-4 rounded-lg transition-colors select-tier" style="background-color: var(--bg-secondary); color: var(--primary-500); border: 1px solid var(--primary-500);">
                   Select Plan
