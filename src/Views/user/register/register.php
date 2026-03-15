@@ -851,7 +851,7 @@ try {
 
           <!-- Premium Tiers -->
           <div class="pt-8 mb-8" style="border-top: 1px solid var(--border-color);">
-            <h4 class="text-xl font-bold mb-6 text-center" style="color: var(--text-primary);">Premium Packages</h4>
+            <h4 class="text-xl font-bold mb-6 text-center" style="color: var(--text-primary);">Premium Packages (Ginto AI Proprietary Datacenter Technology)</h4>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div class="tier-card p-6 relative" data-tier-id="4" data-tier-name="Gold" 
                    data-tier-first-php="10000" data-tier-first-usd="199" 
