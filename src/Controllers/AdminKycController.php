@@ -30,7 +30,8 @@ class AdminKycController extends \Core\Controller
             $k['_user'] = $u ?: null;
         }
         unset($k);
-        return $this->view('admin/kyc_list', ['kycs' => $kycs]);
+        $csrf = generateCsrfToken();
+        return $this->view('admin/kyc_list', ['kycs' => $kycs, 'csrf_token' => $csrf]);
     }
 
     public function review($id = null)

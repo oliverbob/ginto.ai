@@ -41,6 +41,9 @@ $ICON_DEFAULTS = [
     // Payments / Finance
     '/admin/payments' => 'text-amber-500 dark:text-amber-400',
     
+    // KYC Submissions
+    '/admin/kyc' => 'text-orange-500 dark:text-orange-400',
+
     // Database Migrations
     '/admin/migrate' => 'text-green-500 dark:text-green-400',
 
@@ -82,6 +85,8 @@ $ICON_DEFAULT_HEX = [
     
     '/admin/payments' => '#f59e0b',    // amber-500
     
+    '/admin/kyc' => '#f97316',          // orange-500
+
     '/admin/migrate' => '#22c55e',     // green-500
 
     '/admin/notifications' => '#fb7185',

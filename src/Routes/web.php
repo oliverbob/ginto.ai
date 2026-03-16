@@ -1238,6 +1238,37 @@ $router->req('/marketplace/sellers/products/update/{id}', 'SellerController@prod
 $router->req('/admin/kyc', 'AdminKycController@index');
 $router->req('/admin/kyc/review/{id}', 'AdminKycController@review', ['POST']);
 
+// KYC document file serving — admin-only, prevents direct public access to STORAGE_PATH
+$router->req('/storage/kyc/{userId}/{filename}', function($userId, $filename) {
+    // Must be logged-in admin
+    if (empty($_SESSION['user_id'])) { http_response_code(401); exit; }
+    if (!defined('IS_ADMIN') || !IS_ADMIN) { http_response_code(403); exit; }
+    $userId   = preg_replace('/[^0-9]/', '', $userId);
+    $filename = basename($filename);
+    if (!$userId || !preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,6}$/', $filename)) {
+        http_response_code(400); exit;
+    }
+    $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(dirname(dirname(__FILE__))) . '/../storage';
+    $fullPath    = $storagePath . '/kyc/' . $userId . '/' . $filename;
+    // Ensure path stays within the kyc folder (no traversal)
+    $realBase = realpath($storagePath . '/kyc/');
+    $realFull = realpath($fullPath);
+    if (!$realFull || !$realBase || strpos($realFull, $realBase) !== 0) {
+        http_response_code(403); exit;
+    }
+    if (!is_file($realFull)) { http_response_code(404); exit; }
+    $ext  = strtolower(pathinfo($realFull, PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+             'gif' => 'image/gif', 'webp' => 'image/webp', 'pdf' => 'application/pdf',
+             'bmp' => 'image/bmp', 'avif' => 'image/avif'][$ext] ?? null;
+    if (!$mime) { http_response_code(403); exit; }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($realFull));
+    header('Cache-Control: private, no-store');
+    readfile($realFull);
+    exit;
+});
+
 // Mall image serving — PHP proxies files from storage/mall/images (outside web root).
 // Product images are publicly accessible (no login required).
 $router->req('/storage/mall/images/{filename}', function($filename) {

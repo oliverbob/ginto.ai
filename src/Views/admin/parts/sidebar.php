@@ -204,6 +204,14 @@ $activeClass = function($path) use ($currentPath) {
             <span class="font-medium">Media</span>
         </a>
         
+        <!-- KYC Submissions -->
+        <a href="/admin/kyc" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/kyc') ?> <?= activeIconClass('/admin/kyc') ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 <?= iconClassForAdmin('/admin/kyc') ?>" <?= iconStyleForAdmin('/admin/kyc') ?>>
+                <rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="13" y2="13"/><circle cx="17" cy="16" r="3"/><path d="m19 18-1.5-1.5"/>
+            </svg>
+            <span class="font-medium">KYC Submissions</span>
+        </a>
+
         <!-- Users Management (picker button inserted by client-side script) -->
         <a href="/admin/users" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/users') ?> <?= activeIconClass('/admin/users') ?>">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 <?= iconClassForAdmin('/admin/users') ?>" <?= iconStyleForAdmin('/admin/users') ?>>
