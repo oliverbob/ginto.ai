@@ -46,12 +46,15 @@ try {
       </svg>
     </button>
     <?php if ($isLoggedIn || $isAdmin): ?>
-    <button id="model-selector-btn-mobile" class="model-replace-on-tiny flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer inline-flex flex-1 min-w-0 justify-start overflow-hidden max-w-[350px]" aria-haspopup="true" aria-expanded="false">
-      <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="mobile-model-status-dot" aria-hidden="true"></div>
-      <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate min-w-0" id="mobile-model-name" title="Ginto AI">Ginto AI</span>
-      <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+    <button id="model-selector-btn-mobile" class="model-replace-on-tiny flex items-center justify-center p-1.5 h-8 w-8 flex-shrink-0 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer" aria-haspopup="true" aria-expanded="false" title="Select AI model">
+      <!-- Brain icon -->
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9.5 2a2.5 2.5 0 0 1 2.45 2H13a4 4 0 0 1 4 4v.5A2.5 2.5 0 0 1 19.5 11v1a2.5 2.5 0 0 1-1.5 2.28V15a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4v-.72A2.5 2.5 0 0 1 4.5 12v-1A2.5 2.5 0 0 1 7 8.5V8a4 4 0 0 1 4-4h.05A2.5 2.5 0 0 1 9.5 2z"/>
+        <path d="M12 8v4m0 0-2 2m2-2 2 2"/>
       </svg>
+      <!-- Hidden span keeps JS model-name updates working without breaking -->
+      <span class="sr-only" id="mobile-model-name">Ginto AI</span>
+      <div class="hidden" id="mobile-model-status-dot" aria-hidden="true"></div>
     </button>
     <!-- Mobile dropdown (hidden by default) -->
     <div id="model-dropdown-mobile" class="hidden fixed top-12 mx-0 w-auto max-w-[350px] bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[50vh] overflow-hidden flex flex-col" style="left:5px; right:5px; max-width: calc(100vw - 10px);">
