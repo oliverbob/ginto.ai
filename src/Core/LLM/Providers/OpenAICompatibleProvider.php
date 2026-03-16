@@ -79,6 +79,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
             'meta-llama/llama-4-scout-17b-16e-instruct',
             'meta-llama/llama-4-maverick-17b-128e-instruct',
             'moonshotai/kimi-k2-instruct-0905',
+            'openai/gpt-oss-120b',
             // Vision models
             'llama-3.2-11b-vision-preview',
             'llama-3.2-90b-vision-preview',
@@ -104,6 +105,22 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         'local' => [
             'ginto-default',  // Ginto AI - Default (auto-selects vision/reason based on request)
         ],
+    ];
+
+    /**
+     * Per-provider/model maximum INPUT token budgets.
+     * 0 = no enforced limit.
+     * These values prevent hitting provider TPM/context hard limits.
+     * 
+     * Groq free-tier "on_demand" service tier has very low per-model TPM limits.
+     * A single request whose input token count exceeds that limit will be rejected.
+     */
+    protected static array $inputTokenBudgets = [
+        'groq' => [
+            'openai/gpt-oss-120b' => 7000,  // Free tier: 8 000 TPM — leave ~1 000 for output
+            'default'             => 0,      // Other Groq models have much higher TPM
+        ],
+        'default' => 0,
     ];
 
     public function __construct(string $provider = 'openai', array $config = [])
@@ -266,6 +283,17 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
      */
     protected function ensurePayloadWithinLimit(array &$payload): void
     {
+        // ── Token-budget enforcement (for low-TPM models, e.g. Groq free tier) ──
+        if (!empty($payload['messages'])) {
+            $tokenBudget = $this->getInputTokenBudget($payload['model'] ?? '');
+            if ($tokenBudget > 0) {
+                $estimated = self::estimateInputTokens($payload['messages']);
+                if ($estimated > $tokenBudget) {
+                    $this->truncateToTokenBudget($payload['messages'], $tokenBudget);
+                }
+            }
+        }
+
         // Default payload byte limit (can be overridden via env)
         $defaultLimit = 512000; // 512KB
         $envKey = strtoupper($this->providerName) . '_PAYLOAD_MAX_BYTES';
@@ -343,6 +371,81 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
                     $payload['messages'][$i]['content'] = mb_substr($msg['content'], -500); // keep last 500 chars
                 }
             }
+        }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Token-budget helpers
+    // ──────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Return the max allowed INPUT token count for the given model on this provider.
+     * Returns 0 when no limit should be enforced.
+     */
+    protected function getInputTokenBudget(string $model): int
+    {
+        $providerBudgets = static::$inputTokenBudgets[$this->providerName] ?? [];
+        if (isset($providerBudgets[$model])) {
+            return (int)$providerBudgets[$model];
+        }
+        $default = $providerBudgets['default'] ?? (static::$inputTokenBudgets['default'] ?? 0);
+        return (int)$default;
+    }
+
+    /**
+     * Rough token estimate for an array of chat messages.
+     * Uses the common "1 token ≈ 4 characters" heuristic plus a small per-message overhead.
+     */
+    private static function estimateInputTokens(array $messages): int
+    {
+        $total = 0;
+        foreach ($messages as $msg) {
+            $content = $msg['content'] ?? '';
+            $text    = is_string($content) ? $content : (string)json_encode($content);
+            $total  += (int)ceil(mb_strlen($text) / 4) + 4; // 4-token overhead per message
+        }
+        return $total;
+    }
+
+    /**
+     * Trim $messages so that estimateInputTokens() ≤ $tokenBudget.
+     *
+     * Strategy (in order):
+     *  1. Truncate system-message content from the END (less critical info lives there).
+     *  2. If still over budget, drop the oldest non-system messages.
+     */
+    private function truncateToTokenBudget(array &$messages, int $tokenBudget): void
+    {
+        // Phase 1 — shorten system messages (keep at least 400 tokens of core context)
+        $minSystemTokens = 400;
+        foreach ($messages as $i => &$msg) {
+            if (($msg['role'] ?? '') !== 'system' || !is_string($msg['content'])) {
+                continue;
+            }
+            $estimated = self::estimateInputTokens($messages);
+            if ($estimated <= $tokenBudget) {
+                break;
+            }
+            $currentChars  = mb_strlen($msg['content']);
+            $excess        = $estimated - $tokenBudget;
+            $trimChars     = min($currentChars - ($minSystemTokens * 4), $excess * 4);
+            if ($trimChars > 0) {
+                $msg['content'] = mb_substr($msg['content'], 0, $currentChars - $trimChars)
+                    . "\n[System context trimmed to fit model token limit]";
+            }
+        }
+        unset($msg);
+
+        // Phase 2 — drop oldest non-system messages if still over budget
+        $estimated = self::estimateInputTokens($messages);
+        if ($estimated > $tokenBudget) {
+            $systemMessages = array_values(array_filter($messages, fn($m) => ($m['role'] ?? '') === 'system'));
+            $otherMessages  = array_values(array_filter($messages, fn($m) => ($m['role'] ?? '') !== 'system'));
+            // Keep at minimum the last user message
+            while (count($otherMessages) > 1 && self::estimateInputTokens(array_merge($systemMessages, $otherMessages)) > $tokenBudget) {
+                array_shift($otherMessages);
+            }
+            $messages = array_merge($systemMessages, $otherMessages);
         }
     }
 
