@@ -771,9 +771,8 @@ try {
               <div class="mb-4">
                 <div class="tier-price-display" style="color: var(--primary-500);">
                   <span class="text-3xl font-extrabold first-month-price">₱250</span>
-                  <span class="text-sm font-medium" style="color: var(--text-secondary);"> first month</span>
+                  <span class="text-sm font-medium" style="color: var(--text-secondary);"> /month</span>
                 </div>
-                <div class="text-sm recurring-price" style="color: var(--text-secondary);">then <span class="font-semibold" style="color: var(--primary-500);">₱150</span>/month</div>
                 <div class="mt-1 promo-badge-container">
                   <span class="px-2 py-1 text-xs font-bold rounded-full" style="background: linear-gradient(135deg, #ff6a00, #ffe53b); color: #fff;">INCLUDES ₱100 PROMO FEE</span>
                 </div>
