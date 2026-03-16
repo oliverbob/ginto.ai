@@ -39,11 +39,23 @@ class SellerController extends \Core\Controller
         if (!validateCsrfToken($token)) { http_response_code(400); echo 'Invalid CSRF token'; return; }
 
         $userId = (int)$_SESSION['user_id'];
-        $first = trim($_POST['first_name'] ?? '');
-        $last = trim($_POST['last_name'] ?? '');
-        $dob = trim($_POST['dob'] ?? null);
-        $country = trim($_POST['country'] ?? null);
-        $identifier = trim($_POST['identifier'] ?? null);
+        $first         = trim($_POST['first_name']      ?? '');
+        $middleName    = trim($_POST['middle_name']     ?? '');
+        $last          = trim($_POST['last_name']       ?? '');
+        $dob           = trim($_POST['dob']             ?? '');
+        $placeOfBirth  = trim($_POST['place_of_birth']  ?? '');
+        $nationality   = trim($_POST['nationality']     ?? '');
+        $country       = trim($_POST['country']         ?? '');
+        $phone         = trim($_POST['phone']           ?? '');
+        $addressStreet = trim($_POST['address_street']  ?? '');
+        $addressCity   = trim($_POST['address_city']    ?? '');
+        $addressProv   = trim($_POST['address_province'] ?? '');
+        $addressZip    = trim($_POST['address_zip']     ?? '');
+        $tin           = trim($_POST['tin']             ?? '');
+        $idType        = trim($_POST['id_type']         ?? '');
+        $identifier    = trim($_POST['identifier']      ?? '');
+        $businessName  = trim($_POST['business_name']   ?? '');
+        $businessReg   = trim($_POST['business_reg']    ?? '');
 
         // Handle uploaded documents
         $docs = [];
@@ -62,15 +74,27 @@ class SellerController extends \Core\Controller
         }
 
         $payload = [
-            'user_id' => $userId,
-            'first_name' => $first ?: null,
-            'last_name' => $last ?: null,
-            'dob' => $dob ?: null,
-            'country' => $country ?: null,
-            'identifier' => $identifier ?: null,
-            'documents' => !empty($docs) ? json_encode($docs) : null,
-            'submitted_at' => date('Y-m-d H:i:s'),
-            'status' => 'pending'
+            'user_id'          => $userId,
+            'first_name'       => $first ?: null,
+            'middle_name'      => $middleName ?: null,
+            'last_name'        => $last ?: null,
+            'dob'              => $dob ?: null,
+            'place_of_birth'   => $placeOfBirth ?: null,
+            'nationality'      => $nationality ?: null,
+            'country'          => $country ?: null,
+            'phone'            => $phone ?: null,
+            'address_street'   => $addressStreet ?: null,
+            'address_city'     => $addressCity ?: null,
+            'address_province' => $addressProv ?: null,
+            'address_zip'      => $addressZip ?: null,
+            'tin'              => $tin ?: null,
+            'id_type'          => $idType ?: null,
+            'identifier'       => $identifier ?: null,
+            'documents'        => !empty($docs) ? json_encode($docs) : null,
+            'business_name'    => $businessName ?: null,
+            'business_reg'     => $businessReg ?: null,
+            'submitted_at'     => date('Y-m-d H:i:s'),
+            'status'           => 'pending',
         ];
 
         $existing = $this->db->get('kyc_profiles', 'id', ['user_id' => $userId]);

@@ -374,33 +374,112 @@ details summary::-webkit-details-marker { display: none; }
                 <h2 class="kyc-card-title">Personal Information</h2>
             </div>
             <div class="kyc-card-body">
+                <!-- Row 1: First / Middle / Last -->
                 <div class="form-grid-2" style="margin-bottom:14px">
                     <div class="form-group">
                         <label class="form-label" for="kyc-first">First Name <span class="req" aria-hidden="true">*</span></label>
                         <input class="form-input" id="kyc-first" type="text" name="first_name" required
-                            placeholder="John"
+                            placeholder="e.g. Juan"
                             value="<?= htmlspecialchars($kyc['first_name'] ?? '') ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="kyc-last">Last Name <span class="req" aria-hidden="true">*</span></label>
+                        <label class="form-label" for="kyc-middle">Middle Name</label>
+                        <input class="form-input" id="kyc-middle" type="text" name="middle_name"
+                            placeholder="e.g. Santos (or N/A)"
+                            value="<?= htmlspecialchars($kyc['middle_name'] ?? '') ?>">
+                    </div>
+                </div>
+                <!-- Row 2: Last name / DOB -->
+                <div class="form-grid-2" style="margin-bottom:14px">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-last">Last Name / Surname <span class="req" aria-hidden="true">*</span></label>
                         <input class="form-input" id="kyc-last" type="text" name="last_name" required
-                            placeholder="Doe"
+                            placeholder="e.g. dela Cruz"
                             value="<?= htmlspecialchars($kyc['last_name'] ?? '') ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-dob">Date of Birth <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-dob" type="date" name="dob" required
+                            value="<?= htmlspecialchars($kyc['dob'] ?? '') ?>">
+                    </div>
+                </div>
+                <!-- Row 3: Place of birth / Nationality -->
+                <div class="form-grid-2" style="margin-bottom:14px">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-pob">Place of Birth <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-pob" type="text" name="place_of_birth" required
+                            placeholder="e.g. Quezon City, Metro Manila"
+                            value="<?= htmlspecialchars($kyc['place_of_birth'] ?? '') ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-nationality">Nationality <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-nationality" type="text" name="nationality" required
+                            placeholder="e.g. Filipino"
+                            value="<?= htmlspecialchars($kyc['nationality'] ?? 'Filipino') ?>">
+                    </div>
+                </div>
+                <!-- Row 4: Mobile / TIN -->
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-phone">Mobile Number <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-phone" type="tel" name="phone" required
+                            placeholder="e.g. 09171234567"
+                            value="<?= htmlspecialchars($kyc['phone'] ?? '') ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-tin">TIN (Tax ID Number) <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-tin" type="text" name="tin" required
+                            placeholder="e.g. 123-456-789-000"
+                            value="<?= htmlspecialchars($kyc['tin'] ?? '') ?>">
+                        <div class="form-hint">Required by BIR for online sellers (RMC 60-2020).</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Address -->
+        <div class="kyc-card">
+            <div class="kyc-card-header">
+                <div class="kyc-card-icon">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                </div>
+                <h2 class="kyc-card-title">Home Address</h2>
+            </div>
+            <div class="kyc-card-body">
+                <div class="form-group" style="margin-bottom:14px">
+                    <label class="form-label" for="kyc-street">Street Address / Barangay <span class="req" aria-hidden="true">*</span></label>
+                    <input class="form-input" id="kyc-street" type="text" name="address_street" required
+                        placeholder="e.g. 123 Rizal St., Brgy. Poblacion"
+                        value="<?= htmlspecialchars($kyc['address_street'] ?? '') ?>">
+                </div>
+                <div class="form-grid-2" style="margin-bottom:14px">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-city">City / Municipality <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-city" type="text" name="address_city" required
+                            placeholder="e.g. Makati City"
+                            value="<?= htmlspecialchars($kyc['address_city'] ?? '') ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-province">Province / Region <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-province" type="text" name="address_province" required
+                            placeholder="e.g. Metro Manila"
+                            value="<?= htmlspecialchars($kyc['address_province'] ?? '') ?>">
                     </div>
                 </div>
                 <div class="form-grid-2">
                     <div class="form-group">
-                        <label class="form-label" for="kyc-dob">Date of Birth</label>
-                        <input class="form-input" id="kyc-dob" type="date" name="dob"
-                            value="<?= htmlspecialchars($kyc['dob'] ?? '') ?>">
+                        <label class="form-label" for="kyc-zip">ZIP Code</label>
+                        <input class="form-input" id="kyc-zip" type="text" name="address_zip"
+                            placeholder="e.g. 1200"
+                            value="<?= htmlspecialchars($kyc['address_zip'] ?? '') ?>">
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="kyc-country">Country</label>
-                        <select class="form-input" id="kyc-country" name="country">
+                        <label class="form-label" for="kyc-country">Country <span class="req" aria-hidden="true">*</span></label>
+                        <select class="form-input" id="kyc-country" name="country" required>
                             <option value="">Select country…</option>
                             <?php foreach ($countries as $c): ?>
                             <option value="<?= htmlspecialchars($c) ?>"
-                                <?= ($kyc['country'] ?? '') === $c ? 'selected' : '' ?>>
+                                <?= ($kyc['country'] ?? 'Philippines') === $c ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($c) ?>
                             </option>
                             <?php endforeach; ?>
@@ -421,15 +500,72 @@ details summary::-webkit-details-marker { display: none; }
                 <div class="kyc-card-icon">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2 10 22 10"/></svg>
                 </div>
-                <h2 class="kyc-card-title">Government ID</h2>
+                <h2 class="kyc-card-title">Government-Issued ID</h2>
             </div>
             <div class="kyc-card-body">
-                <div class="form-group">
-                    <label class="form-label" for="kyc-id">ID Number</label>
-                    <input class="form-input" id="kyc-id" type="text" name="identifier"
-                        placeholder="Passport / National ID / Driver's License"
-                        value="<?= htmlspecialchars($kyc['identifier'] ?? '') ?>">
-                    <div class="form-hint">Kept confidential — used only for identity verification.</div>
+                <div class="form-grid-2" style="margin-bottom:14px">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-id-type">ID Type <span class="req" aria-hidden="true">*</span></label>
+                        <select class="form-input" id="kyc-id-type" name="id_type" required>
+                            <option value="">Select ID type…</option>
+                            <?php foreach ([
+                                'Philippine National ID (PhilSys)',
+                                'Philippine Passport',
+                                "Driver's License (LTO)",
+                                'Unified Multi-Purpose ID (UMID)',
+                                'SSS ID',
+                                'GSIS ID',
+                                'PRC Professional ID',
+                                "Voter's ID (COMELEC)",
+                                'Senior Citizen ID',
+                                'PhilHealth ID',
+                                'Pag-IBIG (HDMF) ID',
+                                'Postal ID (PHLPost)',
+                                'NBI Clearance',
+                                'TIN Card (BIR)',
+                                'OFW ID / iDOLE',
+                            ] as $idOpt): ?>
+                            <option value="<?= htmlspecialchars($idOpt) ?>"
+                                <?= ($kyc['id_type'] ?? '') === $idOpt ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($idOpt) ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-id">ID Number <span class="req" aria-hidden="true">*</span></label>
+                        <input class="form-input" id="kyc-id" type="text" name="identifier" required
+                            placeholder="As printed on your ID"
+                            value="<?= htmlspecialchars($kyc['identifier'] ?? '') ?>">
+                    </div>
+                </div>
+                <div class="form-hint">All ID information is encrypted and kept strictly confidential — used only for identity verification per RA 9160 (AMLA).</div>
+            </div>
+        </div>
+
+        <!-- Business Registration (optional) -->
+        <div class="kyc-card">
+            <div class="kyc-card-header">
+                <div class="kyc-card-icon">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/></svg>
+                </div>
+                <h2 class="kyc-card-title">Business Registration <span style="font-weight:400;font-size:0.8rem;color:var(--muted)">(optional)</span></h2>
+            </div>
+            <div class="kyc-card-body">
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-biz-name">Registered Business Name</label>
+                        <input class="form-input" id="kyc-biz-name" type="text" name="business_name"
+                            placeholder="e.g. Juan's Online Shop"
+                            value="<?= htmlspecialchars($kyc['business_name'] ?? '') ?>">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="kyc-biz-reg">DTI / SEC / CDA Registration No.</label>
+                        <input class="form-input" id="kyc-biz-reg" type="text" name="business_reg"
+                            placeholder="e.g. DTI-2024-0012345"
+                            value="<?= htmlspecialchars($kyc['business_reg'] ?? '') ?>">
+                        <div class="form-hint">Required for registered sellers under RA 3883 (Business Name Law).</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -447,7 +583,7 @@ details summary::-webkit-details-marker { display: none; }
                     <input type="file" name="documents[]" id="docFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
                     <div class="upload-icon">📎</div>
                     <div class="upload-title">Click or drag &amp; drop files here</div>
-                    <div class="upload-sub">Accepted: JPG, PNG, PDF — ID front &amp; back, selfie, proof of address (max 10 MB each)</div>
+                    <div class="upload-sub">Required: ID front &amp; back · Selfie holding your ID · Proof of address<br>Accepted: JPG, PNG, PDF · Max 10 MB each · Mandated under RA 9160 (AMLA)</div>
                 </div>
                 <div class="doc-previews" id="docPreviews"></div>
             </div>
