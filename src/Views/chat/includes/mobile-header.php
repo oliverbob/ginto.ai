@@ -46,15 +46,18 @@ try {
       </svg>
     </button>
     <?php if ($isLoggedIn || $isAdmin): ?>
-    <button id="model-selector-btn-mobile" class="model-replace-on-tiny flex items-center justify-center p-1.5 h-8 w-8 flex-shrink-0 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer" aria-haspopup="true" aria-expanded="false" title="Select AI model">
-      <!-- Brain icon -->
+    <button id="model-selector-btn-mobile" class="model-replace-on-tiny relative flex items-center justify-center flex-shrink-0 w-9 h-9 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer" aria-haspopup="true" aria-expanded="false" title="Select AI model">
+      <!-- Proper AI brain icon (neural network style) -->
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9.5 2a2.5 2.5 0 0 1 2.45 2H13a4 4 0 0 1 4 4v.5A2.5 2.5 0 0 1 19.5 11v1a2.5 2.5 0 0 1-1.5 2.28V15a4 4 0 0 1-4 4H10a4 4 0 0 1-4-4v-.72A2.5 2.5 0 0 1 4.5 12v-1A2.5 2.5 0 0 1 7 8.5V8a4 4 0 0 1 4-4h.05A2.5 2.5 0 0 1 9.5 2z"/>
-        <path d="M12 8v4m0 0-2 2m2-2 2 2"/>
+        <path d="M12 5C9.2 5 7 7.2 7 10c0 1.4.6 2.7 1.5 3.6C7.6 14.1 7 15.1 7 16.2c0 1.5 1 2.7 2.4 3.1.3.6.9 1 1.6 1h2c.7 0 1.3-.4 1.6-1 1.4-.4 2.4-1.7 2.4-3.1 0-1.1-.6-2.1-1.5-2.6.9-.9 1.5-2.2 1.5-3.6 0-2.8-2.2-5-5-5z"/>
+        <line x1="12" y1="9" x2="12" y2="11"/>
+        <line x1="10" y1="13" x2="14" y2="13"/>
+        <circle cx="10" cy="9" r=".6" fill="currentColor" stroke="none"/>
+        <circle cx="14" cy="9" r=".6" fill="currentColor" stroke="none"/>
       </svg>
-      <!-- Hidden span keeps JS model-name updates working without breaking -->
+      <!-- Green live indicator — visible badge at top-right corner -->
+      <span id="mobile-model-status-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500 ring-1 ring-white dark:ring-gray-800" aria-hidden="true"></span>
       <span class="sr-only" id="mobile-model-name">Ginto AI</span>
-      <div class="hidden" id="mobile-model-status-dot" aria-hidden="true"></div>
     </button>
     <!-- Mobile dropdown (hidden by default) -->
     <div id="model-dropdown-mobile" class="hidden fixed top-12 mx-0 w-auto max-w-[350px] bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[50vh] overflow-hidden flex flex-col" style="left:5px; right:5px; max-width: calc(100vw - 10px);">
