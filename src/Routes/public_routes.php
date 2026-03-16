@@ -681,6 +681,11 @@ req($router, '/marketplace', function() {
     $controller->marketplace();
 });
 
+// /mall is an alias for /marketplace
+req($router, '/mall', function() {
+    header('Location: /marketplace', true, 301); exit;
+});
+
 req($router, '/mall/upload', function() {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); header('Content-Type: application/json'); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
     header('Content-Type: application/json');
