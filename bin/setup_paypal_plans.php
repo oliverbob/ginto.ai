@@ -212,11 +212,11 @@ echo "Product created: {$productId}\n\n";
 $plans = [
     'starter' => [
         'name' => 'Ginto Starter',
-        'description' => 'Perfect for beginners - includes promotional fee on first month',
+        'description' => 'Flat monthly subscription',
         'first_month' => '5.00',
-        'recurring' => '3.00',
+        'recurring' => '5.00',
         'currency' => 'USD',
-        'has_setup_fee' => true,
+        'has_setup_fee' => false,
     ],
     'professional' => [
         'name' => 'Ginto Professional',

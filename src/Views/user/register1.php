@@ -24,7 +24,7 @@
         <form id="gintoRegisterForm" action="/register" method="POST" class="mt-6 space-y-4">
           <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(generateCsrfToken()) ?>">
           <input type="hidden" name="package" id="selectedPackage" value="<?= htmlspecialchars($old['package'] ?? 'Starter') ?>">
-          <input type="hidden" name="package_amount" id="selectedPackageAmount" value="<?= htmlspecialchars($old['package_amount'] ?? 150) ?>">
+          <input type="hidden" name="package_amount" id="selectedPackageAmount" value="<?= htmlspecialchars($old['package_amount'] ?? 250) ?>">
           <input type="hidden" name="package_currency" id="selectedPackageCurrency" value="<?= htmlspecialchars($old['package_currency'] ?? 'PHP') ?>">
           <input type="hidden" name="pay_method" id="selectedPayMethod" value="<?= htmlspecialchars($old['pay_method'] ?? 'btcpay') ?>">
 
@@ -53,7 +53,7 @@
                     }
                 } else {
                     $renderLevels = [
-                        ['name' => 'Starter', 'amount' => 150, 'currency' => 'PHP'],
+                        ['name' => 'Starter', 'amount' => 250, 'currency' => 'PHP'],
                         ['name' => 'Basic', 'amount' => 1000, 'currency' => 'PHP'],
                         ['name' => 'Silver', 'amount' => 5000, 'currency' => 'PHP']
                     ];

@@ -1,11 +1,11 @@
 <?php
 // Subscription pricing configuration - PHP for Philippines, USD for international
-// Starter has ₱100 promo fee on first month (₱250 first, ₱150 recurring)
+// Starter is a flat ₱250/month recurring subscription
 // All other packages have same first month and recurring price
 $pricingConfig = [
     'Starter' => [
         'firstMonth' => ['php' => 250, 'usd' => 5],
-        'recurring' => ['php' => 150, 'usd' => 3],
+        'recurring' => ['php' => 250, 'usd' => 5],
     ],
     'Professional' => [
         'firstMonth' => ['php' => 1000, 'usd' => 20],
@@ -587,7 +587,7 @@ try {
           <div class="p-8" style="background: linear-gradient(120deg, rgba(31,162,255,0.10) 0%, rgba(255,229,59,0.10) 100%);">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
               <div>
-                <h3 class="text-2xl font-semibold mb-5" style="color: var(--primary-500);">Tiered Commission Breakdown (Per ₱150 Sale)</h3>
+                <h3 class="text-2xl font-semibold mb-5" style="color: var(--primary-500);">Tiered Commission Breakdown (Per ₱250 Sale)</h3>
                 <div class="rounded-lg p-6 border" style="background: linear-gradient(135deg, var(--bg-card) 80%, var(--primary-700) 100%); border-color: var(--border-color);">
                   <div class="grid grid-cols-4 gap-4 text-sm font-bold mb-3 border-b pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-color);">
                     <span>Level</span>
@@ -599,55 +599,55 @@ try {
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">1 (Sponsor)</span>
                       <span style="color: var(--primary-600);">0.25%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.38</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱0.38</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.63</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱0.63</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">2</span>
                       <span style="color: var(--primary-600);">0.25%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.38</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱0.75</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.63</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱1.25</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">3</span>
                       <span style="color: var(--primary-600);">0.5%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.75</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱1.50</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱1.25</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱2.50</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">4</span>
                       <span style="color: var(--primary-600);">1%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱1.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱3.00</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱2.50</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱5.00</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">5</span>
                       <span style="color: var(--primary-600);">2%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱3.00</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱6.00</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱5.00</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱10.00</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">6</span>
                       <span style="color: var(--primary-600);">3%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱4.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱10.50</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱7.50</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱17.50</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
                       <span class="font-medium" style="color: var(--text-primary);">7</span>
                       <span style="color: var(--primary-600);">4%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱6.00</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱16.50</span>
+                      <span class="text-right font-bold" style="color: var(--positive-500);">₱10.00</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱27.50</span>
                     </div>
                     <div class="grid grid-cols-4 gap-4 py-2 items-center">
                       <span class="font-bold" style="color: var(--primary-600);">8 (Your sales)</span>
                       <span class="font-bold" style="color: var(--accent-600);">5%</span>
-                      <span class="text-right font-extrabold text-lg" style="color: var(--positive-500);">₱7.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱24.00</span>
+                      <span class="text-right font-extrabold text-lg" style="color: var(--positive-500);">₱12.50</span>
+                      <span class="text-right" style="color: var(--text-secondary);">₱40.00</span>
                     </div>
                   </div>
                   <div class="mt-6 pt-4 flex justify-between items-center" style="border-top: 1px solid var(--border-color);">
                     <span class="text-xl font-bold" style="color: var(--text-primary);">Total Commissions Paid</span>
-                    <span class="text-2xl font-extrabold" style="color: var(--positive-500);">₱24.00 (16% of sale)</span>
+                    <span class="text-2xl font-extrabold" style="color: var(--positive-500);">₱40.00 (16% of sale)</span>
                   </div>
                 </div>
               </div>
@@ -664,16 +664,16 @@ try {
                         <p class="text-sm" style="color: var(--text-secondary);">After all payouts & operational costs</p>
                       </div>
                     </div>
-                    <span class="text-3xl font-extrabold" style="color: var(--positive-500);">₱51</span>
+                    <span class="text-3xl font-extrabold" style="color: var(--positive-500);">₱135</span>
                   </div>
                   <div class="space-y-4 text-lg">
                     <div class="flex justify-between items-center">
                       <span class="font-medium" style="color: var(--text-primary);">Ginto Service Cost</span>
-                      <span class="font-bold" style="color: var(--text-primary);">₱150</span>
+                      <span class="font-bold" style="color: var(--text-primary);">₱250</span>
                     </div>
                     <div class="flex justify-between items-center">
                       <span class="font-medium" style="color: var(--text-primary);">Total Commission Payouts</span>
-                      <span class="font-bold" style="color: #ff4d4f;">- ₱24</span>
+                      <span class="font-bold" style="color: #ff4d4f;">- ₱40</span>
                     </div>
                     <div class="flex justify-between items-center">
                       <span class="font-medium" style="color: var(--text-primary);">Operational Costs</span>
@@ -681,7 +681,7 @@ try {
                     </div>
                     <div class="pt-4 mt-4 flex justify-between items-center" style="border-top: 1px solid var(--border-color);">
                       <span class="font-bold text-xl" style="color: var(--primary-500);">Company Net Profit</span>
-                      <span class="font-extrabold text-2xl" style="color: var(--positive-500);">₱51</span>
+                      <span class="font-extrabold text-2xl" style="color: var(--positive-500);">₱135</span>
                     </div>
                   </div>
                 </div>
@@ -762,8 +762,7 @@ try {
           <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div class="tier-card p-6 relative" data-tier-id="1" data-tier-name="Starter" 
                  data-tier-first-php="250" data-tier-first-usd="5" 
-                 data-tier-recurring-php="150" data-tier-recurring-usd="3" 
-                 data-tier-promo="true">
+                 data-tier-recurring-php="250" data-tier-recurring-usd="5">
               <img src="/assets/images/atome.png" alt="Atome Toothpaste" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
               <div class="tier-badge" style="background: linear-gradient(135deg, #ff6a00, #ffe53b);">🔥 PROMO</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Starter</h4>
@@ -773,9 +772,7 @@ try {
                   <span class="text-3xl font-extrabold first-month-price">₱250</span>
                   <span class="text-sm font-medium" style="color: var(--text-secondary);"> /month</span>
                 </div>
-                <div class="mt-1 promo-badge-container">
-                  <span class="px-2 py-1 text-xs font-bold rounded-full" style="background: linear-gradient(135deg, #ff6a00, #ffe53b); color: #fff;">INCLUDES ₱100 PROMO FEE</span>
-                </div>
+
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One Atome toothpaste</li>
