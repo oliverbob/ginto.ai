@@ -764,6 +764,7 @@ try {
                  data-tier-first-php="250" data-tier-first-usd="5" 
                  data-tier-recurring-php="150" data-tier-recurring-usd="3" 
                  data-tier-promo="true">
+              <img src="/assets/images/atome.png" alt="Atome Toothpaste" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
               <div class="tier-badge" style="background: linear-gradient(135deg, #ff6a00, #ffe53b);">🔥 PROMO</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Starter</h4>
               <p class="mb-4" style="color: var(--text-secondary);">Perfect for beginners with basic training.</p>
@@ -778,6 +779,10 @@ try {
                 </div>
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One Atome toothpaste</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 40% outright referral commission</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Monthly residual earnings</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Ginto General MasterClass</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to Level 1-4 commissions</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Basic training materials</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Starter kit</li>
