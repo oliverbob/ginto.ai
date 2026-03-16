@@ -1087,34 +1087,29 @@ class ChatStreamHandler
                     error_log("[ChatStream] GROQ_VISION_FOR_ALL_MODELS enabled; pre-analyzing image with Groq: $modelName");
                     $adminLogEvents[] = '[vision] GROQ_VISION_FOR_ALL_MODELS enabled, pre-analyzing with groq/' . $modelName;
                 } elseif ($userSelectedVisionModel && $sessionCloudModel) {
-                    // User selected a vision-capable model, use it with already-selected provider/key
+                    // User explicitly selected a vision-capable model — use it directly inline
                     $modelName = $sessionCloudModel;
                     $visionProvider = $selectedProvider;
                     $visionApiKey = $apiKey;
                     $directVisionInMainChat = true;
                     error_log("[ChatStream] Using user's vision model: $modelName on $visionProvider");
                     $adminLogEvents[] = '[vision] using selected vision model: ' . $visionProvider . '/' . $modelName;
-                } elseif (!empty($visionCapableModels[$selectedProvider])) {
-                    // Selected provider has vision models, use its default vision model
-                    $modelName = $modelMapping[$selectedProvider]['vision'] ?? $visionCapableModels[$selectedProvider][0];
-                    $visionProvider = $selectedProvider;
-                    $visionApiKey = $apiKey;
-                    $directVisionInMainChat = true;
-                    error_log("[ChatStream] Using provider's vision model: $modelName on $visionProvider");
-                    $adminLogEvents[] = '[vision] using provider default vision model: ' . $visionProvider . '/' . $modelName;
                 } else {
-                    // Provider doesn't support vision (e.g., Cerebras), fall back to Groq
+                    // For ALL non-vision-model selections (any provider, any model):
+                    // Always pre-analyze the image with Groq vision first, then resume
+                    // with the user's originally selected provider/model for the chat.
+                    // This ensures image support regardless of the model being chosen.
                     $modelName = $modelMapping['groq']['vision'];
                     $visionProvider = 'groq';
-                    // Get Groq API key from DB first, then .env
+                    $directVisionInMainChat = false;
                     $groqKeyData = $keyManager->getAvailableKey('groq');
                     if ($groqKeyData) {
                         $visionApiKey = $groqKeyData['api_key'];
                     } else {
                         $visionApiKey = getenv('GROQ_API_KEY') ?: ($_ENV['GROQ_API_KEY'] ?? '');
                     }
-                    error_log("[ChatStream] Provider $selectedProvider has no vision, falling back to Groq: $modelName");
-                    $adminLogEvents[] = '[vision] provider has no vision, pre-analyzing with groq/' . $modelName;
+                    error_log("[ChatStream] Non-vision model ($selectedProvider/" . ($sessionCloudModel ?? 'default') . "); pre-analyzing image with Groq: $modelName");
+                    $adminLogEvents[] = '[vision] non-vision model, pre-analyzing with groq/' . $modelName;
                 }
             } elseif ($useLocalLlm) {
                 $modelName = $localLlmConfig->getReasoningModel();
