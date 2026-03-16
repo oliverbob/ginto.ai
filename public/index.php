@@ -1767,6 +1767,11 @@ $router->req('/marketplace', function() {
     $controller->marketplace();
 });
 
+// /mall is an alias for /marketplace
+$router->req('/mall', function() {
+    header('Location: /marketplace', true, 301); exit;
+});
+
 // Upload product endpoint (AJAX)
 $router->req('/mall/upload', function() {
     // Only accept POST
