@@ -7,12 +7,19 @@
      * PHP DATA INJECTION
      * ============================ */
     const PRODUCTS = <?= json_encode(array_map(function ($p) {
+        $imgs_arr = [];
         $img = null;
         if (!empty($p['images'])) {
-            $imgs = json_decode($p['images'], true);
-            $img = is_array($imgs) ? ($imgs[0] ?? null) : null;
+            $decoded = json_decode($p['images'], true);
+            if (is_array($decoded)) {
+                $imgs_arr = array_values(array_filter($decoded));
+                $img = $imgs_arr[0] ?? null;
+            }
         }
-        if (!$img && !empty($p['image_path'])) $img = $p['image_path'];
+        if (!$img && !empty($p['image_path'])) {
+            $img = $p['image_path'];
+            if (empty($imgs_arr)) $imgs_arr = [$img];
+        }
         return [
             'id'       => (int)($p['id'] ?? 0),
             'title'    => $p['title'] ?? '',
@@ -21,6 +28,7 @@
             'cat'      => isset($p['category_id']) ? (int)$p['category_id'] : null,
             'rating'   => (float)($p['rating'] ?? 0),
             'img'      => $img,
+            'imgs'     => $imgs_arr,
             'desc'     => $p['short_description'] ?? '',
             'badge'    => $p['badge'] ?? null,
         ];
@@ -132,12 +140,19 @@
         list.forEach(p => {
             const card = document.createElement('div');
             card.className = 'product-card';
-            const imgSrc = p.img || PLACEHOLDER;
+            card.dataset.id = p.id;
+            const imgs     = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
+            const imgSrc   = imgs[0] || PLACEHOLDER;
+            const hasMulti = imgs.length > 1;
+            const dotsHtml  = hasMulti ? `<div class="card-dots">${imgs.map((_, i) => `<span class="card-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>` : '';
+            const arrowHtml = hasMulti ? `<div class="card-arrows"><button class="card-arrow" onclick="cardImgNav(event,this,-1)" aria-label="Previous image">&#8249;</button><button class="card-arrow" onclick="cardImgNav(event,this,1)" aria-label="Next image">&#8250;</button></div>` : '';
             const stars  = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
             card.innerHTML = `
-                <div class="product-img-wrap" role="button" tabindex="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
+                <div class="product-img-wrap" role="button" tabindex="0" data-idx="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
                     <img class="product-img" src="${esc(imgSrc)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
                     ${p.badge ? `<span class="product-badge">${esc(p.badge)}</span>` : ''}
+                    ${arrowHtml}
+                    ${dotsHtml}
                 </div>
                 <div class="product-body">
                     <div class="product-title">${esc(p.title)}</div>
@@ -504,6 +519,26 @@
 
     init();
 
+    /* ============================
+     * CARD IMAGE CAROUSEL
+     * ============================ */
+    function cardImgNav(event, btn, dir) {
+        event.stopPropagation();
+        const wrap = btn.closest('.product-img-wrap');
+        const card = wrap.closest('.product-card');
+        const id   = parseInt(card.dataset.id, 10);
+        const p    = state.products.find(x => x.id === id);
+        if (!p) return;
+        const imgs = (p.imgs && p.imgs.length) ? p.imgs : [];
+        if (imgs.length <= 1) return;
+        let idx = parseInt(wrap.dataset.idx || '0', 10);
+        idx = (idx + dir + imgs.length) % imgs.length;
+        wrap.dataset.idx = idx;
+        const img = wrap.querySelector('.product-img');
+        if (img) img.src = imgs[idx] || PLACEHOLDER;
+        wrap.querySelectorAll('.card-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+    }
+
     // Expose globals needed by inline onclick handlers in home.php
     window.openQV           = openQV;
     window.closeQV          = closeQV;
@@ -513,6 +548,7 @@
     window.checkout         = checkout;
     window.openUploadModal  = openUploadModal;
     window.closeUploadModal = closeUploadModal;
+    window.cardImgNav       = cardImgNav;
 
 }());
 
