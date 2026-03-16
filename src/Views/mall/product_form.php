@@ -110,6 +110,30 @@ select.pf-input    { cursor: pointer; }
     width: 80px; height: 80px; object-fit: cover;
     border-radius: 8px; border: 1px solid var(--border); display: block;
 }
+.existing-img-del {
+    position: absolute; top: 3px; right: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(239,68,68,0.9); color: #fff;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; line-height: 1; font-weight: 700;
+    padding: 0; transition: background var(--trans);
+}
+.existing-img-del:hover { background: rgba(220,38,38,1); }
+.existing-img-wrap.deleted { opacity: 0.3; pointer-events: none; }
+
+/* New upload preview delete */
+.img-prev-item { position: relative; }
+.img-prev-del {
+    position: absolute; top: 3px; right: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(239,68,68,0.9); color: #fff;
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; line-height: 1; font-weight: 700;
+    padding: 0; transition: background var(--trans);
+}
+.img-prev-del:hover { background: rgba(220,38,38,1); }
 
 /* Footer actions */
 .pf-actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
@@ -230,11 +254,13 @@ select.pf-input    { cursor: pointer; }
             <div class="pf-section-body">
                 <?php if (!empty($existingImgs)): ?>
                 <div>
-                    <div class="pf-hint" style="margin-bottom:8px">Current images (uploading new ones will be added alongside these):</div>
-                    <div class="existing-imgs">
+                    <div class="pf-hint" style="margin-bottom:8px">Current images — click <strong style="color:var(--danger)">✕</strong> to remove an image:</div>
+                    <div class="existing-imgs" id="existingImgs">
                         <?php foreach ($existingImgs as $imgUrl): ?>
-                        <div class="existing-img-wrap">
+                        <div class="existing-img-wrap" data-url="<?= htmlspecialchars($imgUrl) ?>">
                             <img src="<?= htmlspecialchars($imgUrl) ?>" alt="Product image" loading="lazy">
+                            <button type="button" class="existing-img-del" aria-label="Remove image" title="Remove">✕</button>
+                            <input type="hidden" name="keep_images[]" value="<?= htmlspecialchars($imgUrl) ?>" class="keep-input">
                         </div>
                         <?php endforeach; ?>
                     </div>
@@ -267,15 +293,38 @@ select.pf-input    { cursor: pointer; }
     const input    = document.getElementById('imgFilesInput');
     const previews = document.getElementById('imgPreviews');
 
+    // Track pending files as a mutable array (FileList is read-only)
+    let pendingFiles = [];
+
+    function syncInputFiles() {
+        if (!input) return;
+        try {
+            const dt = new DataTransfer();
+            pendingFiles.forEach(function (f) { dt.items.add(f); });
+            input.files = dt.files;
+        } catch (_) {}
+    }
+
     function renderPreviews() {
-        if (!previews || !input || !input.files.length) return;
+        if (!previews) return;
         previews.innerHTML = '';
-        Array.from(input.files).forEach(function (file) {
+        pendingFiles.forEach(function (file, idx) {
             const wrap = document.createElement('div');
             wrap.className = 'img-prev-item';
-            const name = document.createElement('div');
-            name.className = 'img-prev-name';
-            name.textContent = file.name;
+
+            // Delete button
+            const del = document.createElement('button');
+            del.type = 'button';
+            del.className = 'img-prev-del';
+            del.setAttribute('aria-label', 'Remove ' + file.name);
+            del.textContent = '✕';
+            del.addEventListener('click', function () {
+                pendingFiles.splice(idx, 1);
+                syncInputFiles();
+                renderPreviews();
+            });
+            wrap.appendChild(del);
+
             if (file.type.startsWith('image/')) {
                 const img = document.createElement('img');
                 img.alt = file.name;
@@ -284,25 +333,51 @@ select.pf-input    { cursor: pointer; }
                 reader.readAsDataURL(file);
                 wrap.appendChild(img);
             } else {
-                wrap.innerHTML = '<div style="width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:1.8rem">🖼️</div>';
+                const ph = document.createElement('div');
+                ph.style.cssText = 'width:80px;height:80px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:1.8rem';
+                ph.textContent = '🖼️';
+                wrap.appendChild(ph);
             }
-            wrap.appendChild(name);
+
+            const nameEl = document.createElement('div');
+            nameEl.className = 'img-prev-name';
+            nameEl.textContent = file.name;
+            wrap.appendChild(nameEl);
+
             previews.appendChild(wrap);
         });
     }
 
-    if (input) input.addEventListener('change', renderPreviews);
+    if (input) {
+        input.addEventListener('change', function () {
+            Array.from(input.files).forEach(function (f) { pendingFiles.push(f); });
+            syncInputFiles();
+            renderPreviews();
+        });
+    }
     if (area) {
         area.addEventListener('dragover',  function (e) { e.preventDefault(); area.classList.add('drag-over'); });
         area.addEventListener('dragleave', function ()  { area.classList.remove('drag-over'); });
         area.addEventListener('drop', function (e) {
             e.preventDefault(); area.classList.remove('drag-over');
-            if (input && e.dataTransfer.files.length) {
-                try { input.files = e.dataTransfer.files; } catch (_) {}
+            if (e.dataTransfer.files.length) {
+                Array.from(e.dataTransfer.files).forEach(function (f) { pendingFiles.push(f); });
+                syncInputFiles();
                 renderPreviews();
             }
         });
     }
+
+    // Existing image delete buttons
+    document.querySelectorAll('.existing-img-del').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            const wrap = btn.closest('.existing-img-wrap');
+            if (!wrap) return;
+            wrap.classList.add('deleted');
+            const keepInput = wrap.querySelector('.keep-input');
+            if (keepInput) keepInput.disabled = true;
+        });
+    });
 
     // Auto-generate slug from title
     const titleInput = document.getElementById('pf-title');

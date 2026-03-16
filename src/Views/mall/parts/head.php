@@ -117,7 +117,7 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     cursor: pointer;
     transition: all var(--trans);
 }
-.search-trigger:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
+.search-trigger:hover { background: transparent; color: var(--text); border-color: transparent; }
 
 /* Full-width expandable search bar that overlays the header */
 .search-overlay {

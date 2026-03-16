@@ -329,8 +329,14 @@ class SellerController extends \Core\Controller
         $qty      = intval($_POST['quantity'] ?? 0);
         $category = intval($_POST['category_id'] ?? 0) ?: null;
 
-        // Append any new image uploads to existing — use B2 when configured, else local storage
-        $imagesArray = json_decode($existing['images'] ?? '[]', true) ?: [];
+        // Start from the kept images (user may have removed some via delete buttons)
+        $allExisting  = json_decode($existing['images'] ?? '[]', true) ?: [];
+        $keepImages   = $_POST['keep_images'] ?? null;
+        $imagesArray  = ($keepImages !== null)
+            ? array_values(array_filter($allExisting, fn($u) => in_array($u, (array)$keepImages, true)))
+            : $allExisting;
+
+        // Append any new image uploads — use B2 when configured, else local storage
         if (!empty($_FILES['images'])) {
             $files   = $_FILES['images'];
             $useB2   = \Ginto\Helpers\B2Helper::isEnabled();
