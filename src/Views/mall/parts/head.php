@@ -170,13 +170,13 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .search-btn {
     width: 36px; height: 36px;
     display: flex; align-items: center; justify-content: center;
-    background: var(--accent);
-    color: white;
+    background: transparent;
+    color: var(--muted);
     border-radius: 20px;
     flex-shrink: 0;
-    transition: background var(--trans);
+    transition: color var(--trans);
 }
-.search-btn:hover { background: var(--accent-h); }
+.search-btn:hover { color: var(--text); }
 .search-close {
     width: 40px; height: 40px;
     display: flex; align-items: center; justify-content: center;

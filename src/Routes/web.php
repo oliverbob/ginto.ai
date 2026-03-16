@@ -1261,12 +1261,34 @@ $router->req('/storage/mall/images/{filename}', function($filename) {
     exit;
 });
 
+// Product images uploaded via seller modal — serve from storage/products/{userId}/{filename}
+$router->req('/storage/products/{userId}/{filename}', function($userId, $filename) {
+    $userId   = preg_replace('/[^0-9]/', '', $userId);
+    $filename = basename($filename);
+    if (!$userId || !preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}$/', $filename)) {
+        http_response_code(400); exit;
+    }
+    $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(dirname(dirname(__FILE__))) . '/../storage';
+    $fullPath    = $storagePath . '/products/' . $userId . '/' . $filename;
+    if (!is_file($fullPath)) { http_response_code(404); exit; }
+    $ext  = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+             'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
+             'bmp' => 'image/bmp', 'avif' => 'image/avif'][$ext] ?? null;
+    if (!$mime) { http_response_code(403); exit; }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($fullPath));
+    header('Cache-Control: public, max-age=86400');
+    readfile($fullPath);
+    exit;
+});
 
-// API: get marketplace products (published & visible)
-$router->req('/api/mall/products', function() use ($db) {
 
 // Upload endpoint used by marketplace upload modal (seller area)
 $router->req('/marketplace/sellers/upload', 'MallController@upload', ['POST']);
+
+// API: get marketplace products (published & visible)
+$router->req('/api/mall/products', function() use ($db) {
 
     header('Content-Type: application/json');
     $products = [];
