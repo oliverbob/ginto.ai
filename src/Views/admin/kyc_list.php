@@ -83,6 +83,16 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
         html.dark .filter-tab-inactive { background: #1f2937; color: #d1d5db; border-color: #374151; }
         .filter-tab-inactive:hover { border-color: #6b7280; }
     </style>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var sidebar    = document.getElementById('sidebar');
+            var menuBtn    = document.getElementById('menu-button');
+            var closeBtn   = document.getElementById('close-button');
+            function toggleSidebar() { sidebar.classList.toggle('-translate-x-full'); }
+            if (menuBtn)  menuBtn.onclick  = toggleSidebar;
+            if (closeBtn) closeBtn.onclick = toggleSidebar;
+        });
+    </script>
 </head>
 <body class="min-h-screen bg-white dark:bg-gray-900">
 <div class="min-h-screen bg-white dark:bg-gray-900">
