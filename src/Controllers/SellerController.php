@@ -199,21 +199,37 @@ class SellerController extends \Core\Controller
 
         // Handle images upload (multiple) — use B2 when configured, else local storage
         $imagesArray = [];
+        $imgLogFile  = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/logs/marketplace_errors.log';
         if (!empty($_FILES['images'])) {
             $files   = $_FILES['images'];
             $useB2   = \Ginto\Helpers\B2Helper::isEnabled();
             $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+            @file_put_contents($imgLogFile, date('c') . " - productCreate image upload start - useB2=" . ($useB2 ? 'yes' : 'no') . " files=" . count($files['name']) . "\n", FILE_APPEND);
             for ($i = 0; $i < count($files['name']); $i++) {
-                if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
+                if ($files['error'][$i] !== UPLOAD_ERR_OK) {
+                    @file_put_contents($imgLogFile, date('c') . " - file[$i] upload error code: " . $files['error'][$i] . "\n", FILE_APPEND);
+                    continue;
+                }
                 $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
                 if ($useB2) {
                     $fileData   = file_get_contents($files['tmp_name'][$i]);
                     $remotePath = 'mall/images/' . uniqid() . '_' . $name;
                     $mimeType   = $files['type'][$i] ?: 'image/jpeg';
                     try {
-                        $imagesArray[] = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                        $url = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                        $imagesArray[] = $url;
+                        @file_put_contents($imgLogFile, date('c') . " - B2 upload OK: $url\n", FILE_APPEND);
                     } catch (\Exception $e) {
-                        error_log('B2 upload failed: ' . $e->getMessage());
+                        @file_put_contents($imgLogFile, date('c') . " - B2 upload FAILED [$i]: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
+                        // Fall back to local storage on B2 failure
+                        $uploadDir = $storagePath . '/mall/images/';
+                        if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+                        $target = $uploadDir . uniqid() . '_' . $name;
+                        if (move_uploaded_file($files['tmp_name'][$i], $target)) {
+                            chmod($target, 0640);
+                            $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                            @file_put_contents($imgLogFile, date('c') . " - Fell back to local: $target\n", FILE_APPEND);
+                        }
                     }
                 } else {
                     $uploadDir = $storagePath . '/mall/images/';
@@ -378,21 +394,37 @@ class SellerController extends \Core\Controller
             : $allExisting;
 
         // Append any new image uploads — use B2 when configured, else local storage
+        $imgLogFile = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/logs/marketplace_errors.log';
         if (!empty($_FILES['images'])) {
             $files   = $_FILES['images'];
             $useB2   = \Ginto\Helpers\B2Helper::isEnabled();
             $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+            @file_put_contents($imgLogFile, date('c') . " - productUpdate image upload start - useB2=" . ($useB2 ? 'yes' : 'no') . " files=" . count($files['name']) . "\n", FILE_APPEND);
             for ($i = 0; $i < count($files['name']); $i++) {
-                if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
+                if ($files['error'][$i] !== UPLOAD_ERR_OK) {
+                    @file_put_contents($imgLogFile, date('c') . " - file[$i] upload error code: " . $files['error'][$i] . "\n", FILE_APPEND);
+                    continue;
+                }
                 $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
                 if ($useB2) {
                     $fileData   = file_get_contents($files['tmp_name'][$i]);
                     $remotePath = 'mall/images/' . uniqid() . '_' . $name;
                     $mimeType   = $files['type'][$i] ?: 'image/jpeg';
                     try {
-                        $imagesArray[] = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                        $url = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                        $imagesArray[] = $url;
+                        @file_put_contents($imgLogFile, date('c') . " - B2 upload OK: $url\n", FILE_APPEND);
                     } catch (\Exception $e) {
-                        error_log('B2 upload failed: ' . $e->getMessage());
+                        @file_put_contents($imgLogFile, date('c') . " - B2 upload FAILED [$i]: " . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n", FILE_APPEND);
+                        // Fall back to local storage on B2 failure
+                        $uploadDir = $storagePath . '/mall/images/';
+                        if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+                        $target = $uploadDir . uniqid() . '_' . $name;
+                        if (move_uploaded_file($files['tmp_name'][$i], $target)) {
+                            chmod($target, 0640);
+                            $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                            @file_put_contents($imgLogFile, date('c') . " - Fell back to local: $target\n", FILE_APPEND);
+                        }
                     }
                 } else {
                     $uploadDir = $storagePath . '/mall/images/';
