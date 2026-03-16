@@ -4,10 +4,12 @@
 /** @var string $csrf_token */
 /** @var string $kyc_status */
 /** @var string $subscription_status */
+/** @var bool $is_admin */
 ?>
 <?php
 $title      = $title ?? 'My Products — Seller Center';
 $isLoggedIn = true;
+$is_admin   = $is_admin ?? false;
 
 $allProductsList = array_merge($products ?? [], $drafts ?? []);
 usort($allProductsList, fn($a, $b) => strtotime($b['created_at'] ?? 0) - strtotime($a['created_at'] ?? 0));
@@ -275,8 +277,10 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
         <div class="sc-seller-info">
             <div class="sc-avatar"><?= strtoupper(substr($_SESSION['username'] ?? $_SESSION['email'] ?? 'S', 0, 1)) ?></div>
             <div class="sc-seller-name"><?= htmlspecialchars($_SESSION['username'] ?? 'Seller') ?></div>
-            <div class="sc-seller-role">Seller Account</div>
+            <div class="sc-seller-role"><?= $is_admin ? 'Admin' : 'Seller Account' ?></div>
+            <?php if (!$is_admin): ?>
             <span class="badge <?= $kycBadgeClass ?>">KYC: <?= htmlspecialchars(ucfirst($kyc_status ?? 'none')) ?></span>
+            <?php endif; ?>
         </div>
         <ul class="sc-nav" role="list">
             <li class="sc-nav-item">
@@ -292,6 +296,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 </a>
             </li>
             <li class="sc-nav-divider" role="separator"></li>
+            <?php if (!$is_admin): ?>
             <li class="sc-nav-item">
                 <a href="/marketplace/sellers/kyc">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2 10 22 10"/></svg>
@@ -299,6 +304,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 </a>
             </li>
             <li class="sc-nav-divider" role="separator"></li>
+            <?php endif; ?>
             <li class="sc-nav-item">
                 <a href="/marketplace">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>

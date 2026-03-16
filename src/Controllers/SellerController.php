@@ -19,8 +19,13 @@ class SellerController extends \Core\Controller
         if (empty($_SESSION['user_id'])) {
             header('Location: /login'); exit;
         }
-        $csrf = generateCsrfToken();
+        $csrf   = generateCsrfToken();
         $userId = (int)$_SESSION['user_id'];
+        $user   = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        // Admins don't need KYC — redirect them straight to products
+        if (in_array($user['role_id'] ?? 0, [1, 2])) {
+            header('Location: /marketplace/sellers/products'); exit;
+        }
         $kyc = $this->db->get('kyc_profiles', '*', ['user_id' => $userId]);
         return $this->view('mall/kyc', ['csrf_token' => $csrf, 'kyc' => $kyc]);
     }
@@ -82,28 +87,38 @@ class SellerController extends \Core\Controller
     public function products()
     {
         if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
-        $userId = (int)$_SESSION['user_id'];
+        $userId   = (int)$_SESSION['user_id'];
+        $user     = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin  = in_array($user['role_id'] ?? 0, [1, 2]);
 
         try {
             $productModel = new Product();
-            $products = $productModel->list(['seller_id' => $userId, 'status' => 'published']);
-            // Also include drafts for seller
-            $drafts = $productModel->list(['seller_id' => $userId, 'status' => 'draft']);
+            // Admins see all products; sellers see only their own
+            $filterPublished = $isAdmin ? ['status' => 'published'] : ['seller_id' => $userId, 'status' => 'published'];
+            $filterDraft     = $isAdmin ? ['status' => 'draft']     : ['seller_id' => $userId, 'status' => 'draft'];
+            $products = $productModel->list($filterPublished);
+            $drafts   = $productModel->list($filterDraft);
 
-            // Enrich with seller metadata for a richer seller dashboard
-            $kycRow = $this->db->get('kyc_profiles', ['status'], ['user_id' => $userId]);
-            $subRow = $this->db->get('seller_subscriptions', ['status','next_billing_at'], ['user_id' => $userId]);
-            $kyc_status = is_array($kycRow) ? ($kycRow['status'] ?? 'pending') : 'pending';
-            $subscription_status = is_array($subRow) ? ($subRow['status'] ?? 'inactive') : 'inactive';
+            // KYC / subscription enrichment — admins are implicitly approved
+            $kyc_status = $isAdmin ? 'approved' : 'none';
+            $subscription_status = 'inactive';
+            $subRow = null;
+            if (!$isAdmin) {
+                $kycRow = $this->db->get('kyc_profiles', ['status'], ['user_id' => $userId]);
+                $subRow = $this->db->get('seller_subscriptions', ['status','next_billing_at'], ['user_id' => $userId]);
+                $kyc_status          = is_array($kycRow) ? ($kycRow['status'] ?? 'none') : 'none';
+                $subscription_status = is_array($subRow) ? ($subRow['status'] ?? 'inactive') : 'inactive';
+            }
 
             $csrf = generateCsrfToken();
             return $this->view('mall/seller_products', [
-                'products' => $products,
-                'drafts' => $drafts,
-                'csrf_token' => $csrf,
-                'kyc_status' => $kyc_status,
+                'products'            => $products,
+                'drafts'              => $drafts,
+                'csrf_token'          => $csrf,
+                'kyc_status'          => $kyc_status,
                 'subscription_status' => $subscription_status,
-                'next_billing_at' => $subRow['next_billing_at'] ?? null
+                'next_billing_at'     => $subRow['next_billing_at'] ?? null,
+                'is_admin'            => $isAdmin,
             ]);
         } catch (\Throwable $e) {
             // Log full stack trace and user context for debugging
@@ -162,14 +177,16 @@ class SellerController extends \Core\Controller
         $imagesArray = [];
         if (!empty($_FILES['images'])) {
             $files = $_FILES['images'];
-            $uploadDir = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__,2) . '/../storage') . '/products/' . $userId . '/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+            $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+            $uploadDir   = $storagePath . '/mall/images/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
             for ($i = 0; $i < count($files['name']); $i++) {
                 if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
+                $name   = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
                 $target = $uploadDir . uniqid() . '_' . $name;
                 if (move_uploaded_file($files['tmp_name'][$i], $target)) {
-                    $imagesArray[] = str_replace((defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__,2) . '/../storage'), '/storage', $target);
+                    chmod($target, 0640);
+                    $imagesArray[] = str_replace($storagePath, '/storage', $target);
                 }
             }
         }
@@ -193,6 +210,143 @@ class SellerController extends \Core\Controller
         if (!$created) {
             http_response_code(500); echo 'Failed to create product'; return;
         }
+
+        header('Location: /marketplace/sellers/products'); exit;
+    }
+
+    public function productToggle()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); return; }
+        if (empty($_SESSION['user_id'])) { http_response_code(401); return; }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) { http_response_code(400); echo 'Invalid CSRF token'; return; }
+
+        $userId    = (int)$_SESSION['user_id'];
+        $productId = (int)($_POST['id'] ?? 0);
+        $current   = $_POST['current_status'] ?? 'draft';
+        $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
+        if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
+            http_response_code(403); echo 'Not authorized'; return;
+        }
+
+        $newStatus = ($current === 'published') ? 'draft' : 'published';
+        $this->db->update('products', [
+            'status'     => $newStatus,
+            'is_visible' => ($newStatus === 'published') ? 1 : 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], ['id' => $productId]);
+
+        header('Location: /marketplace/sellers/products'); exit;
+    }
+
+    public function productDelete()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); return; }
+        if (empty($_SESSION['user_id'])) { http_response_code(401); return; }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) { http_response_code(400); echo 'Invalid CSRF token'; return; }
+
+        $userId    = (int)$_SESSION['user_id'];
+        $productId = (int)($_POST['id'] ?? 0);
+        $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
+        if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
+            http_response_code(403); echo 'Not authorized'; return;
+        }
+
+        $this->db->update('products', [
+            'status'     => 'deleted',
+            'is_visible' => 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], ['id' => $productId]);
+
+        header('Location: /marketplace/sellers/products'); exit;
+    }
+
+    public function productEdit($id = null)
+    {
+        if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
+        $userId    = (int)$_SESSION['user_id'];
+        $productId = (int)$id;
+        $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        $product = $this->db->get('products', '*', ['id' => $productId]);
+        if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
+            http_response_code(403); echo 'Not authorized'; return;
+        }
+
+        $categories = $this->db->select('categories', '*') ?: [];
+        $csrf = generateCsrfToken();
+        return $this->view('mall/product_form', [
+            'csrf_token'  => $csrf,
+            'categories'  => $categories,
+            'product'     => $product,
+            'editing'     => true,
+        ]);
+    }
+
+    public function productUpdate($id = null)
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); return; }
+        if (empty($_SESSION['user_id'])) { http_response_code(401); return; }
+        $token = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) { http_response_code(400); echo 'Invalid CSRF token'; return; }
+
+        $userId    = (int)$_SESSION['user_id'];
+        $productId = (int)$id;
+        $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        $existing = $this->db->get('products', ['id', 'seller_id', 'images'], ['id' => $productId]);
+        if (!$existing || (!$isAdmin && (int)$existing['seller_id'] !== $userId)) {
+            http_response_code(403); echo 'Not authorized'; return;
+        }
+
+        $title    = trim($_POST['title'] ?? '');
+        $slug     = trim($_POST['slug'] ?? '') ?: null;
+        $short    = trim($_POST['short_description'] ?? '') ?: null;
+        $desc     = trim($_POST['description'] ?? '') ?: null;
+        $price    = floatval($_POST['price'] ?? 0);
+        $currency = $_POST['currency'] ?? 'USD';
+        $qty      = intval($_POST['quantity'] ?? 0);
+        $category = intval($_POST['category_id'] ?? 0) ?: null;
+
+        // Append any new image uploads to existing images
+        $imagesArray = json_decode($existing['images'] ?? '[]', true) ?: [];
+        if (!empty($_FILES['images'])) {
+            $files       = $_FILES['images'];
+            $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+            $uploadDir   = $storagePath . '/mall/images/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+            for ($i = 0; $i < count($files['name']); $i++) {
+                if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
+                $name   = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
+                $target = $uploadDir . uniqid() . '_' . $name;
+                if (move_uploaded_file($files['tmp_name'][$i], $target)) {
+                    chmod($target, 0640);
+                    $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                }
+            }
+        }
+
+        $this->db->update('products', [
+            'title'             => $title,
+            'slug'              => $slug,
+            'short_description' => $short,
+            'description'       => $desc,
+            'price'             => $price,
+            'currency'          => $currency,
+            'quantity'          => $qty,
+            'category_id'       => $category,
+            'images'            => json_encode($imagesArray),
+            'updated_at'        => date('Y-m-d H:i:s'),
+        ], ['id' => $productId]);
 
         header('Location: /marketplace/sellers/products'); exit;
     }

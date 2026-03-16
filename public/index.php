@@ -23,6 +23,13 @@ foreach (['sessions', 'logs', 'cache', 'backups', 'backups/repo', 'temp', 'uploa
         @mkdir($path, 0755, true);
     }
 }
+// Mall image storage — owner+group readable only (no world access)
+foreach (['mall', 'mall/images'] as $subdir) {
+    $path = STORAGE_PATH . '/' . $subdir;
+    if (!is_dir($path)) {
+        @mkdir($path, 0750, true);
+    }
+}
 
 // Check if installation is complete
 $installedMarkerExists = file_exists(ROOT_PATH . '/.installed') || file_exists(STORAGE_PATH . '/.installed');

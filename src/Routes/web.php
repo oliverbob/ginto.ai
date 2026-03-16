@@ -1229,10 +1229,39 @@ $router->req('/marketplace/sellers/kyc/submit', 'SellerController@submitKyc', ['
 $router->req('/marketplace/sellers/products', 'SellerController@products');
 $router->req('/marketplace/sellers/products/new', 'SellerController@productNew');
 $router->req('/marketplace/sellers/products/create', 'SellerController@productCreate', ['POST']);
+$router->req('/marketplace/sellers/products/toggle', 'SellerController@productToggle', ['POST']);
+$router->req('/marketplace/sellers/products/delete', 'SellerController@productDelete', ['POST']);
+$router->req('/marketplace/sellers/products/edit/{id}', 'SellerController@productEdit');
+$router->req('/marketplace/sellers/products/update/{id}', 'SellerController@productUpdate', ['POST']);
 
 // Admin KYC review
 $router->req('/admin/kyc', 'AdminKycController@index');
 $router->req('/admin/kyc/review/{id}', 'AdminKycController@review', ['POST']);
+
+// Mall image serving — PHP proxies files from storage/mall/images (outside web root) to prevent
+// direct filesystem access. Only image file types are served; login required.
+$router->req('/storage/mall/images/{filename}', function($filename) {
+    if (empty($_SESSION['user_id'])) { http_response_code(403); exit; }
+    // Sanitize: only allow safe filenames (no path traversal)
+    $filename = basename($filename);
+    if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}$/', $filename)) {
+        http_response_code(400); exit;
+    }
+    $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(dirname(dirname(__FILE__))) . '/../storage';
+    $fullPath    = $storagePath . '/mall/images/' . $filename;
+    if (!is_file($fullPath)) { http_response_code(404); exit; }
+    $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
+    $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
+             'gif' => 'image/gif', 'webp' => 'image/webp', 'svg' => 'image/svg+xml',
+             'bmp' => 'image/bmp', 'avif' => 'image/avif'][$ext] ?? null;
+    if (!$mime) { http_response_code(403); exit; }
+    header('Content-Type: ' . $mime);
+    header('Content-Length: ' . filesize($fullPath));
+    header('Cache-Control: public, max-age=86400');
+    readfile($fullPath);
+    exit;
+});
+
 
 // API: get marketplace products (published & visible)
 $router->req('/api/mall/products', function() use ($db) {
