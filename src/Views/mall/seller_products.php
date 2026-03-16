@@ -317,7 +317,15 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 </a>
             </li>
             <li class="sc-nav-divider" role="separator"></li>
-            <?php if (!$is_admin): ?>
+            <?php if ($is_admin): ?>
+            <li class="sc-nav-item">
+                <a href="/admin/kyc">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    KYC Submissions
+                </a>
+            </li>
+            <li class="sc-nav-divider" role="separator"></li>
+            <?php else: ?>
             <li class="sc-nav-item">
                 <a href="/marketplace/sellers/kyc">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2 10 22 10"/></svg>
