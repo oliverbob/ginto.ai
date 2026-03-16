@@ -257,25 +257,42 @@ class SellerController extends \Core\Controller
         $token = $_POST['csrf_token'] ?? '';
         if (!validateCsrfToken($token)) { http_response_code(400); echo 'Invalid CSRF token'; return; }
 
-        $userId    = (int)$_SESSION['user_id'];
-        $productId = (int)($_POST['id'] ?? 0);
-        $current   = $_POST['current_status'] ?? 'draft';
-        $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
-        $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
+        try {
+            $userId    = (int)$_SESSION['user_id'];
+            $productId = (int)($_POST['id'] ?? 0);
+            $current   = $_POST['current_status'] ?? 'draft';
+            $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+            $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
 
-        $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
-        if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
-            http_response_code(403); echo 'Not authorized'; return;
+            $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
+            if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
+                http_response_code(403); echo 'Not authorized'; return;
+            }
+
+            $newStatus = ($current === 'published') ? 'draft' : 'published';
+            $this->db->update('products', [
+                'status'     => $newStatus,
+                'is_visible' => ($newStatus === 'published') ? 1 : 0,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $productId]);
+
+            header('Location: /marketplace/sellers/products'); exit;
+        } catch (\Throwable $e) {
+            $logDir  = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/logs';
+            @mkdir($logDir, 0755, true);
+            @file_put_contents($logDir . '/marketplace_errors.log',
+                date('c') . ' - productToggle - user=' . ($_SESSION['user_id'] ?? '?') .
+                ' product=' . ($_POST['id'] ?? '?') .
+                ' - ' . $e->getMessage() . "\n" . $e->getTraceAsString() . "\n\n",
+                FILE_APPEND
+            );
+            http_response_code(500);
+            echo '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:sans-serif">'
+               . '<h2>Failed to update product</h2>'
+               . '<p style="color:#ef4444">' . htmlspecialchars($e->getMessage()) . '</p>'
+               . '<p><a href="/marketplace/sellers/products">← Back to products</a></p>'
+               . '</div>';
         }
-
-        $newStatus = ($current === 'published') ? 'draft' : 'published';
-        $this->db->update('products', [
-            'status'     => $newStatus,
-            'is_visible' => ($newStatus === 'published') ? 1 : 0,
-            'updated_at' => date('Y-m-d H:i:s'),
-        ], ['id' => $productId]);
-
-        header('Location: /marketplace/sellers/products'); exit;
     }
 
     public function productDelete()
