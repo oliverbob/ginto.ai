@@ -457,6 +457,12 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                         <td style="white-space:nowrap;color:var(--muted);font-size:0.775rem"><?= htmlspecialchars(date('M j, Y', strtotime($p['created_at'] ?? 'now'))) ?></td>
                         <td>
                             <div class="sc-actions">
+                                <?php if ($status === 'published'): ?>
+                                <a href="/marketplace" class="sc-action-btn" style="color:#22c55e;border-color:rgba(34,197,94,0.3)" target="_blank" aria-label="View <?= htmlspecialchars($p['title'] ?? '') ?> on store">
+                                    <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                    View
+                                </a>
+                                <?php endif; ?>
                                 <a href="/marketplace/sellers/products/edit/<?= htmlspecialchars($p['id']) ?>"
                                    class="sc-action-btn edit"
                                    aria-label="Edit <?= htmlspecialchars($p['title'] ?? '') ?>">

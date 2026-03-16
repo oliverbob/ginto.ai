@@ -148,7 +148,14 @@ $isLoggedIn = !empty($_SESSION['user_id']);
 <div id="qvOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="qvTitle" aria-hidden="true">
     <div class="modal-box">
         <div class="modal-img-side">
-            <img id="qvImg" src="" alt="">
+            <div class="qv-main-wrap" id="qvMainWrap">
+                <img id="qvImg" src="" alt="" draggable="false">
+                <div class="qv-zoom-lens" id="qvZoomLens"></div>
+                <button class="qv-arrow qv-prev" id="qvPrev" onclick="qvNav(-1)" aria-label="Previous image">&#8249;</button>
+                <button class="qv-arrow qv-next" id="qvNext" onclick="qvNav(1)" aria-label="Next image">&#8250;</button>
+                <div class="qv-counter" id="qvCounter" style="display:none"></div>
+            </div>
+            <div class="qv-thumbs" id="qvThumbs" style="display:none"></div>
         </div>
         <div class="modal-info-side">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">

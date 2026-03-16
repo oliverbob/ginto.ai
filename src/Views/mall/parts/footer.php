@@ -141,19 +141,15 @@
             const card = document.createElement('div');
             card.className = 'product-card';
             card.dataset.id = p.id;
-            const imgs     = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
-            const imgSrc   = imgs[0] || PLACEHOLDER;
-            const hasMulti = imgs.length > 1;
-            const imgsAttr = JSON.stringify(imgs).replace(/"/g, '&quot;');
-            const dotsHtml  = hasMulti ? `<div class="card-dots">${imgs.map((_, i) => `<span class="card-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>` : '';
-            const arrowHtml = hasMulti ? `<div class="card-arrows"><button class="card-arrow" onclick="cardImgNav(event,this,-1)" aria-label="Previous image">&#8249;</button><button class="card-arrow" onclick="cardImgNav(event,this,1)" aria-label="Next image">&#8250;</button></div>` : '';
-            const stars  = '&#9733;'.repeat(Math.round(p.rating)) + '&#9734;'.repeat(5 - Math.round(p.rating));
+            const imgs    = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
+            const imgSrc  = imgs[0] || PLACEHOLDER;
+            const stars   = '&#9733;'.repeat(Math.round(p.rating)) + '&#9734;'.repeat(5 - Math.round(p.rating));
+            const multiBadge = imgs.length > 1 ? `<span class="card-multi-badge">&#128247; ${imgs.length}</span>` : '';
             card.innerHTML = `
-                <div class="product-img-wrap" role="button" tabindex="0" data-idx="0" data-imgs="${imgsAttr}" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
+                <div class="product-img-wrap" role="button" tabindex="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
                     <img class="product-img" src="${esc(imgSrc)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
                     ${p.badge ? `<span class="product-badge">${esc(p.badge)}</span>` : ''}
-                    ${arrowHtml}
-                    ${dotsHtml}
+                    ${multiBadge}
                 </div>
                 <div class="product-body">
                     <div class="product-title">${esc(p.title)}</div>
@@ -239,27 +235,107 @@
     }
 
     /* ============================
-     * QUICK VIEW MODAL
+     * QUICK VIEW MODAL — carousel + zoom
      * ============================ */
+    let _qvImgs = [];
+    let _qvIdx  = 0;
+    let _qvZoomFn = null;
+
     function openQV(id) {
         const p = state.products.find(x => x.id === id);
         if (!p || !qvOverlay) return;
-        document.getElementById('qvImg').src   = p.img || PLACEHOLDER;
-        document.getElementById('qvImg').alt   = p.title;
+
+        _qvImgs = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : [PLACEHOLDER]);
+        _qvIdx  = 0;
+
+        const imgEl = document.getElementById('qvImg');
+        imgEl.src = _qvImgs[0] || PLACEHOLDER;
+        imgEl.alt = p.title;
+
         document.getElementById('qvTitle').textContent  = p.title;
-        document.getElementById('qvRating').textContent = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
+        document.getElementById('qvRating').textContent = '\u2605'.repeat(Math.round(p.rating)) + '\u2606'.repeat(5 - Math.round(p.rating));
         document.getElementById('qvPrice').textContent  = formatPrice(p.price, p.currency);
         document.getElementById('qvDesc').textContent   = p.desc || 'No description available.';
         document.getElementById('qvAddBtn').onclick = function () { addToCart(id); closeQV(); };
+
+        // Thumbnails & counter
+        const thumbsEl  = document.getElementById('qvThumbs');
+        const counterEl = document.getElementById('qvCounter');
+        const prevBtn   = document.getElementById('qvPrev');
+        const nextBtn   = document.getElementById('qvNext');
+        thumbsEl.innerHTML = '';
+        if (_qvImgs.length > 1) {
+            _qvImgs.forEach(function(src, i) {
+                const t = new Image();
+                t.src = src || PLACEHOLDER;
+                t.className = 'qv-thumb' + (i === 0 ? ' active' : '');
+                t.onerror = function () { this.src = PLACEHOLDER; };
+                t.onclick  = function () { qvGoTo(i); };
+                t.setAttribute('aria-label', 'Image ' + (i + 1));
+                thumbsEl.appendChild(t);
+            });
+            counterEl.textContent = '1 / ' + _qvImgs.length;
+            counterEl.style.display = 'block';
+            thumbsEl.style.display  = 'flex';
+            prevBtn.style.display = nextBtn.style.display = '';
+        } else {
+            counterEl.style.display = 'none';
+            thumbsEl.style.display  = 'none';
+            prevBtn.style.display = nextBtn.style.display = 'none';
+        }
+
+        setupQVZoom(imgEl);
         qvOverlay.classList.add('active');
         qvOverlay.setAttribute('aria-hidden', 'false');
         document.body.style.overflow = 'hidden';
     }
+
+    function qvGoTo(idx) {
+        if (!_qvImgs.length) return;
+        _qvIdx  = idx;
+        const imgEl = document.getElementById('qvImg');
+        imgEl.src = _qvImgs[idx] || PLACEHOLDER;
+        document.querySelectorAll('.qv-thumb').forEach(function(t, i) {
+            t.classList.toggle('active', i === idx);
+        });
+        const counterEl = document.getElementById('qvCounter');
+        if (counterEl && counterEl.style.display !== 'none') {
+            counterEl.textContent = (idx + 1) + ' / ' + _qvImgs.length;
+        }
+        setupQVZoom(imgEl);
+    }
+
+    function qvNav(dir) {
+        qvGoTo((_qvIdx + dir + _qvImgs.length) % _qvImgs.length);
+    }
+
+    function setupQVZoom(imgEl) {
+        const wrap = document.getElementById('qvMainWrap');
+        const lens = document.getElementById('qvZoomLens');
+        if (!wrap || !lens) return;
+        if (_qvZoomFn) wrap.removeEventListener('mousemove', _qvZoomFn);
+        const ZF = 3, R = 70; // 3× zoom, lens radius 70 px
+        _qvZoomFn = function (e) {
+            const rect = wrap.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            lens.style.left = x + 'px';
+            lens.style.top  = y + 'px';
+            const src = imgEl.src || '';
+            lens.style.backgroundImage    = "url('" + src.replace(/'/g, "\\'") + "')";
+            lens.style.backgroundSize     = (rect.width * ZF) + 'px ' + (rect.height * ZF) + 'px';
+            lens.style.backgroundPosition = (-(x * ZF - R)) + 'px ' + (-(y * ZF - R)) + 'px';
+        };
+        wrap.addEventListener('mousemove', _qvZoomFn);
+    }
+
     function closeQV() {
         if (!qvOverlay) return;
         qvOverlay.classList.remove('active');
         qvOverlay.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
+        const wrap = document.getElementById('qvMainWrap');
+        if (wrap && _qvZoomFn) { wrap.removeEventListener('mousemove', _qvZoomFn); _qvZoomFn = null; }
     }
     if (qvOverlay) qvOverlay.addEventListener('click', function (e) { if (e.target === qvOverlay) closeQV(); });
 
@@ -480,6 +556,8 @@
      * KEYBOARD / ESCAPE
      * ============================ */
     document.addEventListener('keydown', function (e) {
+        if (e.key === 'ArrowLeft'  && qvOverlay && qvOverlay.classList.contains('active') && _qvImgs.length > 1) { qvNav(-1); return; }
+        if (e.key === 'ArrowRight' && qvOverlay && qvOverlay.classList.contains('active') && _qvImgs.length > 1) { qvNav(1);  return; }
         if (e.key === 'Escape') {
             if (searchOverlay && searchOverlay.classList.contains('open'))     { closeSearch(); return; }
             if (qvOverlay && qvOverlay.classList.contains('active'))           { closeQV(); return; }
@@ -539,44 +617,16 @@
 
     init();
 
-    /* ============================
-     * CARD IMAGE CAROUSEL
-     * ============================ */
-    function cardImgNav(event, btn, dir) {
-        event.stopPropagation();
-        const wrap = btn.closest('.product-img-wrap');
-        let imgs;
-        try { imgs = JSON.parse(wrap.dataset.imgs || '[]'); } catch(e) { imgs = []; }
-        if (imgs.length <= 1) return;
-        let idx = parseInt(wrap.dataset.idx || '0', 10);
-        idx = (idx + dir + imgs.length) % imgs.length;
-        wrap.dataset.idx = idx;
-        const img = wrap.querySelector('.product-img');
-        if (img) {
-            img.classList.add('img-fading');
-            const next = imgs[idx] || PLACEHOLDER;
-            const onLoaded = () => img.classList.remove('img-fading');
-            if (img.src !== next && img.src !== location.origin + next) {
-                img.addEventListener('load', onLoaded, { once: true });
-                img.addEventListener('error', onLoaded, { once: true });
-                img.src = next;
-            } else {
-                setTimeout(onLoaded, 20);
-            }
-        }
-        wrap.querySelectorAll('.card-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
-    }
-
-    // Expose globals needed by inline onclick handlers in home.php
+    // Expose globals needed by inline onclick handlers
     window.openQV           = openQV;
     window.closeQV          = closeQV;
+    window.qvNav            = qvNav;
     window.addToCart        = addToCart;
     window.updateCartQty    = updateCartQty;
     window.toggleCart       = toggleCart;
     window.checkout         = checkout;
     window.openUploadModal  = openUploadModal;
     window.closeUploadModal = closeUploadModal;
-    window.cardImgNav       = cardImgNav;
 
 }());
 
