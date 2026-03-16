@@ -198,12 +198,29 @@ details summary::-webkit-details-marker { display: none; }
     .form-grid-2 { grid-template-columns: 1fr; }
     .kyc-step-info { display: none; }
 }
+
+/* Hamburger nav drawer — always fixed and off-screen, slides in on .open */
+#sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 280px;
+    z-index: 1002;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+}
+#sidebar.open { transform: translateX(0); }
+#sidebarBackdrop { display: block; }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 <div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 <!-- Mobile seller nav drawer (hamburger target) -->
-<aside class="sidebar" id="sidebar" role="navigation" aria-label="Seller navigation" style="width:224px">
+<aside class="sidebar" id="sidebar" role="navigation" aria-label="Seller navigation">
     <div class="sidebar-close-row" id="sidebarCloseRow">
         <div class="sidebar-close-logo">
             <img src="/assets/images/ginto.png" alt="Ginto">

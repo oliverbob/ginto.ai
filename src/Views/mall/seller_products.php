@@ -263,12 +263,14 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
         position: fixed;
         top: 0; left: 0;
         height: 100vh;
-        z-index: 200;
+        z-index: 1002;
         transform: translateX(-100%);
         transition: transform 0.25s ease;
-        box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+        box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        background: var(--bg);
     }
     .sc-sidebar.open { transform: translateX(0); }
+    #sidebarBackdrop { display: block; }
     .sc-main { padding: 16px 14px 32px; }
     .sc-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .sc-table th:nth-child(4), .sc-table td:nth-child(4),
