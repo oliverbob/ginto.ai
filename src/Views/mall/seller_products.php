@@ -259,7 +259,16 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 .sc-empty p    { font-size: 0.855rem; margin-bottom: 18px; }
 
 @media (max-width: 900px) {
-    .sc-sidebar { display: none; }
+    .sc-sidebar {
+        position: fixed;
+        top: 0; left: 0;
+        height: 100vh;
+        z-index: 200;
+        transform: translateX(-100%);
+        transition: transform 0.25s ease;
+        box-shadow: 4px 0 24px rgba(0,0,0,0.18);
+    }
+    .sc-sidebar.open { transform: translateX(0); }
     .sc-main { padding: 16px 14px 32px; }
     .sc-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .sc-table th:nth-child(4), .sc-table td:nth-child(4),
@@ -269,11 +278,21 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
+<div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
 
 <div class="sc-layout">
 
     <!-- ===== SELLER SIDEBAR ===== -->
-    <aside class="sc-sidebar" aria-label="Seller navigation">
+    <aside class="sc-sidebar" id="sidebar" aria-label="Seller navigation">
+        <div class="sidebar-close-row" id="sidebarCloseRow">
+            <div class="sidebar-close-logo">
+                <img src="/assets/images/ginto.png" alt="Ginto">
+                <span>ePower</span>
+            </div>
+            <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close menu">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
         <div class="sc-seller-info">
             <div class="sc-avatar"><?= strtoupper(substr($_SESSION['username'] ?? $_SESSION['email'] ?? 'S', 0, 1)) ?></div>
             <div class="sc-seller-name"><?= htmlspecialchars($_SESSION['username'] ?? 'Seller') ?></div>
