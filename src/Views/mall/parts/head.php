@@ -66,13 +66,15 @@ img { display: block; max-width: 100%; }
 body.light .site-header { background: rgba(255,255,255,0.92); }
 
 .header-inner {
+    position: relative;
     width: 100%;
     max-width: 1440px;
     margin: 0 auto;
-    padding: 0 16px;
+    padding: 0 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
+    overflow: visible;
 }
 
 /* Hamburger (hidden on desktop, shown via media query) */
@@ -103,9 +105,44 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
 .brand img { width: 32px; height: 32px; border-radius: 50%; }
 .brand-name { display: inline; }
 
-.search-form {
+/* Search — icon-only by default, expands into an overlay on click */
+.search-trigger {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all var(--trans);
+}
+.search-trigger:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
+
+/* Full-width expandable search bar that overlays the header */
+.search-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(15,23,42,0.98);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    opacity: 0;
+    pointer-events: none;
+    transform: scaleY(0.9);
+    transform-origin: top;
+    transition: opacity .18s ease, transform .18s ease;
+    z-index: 10;
+}
+body.light .search-overlay { background: rgba(255,255,255,0.98); }
+.search-overlay.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scaleY(1);
+}
+.search-overlay .search-form {
     flex: 1;
-    max-width: 560px;
     display: flex;
     align-items: center;
     background: var(--surface);
@@ -115,11 +152,11 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     gap: 8px;
     transition: border-color var(--trans), box-shadow var(--trans);
 }
-.search-form:focus-within {
+.search-overlay .search-form:focus-within {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
 }
-.search-form input {
+.search-overlay .search-form input {
     flex: 1;
     background: transparent;
     border: none;
@@ -127,14 +164,12 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     color: var(--text);
     font-size: 0.95rem;
     padding: 9px 0;
+    min-width: 0;
 }
-.search-form input::placeholder { color: var(--muted); }
+.search-overlay .search-form input::placeholder { color: var(--muted); }
 .search-btn {
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    width: 36px; height: 36px;
+    display: flex; align-items: center; justify-content: center;
     background: var(--accent);
     color: white;
     border-radius: 20px;
@@ -142,6 +177,19 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     transition: background var(--trans);
 }
 .search-btn:hover { background: var(--accent-h); }
+.search-close {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: all var(--trans);
+}
+.search-close:hover { background: var(--surface); color: var(--text); }
 
 .header-actions {
     display: flex;

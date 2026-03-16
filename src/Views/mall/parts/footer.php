@@ -429,15 +429,34 @@
     // (filters apply when products carry the flags)
 
     /* ============================
-     * SEARCH
+     * SEARCH OVERLAY
      * ============================ */
+    var searchTrigger = document.getElementById('searchTrigger');
+    var searchOverlay = document.getElementById('searchOverlay');
+    var searchClose   = document.getElementById('searchClose');
+
+    function openSearch() {
+        if (!searchOverlay) return;
+        searchOverlay.classList.add('open');
+        if (searchTrigger) searchTrigger.setAttribute('aria-expanded', 'true');
+        setTimeout(function () { if (searchInput) searchInput.focus(); }, 60);
+    }
+    function closeSearch() {
+        if (!searchOverlay) return;
+        searchOverlay.classList.remove('open');
+        if (searchTrigger) searchTrigger.setAttribute('aria-expanded', 'false');
+    }
+
+    if (searchTrigger) searchTrigger.addEventListener('click', openSearch);
+    if (searchClose)   searchClose.addEventListener('click', closeSearch);
+
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             state.filters.search = this.value;
             renderProducts();
         });
         // Prevent form submit reload
-        const searchForm = document.getElementById('searchForm');
+        var searchForm = document.getElementById('searchForm');
         if (searchForm) searchForm.addEventListener('submit', function (e) { e.preventDefault(); });
     }
 
@@ -446,11 +465,12 @@
      * ============================ */
     document.addEventListener('keydown', function (e) {
         if (e.key === 'Escape') {
-            if (qvOverlay && qvOverlay.classList.contains('active'))          { closeQV(); return; }
+            if (searchOverlay && searchOverlay.classList.contains('open'))     { closeSearch(); return; }
+            if (qvOverlay && qvOverlay.classList.contains('active'))           { closeQV(); return; }
             const upOvl = document.getElementById('uploadOverlay');
-            if (upOvl && upOvl.classList.contains('active'))                  { closeUploadModal(); return; }
-            if (cartDrawer && cartDrawer.classList.contains('active'))         { closeCart(); return; }
-            if (sidebar && sidebar.classList.contains('open'))                 { closeSidebar(); }
+            if (upOvl && upOvl.classList.contains('active'))                   { closeUploadModal(); return; }
+            if (cartDrawer && cartDrawer.classList.contains('active'))          { closeCart(); return; }
+            if (sidebar && sidebar.classList.contains('open'))                  { closeSidebar(); }
         }
     });
 

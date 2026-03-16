@@ -20,18 +20,28 @@ $isLoggedIn = !empty($_SESSION['user_id']);
             <span class="brand-name">ePower</span>
         </a>
 
-        <!-- Search -->
-        <form class="search-form" id="searchForm" role="search" aria-label="Search products">
-            <input id="searchInput" type="search" placeholder="Search products…" aria-label="Search products" autocomplete="off">
-            <button class="search-btn" type="submit" aria-label="Search">
-                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-            </button>
-        </form>
+        <!-- Search trigger icon -->
+        <button class="search-trigger" id="searchTrigger" aria-label="Search products" aria-expanded="false" aria-controls="searchOverlay">
+            <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+        </button>
+
+        <!-- Search overlay (expands over header when open) -->
+        <div class="search-overlay" id="searchOverlay" role="search" aria-label="Search products">
+            <form class="search-form" id="searchForm">
+                <input id="searchInput" type="search" placeholder="Search products…" aria-label="Search products" autocomplete="off">
+                <button class="search-btn" type="submit" aria-label="Submit search">
+                    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                    </svg>
+                </button>
+            </form>
+            <button class="search-close" id="searchClose" aria-label="Close search">✕</button>
+        </div>
 
         <!-- Actions -->
-        <div class="header-actions">
+        <div class="header-actions" style="margin-left:auto">
             <?php if ($isLoggedIn): ?>
             <button class="action-btn" id="sellBtn" aria-label="Sell an item" title="Sell an item" onclick="openUploadModal()">
                 <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
