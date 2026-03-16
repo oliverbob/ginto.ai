@@ -114,6 +114,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
      * 
      * Groq free-tier "on_demand" service tier has very low per-model TPM limits.
      * A single request whose input token count exceeds that limit will be rejected.
+     * Note: budget applies to the TOTAL request (messages + tools). See ensurePayloadWithinLimit.
      */
     protected static array $inputTokenBudgets = [
         'groq' => [
@@ -287,9 +288,12 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         if (!empty($payload['messages'])) {
             $tokenBudget = $this->getInputTokenBudget($payload['model'] ?? '');
             if ($tokenBudget > 0) {
-                $estimated = self::estimateInputTokens($payload['messages']);
-                if ($estimated > $tokenBudget) {
-                    $this->truncateToTokenBudget($payload['messages'], $tokenBudget);
+                // Tools (function definitions) consume tokens too — estimate and reserve space for them
+                $toolsTokens   = self::estimateToolsTokens($payload['tools'] ?? []);
+                $messageBudget = max(500, $tokenBudget - $toolsTokens);
+                $estimated     = self::estimateInputTokens($payload['messages']);
+                if ($estimated > $messageBudget) {
+                    $this->truncateToTokenBudget($payload['messages'], $messageBudget);
                 }
             }
         }
@@ -405,6 +409,19 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
             $total  += (int)ceil(mb_strlen($text) / 4) + 4; // 4-token overhead per message
         }
         return $total;
+    }
+
+    /**
+     * Rough token estimate for the tools array (function definitions).
+     * Each tool definition is serialised to JSON for a reliable character count.
+     */
+    private static function estimateToolsTokens(array $tools): int
+    {
+        if (empty($tools)) {
+            return 0;
+        }
+        $json = json_encode($tools) ?: '';
+        return (int)ceil(mb_strlen($json) / 4) + 10; // small overhead for the tools wrapper
     }
 
     /**
