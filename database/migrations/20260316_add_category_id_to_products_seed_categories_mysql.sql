@@ -20,7 +20,7 @@ SET @has_col = (
 );
 SET @sql = IF(
     @has_col = 0,
-    'ALTER TABLE `products` ADD COLUMN `category_id` BIGINT UNSIGNED DEFAULT NULL',
+    'ALTER TABLE `products` ADD COLUMN `category_id` INT DEFAULT NULL',
     'SELECT "products.category_id already exists" AS note'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
@@ -63,7 +63,7 @@ SET @cats_exist = (
 
 SET @sql = IF(
     @has_fk = 0 AND @cats_exist = 1,
-    'ALTER TABLE `products` ADD CONSTRAINT `products_category_fk` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL',
+    'ALTER TABLE `products` ADD CONSTRAINT `products_category_fk` FOREIGN KEY (`category_id`) REFERENCES `categories` (`id`) ON DELETE SET NULL ON UPDATE CASCADE',
     'SELECT "fk already exists or categories table missing" AS note'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
