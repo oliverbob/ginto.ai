@@ -487,9 +487,10 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     inset: 0;
     width: 100%; height: 100%;
     object-fit: cover;
-    transition: transform 0.4s, opacity 0.25s;
+    transition: transform 0.45s ease, opacity 0.22s ease;
 }
-.product-card:hover .product-img { transform: scale(1.04); }
+.product-img-wrap:hover .product-img { transform: scale(1.1); }
+.product-img.img-fading { opacity: 0.15; }
 /* Multi-image carousel */
 .card-arrows {
     position: absolute;
@@ -498,50 +499,52 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     align-items: center;
     justify-content: space-between;
     opacity: 0;
-    transition: opacity 0.2s;
+    transition: opacity 0.18s;
     pointer-events: none;
-    z-index: 2;
+    z-index: 3;
 }
 .product-img-wrap:hover .card-arrows { opacity: 1; pointer-events: auto; }
 .card-arrow {
-    background: rgba(0,0,0,0.45);
+    background: rgba(0,0,0,0.55);
     color: #fff;
-    width: 28px;
-    height: 28px;
+    width: 30px;
+    height: 30px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 1.15rem;
+    font-size: 1.3rem;
     line-height: 1;
     margin: 6px;
     flex-shrink: 0;
-    transition: background 0.15s;
+    transition: background 0.15s, transform 0.15s;
     border: none;
     outline: none;
     font-family: inherit;
+    user-select: none;
 }
-.card-arrow:hover { background: rgba(0,0,0,0.75); }
+.card-arrow:hover { background: rgba(0,0,0,0.82); transform: scale(1.1); }
 .card-dots {
     position: absolute;
-    bottom: 8px;
+    bottom: 7px;
     left: 0;
     right: 0;
     display: flex;
     justify-content: center;
     gap: 5px;
-    z-index: 2;
+    z-index: 3;
     pointer-events: none;
 }
 .card-dot {
-    width: 6px;
-    height: 6px;
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
-    background: rgba(255,255,255,0.45);
+    background: rgba(255,255,255,0.4);
+    border: 1px solid rgba(255,255,255,0.6);
     transition: background 0.2s, transform 0.2s;
 }
-.card-dot.active { background: #fff; transform: scale(1.3); }
+.card-dot.active { background: #fff; transform: scale(1.35); border-color: #fff; }
 .product-badge {
     position: absolute;
     top: 10px; left: 10px;

@@ -144,11 +144,12 @@
             const imgs     = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
             const imgSrc   = imgs[0] || PLACEHOLDER;
             const hasMulti = imgs.length > 1;
+            const imgsAttr = JSON.stringify(imgs).replace(/"/g, '&quot;');
             const dotsHtml  = hasMulti ? `<div class="card-dots">${imgs.map((_, i) => `<span class="card-dot${i === 0 ? ' active' : ''}"></span>`).join('')}</div>` : '';
             const arrowHtml = hasMulti ? `<div class="card-arrows"><button class="card-arrow" onclick="cardImgNav(event,this,-1)" aria-label="Previous image">&#8249;</button><button class="card-arrow" onclick="cardImgNav(event,this,1)" aria-label="Next image">&#8250;</button></div>` : '';
-            const stars  = '★'.repeat(Math.round(p.rating)) + '☆'.repeat(5 - Math.round(p.rating));
+            const stars  = '&#9733;'.repeat(Math.round(p.rating)) + '&#9734;'.repeat(5 - Math.round(p.rating));
             card.innerHTML = `
-                <div class="product-img-wrap" role="button" tabindex="0" data-idx="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
+                <div class="product-img-wrap" role="button" tabindex="0" data-idx="0" data-imgs="${imgsAttr}" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
                     <img class="product-img" src="${esc(imgSrc)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
                     ${p.badge ? `<span class="product-badge">${esc(p.badge)}</span>` : ''}
                     ${arrowHtml}
@@ -492,15 +493,34 @@
     /* ============================
      * SERVER PRODUCT LOAD
      * ============================ */
+    function normaliseProduct(p) {
+        const raw  = Array.isArray(p.images) ? p.images : (Array.isArray(p.imgs) ? p.imgs : []);
+        const imgs = raw.filter(Boolean);
+        const img  = p.img || imgs[0] || null;
+        return {
+            id:       p.id,
+            title:    p.title || '',
+            price:    parseFloat(p.price) || 0,
+            currency: p.currency || 'USD',
+            cat:      p.cat != null ? p.cat : (p.category_id != null ? parseInt(p.category_id, 10) : null),
+            rating:   parseFloat(p.rating) || 0,
+            img:      img,
+            imgs:     imgs.length ? imgs : (img ? [img] : []),
+            desc:     p.desc || p.short_description || '',
+            badge:    p.badge || null,
+        };
+    }
+
     async function loadServerProducts() {
         try {
             const res = await fetch('/api/mall/products');
             if (!res.ok) return;
             const json = await res.json();
             if (json?.success && Array.isArray(json.products)) {
-                // Merge: server products first, local (JS-only) stubs appended
-                const ids = new Set(json.products.map(p => p.id));
-                state.products = [...json.products, ...state.products.filter(p => !ids.has(p.id))];
+                // Merge: server products first (normalised), then any local stubs not in server list
+                const normalised = json.products.map(normaliseProduct);
+                const ids = new Set(normalised.map(p => p.id));
+                state.products = [...normalised, ...state.products.filter(p => !ids.has(p.id))];
             }
         } catch (e) {
             console.warn('Failed to fetch server products', e);
@@ -525,17 +545,25 @@
     function cardImgNav(event, btn, dir) {
         event.stopPropagation();
         const wrap = btn.closest('.product-img-wrap');
-        const card = wrap.closest('.product-card');
-        const id   = parseInt(card.dataset.id, 10);
-        const p    = state.products.find(x => x.id === id);
-        if (!p) return;
-        const imgs = (p.imgs && p.imgs.length) ? p.imgs : [];
+        let imgs;
+        try { imgs = JSON.parse(wrap.dataset.imgs || '[]'); } catch(e) { imgs = []; }
         if (imgs.length <= 1) return;
         let idx = parseInt(wrap.dataset.idx || '0', 10);
         idx = (idx + dir + imgs.length) % imgs.length;
         wrap.dataset.idx = idx;
         const img = wrap.querySelector('.product-img');
-        if (img) img.src = imgs[idx] || PLACEHOLDER;
+        if (img) {
+            img.classList.add('img-fading');
+            const next = imgs[idx] || PLACEHOLDER;
+            const onLoaded = () => img.classList.remove('img-fading');
+            if (img.src !== next && img.src !== location.origin + next) {
+                img.addEventListener('load', onLoaded, { once: true });
+                img.addEventListener('error', onLoaded, { once: true });
+                img.src = next;
+            } else {
+                setTimeout(onLoaded, 20);
+            }
+        }
         wrap.querySelectorAll('.card-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
     }
 

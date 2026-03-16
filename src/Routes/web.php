@@ -1295,14 +1295,30 @@ $router->req('/api/mall/products', function() use ($db) {
     try {
         $rows = $db->select('products', '*', ['status' => 'published', 'is_visible' => 1, 'ORDER' => ['created_at' => 'DESC'], 'LIMIT' => [0, 200]]);
         foreach ($rows as $r) {
+            $imgs_arr = [];
+            $img = null;
+            if (!empty($r['images'])) {
+                $decoded = json_decode($r['images'], true);
+                if (is_array($decoded)) {
+                    $imgs_arr = array_values(array_filter($decoded));
+                    $img = $imgs_arr[0] ?? null;
+                }
+            }
+            if (!$img && !empty($r['image_path'])) {
+                $img = $r['image_path'];
+                if (empty($imgs_arr)) $imgs_arr = [$img];
+            }
             $products[] = [
-                'id' => (int)$r['id'],
-                'title' => $r['title'],
-                'price' => floatval($r['price']),
-                'currency' => $r['currency'],
-                'category_id' => $r['category_id'],
-                'short_description' => $r['short_description'],
-                'images' => !empty($r['images']) ? json_decode($r['images'], true) : [],
+                'id'       => (int)$r['id'],
+                'title'    => $r['title'] ?? '',
+                'price'    => (float)($r['price'] ?? 0),
+                'currency' => $r['currency'] ?? 'USD',
+                'cat'      => isset($r['category_id']) ? (int)$r['category_id'] : null,
+                'rating'   => (float)($r['rating'] ?? 0),
+                'img'      => $img,
+                'imgs'     => $imgs_arr,
+                'desc'     => $r['short_description'] ?? '',
+                'badge'    => $r['badge'] ?? null,
             ];
         }
     } catch (\Throwable $e) {
