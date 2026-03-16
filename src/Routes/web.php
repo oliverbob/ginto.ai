@@ -1238,10 +1238,9 @@ $router->req('/marketplace/sellers/products/update/{id}', 'SellerController@prod
 $router->req('/admin/kyc', 'AdminKycController@index');
 $router->req('/admin/kyc/review/{id}', 'AdminKycController@review', ['POST']);
 
-// Mall image serving — PHP proxies files from storage/mall/images (outside web root) to prevent
-// direct filesystem access. Only image file types are served; login required.
+// Mall image serving — PHP proxies files from storage/mall/images (outside web root).
+// Product images are publicly accessible (no login required).
 $router->req('/storage/mall/images/{filename}', function($filename) {
-    if (empty($_SESSION['user_id'])) { http_response_code(403); exit; }
     // Sanitize: only allow safe filenames (no path traversal)
     $filename = basename($filename);
     if (!preg_match('/^[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}$/', $filename)) {

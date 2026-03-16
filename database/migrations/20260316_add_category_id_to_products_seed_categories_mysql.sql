@@ -52,4 +52,5 @@ INSERT IGNORE INTO `categories` (`name`, `slug`, `description`, `sort_order`, `c
     ('Beauty',         'beauty',        'Skincare, makeup, hair care & wellness',    5, NOW(), NOW()),
     ('Books',          'books',         'Books, education & learning materials',     6, NOW(), NOW()),
     ('Food & Grocery', 'food-grocery',  'Fresh produce, snacks & packaged goods',   7, NOW(), NOW()),
-    ('Toys & Hobbies', 'toys-hobbies',  'Toys, board games & hobby supplies',       8, NOW(), NOW());
+    ('Toys & Hobbies',    'toys-hobbies',     'Toys, board games & hobby supplies',                8, NOW(), NOW()),
+    ('Health & Wellness', 'health-wellness', 'Health supplements, fitness, wellness products',  9, NOW(), NOW());

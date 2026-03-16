@@ -173,20 +173,32 @@ class SellerController extends \Core\Controller
         $currency = $_POST['currency'] ?? 'USD';
         $category = intval($_POST['category_id'] ?? 0) ?: null;
 
-        // Handle images upload (multiple)
+        // Handle images upload (multiple) — use B2 when configured, else local storage
         $imagesArray = [];
         if (!empty($_FILES['images'])) {
-            $files = $_FILES['images'];
+            $files   = $_FILES['images'];
+            $useB2   = \Ginto\Helpers\B2Helper::isEnabled();
             $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
-            $uploadDir   = $storagePath . '/mall/images/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
             for ($i = 0; $i < count($files['name']); $i++) {
                 if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $name   = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
-                $target = $uploadDir . uniqid() . '_' . $name;
-                if (move_uploaded_file($files['tmp_name'][$i], $target)) {
-                    chmod($target, 0640);
-                    $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
+                if ($useB2) {
+                    $fileData   = file_get_contents($files['tmp_name'][$i]);
+                    $remotePath = 'mall/images/' . uniqid() . '_' . $name;
+                    $mimeType   = $files['type'][$i] ?: 'image/jpeg';
+                    try {
+                        $imagesArray[] = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                    } catch (\Exception $e) {
+                        error_log('B2 upload failed: ' . $e->getMessage());
+                    }
+                } else {
+                    $uploadDir = $storagePath . '/mall/images/';
+                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+                    $target = $uploadDir . uniqid() . '_' . $name;
+                    if (move_uploaded_file($files['tmp_name'][$i], $target)) {
+                        chmod($target, 0640);
+                        $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                    }
                 }
             }
         }
@@ -317,20 +329,32 @@ class SellerController extends \Core\Controller
         $qty      = intval($_POST['quantity'] ?? 0);
         $category = intval($_POST['category_id'] ?? 0) ?: null;
 
-        // Append any new image uploads to existing images
+        // Append any new image uploads to existing — use B2 when configured, else local storage
         $imagesArray = json_decode($existing['images'] ?? '[]', true) ?: [];
         if (!empty($_FILES['images'])) {
-            $files       = $_FILES['images'];
+            $files   = $_FILES['images'];
+            $useB2   = \Ginto\Helpers\B2Helper::isEnabled();
             $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
-            $uploadDir   = $storagePath . '/mall/images/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
             for ($i = 0; $i < count($files['name']); $i++) {
                 if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $name   = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
-                $target = $uploadDir . uniqid() . '_' . $name;
-                if (move_uploaded_file($files['tmp_name'][$i], $target)) {
-                    chmod($target, 0640);
-                    $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
+                if ($useB2) {
+                    $fileData   = file_get_contents($files['tmp_name'][$i]);
+                    $remotePath = 'mall/images/' . uniqid() . '_' . $name;
+                    $mimeType   = $files['type'][$i] ?: 'image/jpeg';
+                    try {
+                        $imagesArray[] = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mimeType);
+                    } catch (\Exception $e) {
+                        error_log('B2 upload failed: ' . $e->getMessage());
+                    }
+                } else {
+                    $uploadDir = $storagePath . '/mall/images/';
+                    if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+                    $target = $uploadDir . uniqid() . '_' . $name;
+                    if (move_uploaded_file($files['tmp_name'][$i], $target)) {
+                        chmod($target, 0640);
+                        $imagesArray[] = str_replace($storagePath, '/storage', $target);
+                    }
                 }
             }
         }
