@@ -47,16 +47,17 @@ try {
     </button>
     <?php if ($isLoggedIn || $isAdmin): ?>
     <button id="model-selector-btn-mobile" class="model-replace-on-tiny relative flex items-center justify-center flex-shrink-0 w-9 h-9 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer" aria-haspopup="true" aria-expanded="false" title="Select AI model">
-      <!-- Proper AI brain icon (neural network style) -->
+      <!-- Bot icon -->
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 5C9.2 5 7 7.2 7 10c0 1.4.6 2.7 1.5 3.6C7.6 14.1 7 15.1 7 16.2c0 1.5 1 2.7 2.4 3.1.3.6.9 1 1.6 1h2c.7 0 1.3-.4 1.6-1 1.4-.4 2.4-1.7 2.4-3.1 0-1.1-.6-2.1-1.5-2.6.9-.9 1.5-2.2 1.5-3.6 0-2.8-2.2-5-5-5z"/>
-        <line x1="12" y1="9" x2="12" y2="11"/>
-        <line x1="10" y1="13" x2="14" y2="13"/>
-        <circle cx="10" cy="9" r=".6" fill="currentColor" stroke="none"/>
-        <circle cx="14" cy="9" r=".6" fill="currentColor" stroke="none"/>
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <path d="M12 11V7"/>
+        <circle cx="12" cy="5" r="2"/>
+        <circle cx="8.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+        <path d="M8 19h8"/>
       </svg>
-      <!-- Green live indicator — visible badge at top-right corner -->
-      <span id="mobile-model-status-dot" class="absolute top-1 right-1 w-2 h-2 rounded-full bg-green-500 ring-1 ring-white dark:ring-gray-800" aria-hidden="true"></span>
+      <!-- Green live indicator — offset further from icon -->
+      <span id="mobile-model-status-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900" aria-hidden="true"></span>
       <span class="sr-only" id="mobile-model-name">Ginto AI</span>
     </button>
     <!-- Mobile dropdown (hidden by default) -->
