@@ -808,6 +808,8 @@ try {
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Build Pro kit given free every 6 months</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Optional P3000.00 (PH only) for the multivitamin kit</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 45% outright commission</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Monthly residual income</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to Level 1-6 commissions</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced training</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Marketing materials</li>
