@@ -555,7 +555,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['livelihood','🌾', 'Livelihood', 'Small-scale: farmers, fisherfolk, artisans, backyard producers'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
-                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
                                 <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
                             </label>
                             <?php endforeach; ?>
@@ -573,7 +573,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['mall',                '🏬', 'Mall / Tiangge',      'Multi-category storefront, boutique, or kiosk'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
-                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
                                 <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
                             </label>
                             <?php endforeach; ?>
@@ -598,7 +598,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['arts_crafts',          '🎨', 'Arts & Crafts',       'Handmade items, custom art, crafts, collectibles, and creative goods'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
-                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
                                 <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
                             </label>
                             <?php endforeach; ?>
@@ -614,7 +614,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['cooperative',  '🤝', 'Cooperative',  'CDA-registered cooperative or multi-stakeholder group'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
-                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
                                 <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
                             </label>
                             <?php endforeach; ?>
@@ -631,7 +631,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['ginto_partnership_program', '🤜', 'Partnership Program', 'Formal revenue-sharing partnership with Ginto ePower Mall'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
-                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
                                 <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
                             </label>
                             <?php endforeach; ?>
@@ -960,7 +960,7 @@ details summary::-webkit-details-marker { display: none; }
         </div>
 
         <!-- ===== SUPPORTING / BUSINESS DOCUMENTS ===== -->
-        <div class="kyc-card" style="margin-bottom:24px">
+        <div class="kyc-card" id="supportDocsCard" style="margin-bottom:24px">
             <div class="kyc-card-header">
                 <div class="kyc-card-icon">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -1143,20 +1143,33 @@ function kycIsSupportRequired() {
 
 function kycUpdateSupportUI() {
     var req     = kycIsSupportRequired();
+    var card    = document.getElementById('supportDocsCard');
     var badge   = document.getElementById('supportReqBadge');
     var note    = document.getElementById('supportMandatoryNote');
     var reqStar = document.getElementById('supportCheckReq');
+    if (card)    card.style.display    = req ? ''       : 'none';
     if (badge)   badge.style.display   = req ? 'inline' : 'none';
     if (note)    note.style.display    = req ? 'block'  : 'none';
     if (reqStar) reqStar.style.display = req ? 'inline' : 'none';
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-    document.querySelectorAll('input[name="_acct_radio"]').forEach(function (r) {
-        r.addEventListener('change', kycUpdateSupportUI);
-    });
-    kycUpdateSupportUI();
-});
+// Run immediately (script is at bottom of page — DOMContentLoaded may have already fired)
+kycUpdateSupportUI();
+
+// Also attach change listeners; guard against double-attach
+(function attachAcctListeners() {
+    var radios = document.querySelectorAll('input[name="_acct_radio"]');
+    if (radios.length) {
+        radios.forEach(function (r) { r.addEventListener('change', kycUpdateSupportUI); });
+    } else {
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('input[name="_acct_radio"]').forEach(function (r) {
+                r.addEventListener('change', kycUpdateSupportUI);
+            });
+            kycUpdateSupportUI();
+        });
+    }
+}());
 
 /* ===== SUBMIT VALIDATION ===== */
 window.kycValidateAndSubmit = function (btn) {
