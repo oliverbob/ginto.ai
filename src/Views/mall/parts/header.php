@@ -15,7 +15,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
         </button>
 
         <!-- Brand -->
-        <a href="/marketplace" class="brand" aria-label="ePower Mall home">
+        <a href="/" class="brand" aria-label="Ginto home">
             <img src="/assets/images/ginto.png" alt="Ginto">
             <span class="brand-name">ePower</span>
         </a>

@@ -28,6 +28,14 @@ $isLoggedIn = !empty($_SESSION['user_id']);
 
         <div class="sidebar-inner">
 
+            <!-- Back to Ginto Home -->
+            <div class="sidebar-section" style="margin-bottom:16px">
+                <a href="/" class="cat-item" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit;" aria-label="Back to Ginto home">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    Ginto Home
+                </a>
+            </div>
+
             <!-- Categories -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Categories</div>
