@@ -1123,6 +1123,22 @@ details summary::-webkit-details-marker { display: none; }
 }());
 </script>
 
+<footer style="text-align:center;padding:32px 16px 40px;border-top:1px solid var(--border);margin-top:48px">
+    <div style="max-width:700px;margin:0 auto">
+        <div style="font-size:0.72rem;color:var(--muted);line-height:1.9">
+            <strong style="color:var(--text);font-size:0.8rem">Ginto Mall</strong>,
+            <strong style="color:var(--text);font-size:0.8rem">Ginto ePower Mall</strong>, and
+            <strong style="color:var(--text);font-size:0.8rem">Ginto Marketplace</strong>
+            are trademarks of <strong style="color:var(--text)">BusinessWeek Mindanao</strong>,
+            <strong style="color:var(--text)">AI HQ Corp</strong>, and
+            <strong style="color:var(--text)">Conglomerates</strong>.
+            All rights reserved.<br>
+            &copy; <?= date('Y') ?> Ginto ePower Mall. Unauthorized use, reproduction, or distribution of these marks is prohibited.<br>
+            <span style="font-size:0.68rem;opacity:0.7">Powered by Ginto &middot; Secured by RA 10173 &middot; Compliant with RA 9160</span>
+        </div>
+    </div>
+</footer>
+
 <?php include __DIR__ . '/parts/footer.php'; ?>
 </body>
 </html>
