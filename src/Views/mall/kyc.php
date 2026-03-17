@@ -610,8 +610,10 @@ details summary::-webkit-details-marker { display: none; }
                         <div class="acct-type-group-label">🤝 Organizational</div>
                         <div class="acct-type-grid">
                             <?php foreach ([
-                                ['business',     '🏢', 'Business',     'DTI / SEC registered company or enterprise'],
-                                ['cooperative',  '🤝', 'Cooperative',  'CDA-registered cooperative or multi-stakeholder group'],
+                                ['business',          '🏢', 'Business',     'DTI / SEC registered company or enterprise'],
+                                ['cooperative',       '🤝', 'Cooperative',  'CDA-registered cooperative or multi-stakeholder group'],
+                                ['non_profit',        '💚', 'Non-Profit',   'NGO, foundation, association, or charitable organization (SEC / DSWD registered)'],
+                                ['government_program','🏛️', 'Government Program', 'LGU, national agency, or government-sponsored program'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
                                 <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value;if(window.kycUpdateSupportUI)kycUpdateSupportUI();">
@@ -981,8 +983,9 @@ details summary::-webkit-details-marker { display: none; }
                             'sec_certificate'   => '🏛️ SEC Certificate of Registration',
                             'business_permit'   => "📋 Business Permit / Mayor's Permit",
                             'bir_cor'           => '🧾 BIR Certificate of Registration (Form 2303)',
-                            'cda_certificate'   => '🤝 CDA Cooperative Registration',
-                            'other_support'     => '📎 Other Supporting Document',
+                            'cda_certificate'             => '🤝 CDA Cooperative Registration',
+                            'government_program_certificate' => '🏛️ Government Program Certificate / Authority',
+                            'other_support'               => '📎 Other Supporting Document',
                         ] as $val => $label): ?>
                         <label class="doc-check-label">
                             <input type="checkbox" name="doc_types[]" value="<?= htmlspecialchars($val) ?>"
@@ -1132,7 +1135,7 @@ var SUPPORT_REQUIRED_TYPES = [
     'products','services','real_estate','rentals','multi_purpose',
     'digital_content','intellectual_property','food_beverage',
     'fashion_apparel','health_wellness','arts_crafts',
-    'business','cooperative',
+    'business','cooperative','non_profit','government_program',
     'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program'
 ];
 

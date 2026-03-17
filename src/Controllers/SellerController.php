@@ -63,7 +63,7 @@ class SellerController extends \Core\Controller
             'mall','products','services','real_estate','rentals','multi_purpose',
             'digital_content','intellectual_property','food_beverage',
             'fashion_apparel','health_wellness','arts_crafts',
-            'business','cooperative',
+            'business','cooperative','non_profit','government_program',
             'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program',
         ];
         $rawAccountType = trim($_POST['account_type'] ?? '');
@@ -78,7 +78,7 @@ class SellerController extends \Core\Controller
             'ncip_certificate','entity_endorsement','other_id',
             // Supporting / business documents
             'proof_of_address','dti_certificate','sec_certificate',
-            'business_permit','bir_cor','cda_certificate','other_support',
+            'business_permit','bir_cor','cda_certificate','government_program_certificate','other_support',
             'other', // legacy
         ];
         $docTypes = array_values(array_intersect((array)$rawDocTypes, $allowedDocTypes));
