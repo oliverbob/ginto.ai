@@ -630,7 +630,7 @@ details summary::-webkit-details-marker { display: none; }
                             'barangay_clearance'=> 'Barangay Clearance',
                             'dti_certificate'   => 'DTI Business Name Certificate',
                             'sec_certificate'   => 'SEC Certificate of Registration',
-                            'business_permit'   => 'Business Permit / Mayor's Permit',
+                            'business_permit'   => "Business Permit / Mayor's Permit",
                             'bir_cor'           => 'BIR Certificate of Registration (Form 2303)',
                             'cda_certificate'   => 'CDA Cooperative Registration',
                             'ncip_certificate'  => 'NCIP Certificate of Membership',
