@@ -946,10 +946,12 @@ details summary::-webkit-details-marker { display: none; }
                     <div class="form-hint" style="margin-top:6px">Check all document types included in your upload below.</div>
                 </div>
 
+                <input type="hidden" id="kycHasExistingDocs" value="<?= !empty($docs) ? '1' : '0' ?>">
+
                 <div class="doc-upload-area" id="docUploadArea" role="button" tabindex="0" aria-label="Upload documents">
                     <input type="file" name="documents[]" id="docFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
                     <div class="upload-icon">📎</div>
-                    <div class="upload-title">Click or drag &amp; drop files here</div>
+                    <div class="upload-title" id="uploadTitle">Click or drag &amp; drop files here</div>
                     <div class="upload-sub">
                         Required: ID / Document (front &amp; back) · Selfie holding your ID · Proof of address<br>
                         Business sellers: include DTI / SEC / Business Permit &amp; BIR COR<br>
@@ -957,14 +959,17 @@ details summary::-webkit-details-marker { display: none; }
                         <span style="color:var(--accent)">Mandated under RA 9160 (AMLA) &amp; RA 10173 (Data Privacy Act)</span>
                     </div>
                 </div>
+                <div id="kycFileCount" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:#22c55e;font-weight:600"></div>
                 <div class="doc-previews" id="docPreviews"></div>
+
+                <div id="kycDocsErr" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--danger)"></div>
             </div>
         </div>
 
         <div class="kyc-wiz-btns">
             <button type="button" class="kwb-back" onclick="kycWizardGoTo(4)">← Back</button>
             <span class="kwb-space"></span>
-            <button type="submit" class="btn btn-primary kwb-next" style="padding:10px 26px">
+            <button type="button" class="btn btn-primary kwb-next" style="padding:10px 26px" onclick="kycValidateAndSubmit(this)">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <?= $submitted ? 'Re-submit KYC' : 'Submit for Review' ?>
             </button>
@@ -1073,11 +1078,60 @@ details summary::-webkit-details-marker { display: none; }
     updateNav();
 })();
 
+/* ===== SUBMIT VALIDATION ===== */
+window.kycValidateAndSubmit = function (btn) {
+    var err        = document.getElementById('kycDocsErr');
+    var fileInput  = document.getElementById('docFilesInput');
+    var checkboxes = document.querySelectorAll('input[name="doc_types[]"]');
+    var checked    = document.querySelectorAll('input[name="doc_types[]"]:checked');
+    var hasExist   = document.getElementById('kycHasExistingDocs');
+    var hasExistingDocs = hasExist && hasExist.value === '1';
+    var messages   = [];
+
+    if (checked.length === 0) {
+        messages.push('⚠ Please tick at least one document type in the checklist above so we know what you are uploading.');
+    }
+    if (!fileInput || fileInput.files.length === 0) {
+        if (!hasExistingDocs) {
+            messages.push('⚠ No files attached. Click the upload area to select your ID, selfie, and supporting documents before submitting.');
+        }
+    }
+
+    if (messages.length > 0) {
+        err.style.display = 'block';
+        err.innerHTML = messages.join('<br style="margin-bottom:4px">');
+        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+    }
+
+    err.style.display = 'none';
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Uploading & Submitting…';
+    btn.closest('form').submit();
+};
+
 /* ===== DOCUMENT UPLOAD ===== */
 (function () {
     const area     = document.getElementById('docUploadArea');
     const input    = document.getElementById('docFilesInput');
     const previews = document.getElementById('docPreviews');
+    const countEl  = document.getElementById('kycFileCount');
+    const titleEl  = document.getElementById('uploadTitle');
+
+    function updateFileCount() {
+        if (!input || !countEl) return;
+        var n = input.files ? input.files.length : 0;
+        if (n > 0) {
+            countEl.style.display = 'block';
+            countEl.textContent = '✅ ' + n + ' file' + (n > 1 ? 's' : '') + ' selected and ready to submit.';
+            if (titleEl) titleEl.textContent = n + ' file' + (n > 1 ? 's' : '') + ' selected';
+            var err = document.getElementById('kycDocsErr');
+            if (err) err.style.display = 'none';
+        } else {
+            countEl.style.display = 'none';
+            if (titleEl) titleEl.innerHTML = 'Click or drag &amp; drop files here';
+        }
+    }
 
     function showPreviews() {
         if (!previews || !input || !input.files.length) return;
@@ -1103,7 +1157,7 @@ details summary::-webkit-details-marker { display: none; }
         });
     }
 
-    if (input) input.addEventListener('change', showPreviews);
+    if (input) input.addEventListener('change', function () { updateFileCount(); showPreviews(); });
 
     if (area) {
         area.addEventListener('keydown', function (e) {
@@ -1116,6 +1170,7 @@ details summary::-webkit-details-marker { display: none; }
             area.classList.remove('drag-over');
             if (input && e.dataTransfer.files.length) {
                 try { input.files = e.dataTransfer.files; } catch (_) {}
+                updateFileCount();
                 showPreviews();
             }
         });
