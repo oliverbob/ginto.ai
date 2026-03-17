@@ -606,7 +606,7 @@ details summary::-webkit-details-marker { display: none; }
                         <div class="acct-type-group-label">⭐ Ginto Platform Programs</div>
                         <div class="acct-type-grid">
                             <?php foreach ([
-                                ['ginto_sell_for_me',         '⭐', 'Sell for Me',        'Ginto platform sells on your behalf — you provide inventory &amp; details'],
+                                ['ginto_sell_for_me',         '⭐', 'Sell for Me',        'Ginto platform sells on your behalf — you provide inventory & details'],
                                 ['ginto_special_agreement',   '📋', 'Special Agreement',   'Custom terms individually negotiated with the Ginto team'],
                                 ['ginto_partnership_program', '🤜', 'Partnership Program', 'Formal revenue-sharing partnership with Ginto ePower Mall'],
                             ] as [$val,$emoji,$name,$desc]): ?>
