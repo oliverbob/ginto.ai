@@ -200,9 +200,47 @@ select.pf-input    { cursor: pointer; }
     font-size: 0.84rem; color: var(--text); line-height: 1.6;
 }
 .possession-banner-icon { font-size: 1.4rem; flex-shrink: 0; }
+
+/* Hamburger nav drawer — always fixed and off-screen, slides in on .open */
+#sidebar {
+    position: fixed;
+    top: 0; left: 0;
+    height: 100vh;
+    width: 280px;
+    z-index: 1002;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    overflow-y: auto;
+    background: var(--bg);
+    border-right: 1px solid var(--border);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+}
+#sidebar.open { transform: translateX(0); }
+#sidebarBackdrop { display: block; }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
+<div id="sidebarBackdrop" class="sidebar-backdrop" aria-hidden="true"></div>
+<!-- Mobile seller nav drawer (hamburger target) -->
+<aside class="sidebar" id="sidebar" role="navigation" aria-label="Seller navigation">
+    <div class="sidebar-close-row" id="sidebarCloseRow">
+        <div class="sidebar-close-logo">
+            <img src="/assets/images/ginto.png" alt="Ginto">
+            <span>ePower</span>
+        </div>
+        <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close menu">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="sidebar-inner" style="padding:16px 0">
+        <ul class="sc-nav" role="list" style="list-style:none;margin:0;padding:0">
+            <li class="sc-nav-item"><a href="/marketplace/sellers/products" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">📦 My Products</a></li>
+            <li class="sc-nav-item"><a href="/marketplace/sellers/products/new" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--accent);text-decoration:none;font-weight:600">➕ New Product</a></li>
+            <li class="sc-nav-item"><a href="/marketplace/sellers/kyc" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🪪 KYC Verification</a></li>
+            <li class="sc-nav-item"><a href="/marketplace" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🏠 View Marketplace</a></li>
+        </ul>
+    </div>
+</aside>
 
 <?php /* ====== KYC GATE MODAL — shown only when KYC is not approved ====== */ ?>
 <?php if (!$isAdmin && $kycStatus !== 'approved'): ?>
