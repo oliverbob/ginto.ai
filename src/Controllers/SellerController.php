@@ -61,6 +61,8 @@ class SellerController extends \Core\Controller
         $allowedAccountTypes = [
             'personal','livelihood','retailer','wholesale','general_merchandise',
             'mall','products','services','real_estate','rentals','multi_purpose',
+            'digital_content','intellectual_property','food_beverage',
+            'fashion_apparel','health_wellness','arts_crafts',
             'business','cooperative',
             'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program',
         ];

@@ -504,12 +504,16 @@ details summary::-webkit-details-marker { display: none; }
                             <li>Prices must include all applicable taxes and charges.</li>
                             <li>Abuse of the platform (fake reviews, spam, fee circumvention) will result in immediate termination.</li>
                         </ul>
-                        <h3>9. Data Retention</h3>
+                        <h3>9. Seller Eligibility — Minimum Age Requirement</h3>
+                        <p>You must be at least <strong>18 years of age</strong> to register and sell on ePower Mall. By submitting this application, you confirm that you are 18 years old or older. Minors may not create seller accounts. If a minor is found to have submitted a false date of birth, the account will be immediately suspended and any earnings held pending legal guardian verification, in accordance with RA 7610 (Special Protection of Children Against Abuse) and applicable civil law provisions.</p>
+                        <h3>10. Intellectual Property (RA 8293)</h3>
+                        <p>Sellers of digital content, creative works, software, music, videos, e-books, courses, or any intellectual property must hold the legal right to distribute or sell such works. Uploading, listing, or selling pirated, plagiarized, or unauthorized copies of copyrighted materials is strictly prohibited under the Intellectual Property Code of the Philippines (RA 8293) and may result in civil and criminal liability.</p>
+                        <h3>11. Data Retention</h3>
                         <p>KYC documents and identity records are retained per applicable law. Deletion requests can be submitted to our Data Privacy Officer at <strong>privacy@ginto.ai</strong>, subject to legal retention obligations under RA 10173, Section 11(c).</p>
                     </div>
                     <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.83rem;padding:12px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);margin-bottom:4px">
                         <input type="checkbox" id="kycTosCheck" style="margin-top:3px;accent-color:var(--accent);flex-shrink:0" <?= $tosAgreed ? 'checked' : '' ?>>
-                        <span>I have read and fully agree to the <strong>Seller Terms &amp; Conditions</strong>, including data collection under <strong>RA 10173</strong>, anti-money laundering compliance under <strong>RA 9160</strong>, and the 7-day payment disbursement policy. I understand this is a legally binding agreement.</span>
+                        <span>I have read and fully agree to the <strong>Seller Terms &amp; Conditions</strong>, including data collection under <strong>RA 10173</strong>, anti-money laundering compliance under <strong>RA 9160</strong>, and the 7-day payment disbursement policy. I confirm that I am <strong>18 years of age or older</strong>. I understand this is a legally binding agreement.</span>
                     </label>
                     <div id="kycTosErr" style="color:var(--danger);font-size:0.77rem;margin-top:4px;display:none">⚠ You must agree to the terms before continuing.</div>
                     <div class="kyc-wiz-btns" style="justify-content:flex-end">
@@ -575,7 +579,13 @@ details summary::-webkit-details-marker { display: none; }
                                 ['services',     '🔧', 'Services',     'Service-based: repairs, tutoring, freelance, consultancy'],
                                 ['real_estate',  '🏠', 'Real Estate',  'Property listings for sale, lease, or pre-selling'],
                                 ['rentals',      '🔑', 'Rentals',      'Equipment, vehicles, property, and event item rentals'],
-                                ['multi_purpose','🔀', 'Multi-Purpose / Multi-Type', 'Combines multiple categories — products, services, rentals, and more'],
+                                        ['multi_purpose',        '🔀', 'Multi-Purpose / Multi-Type', 'Combines multiple categories — products, services, rentals, and more'],
+                                ['digital_content',      '💻', 'Digital Content',    'E-books, courses, music, videos, templates, software downloads'],
+                                ['intellectual_property','🧠', 'Intellectual Property','Licensing, patents, trademarks, royalties, franchises, creative rights'],
+                                ['food_beverage',        '🍱', 'Food & Beverage',     'Food products, beverages, catering, baked goods, ready-to-eat items'],
+                                ['fashion_apparel',      '👗', 'Fashion & Apparel',   'Clothing, footwear, bags, accessories, and wearable goods'],
+                                ['health_wellness',      '💊', 'Health & Wellness',   'Supplements, beauty products, personal care, medical/health supplies'],
+                                ['arts_crafts',          '🎨', 'Arts & Crafts',       'Handmade items, custom art, crafts, collectibles, and creative goods'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
                                 <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
@@ -1023,6 +1033,30 @@ details summary::-webkit-details-marker { display: none; }
                     var el = document.getElementById(bad[0]);
                     if (el) { el.focus(); el.style.outline = '2px solid var(--danger)'; setTimeout(function(){ el.style.outline=''; },2000); }
                     return;
+                }
+                // Age check — must be 18+
+                var dobEl = document.getElementById('kyc-dob');
+                if (dobEl && dobEl.value) {
+                    var dob = new Date(dobEl.value);
+                    var today = new Date();
+                    var age = today.getFullYear() - dob.getFullYear();
+                    var m = today.getMonth() - dob.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+                    if (age < 18) {
+                        dobEl.focus();
+                        dobEl.style.outline = '2px solid var(--danger)';
+                        setTimeout(function(){ dobEl.style.outline=''; }, 3000);
+                        var ageErrId = 'kycAgeErr';
+                        var ageErr = document.getElementById(ageErrId);
+                        if (!ageErr) {
+                            ageErr = document.createElement('div');
+                            ageErr.id = ageErrId;
+                            ageErr.style.cssText = 'color:var(--danger);font-size:0.78rem;margin-top:6px;padding:8px 12px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.3);border-radius:6px';
+                            dobEl.parentNode.appendChild(ageErr);
+                        }
+                        ageErr.textContent = '⚠ You must be 18 years of age or older to register as a seller.';
+                        return;
+                    }
                 }
             }
             if (currentStep === 4) {
