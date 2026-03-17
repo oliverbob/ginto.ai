@@ -15,6 +15,10 @@ $step = 1;
 if ($submitted && $kycStatus === 'pending')                        $step = 2;
 if ($submitted && in_array($kycStatus, ['approved', 'rejected'])) $step = 3;
 
+// Wizard helpers
+$tosAgreed        = $submitted; // pre-check TOS for returning/re-submitters
+$savedAccountType = $kyc['account_type'] ?? '';
+
 $countries = [
     'Philippines','Nigeria','United States','United Kingdom','Canada','Australia',
     'India','Germany','France','Singapore','Malaysia','Indonesia','South Africa',
@@ -215,6 +219,97 @@ details summary::-webkit-details-marker { display: none; }
 }
 #sidebar.open { transform: translateX(0); }
 #sidebarBackdrop { display: block; }
+
+/* ===== KYC WIZARD ===== */
+.kyc-wizard-nav {
+    display: flex; align-items: stretch;
+    border: 1px solid var(--border); border-radius: var(--radius);
+    overflow: hidden; background: var(--surface);
+    margin-bottom: 24px;
+}
+.kwn-step {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 10px 4px; border-right: 1px solid var(--border);
+    text-align: center; transition: background var(--trans);
+}
+.kwn-step:last-child { border-right: none; }
+.kwn-step-num {
+    width: 22px; height: 22px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.68rem; font-weight: 700;
+    background: var(--surface2); color: var(--muted);
+    border: 1.5px solid var(--border); margin-bottom: 4px;
+    transition: all var(--trans);
+}
+.kwn-step-label { font-size: 0.6rem; color: var(--muted); font-weight: 500; line-height: 1.2; }
+.kwn-step.wdone .kwn-step-num  { background: #22c55e; border-color: #22c55e; color: white; }
+.kwn-step.wdone .kwn-step-num::before { content: '✓'; }
+.kwn-step.wactive .kwn-step-num { background: var(--accent); border-color: var(--accent); color: white; }
+.kwn-step.wactive { background: rgba(59,130,246,0.05); }
+.kwn-step.wactive .kwn-step-label { color: var(--text); font-weight: 700; }
+
+/* Wizard panels */
+.kyc-wstep         { display: none; }
+.kyc-wstep.wactive { display: block; }
+
+/* TOS scroll box */
+.kyc-tos-box {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 18px 20px;
+    max-height: 320px; overflow-y: auto;
+    font-size: 0.81rem; color: var(--muted); line-height: 1.75;
+    margin-bottom: 14px;
+    scrollbar-width: thin;
+}
+.kyc-tos-box h3 { font-size: 0.87rem; font-weight: 700; color: var(--text); margin: 14px 0 4px; }
+.kyc-tos-box h3:first-child { margin-top: 0; }
+.kyc-tos-box ul  { padding-left: 18px; margin: 6px 0; }
+
+/* Account type cards */
+.acct-type-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 9px;
+}
+.acct-type-group { margin-bottom: 18px; }
+.acct-type-group-label {
+    font-size: 0.71rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--muted);
+    margin-bottom: 8px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+.acct-type-card { position: relative; cursor: pointer; }
+.acct-type-card input { position: absolute; opacity: 0; pointer-events: none; }
+.acct-type-label {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+    padding: 11px 13px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer;
+    transition: all var(--trans);
+}
+.acct-type-label:hover { border-color: var(--accent); background: rgba(59,130,246,0.05); }
+.acct-type-card input:checked + .acct-type-label {
+    border-color: var(--accent); background: rgba(59,130,246,0.1);
+    box-shadow: 0 0 0 3px rgba(59,130,246,0.12);
+}
+.acct-type-emoji { font-size: 1.05rem; margin-bottom: 2px; }
+.acct-type-name  { font-size: 0.82rem; font-weight: 700; color: var(--text); }
+.acct-type-desc  { font-size: 0.69rem; color: var(--muted); line-height: 1.35; }
+
+/* Wizard nav buttons */
+.kyc-wiz-btns {
+    display: flex; align-items: center; gap: 10px;
+    margin-top: 22px; padding-top: 16px;
+    border-top: 1px solid var(--border);
+}
+.kyc-wiz-btns .kwb-space { flex: 1; }
+.kyc-wiz-btns .kwb-back {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); padding: 9px 20px;
+    border-radius: var(--radius-sm); font-size: 0.87rem;
+    cursor: pointer; transition: background var(--trans); font-family: inherit;
+}
+.kyc-wiz-btns .kwb-back:hover { background: var(--border); }
+.kyc-wiz-btns .kwb-next { padding: 9px 24px; font-size: 0.87rem; font-weight: 600; }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
@@ -365,6 +460,176 @@ details summary::-webkit-details-marker { display: none; }
     <form method="POST" action="/marketplace/sellers/kyc/submit" enctype="multipart/form-data" novalidate>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
 
+        <!-- Wizard step indicator (inside the form) -->
+        <div class="kyc-wizard-nav" id="kycWizNav" role="list" aria-label="Application steps">
+            <div class="kwn-step wactive" id="kwn1" role="listitem"><div class="kwn-step-num">1</div><div class="kwn-step-label">Terms</div></div>
+            <div class="kwn-step" id="kwn2" role="listitem"><div class="kwn-step-num">2</div><div class="kwn-step-label">Account Type</div></div>
+            <div class="kwn-step" id="kwn3" role="listitem"><div class="kwn-step-num">3</div><div class="kwn-step-label">Your Info</div></div>
+            <div class="kwn-step" id="kwn4" role="listitem"><div class="kwn-step-num">4</div><div class="kwn-step-label">Documents</div></div>
+            <div class="kwn-step" id="kwn5" role="listitem"><div class="kwn-step-num">5</div><div class="kwn-step-label">Submit</div></div>
+        </div>
+
+        <!-- ===================== STEP 1: TERMS ===================== -->
+        <div class="kyc-wstep wactive" id="kycStep1">
+            <div class="kyc-card">
+                <div class="kyc-card-header">
+                    <div class="kyc-card-icon">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    </div>
+                    <h2 class="kyc-card-title">Terms &amp; Conditions — Please Read Before Proceeding</h2>
+                </div>
+                <div class="kyc-card-body">
+                    <p style="font-size:0.83rem;color:var(--muted);margin-bottom:13px">Read all terms below. You must agree to continue your identity verification.</p>
+                    <div class="kyc-tos-box" id="kycTosBox">
+                        <h3>1. Identity Verification &amp; Data Privacy (RA 10173)</h3>
+                        <p>Under the Philippines Data Privacy Act of 2012 (Republic Act No. 10173), your personal information and identity documents are collected solely for identity verification. Your data is processed with your consent, encrypted at rest and in transit, and will not be shared with any third party without your explicit written permission, except as required by law. You have the right to access, correct, and request deletion of your data by writing to <strong>privacy@ginto.ai</strong>.</p>
+                        <h3>2. Anti-Money Laundering Compliance (RA 9160)</h3>
+                        <p>ePower Mall is obligated under the Anti-Money Laundering Act to verify the identity of all sellers. Submitting fraudulent documents or inaccurate information may result in immediate account suspension and referral to appropriate government authorities.</p>
+                        <h3>3. Business Name Registration (RA 3883)</h3>
+                        <p>Commercial sellers operating under a business name are required by law to register with the DTI, SEC, or CDA. ePower Mall may require proof of registration for business accounts as required under RA 3883 (Business Name Law).</p>
+                        <h3>4. BIR Tax Obligations (RMC 60-2020)</h3>
+                        <p>All persons engaging in online selling are required by BIR Revenue Memorandum Circular 60-2020 to register as taxpayers, maintain books of accounts, and issue official receipts. By selling on this platform, you agree to comply with your BIR registration and tax obligations.</p>
+                        <h3>5. Payment Disbursement Policy</h3>
+                        <p>Payments for completed orders are held for <strong>seven (7) calendar days</strong> from the Order Completed / Delivered date to ensure buyer protection and transaction integrity. Disbursements are credited to your registered payment method within 2 business days after the holding period ends.</p>
+                        <h3>6. Authentic Listings &amp; Anti-Fraud</h3>
+                        <p>You agree to list only products and services that you legally own, possess, or have the right to sell. Listing counterfeit goods, pirated content, fraudulent services, or items prohibited under Philippine law (including RA 8293 — Intellectual Property Code) is strictly prohibited and may result in permanent termination and legal action.</p>
+                        <h3>7. Shipping &amp; Fulfillment</h3>
+                        <ul>
+                            <li>Orders must be prepared and handed to the courier within the committed timeframe stated in your listing.</li>
+                            <li>Failure to ship confirmed orders without valid reason may result in account penalties.</li>
+                        </ul>
+                        <h3>8. Platform Rules</h3>
+                        <ul>
+                            <li>Product listings must be accurate and comply with consumer protection laws (RA 7394).</li>
+                            <li>Prices must include all applicable taxes and charges.</li>
+                            <li>Abuse of the platform (fake reviews, spam, fee circumvention) will result in immediate termination.</li>
+                        </ul>
+                        <h3>9. Data Retention</h3>
+                        <p>KYC documents and identity records are retained per applicable law. Deletion requests can be submitted to our Data Privacy Officer at <strong>privacy@ginto.ai</strong>, subject to legal retention obligations under RA 10173, Section 11(c).</p>
+                    </div>
+                    <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.83rem;padding:12px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);margin-bottom:4px">
+                        <input type="checkbox" id="kycTosCheck" style="margin-top:3px;accent-color:var(--accent);flex-shrink:0" <?= $tosAgreed ? 'checked' : '' ?>>
+                        <span>I have read and fully agree to the <strong>Seller Terms &amp; Conditions</strong>, including data collection under <strong>RA 10173</strong>, anti-money laundering compliance under <strong>RA 9160</strong>, and the 7-day payment disbursement policy. I understand this is a legally binding agreement.</span>
+                    </label>
+                    <div id="kycTosErr" style="color:var(--danger);font-size:0.77rem;margin-top:4px;display:none">⚠ You must agree to the terms before continuing.</div>
+                    <div class="kyc-wiz-btns" style="justify-content:flex-end">
+                        <button type="button" class="btn btn-primary kwb-next" onclick="kycWizardGoTo(2)">Continue →</button>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /kycStep1 -->
+
+        <!-- ================ STEP 2: ACCOUNT TYPE ================= -->
+        <div class="kyc-wstep" id="kycStep2">
+            <div class="kyc-card">
+                <div class="kyc-card-header">
+                    <div class="kyc-card-icon">
+                        <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+                    </div>
+                    <h2 class="kyc-card-title">Account Type</h2>
+                </div>
+                <div class="kyc-card-body">
+                    <p style="font-size:0.83rem;color:var(--muted);margin-bottom:18px">Select the type that best describes your selling activity. This helps us tailor your onboarding, fees, and features. You may update this after approval.</p>
+                    <input type="hidden" name="account_type" id="accountTypeInput" value="<?= htmlspecialchars($savedAccountType) ?>">
+
+                    <!-- Group: Individual -->
+                    <div class="acct-type-group">
+                        <div class="acct-type-group-label">👤 Individual Sellers</div>
+                        <div class="acct-type-grid">
+                            <?php foreach ([
+                                ['personal',  '🙋', 'Personal',   'Selling personal items, second-hand goods, or individual crafts'],
+                                ['livelihood','🌾', 'Livelihood', 'Small-scale: farmers, fisherfolk, artisans, backyard producers'],
+                            ] as [$val,$emoji,$name,$desc]): ?>
+                            <label class="acct-type-card">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Group: Retail & Commerce -->
+                    <div class="acct-type-group">
+                        <div class="acct-type-group-label">🏪 Retail &amp; Commerce</div>
+                        <div class="acct-type-grid">
+                            <?php foreach ([
+                                ['retailer',            '🏪', 'Retailer',            'Sell directly to consumers in individual units'],
+                                ['wholesale',           '📦', 'Wholesale',           'Bulk sales with minimum order quantities'],
+                                ['general_merchandise', '🛒', 'General Merchandise', 'Mixed categories — sari-sari, variety, tiangge'],
+                                ['mall',                '🏬', 'Mall / Tiangge',      'Multi-category storefront, boutique, or kiosk'],
+                            ] as [$val,$emoji,$name,$desc]): ?>
+                            <label class="acct-type-card">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Group: Category-Specific -->
+                    <div class="acct-type-group">
+                        <div class="acct-type-group-label">📦 Category-Specific</div>
+                        <div class="acct-type-grid">
+                            <?php foreach ([
+                                ['products',     '🛍️', 'Products',     'Physical goods — manufactured, imported, or locally-made'],
+                                ['services',     '🔧', 'Services',     'Service-based: repairs, tutoring, freelance, consultancy'],
+                                ['real_estate',  '🏠', 'Real Estate',  'Property listings for sale, lease, or pre-selling'],
+                                ['rentals',      '🔑', 'Rentals',      'Equipment, vehicles, property, and event item rentals'],
+                            ] as [$val,$emoji,$name,$desc]): ?>
+                            <label class="acct-type-card">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Group: Organizational -->
+                    <div class="acct-type-group">
+                        <div class="acct-type-group-label">🤝 Organizational</div>
+                        <div class="acct-type-grid">
+                            <?php foreach ([
+                                ['business',     '🏢', 'Business',     'DTI / SEC registered company or enterprise'],
+                                ['cooperative',  '🤝', 'Cooperative',  'CDA-registered cooperative or multi-stakeholder group'],
+                            ] as [$val,$emoji,$name,$desc]): ?>
+                            <label class="acct-type-card">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <!-- Group: Ginto Programs -->
+                    <div class="acct-type-group" style="margin-bottom:4px">
+                        <div class="acct-type-group-label">⭐ Ginto Platform Programs</div>
+                        <div class="acct-type-grid">
+                            <?php foreach ([
+                                ['ginto_sell_for_me',         '⭐', 'Sell for Me',        'Ginto platform sells on your behalf — you provide inventory &amp; details'],
+                                ['ginto_special_agreement',   '📋', 'Special Agreement',   'Custom terms individually negotiated with the Ginto team'],
+                                ['ginto_partnership_program', '🤜', 'Partnership Program', 'Formal revenue-sharing partnership with Ginto ePower Mall'],
+                            ] as [$val,$emoji,$name,$desc]): ?>
+                            <label class="acct-type-card">
+                                <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">
+                                <div class="acct-type-label"><span class="acct-type-emoji"><?= $emoji ?></span><span class="acct-type-name"><?= htmlspecialchars($name) ?></span><span class="acct-type-desc"><?= htmlspecialchars($desc) ?></span></div>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <div id="kycAcctErr" style="color:var(--danger);font-size:0.77rem;margin-top:4px;display:none">⚠ Please choose an account type to continue.</div>
+                    <div class="kyc-wiz-btns">
+                        <button type="button" class="kwb-back" onclick="kycWizardGoTo(1)">← Back</button>
+                        <span class="kwb-space"></span>
+                        <button type="button" class="btn btn-primary kwb-next" onclick="kycWizardGoTo(3)">Continue →</button>
+                    </div>
+                </div>
+            </div>
+        </div><!-- /kycStep2 -->
+
+        <!-- ============= STEP 3: PERSONAL INFO + ADDRESS ============= -->
+        <div class="kyc-wstep" id="kycStep3">
+
         <!-- Personal info -->
         <div class="kyc-card">
             <div class="kyc-card-header">
@@ -494,6 +759,17 @@ details summary::-webkit-details-marker { display: none; }
             </div>
         </div>
 
+        <!-- Step 3 nav buttons -->
+        <div class="kyc-wiz-btns">
+            <button type="button" class="kwb-back" onclick="kycWizardGoTo(2)">← Back</button>
+            <span class="kwb-space"></span>
+            <button type="button" class="btn btn-primary kwb-next" onclick="kycWizardGoTo(4)">Continue →</button>
+        </div>
+        </div><!-- /kycStep3 -->
+
+        <!-- ============= STEP 4: IDENTITY DOCUMENT ============= -->
+        <div class="kyc-wstep" id="kycStep4">
+
         <!-- ID verification -->
         <div class="kyc-card">
             <div class="kyc-card-header">
@@ -551,13 +827,8 @@ details summary::-webkit-details-marker { display: none; }
                                 <option value="Certificate of Indigency (Municipal / City Hall)" <?= ($kyc['id_type'] ?? '') === 'Certificate of Indigency (Municipal / City Hall)' ? 'selected' : '' ?>>Certificate of Indigency (Municipal / City Hall)</option>
                                 <option value="Solo Parent ID (DSWD)" <?= ($kyc['id_type'] ?? '') === 'Solo Parent ID (DSWD)' ? 'selected' : '' ?>>Solo Parent ID (DSWD)</option>
                             </optgroup>
-                            <optgroup label="🏢 Business &amp; Entity Documents">
+                            <optgroup label="🤝 Organization &amp; Entity Identity">
                                 <option value="Entity Endorsement Letter" <?= ($kyc['id_type'] ?? '') === 'Entity Endorsement Letter' ? 'selected' : '' ?>>Entity Endorsement Letter (NGO / Cooperative / Association)</option>
-                                <option value="DTI Business Name Registration" <?= ($kyc['id_type'] ?? '') === 'DTI Business Name Registration' ? 'selected' : '' ?>>DTI Business Name Registration Certificate</option>
-                                <option value="SEC Certificate of Registration" <?= ($kyc['id_type'] ?? '') === 'SEC Certificate of Registration' ? 'selected' : '' ?>>SEC Certificate of Registration</option>
-                                <option value="Business Permit / Mayor's Permit" <?= ($kyc['id_type'] ?? '') === "Business Permit / Mayor's Permit" ? 'selected' : '' ?>>Business Permit / Mayor's Permit</option>
-                                <option value="CDA Cooperative Registration" <?= ($kyc['id_type'] ?? '') === 'CDA Cooperative Registration' ? 'selected' : '' ?>>CDA Cooperative Registration Certificate</option>
-                                <option value="BIR Certificate of Registration (Form 2303)" <?= ($kyc['id_type'] ?? '') === 'BIR Certificate of Registration (Form 2303)' ? 'selected' : '' ?>>BIR Certificate of Registration (Form 2303)</option>
                             </optgroup>
                             <optgroup label="🖼️ Proof of Identity (Alternate)">
                                 <option value="COMELEC Voter Registration Form" <?= ($kyc['id_type'] ?? '') === 'COMELEC Voter Registration Form' ? 'selected' : '' ?>>COMELEC Voter Registration Form</option>
@@ -579,6 +850,17 @@ details summary::-webkit-details-marker { display: none; }
                 <div class="form-hint">All identity information is encrypted and kept strictly confidential — used only for identity verification as required by RA 9160 (AMLA), RA 10173 (Data Privacy Act), and RA 3883 (Business Name Law).</div>
             </div>
         </div>
+
+        <!-- Step 4 nav buttons -->
+        <div class="kyc-wiz-btns">
+            <button type="button" class="kwb-back" onclick="kycWizardGoTo(3)">← Back</button>
+            <span class="kwb-space"></span>
+            <button type="button" class="btn btn-primary kwb-next" onclick="kycWizardGoTo(5)">Continue →</button>
+        </div>
+        </div><!-- /kycStep4 -->
+
+        <!-- ============= STEP 5: BUSINESS REG + DOCUMENTS + SUBMIT ============= -->
+        <div class="kyc-wstep" id="kycStep5">
 
         <!-- Business Registration (optional) -->
         <div class="kyc-card">
@@ -668,13 +950,16 @@ details summary::-webkit-details-marker { display: none; }
             </div>
         </div>
 
-        <div style="display:flex;gap:10px;align-items:center">
-            <button type="submit" class="btn btn-primary" style="padding:11px 26px;font-size:0.92rem">
+        <div class="kyc-wiz-btns">
+            <button type="button" class="kwb-back" onclick="kycWizardGoTo(4)">← Back</button>
+            <span class="kwb-space"></span>
+            <button type="submit" class="btn btn-primary kwb-next" style="padding:10px 26px">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <?= $submitted ? 'Re-submit KYC' : 'Submit for Review' ?>
             </button>
-            <a href="/marketplace/sellers/products" class="btn btn-secondary">Cancel</a>
         </div>
+
+        </div><!-- /kycStep5 -->
     </form>
 
     <?php if ($showCollapsed): ?>
@@ -684,6 +969,76 @@ details summary::-webkit-details-marker { display: none; }
 </div>
 
 <script>
+/* ===== KYC WIZARD NAVIGATION ===== */
+(function () {
+    var currentStep = 1;
+    var TOTAL = 5;
+
+    // Auto-advance to last completed step for re-submitters
+    var savedAccountType = <?= json_encode($savedAccountType) ?>;
+    if (savedAccountType) {
+        currentStep = 3; // at least past TOS + account type
+    }
+
+    function updateNav() {
+        for (var i = 1; i <= TOTAL; i++) {
+            var step  = document.getElementById('kycStep' + i);
+            var nav   = document.getElementById('kwn' + i);
+            if (!step || !nav) continue;
+            step.classList.toggle('wactive', i === currentStep);
+            nav.classList.toggle('wactive', i === currentStep);
+            nav.classList.toggle('wdone',   i < currentStep);
+            if (i < currentStep) {
+                nav.querySelector('.kwn-step-num').innerHTML = '✓';
+            } else if (!nav.querySelector('.kwn-step-num').dataset.orig) {
+                nav.querySelector('.kwn-step-num').dataset.orig = String(i);
+                if (i > currentStep) nav.querySelector('.kwn-step-num').textContent = String(i);
+            } else if (i > currentStep) {
+                nav.querySelector('.kwn-step-num').textContent = nav.querySelector('.kwn-step-num').dataset.orig || String(i);
+            }
+        }
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    window.kycWizardGoTo = function (target) {
+        // Validate before advancing
+        if (target > currentStep) {
+            if (currentStep === 1) {
+                var tos = document.getElementById('kycTosCheck');
+                var err = document.getElementById('kycTosErr');
+                if (!tos.checked) { err.style.display = 'block'; tos.focus(); return; }
+                err.style.display = 'none';
+            }
+            if (currentStep === 2) {
+                var acctInput = document.getElementById('accountTypeInput');
+                var acctErr   = document.getElementById('kycAcctErr');
+                if (!acctInput.value) { acctErr.style.display = 'block'; return; }
+                acctErr.style.display = 'none';
+            }
+            if (currentStep === 3) {
+                var req3 = ['kyc-first','kyc-last','kyc-dob','kyc-pob','kyc-nationality','kyc-phone','kyc-tin','kyc-street','kyc-city','kyc-province'];
+                var bad = req3.filter(function(id){ var el=document.getElementById(id); return el && !el.value.trim(); });
+                if (bad.length) {
+                    var el = document.getElementById(bad[0]);
+                    if (el) { el.focus(); el.style.outline = '2px solid var(--danger)'; setTimeout(function(){ el.style.outline=''; },2000); }
+                    return;
+                }
+            }
+            if (currentStep === 4) {
+                var idTypeEl  = document.getElementById('kyc-id-type');
+                var identEl   = document.getElementById('kyc-id');
+                if (idTypeEl && !idTypeEl.value) { idTypeEl.focus(); return; }
+                if (identEl && !identEl.value.trim()) { identEl.focus(); return; }
+            }
+        }
+        currentStep = target;
+        updateNav();
+    };
+
+    updateNav();
+})();
+
+/* ===== DOCUMENT UPLOAD ===== */
 (function () {
     const area     = document.getElementById('docUploadArea');
     const input    = document.getElementById('docFilesInput');

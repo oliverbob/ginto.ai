@@ -57,6 +57,16 @@ class SellerController extends \Core\Controller
         $businessName  = trim($_POST['business_name']   ?? '');
         $businessReg   = trim($_POST['business_reg']    ?? '');
 
+        // Account type (from wizard Step 2)
+        $allowedAccountTypes = [
+            'personal','livelihood','retailer','wholesale','general_merchandise',
+            'mall','products','services','real_estate','rentals',
+            'business','cooperative',
+            'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program',
+        ];
+        $rawAccountType = trim($_POST['account_type'] ?? '');
+        $accountType = in_array($rawAccountType, $allowedAccountTypes, true) ? $rawAccountType : null;
+
         // Sanitise and capture doc_types checkboxes
         $rawDocTypes = $_POST['doc_types'] ?? [];
         $allowedDocTypes = [
@@ -102,6 +112,7 @@ class SellerController extends \Core\Controller
             'identifier'       => $identifier ?: null,
             'documents'        => !empty($docs) ? json_encode($docs) : null,
             'doc_types'        => !empty($docTypes) ? json_encode($docTypes) : null,
+            'account_type'     => $accountType,
             'business_name'    => $businessName ?: null,
             'business_reg'     => $businessReg ?: null,
             'submitted_at'     => date('Y-m-d H:i:s'),
