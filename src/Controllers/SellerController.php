@@ -72,25 +72,33 @@ class SellerController extends \Core\Controller
         // Sanitise and capture doc_types checkboxes
         $rawDocTypes = $_POST['doc_types'] ?? [];
         $allowedDocTypes = [
-            'id_front','id_back','selfie_with_id','proof_of_address',
-            'birth_certificate','barangay_clearance','dti_certificate',
-            'sec_certificate','business_permit','bir_cor','cda_certificate',
-            'ncip_certificate','church_clearance','entity_endorsement','other',
+            // Identity documents
+            'id_front','id_back','selfie_with_id',
+            'birth_certificate','barangay_clearance','church_clearance',
+            'ncip_certificate','entity_endorsement','other_id',
+            // Supporting / business documents
+            'proof_of_address','dti_certificate','sec_certificate',
+            'business_permit','bir_cor','cda_certificate','other_support',
+            'other', // legacy
         ];
         $docTypes = array_values(array_intersect((array)$rawDocTypes, $allowedDocTypes));
 
-        // Handle uploaded documents
+        // Handle uploaded documents from both upload areas
         $docs = [];
-        if (!empty($_FILES['documents'])) {
-            $files = $_FILES['documents'];
-            $uploadDir = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/kyc/' . $userId . '/';
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        $uploadDir = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/kyc/' . $userId . '/';
+        if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
+        foreach (['id_files', 'support_files', 'documents'] as $fieldName) {
+            if (empty($_FILES[$fieldName])) continue;
+            $files = $_FILES[$fieldName];
             for ($i = 0; $i < count($files['name']); $i++) {
                 if ($files['error'][$i] !== UPLOAD_ERR_OK) continue;
-                $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
+                $name   = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($files['name'][$i]));
                 $target = $uploadDir . uniqid() . '_' . $name;
                 if (move_uploaded_file($files['tmp_name'][$i], $target)) {
-                    $docs[] = str_replace((defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage'), '/storage', $target);
+                    $docs[] = str_replace(
+                        (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage'),
+                        '/storage', $target
+                    );
                 }
             }
         }

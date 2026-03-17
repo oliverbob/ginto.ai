@@ -220,6 +220,16 @@ details summary::-webkit-details-marker { display: none; }
 #sidebar.open { transform: translateX(0); }
 #sidebarBackdrop { display: block; }
 
+/* Doc checklist label */
+.doc-check-label {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer;
+    font-size: 0.82rem; transition: background var(--trans);
+}
+.doc-check-label:hover { background: var(--border); }
+
 /* ===== KYC WIZARD ===== */
 .kyc-wizard-nav {
     display: flex; align-items: stretch;
@@ -900,69 +910,102 @@ details summary::-webkit-details-marker { display: none; }
             </div>
         </div>
 
-        <!-- Documents upload -->
-        <div class="kyc-card" style="margin-bottom:24px">
+        <!-- ===== IDENTITY DOCUMENTS ===== -->
+        <div class="kyc-card" style="margin-bottom:16px">
             <div class="kyc-card-header">
                 <div class="kyc-card-icon">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2 10 22 10"/></svg>
                 </div>
-                <h2 class="kyc-card-title">Upload Supporting Documents</h2>
+                <h2 class="kyc-card-title">Identity Documents <span style="color:var(--danger);font-size:0.78rem;font-weight:500">— Required</span></h2>
             </div>
             <div class="kyc-card-body">
-                <!-- Document category checklist -->
-                <div style="margin-bottom:18px">
-                    <div class="form-label" style="margin-bottom:8px">Which documents are you uploading? <span class="req">*</span></div>
-                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
-                        <?php
-                        $docCategories = [
-                            'id_front'          => 'ID / Document — Front',
-                            'id_back'           => 'ID / Document — Back',
-                            'selfie_with_id'    => 'Selfie Holding Your ID / Document',
-                            'proof_of_address'  => 'Proof of Address (Utility Bill / Barangay Cert.)',
-                            'birth_certificate' => 'Birth Certificate (PSA)',
-                            'barangay_clearance'=> 'Barangay Clearance',
-                            'dti_certificate'   => 'DTI Business Name Certificate',
-                            'sec_certificate'   => 'SEC Certificate of Registration',
-                            'business_permit'   => "Business Permit / Mayor's Permit",
-                            'bir_cor'           => 'BIR Certificate of Registration (Form 2303)',
-                            'cda_certificate'   => 'CDA Cooperative Registration',
-                            'ncip_certificate'  => 'NCIP Certificate of Membership',
-                            'church_clearance'  => 'Church Clearance Certificate',
-                            'entity_endorsement'=> 'Entity / Organization Endorsement Letter',
-                            'other'             => 'Other Supporting Document',
-                        ];
-                        $savedDocTypes = (!empty($kyc['doc_types'])) ? (json_decode($kyc['doc_types'], true) ?: []) : [];
-                        foreach ($docCategories as $val => $label):
-                        ?>
-                        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.82rem;transition:background var(--trans)"
-                               onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+                <p style="font-size:0.83rem;color:var(--muted);margin-bottom:13px">Upload clear photos or scans of your ID or identity certificate. Front and back are required where applicable. <strong>This section is mandatory for all applicants.</strong></p>
+                <?php $savedDocTypes = (!empty($kyc['doc_types'])) ? (json_decode($kyc['doc_types'], true) ?: []) : []; ?>
+                <div style="margin-bottom:14px">
+                    <div class="form-label" style="margin-bottom:8px">Identity documents you are uploading <span class="req" aria-hidden="true">*</span></div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
+                        <?php foreach ([
+                            'id_front'          => '🪪 ID / Document — Front',
+                            'id_back'           => '🪪 ID / Document — Back',
+                            'selfie_with_id'    => '🤳 Selfie Holding Your ID / Document',
+                            'birth_certificate' => '📄 Birth Certificate (PSA)',
+                            'barangay_clearance'=> '📋 Barangay Clearance / Certificate',
+                            'church_clearance'  => '⛪ Church Clearance Certificate',
+                            'ncip_certificate'  => '🏘️ NCIP Certificate of Membership',
+                            'entity_endorsement'=> '🤝 Entity / Organization Endorsement Letter',
+                            'other_id'          => '📎 Other Identity Document',
+                        ] as $val => $label): ?>
+                        <label class="doc-check-label">
                             <input type="checkbox" name="doc_types[]" value="<?= htmlspecialchars($val) ?>"
                                 <?= in_array($val, $savedDocTypes) ? 'checked' : '' ?>
-                                style="accent-color:var(--accent)">
-                            <?= htmlspecialchars($label) ?>
+                                style="accent-color:var(--accent)" onchange="kycClearErr('kycIdErr')">
+                            <span><?= htmlspecialchars($label) ?></span>
                         </label>
                         <?php endforeach; ?>
                     </div>
-                    <div class="form-hint" style="margin-top:6px">Check all document types included in your upload below.</div>
                 </div>
-
-                <input type="hidden" id="kycHasExistingDocs" value="<?= !empty($docs) ? '1' : '0' ?>">
-
-                <div class="doc-upload-area" id="docUploadArea" role="button" tabindex="0" aria-label="Upload documents">
-                    <input type="file" name="documents[]" id="docFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
-                    <div class="upload-icon">📎</div>
-                    <div class="upload-title" id="uploadTitle">Click or drag &amp; drop files here</div>
+                <div class="doc-upload-area" id="idUploadArea" role="button" tabindex="0" aria-label="Upload identity documents">
+                    <input type="file" name="id_files[]" id="idFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
+                    <div class="upload-icon">🪪</div>
+                    <div class="upload-title" id="idUploadTitle">Click or drag &amp; drop ID files here</div>
                     <div class="upload-sub">
-                        Required: ID / Document (front &amp; back) · Selfie holding your ID · Proof of address<br>
-                        Business sellers: include DTI / SEC / Business Permit &amp; BIR COR<br>
-                        Accepted: JPG, PNG, PDF · Max 10 MB each<br>
-                        <span style="color:var(--accent)">Mandated under RA 9160 (AMLA) &amp; RA 10173 (Data Privacy Act)</span>
+                        JPG, PNG, PDF accepted · Multiple files · Max 10 MB each<br>
+                        <span style="color:var(--accent)">Required under RA 9160 (AMLA) &amp; RA 10173 (Data Privacy Act)</span>
                     </div>
                 </div>
-                <div id="kycFileCount" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:#22c55e;font-weight:600"></div>
-                <div class="doc-previews" id="docPreviews"></div>
+                <div id="idFileCount" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:#22c55e;font-weight:600"></div>
+                <div class="doc-previews" id="idPreviews"></div>
+                <div id="kycIdErr" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--danger)"></div>
+            </div>
+        </div>
 
-                <div id="kycDocsErr" style="display:none;margin-top:12px;padding:10px 14px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--danger)"></div>
+        <!-- ===== SUPPORTING / BUSINESS DOCUMENTS ===== -->
+        <div class="kyc-card" style="margin-bottom:24px">
+            <div class="kyc-card-header">
+                <div class="kyc-card-icon">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                </div>
+                <h2 class="kyc-card-title">Supporting / Business Documents <span id="supportReqBadge" style="display:none;color:var(--danger);font-size:0.78rem;font-weight:500">— Required for your account type</span></h2>
+            </div>
+            <div class="kyc-card-body">
+                <p style="font-size:0.83rem;color:var(--muted);margin-bottom:6px">Upload business registrations, permits, or proof of address. <strong>Mandatory for all non-personal account types.</strong></p>
+                <div id="supportMandatoryNote" style="display:none;margin-bottom:13px;padding:9px 12px;background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.3);border-radius:var(--radius-sm);font-size:0.79rem;color:#b45309">
+                    ⚠ Your selected account type requires at least one business or legal document.
+                </div>
+                <div style="margin-bottom:14px">
+                    <div class="form-label" style="margin-bottom:8px">Supporting documents you are uploading <span id="supportCheckReq" class="req" style="display:none" aria-hidden="true">*</span></div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px">
+                        <?php foreach ([
+                            'proof_of_address'  => '🏠 Proof of Address (Utility Bill / Barangay Cert.)',
+                            'dti_certificate'   => '🏢 DTI Business Name Certificate',
+                            'sec_certificate'   => '🏛️ SEC Certificate of Registration',
+                            'business_permit'   => "📋 Business Permit / Mayor's Permit",
+                            'bir_cor'           => '🧾 BIR Certificate of Registration (Form 2303)',
+                            'cda_certificate'   => '🤝 CDA Cooperative Registration',
+                            'other_support'     => '📎 Other Supporting Document',
+                        ] as $val => $label): ?>
+                        <label class="doc-check-label">
+                            <input type="checkbox" name="doc_types[]" value="<?= htmlspecialchars($val) ?>"
+                                <?= in_array($val, $savedDocTypes) ? 'checked' : '' ?>
+                                style="accent-color:var(--accent)" onchange="kycClearErr('kycSupportErr')">
+                            <span><?= htmlspecialchars($label) ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <div class="doc-upload-area" id="supportUploadArea" role="button" tabindex="0" aria-label="Upload supporting documents">
+                    <input type="file" name="support_files[]" id="supportFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
+                    <div class="upload-icon">📂</div>
+                    <div class="upload-title" id="supportUploadTitle">Click or drag &amp; drop business / support files here</div>
+                    <div class="upload-sub">
+                        JPG, PNG, PDF accepted · Multiple files · Max 10 MB each<br>
+                        <span style="color:var(--accent)">DTI / SEC / CDA / BIR / Business Permit accepted</span>
+                    </div>
+                </div>
+                <div id="supportFileCount" style="display:none;margin-top:8px;padding:8px 12px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:#22c55e;font-weight:600"></div>
+                <div class="doc-previews" id="supportPreviews"></div>
+                <div id="kycSupportErr" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);font-size:0.82rem;color:var(--danger)"></div>
+                <input type="hidden" id="kycHasExistingDocs" value="<?= !empty($docs) ? '1' : '0' ?>">
             </div>
         </div>
 
@@ -1078,58 +1121,123 @@ details summary::-webkit-details-marker { display: none; }
     updateNav();
 })();
 
+/* ===== HELPERS ===== */
+window.kycClearErr = function (id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+};
+
+var SUPPORT_REQUIRED_TYPES = [
+    'retailer','wholesale','general_merchandise','mall',
+    'products','services','real_estate','rentals','multi_purpose',
+    'digital_content','intellectual_property','food_beverage',
+    'fashion_apparel','health_wellness','arts_crafts',
+    'business','cooperative',
+    'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program'
+];
+
+function kycIsSupportRequired() {
+    var acct = document.getElementById('accountTypeInput');
+    return acct && SUPPORT_REQUIRED_TYPES.indexOf(acct.value) !== -1;
+}
+
+function kycUpdateSupportUI() {
+    var req     = kycIsSupportRequired();
+    var badge   = document.getElementById('supportReqBadge');
+    var note    = document.getElementById('supportMandatoryNote');
+    var reqStar = document.getElementById('supportCheckReq');
+    if (badge)   badge.style.display   = req ? 'inline' : 'none';
+    if (note)    note.style.display    = req ? 'block'  : 'none';
+    if (reqStar) reqStar.style.display = req ? 'inline' : 'none';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('input[name="_acct_radio"]').forEach(function (r) {
+        r.addEventListener('change', kycUpdateSupportUI);
+    });
+    kycUpdateSupportUI();
+});
+
 /* ===== SUBMIT VALIDATION ===== */
 window.kycValidateAndSubmit = function (btn) {
-    var err        = document.getElementById('kycDocsErr');
-    var fileInput  = document.getElementById('docFilesInput');
-    var checkboxes = document.querySelectorAll('input[name="doc_types[]"]');
-    var checked    = document.querySelectorAll('input[name="doc_types[]"]:checked');
-    var hasExist   = document.getElementById('kycHasExistingDocs');
+    var hasExist        = document.getElementById('kycHasExistingDocs');
     var hasExistingDocs = hasExist && hasExist.value === '1';
-    var messages   = [];
 
-    if (checked.length === 0) {
-        messages.push('⚠ Please tick at least one document type in the checklist above so we know what you are uploading.');
+    var ID_KEYS  = ['id_front','id_back','selfie_with_id','birth_certificate','barangay_clearance',
+                    'church_clearance','ncip_certificate','entity_endorsement','other_id'];
+    var SUP_KEYS = ['proof_of_address','dti_certificate','sec_certificate',
+                    'business_permit','bir_cor','cda_certificate','other_support'];
+
+    var allChecked = Array.from(document.querySelectorAll('input[name="doc_types[]"]:checked'));
+    var checkedId  = allChecked.filter(function (c) { return ID_KEYS.indexOf(c.value)  !== -1; });
+    var checkedSup = allChecked.filter(function (c) { return SUP_KEYS.indexOf(c.value) !== -1; });
+
+    var idInput  = document.getElementById('idFilesInput');
+    var supInput = document.getElementById('supportFilesInput');
+    var idCount  = idInput  ? idInput.files.length  : 0;
+    var supCount = supInput ? supInput.files.length : 0;
+
+    var valid = true;
+
+    // Identity — always required
+    var idErr = document.getElementById('kycIdErr');
+    var idMsgs = [];
+    if (checkedId.length === 0)
+        idMsgs.push('⚠ Tick at least one identity document type from the checklist.');
+    if (idCount === 0 && !hasExistingDocs)
+        idMsgs.push('⚠ No identity files attached — click the 🪪 upload area above to select your ID photos or scans.');
+    if (idMsgs.length) {
+        idErr.style.display = 'block';
+        idErr.innerHTML = idMsgs.join('<br>');
+        idErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        valid = false;
+    } else {
+        idErr.style.display = 'none';
     }
-    if (!fileInput || fileInput.files.length === 0) {
-        if (!hasExistingDocs) {
-            messages.push('⚠ No files attached. Click the upload area to select your ID, selfie, and supporting documents before submitting.');
+
+    // Supporting — required only for non-personal accounts
+    var supErr = document.getElementById('kycSupportErr');
+    if (kycIsSupportRequired()) {
+        var supMsgs = [];
+        if (checkedSup.length === 0)
+            supMsgs.push('⚠ Your account type requires at least one supporting document type to be ticked.');
+        if (supCount === 0 && !hasExistingDocs)
+            supMsgs.push('⚠ No supporting files attached — click the 📂 upload area to attach your business or legal documents.');
+        if (supMsgs.length) {
+            supErr.style.display = 'block';
+            supErr.innerHTML = supMsgs.join('<br>');
+            if (valid) supErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            valid = false;
+        } else {
+            supErr.style.display = 'none';
         }
+    } else {
+        supErr.style.display = 'none';
     }
 
-    if (messages.length > 0) {
-        err.style.display = 'block';
-        err.innerHTML = messages.join('<br style="margin-bottom:4px">');
-        err.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-    }
-
-    err.style.display = 'none';
+    if (!valid) return;
     btn.disabled = true;
-    btn.innerHTML = '⏳ Uploading & Submitting…';
+    btn.innerHTML = '⏳ Uploading &amp; Submitting…';
     btn.closest('form').submit();
 };
 
-/* ===== DOCUMENT UPLOAD ===== */
-(function () {
-    const area     = document.getElementById('docUploadArea');
-    const input    = document.getElementById('docFilesInput');
-    const previews = document.getElementById('docPreviews');
-    const countEl  = document.getElementById('kycFileCount');
-    const titleEl  = document.getElementById('uploadTitle');
+/* ===== UPLOAD AREAS ===== */
+function makeUploadArea(areaId, inputId, previewId, countId, titleId, errId) {
+    var area     = document.getElementById(areaId);
+    var input    = document.getElementById(inputId);
+    var previews = document.getElementById(previewId);
+    var countEl  = document.getElementById(countId);
+    var titleEl  = document.getElementById(titleId);
+    if (!area || !input) return;
 
-    function updateFileCount() {
-        if (!input || !countEl) return;
+    function updateCount() {
         var n = input.files ? input.files.length : 0;
         if (n > 0) {
-            countEl.style.display = 'block';
-            countEl.textContent = '✅ ' + n + ' file' + (n > 1 ? 's' : '') + ' selected and ready to submit.';
+            if (countEl) { countEl.style.display = 'block'; countEl.textContent = '✅ ' + n + ' file' + (n > 1 ? 's' : '') + ' selected and ready to upload.'; }
             if (titleEl) titleEl.textContent = n + ' file' + (n > 1 ? 's' : '') + ' selected';
-            var err = document.getElementById('kycDocsErr');
-            if (err) err.style.display = 'none';
+            var err = document.getElementById(errId); if (err) err.style.display = 'none';
         } else {
-            countEl.style.display = 'none';
-            if (titleEl) titleEl.innerHTML = 'Click or drag &amp; drop files here';
+            if (countEl) countEl.style.display = 'none';
         }
     }
 
@@ -1137,45 +1245,32 @@ window.kycValidateAndSubmit = function (btn) {
         if (!previews || !input || !input.files.length) return;
         previews.innerHTML = '';
         Array.from(input.files).forEach(function (file) {
-            const item    = document.createElement('div');
-            item.className = 'doc-prev-item';
-            const nameEl  = document.createElement('div');
-            nameEl.className = 'doc-prev-name';
-            nameEl.textContent = file.name;
+            var item = document.createElement('div'); item.className = 'doc-prev-item';
+            var nameEl = document.createElement('div'); nameEl.className = 'doc-prev-name'; nameEl.textContent = file.name;
             if (file.type.startsWith('image/')) {
-                const img = document.createElement('img');
-                img.alt   = file.name;
-                const reader = new FileReader();
-                reader.onload = function (e) { img.src = e.target.result; };
-                reader.readAsDataURL(file);
+                var img = document.createElement('img'); img.alt = file.name;
+                var reader = new FileReader(); reader.onload = function (e) { img.src = e.target.result; }; reader.readAsDataURL(file);
                 item.appendChild(img);
             } else {
                 item.innerHTML = '<div style="width:68px;height:68px;display:flex;align-items:center;justify-content:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:1.6rem">📄</div>';
             }
-            item.appendChild(nameEl);
-            previews.appendChild(item);
+            item.appendChild(nameEl); previews.appendChild(item);
         });
     }
 
-    if (input) input.addEventListener('change', function () { updateFileCount(); showPreviews(); });
+    input.addEventListener('change', function () { updateCount(); showPreviews(); });
+    area.addEventListener('click',   function () { input.click(); });
+    area.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    area.addEventListener('dragover',  function (e) { e.preventDefault(); area.classList.add('drag-over'); });
+    area.addEventListener('dragleave', function ()  { area.classList.remove('drag-over'); });
+    area.addEventListener('drop', function (e) {
+        e.preventDefault(); area.classList.remove('drag-over');
+        if (e.dataTransfer.files.length) { try { input.files = e.dataTransfer.files; } catch (_) {} updateCount(); showPreviews(); }
+    });
+}
 
-    if (area) {
-        area.addEventListener('keydown', function (e) {
-            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input && input.click(); }
-        });
-        area.addEventListener('dragover',  function (e) { e.preventDefault(); area.classList.add('drag-over'); });
-        area.addEventListener('dragleave', function ()  { area.classList.remove('drag-over'); });
-        area.addEventListener('drop', function (e) {
-            e.preventDefault();
-            area.classList.remove('drag-over');
-            if (input && e.dataTransfer.files.length) {
-                try { input.files = e.dataTransfer.files; } catch (_) {}
-                updateFileCount();
-                showPreviews();
-            }
-        });
-    }
-}());
+makeUploadArea('idUploadArea',      'idFilesInput',      'idPreviews',      'idFileCount',      'idUploadTitle',      'kycIdErr');
+makeUploadArea('supportUploadArea', 'supportFilesInput', 'supportPreviews', 'supportFileCount', 'supportUploadTitle', 'kycSupportErr');
 </script>
 
 <footer style="text-align:center;padding:32px 16px 40px;border-top:1px solid var(--border);margin-top:48px">
