@@ -178,14 +178,14 @@ class SellerController extends \Core\Controller
         $user   = $this->db->get('users', ['id','role_id','seller_tos_agreed_at'], ['id' => $userId]);
         $isAdmin = in_array($user['role_id'] ?? 0, [1, 2]);
 
-        // Determine KYC status for non-admins
-        $kycStatus = $isAdmin ? 'approved' : 'none';
+        // Admins always bypass KYC and TOS
+        $kycStatus = 'approved';
+        $tosAgreed = true;
         if (!$isAdmin) {
             $kycRow    = $this->db->get('kyc_profiles', ['status'], ['user_id' => $userId]);
             $kycStatus = is_array($kycRow) ? ($kycRow['status'] ?? 'none') : 'none';
+            $tosAgreed = !empty($user['seller_tos_agreed_at']);
         }
-
-        $tosAgreed = !empty($user['seller_tos_agreed_at']);
 
         $categories = $this->db->select('categories', '*') ?: [];
         return $this->view('mall/product_form', [
@@ -401,11 +401,25 @@ class SellerController extends \Core\Controller
 
         $categories = $this->db->select('categories', '*') ?: [];
         $csrf = generateCsrfToken();
+
+        // Admins always bypass KYC and TOS — also populate for non-admin editors
+        $kycStatus = 'approved';
+        $tosAgreed = true;
+        if (!$isAdmin) {
+            $kycRow    = $this->db->get('kyc_profiles', ['status'], ['user_id' => $userId]);
+            $kycStatus = is_array($kycRow) ? ($kycRow['status'] ?? 'none') : 'none';
+            $userRow   = $this->db->get('users', ['seller_tos_agreed_at'], ['id' => $userId]);
+            $tosAgreed = !empty($userRow['seller_tos_agreed_at']);
+        }
+
         return $this->view('mall/product_form', [
             'csrf_token'  => $csrf,
             'categories'  => $categories,
             'product'     => $product,
             'editing'     => true,
+            'kyc_status'  => $kycStatus,
+            'tos_agreed'  => $tosAgreed,
+            'is_admin'    => $isAdmin,
         ]);
     }
 
