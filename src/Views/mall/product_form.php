@@ -3,12 +3,18 @@
 /** @var string $csrf_token */
 /** @var array|null $product  — set when editing */
 /** @var bool $editing */
+/** @var string $kyc_status */
+/** @var bool $tos_agreed */
+/** @var bool $is_admin */
 $editing    = $editing ?? false;
 $product    = $product ?? [];
 $pageTitle  = $editing ? 'Edit Product' : 'New Product';
 $action     = $editing
     ? '/marketplace/sellers/products/update/' . (int)($product['id'] ?? 0)
     : '/marketplace/sellers/products/create';
+$kycStatus  = $kyc_status ?? 'none';
+$tosAgreed  = $tos_agreed ?? false;
+$isAdmin    = $is_admin ?? false;
 
 $p = $product; // shorthand
 $existingImgs = [];
@@ -141,9 +147,183 @@ select.pf-input    { cursor: pointer; }
 @media (max-width: 580px) {
     .pf-grid-2 { grid-template-columns: 1fr; }
 }
+
+/* ===== GATE MODALS ===== */
+.gate-overlay {
+    position: fixed; inset: 0; z-index: 9000;
+    background: rgba(0,0,0,0.62);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+}
+.gate-overlay.hidden { display: none; }
+.gate-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    max-width: 520px; width: 100%;
+    padding: 36px 32px 28px;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+    position: relative;
+}
+.gate-icon { font-size: 3rem; text-align: center; margin-bottom: 16px; }
+.gate-title { font-size: 1.25rem; font-weight: 800; text-align: center; margin-bottom: 8px; }
+.gate-body  { font-size: 0.875rem; color: var(--muted); line-height: 1.7; text-align: center; margin-bottom: 24px; }
+.gate-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+/* TOS modal specifics */
+.tos-scroll {
+    max-height: 340px; overflow-y: auto;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 16px 18px;
+    font-size: 0.82rem; color: var(--muted); line-height: 1.75;
+    margin-bottom: 18px;
+    text-align: left;
+}
+.tos-scroll h4 { font-size: 0.84rem; font-weight: 700; color: var(--text); margin: 14px 0 4px; }
+.tos-scroll h4:first-child { margin-top: 0; }
+.tos-scroll p  { margin: 0 0 8px; }
+.tos-scroll ul { margin: 0 0 8px; padding-left: 18px; }
+.tos-scroll li { margin-bottom: 4px; }
+.tos-agree-row { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 18px; font-size: 0.84rem; }
+.tos-agree-row input[type="checkbox"] { accent-color: var(--accent); margin-top: 2px; flex-shrink: 0; }
+
+/* Product possession reminder banner */
+.possession-banner {
+    background: rgba(245,158,11,0.08);
+    border: 1px solid rgba(245,158,11,0.35);
+    border-radius: var(--radius-sm);
+    padding: 14px 18px;
+    display: flex; align-items: flex-start; gap: 12px;
+    margin-bottom: 22px;
+    font-size: 0.84rem; color: var(--text); line-height: 1.6;
+}
+.possession-banner-icon { font-size: 1.4rem; flex-shrink: 0; }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
+
+<?php /* ====== KYC GATE MODAL — shown only when KYC is not approved ====== */ ?>
+<?php if (!$isAdmin && $kycStatus !== 'approved'): ?>
+<div class="gate-overlay" id="kycGateOverlay" role="dialog" aria-modal="true" aria-labelledby="kycGateTitle">
+    <div class="gate-modal">
+        <div class="gate-icon">🪪</div>
+        <h2 class="gate-title" id="kycGateTitle">Identity Verification Required</h2>
+        <div class="gate-body">
+            <?php if ($kycStatus === 'pending'): ?>
+                <p><strong>Your KYC application is currently under review.</strong></p>
+                <p>Our team typically completes reviews within <strong>1–3 business days</strong>. Once your identity is verified and approved, you will be able to publish products on ePower Mall.</p>
+                <p>Thank you for your patience.</p>
+            <?php elseif ($kycStatus === 'rejected'): ?>
+                <p><strong>Your previous KYC application was not approved.</strong></p>
+                <p>Please revisit your KYC submission, address the reviewer's notes, and resubmit with clear, valid documents. You will be able to upload products once your identity is verified.</p>
+            <?php else: ?>
+                <p>To protect buyers and maintain a trusted marketplace, <strong>all sellers must complete identity verification (KYC)</strong> before listing products.</p>
+                <p>This is required under Philippine law — including RA 9160 (AMLA) and RA 10173 (Data Privacy Act) — to prevent fraud and ensure a safe trading environment for everyone.</p>
+                <p>The process is simple and takes only a few minutes.</p>
+            <?php endif; ?>
+        </div>
+        <div class="gate-actions">
+            <a href="/marketplace/sellers/kyc" class="btn btn-primary" style="padding:11px 28px">
+                <?= $kycStatus === 'pending' ? '⏳ View KYC Status' : '🪪 Start KYC Verification' ?>
+            </a>
+            <a href="/marketplace/sellers/products" class="btn btn-secondary">Back to Products</a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
+
+<?php /* ====== SELLER TERMS OF SERVICE MODAL — shown once per user ====== */ ?>
+<?php if (!$isAdmin && $kycStatus === 'approved' && !$tosAgreed): ?>
+<div class="gate-overlay" id="tosOverlay" role="dialog" aria-modal="true" aria-labelledby="tosTitle">
+    <div class="gate-modal" style="max-width:640px">
+        <div class="gate-icon">📋</div>
+        <h2 class="gate-title" id="tosTitle">ePower Mall — Seller Terms of Service</h2>
+        <p style="font-size:0.82rem;color:var(--muted);text-align:center;margin-bottom:14px">Please read the full terms carefully before listing any product.</p>
+        <div class="tos-scroll" id="tosScroll">
+
+            <h4>1. Acceptance of Terms</h4>
+            <p>By clicking "I Agree and Continue", you confirm that you have read, understood, and agree to be bound by these Seller Terms of Service ("Terms"), the ePower Mall Privacy Policy, and all applicable Philippine laws and regulations. These Terms form a legally binding agreement between you ("Seller") and ePower Mall ("Platform").</p>
+
+            <h4>2. Data Privacy Act Disclosure (RA 10173)</h4>
+            <p>Pursuant to Republic Act No. 10173, the <strong>Data Privacy Act of 2012</strong> (DPA), and its Implementing Rules and Regulations (IRR), you are hereby informed that ePower Mall, as a Personal Information Controller (PIC), will collect, process, and store your sensitive personal information — including your full name, date of birth, address, contact details, government-issued ID, and financial information — for the following purposes:</p>
+            <ul>
+                <li>Verification of your identity (Know Your Customer — KYC) as mandated by RA 9160 (AMLA);</li>
+                <li>Compliance with BIR regulations on online sellers (Revenue Memorandum Circular 60-2020);</li>
+                <li>Prevention of fraud, money laundering, and prohibited trade;</li>
+                <li>Administration of your seller account and processing of payments.</li>
+            </ul>
+            <p>Your data will be kept strictly confidential, encrypted at rest and in transit, and will not be shared with third parties except as required by law or authorized by you. You have the right to access, correct, and request erasure of your personal data in compliance with the DPA. For data privacy concerns, contact our Privacy Officer at <em>privacy@epower.com.ph</em>.</p>
+
+            <h4>3. Government Investigation &amp; Juridical Authority</h4>
+            <p>You acknowledge and agree that in the event of a dispute, complaint, or investigation involving fraud, unauthorized transactions, prohibited goods, or any violation of Philippine law, <strong>the personal information you provided during KYC and all transaction records may be disclosed to authorized government agencies</strong> — including the NBI, PNP, DOJ, BIR, SEC, DTI, and courts of competent jurisdiction — when a valid legal warrant, court order, or official governmental request is presented. By agreeing to these Terms, you waive confidentiality of said information to the extent required by Philippine juridical authority in pursuing such investigations.</p>
+
+            <h4>4. Seller Obligations — Product Authenticity</h4>
+            <ul>
+                <li><strong>You must only list products that are actually in your physical possession at the time of listing.</strong> Listing products you do not own, cannot deliver, or are unavailable is strictly prohibited and constitutes fraud.</li>
+                <li>All product descriptions, images, and prices must be accurate, truthful, and not misleading.</li>
+                <li>You must not list counterfeit, stolen, prohibited, hazardous, or regulated goods.</li>
+                <li>You must comply with the Consumer Act of the Philippines (RA 7394) — no deceptive labeling or misrepresentation.</li>
+                <li>Products must comply with all applicable DTI regulations on product standards and labeling.</li>
+            </ul>
+
+            <h4>5. Payment Disbursement Policy</h4>
+            <p>Upon a buyer's confirmation of successful delivery of each item (or after the platform's automatic confirmation period), <strong>payment will be released to your registered payout account within seven (7) calendar days</strong>. This holding period protects buyers and ensures dispute resolution before funds are disbursed. ePower Mall reserves the right to withhold payment pending resolution of any open dispute, chargeback, or investigation.</p>
+
+            <h4>6. Shipment &amp; Delivery Standards</h4>
+            <ul>
+                <li>You must ship items within the handling time stated in your listing (default: 1–3 business days).</li>
+                <li>You are responsible for ensuring items are properly packed to prevent damage during transit.</li>
+                <li>Once an order is accepted, you must provide a valid tracking number within 24 hours of shipment.</li>
+                <li>You must comply with PDEA, BOC, and CAAP regulations regarding prohibited items in parcels.</li>
+                <li>For items shipped via air freight, all dangerous goods restrictions of the Civil Aviation Authority of the Philippines (CAAP) apply.</li>
+                <li>If a package is lost, damaged, or significantly delayed due to your fault, you are obligated to compensate the buyer or issue a full refund.</li>
+            </ul>
+
+            <h4>7. Anti-Fraud &amp; Prohibited Conduct</h4>
+            <ul>
+                <li>Shill bidding, fake reviews, account manipulation, or any form of marketplace fraud is strictly prohibited and may result in permanent account termination and criminal referral.</li>
+                <li>Sellers may not transact outside the platform to circumvent fees or buyer protections.</li>
+                <li>Any attempt to launder money, finance terrorism, or trade in prohibited/controlled goods will be reported to the AMLC and law enforcement authorities under RA 9160 and RA 10365.</li>
+            </ul>
+
+            <h4>8. Taxes &amp; BIR Compliance</h4>
+            <p>You are responsible for declaring your online selling income to the Bureau of Internal Revenue as required by RMC 60-2020. ePower Mall will provide transaction summaries upon request to support your tax filing obligations. Failure to comply with BIR regulations is your sole legal responsibility.</p>
+
+            <h4>9. Intellectual Property</h4>
+            <p>By uploading product images and descriptions, you confirm you own the copyright or have obtained proper authorization to use them. ePower Mall respects IP rights under RA 8293 (Intellectual Property Code). Infringing content will be removed and repeat violators will be suspended.</p>
+
+            <h4>10. Consumer Protection (RA 7394)</h4>
+            <p>You agree to honor the platform's return and refund policy in accordance with the Consumer Act of the Philippines. Products must match their descriptions. Buyers have the right to return defective products within the applicable warranty period. Sellers who repeatedly violate consumer protection rules may be suspended and reported to the DTI.</p>
+
+            <h4>11. Accuracy of Information</h4>
+            <p><strong>You warrant that all information provided during registration, KYC, and product listing is truthful, accurate, and up to date.</strong> Submission of false or fraudulent information is a criminal offense under RA 10175 (Cybercrime Prevention Act) and RA 3815 (Revised Penal Code), and may result in criminal prosecution, account termination, and civil liability.</p>
+
+            <h4>12. Seller Rights &amp; Platform Obligations</h4>
+            <ul>
+                <li>You have the right to be informed of the reason for any account suspension or product removal.</li>
+                <li>You have the right to appeal platform decisions through the official dispute resolution process.</li>
+                <li>ePower Mall commits to processing your payouts promptly and transparently within the stated timelines.</li>
+                <li>ePower Mall will not disclose your personal data without legal basis as defined under RA 10173.</li>
+            </ul>
+
+            <h4>13. Amendments</h4>
+            <p>ePower Mall reserves the right to amend these Terms at any time. You will be notified via email and/or platform notification. Continued use of the platform after notice constitutes acceptance of the updated Terms.</p>
+
+            <p style="margin-top:14px;font-size:0.78rem;color:var(--muted)">Last updated: <?= date('F j, Y') ?> · Governed by the laws of the Republic of the Philippines.</p>
+        </div>
+        <div class="tos-agree-row">
+            <input type="checkbox" id="tosCheckbox" required>
+            <label for="tosCheckbox">I have read and fully understand the Seller Terms of Service, including the Data Privacy Act disclosure, payment policy, and anti-fraud provisions. I agree to comply with all applicable Philippine laws as a seller on ePower Mall.</label>
+        </div>
+        <div class="gate-actions">
+            <button type="button" id="tosBtnAgree" class="btn btn-primary" style="padding:11px 28px" disabled>✅ I Agree and Continue</button>
+            <a href="/marketplace/sellers/products" class="btn btn-secondary">Decline — Back to Products</a>
+        </div>
+    </div>
+</div>
+<?php endif; ?>
 
 <div class="pf-shell">
 
@@ -156,6 +336,17 @@ select.pf-input    { cursor: pointer; }
         <h1 class="pf-title"><?= $pageTitle ?></h1>
         <p class="pf-sub"><?= $editing ? 'Update the details for this listing' : 'Fill in the details to create a new listing' ?></p>
     </div>
+
+    <!-- Product Possession Reminder -->
+    <?php if (!$editing): ?>
+    <div class="possession-banner" role="note" aria-label="Important seller reminder">
+        <div class="possession-banner-icon">📦</div>
+        <div>
+            <strong>Important Reminder:</strong> Only upload products that you actually have in your possession right now.
+            Listing items you do not physically have — including pre-orders without confirmed stock, items belonging to others, or products you have not yet received — is <strong>strictly prohibited</strong> and may result in account suspension, buyer disputes, and legal action. By continuing, you confirm that the product you are listing is available, yours to sell, and ready to ship.
+        </div>
+    </div>
+    <?php endif; ?>
 
     <form method="POST" action="<?= htmlspecialchars($action) ?>" enctype="multipart/form-data" novalidate>
         <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
@@ -391,6 +582,60 @@ select.pf-input    { cursor: pointer; }
         });
         slugInput.addEventListener('input', function () { slugInput.dataset.manual = '1'; });
     }
+}());
+
+// ===== KYC GATE =====
+(function () {
+    var overlay = document.getElementById('kycGateOverlay');
+    if (overlay) {
+        // Prevent closing by clicking backdrop — user must take action
+        overlay.addEventListener('click', function (e) { e.stopPropagation(); });
+    }
+}());
+
+// ===== TERMS OF SERVICE MODAL =====
+(function () {
+    var tosOverlay  = document.getElementById('tosOverlay');
+    var tosCheckbox = document.getElementById('tosCheckbox');
+    var tosBtnAgree = document.getElementById('tosBtnAgree');
+    var csrfToken   = '<?= htmlspecialchars($csrf_token) ?>';
+
+    if (!tosOverlay) {
+        // TOS already agreed server-side — also check localStorage (belt & braces)
+        return;
+    }
+
+    // Enable agree button only when checkbox is ticked
+    if (tosCheckbox && tosBtnAgree) {
+        tosCheckbox.addEventListener('change', function () {
+            tosBtnAgree.disabled = !tosCheckbox.checked;
+        });
+    }
+
+    if (tosBtnAgree) {
+        tosBtnAgree.addEventListener('click', function () {
+            if (!tosCheckbox || !tosCheckbox.checked) return;
+
+            // Persist locally immediately so modal doesn't flash on retry
+            try { localStorage.setItem('epower_seller_tos_v1', '1'); } catch (_) {}
+
+            // Record server-side via AJAX
+            var fd = new FormData();
+            fd.append('csrf_token', csrfToken);
+            fetch('/marketplace/sellers/tos/agree', { method: 'POST', body: fd })
+                .catch(function () { /* best-effort */ });
+
+            // Dismiss modal and let user continue
+            tosOverlay.classList.add('hidden');
+        });
+    }
+
+    // Respect prior localStorage agreement (e.g., server hasn't updated yet)
+    try {
+        if (localStorage.getItem('epower_seller_tos_v1') === '1') {
+            if (tosOverlay) tosOverlay.classList.add('hidden');
+        }
+    } catch (_) {}
 }());
 </script>
 

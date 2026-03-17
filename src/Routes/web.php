@@ -1226,6 +1226,7 @@ $router->req('/api/account/keys/revoke', 'UserController@revokeAccountApiKey', [
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');
 $router->req('/marketplace/sellers/kyc/submit', 'SellerController@submitKyc', ['POST']);
+$router->req('/marketplace/sellers/tos/agree', 'SellerController@tosAgree', ['POST']);
 $router->req('/marketplace/sellers/products', 'SellerController@products');
 $router->req('/marketplace/sellers/products/new', 'SellerController@productNew');
 $router->req('/marketplace/sellers/products/create', 'SellerController@productCreate', ['POST']);

@@ -500,46 +500,83 @@ details summary::-webkit-details-marker { display: none; }
                 <div class="kyc-card-icon">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="2 10 22 10"/></svg>
                 </div>
-                <h2 class="kyc-card-title">Government-Issued ID</h2>
+                <h2 class="kyc-card-title">Primary Identity Document</h2>
             </div>
             <div class="kyc-card-body">
+                <div style="background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:16px;font-size:0.82rem;color:var(--muted);line-height:1.6">
+                    <strong style="color:var(--text)">📋 Note:</strong> We accept a wide range of documents to ensure all Filipinos — including students, senior citizens, indigenous peoples, and those without government IDs — can participate. Select the document that best represents your identity.
+                </div>
                 <div class="form-grid-2" style="margin-bottom:14px">
                     <div class="form-group">
-                        <label class="form-label" for="kyc-id-type">ID Type <span class="req" aria-hidden="true">*</span></label>
+                        <label class="form-label" for="kyc-id-type">Document / ID Type <span class="req" aria-hidden="true">*</span></label>
                         <select class="form-input" id="kyc-id-type" name="id_type" required>
-                            <option value="">Select ID type…</option>
-                            <?php foreach ([
-                                'Philippine National ID (PhilSys)',
-                                'Philippine Passport',
-                                "Driver's License (LTO)",
-                                'Unified Multi-Purpose ID (UMID)',
-                                'SSS ID',
-                                'GSIS ID',
-                                'PRC Professional ID',
-                                "Voter's ID (COMELEC)",
-                                'Senior Citizen ID',
-                                'PhilHealth ID',
-                                'Pag-IBIG (HDMF) ID',
-                                'Postal ID (PHLPost)',
-                                'NBI Clearance',
-                                'TIN Card (BIR)',
-                                'OFW ID / iDOLE',
-                            ] as $idOpt): ?>
-                            <option value="<?= htmlspecialchars($idOpt) ?>"
-                                <?= ($kyc['id_type'] ?? '') === $idOpt ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($idOpt) ?>
-                            </option>
-                            <?php endforeach; ?>
+                            <option value="">Select document type…</option>
+                            <optgroup label="🏛️ Primary Government-Issued IDs">
+                                <option value="Philippine National ID (PhilSys)" <?= ($kyc['id_type'] ?? '') === 'Philippine National ID (PhilSys)' ? 'selected' : '' ?>>Philippine National ID (PhilSys)</option>
+                                <option value="Philippine Passport" <?= ($kyc['id_type'] ?? '') === 'Philippine Passport' ? 'selected' : '' ?>>Philippine Passport</option>
+                                <option value="Driver's License (LTO)" <?= ($kyc['id_type'] ?? '') === "Driver's License (LTO)" ? 'selected' : '' ?>>Driver's License (LTO)</option>
+                                <option value="Unified Multi-Purpose ID (UMID)" <?= ($kyc['id_type'] ?? '') === 'Unified Multi-Purpose ID (UMID)' ? 'selected' : '' ?>>Unified Multi-Purpose ID (UMID)</option>
+                                <option value="SSS ID" <?= ($kyc['id_type'] ?? '') === 'SSS ID' ? 'selected' : '' ?>>SSS ID</option>
+                                <option value="GSIS ID" <?= ($kyc['id_type'] ?? '') === 'GSIS ID' ? 'selected' : '' ?>>GSIS ID</option>
+                                <option value="PRC Professional ID" <?= ($kyc['id_type'] ?? '') === 'PRC Professional ID' ? 'selected' : '' ?>>PRC Professional ID</option>
+                                <option value="Voter's ID (COMELEC)" <?= ($kyc['id_type'] ?? '') === "Voter's ID (COMELEC)" ? 'selected' : '' ?>>Voter's ID (COMELEC)</option>
+                                <option value="Senior Citizen ID (OSCA)" <?= ($kyc['id_type'] ?? '') === 'Senior Citizen ID (OSCA)' ? 'selected' : '' ?>>Senior Citizen ID (OSCA)</option>
+                                <option value="PhilHealth ID" <?= ($kyc['id_type'] ?? '') === 'PhilHealth ID' ? 'selected' : '' ?>>PhilHealth ID</option>
+                                <option value="Pag-IBIG (HDMF) ID" <?= ($kyc['id_type'] ?? '') === 'Pag-IBIG (HDMF) ID' ? 'selected' : '' ?>>Pag-IBIG (HDMF) ID</option>
+                                <option value="Postal ID (PHLPost)" <?= ($kyc['id_type'] ?? '') === 'Postal ID (PHLPost)' ? 'selected' : '' ?>>Postal ID (PHLPost)</option>
+                                <option value="NBI Clearance" <?= ($kyc['id_type'] ?? '') === 'NBI Clearance' ? 'selected' : '' ?>>NBI Clearance</option>
+                                <option value="TIN Card (BIR)" <?= ($kyc['id_type'] ?? '') === 'TIN Card (BIR)' ? 'selected' : '' ?>>TIN Card (BIR)</option>
+                                <option value="OFW ID / iDOLE" <?= ($kyc['id_type'] ?? '') === 'OFW ID / iDOLE' ? 'selected' : '' ?>>OFW ID / iDOLE</option>
+                                <option value="PWD ID (NCDA)" <?= ($kyc['id_type'] ?? '') === 'PWD ID (NCDA)' ? 'selected' : '' ?>>PWD ID (NCDA – Persons with Disability)</option>
+                            </optgroup>
+                            <optgroup label="🎓 Student &amp; OJT Documents">
+                                <option value="Student ID (School-Issued)" <?= ($kyc['id_type'] ?? '') === 'Student ID (School-Issued)' ? 'selected' : '' ?>>Student ID (School-Issued)</option>
+                                <option value="OJT / Internship Endorsement Letter" <?= ($kyc['id_type'] ?? '') === 'OJT / Internship Endorsement Letter' ? 'selected' : '' ?>>OJT / Internship Endorsement Letter</option>
+                                <option value="School Enrollment Certificate" <?= ($kyc['id_type'] ?? '') === 'School Enrollment Certificate' ? 'selected' : '' ?>>School Enrollment Certificate</option>
+                            </optgroup>
+                            <optgroup label="📜 Civil &amp; Community Documents">
+                                <option value="Birth Certificate (PSA)" <?= ($kyc['id_type'] ?? '') === 'Birth Certificate (PSA)' ? 'selected' : '' ?>>Birth Certificate (PSA)</option>
+                                <option value="Barangay Clearance" <?= ($kyc['id_type'] ?? '') === 'Barangay Clearance' ? 'selected' : '' ?>>Barangay Clearance</option>
+                                <option value="Barangay Certificate of Residency" <?= ($kyc['id_type'] ?? '') === 'Barangay Certificate of Residency' ? 'selected' : '' ?>>Barangay Certificate of Residency</option>
+                                <option value="Barangay Indigency Certificate" <?= ($kyc['id_type'] ?? '') === 'Barangay Indigency Certificate' ? 'selected' : '' ?>>Barangay Indigency Certificate</option>
+                                <option value="Church/Parish Clearance Certificate" <?= ($kyc['id_type'] ?? '') === 'Church/Parish Clearance Certificate' ? 'selected' : '' ?>>Church / Parish Clearance Certificate</option>
+                                <option value="Church Baptismal Certificate" <?= ($kyc['id_type'] ?? '') === 'Church Baptismal Certificate' ? 'selected' : '' ?>>Church Baptismal Certificate</option>
+                                <option value="Marriage Certificate (PSA)" <?= ($kyc['id_type'] ?? '') === 'Marriage Certificate (PSA)' ? 'selected' : '' ?>>Marriage Certificate (PSA)</option>
+                            </optgroup>
+                            <optgroup label="🏘️ Indigenous Peoples &amp; Indigent Filipinos">
+                                <option value="NCIP Certificate of Membership (IP)" <?= ($kyc['id_type'] ?? '') === 'NCIP Certificate of Membership (IP)' ? 'selected' : '' ?>>NCIP Certificate of Membership (IP)</option>
+                                <option value="Tribal Leader Endorsement Letter" <?= ($kyc['id_type'] ?? '') === 'Tribal Leader Endorsement Letter' ? 'selected' : '' ?>>Tribal Leader Endorsement Letter</option>
+                                <option value="IP Community ID / Tribal ID" <?= ($kyc['id_type'] ?? '') === 'IP Community ID / Tribal ID' ? 'selected' : '' ?>>IP Community ID / Tribal ID</option>
+                                <option value="DSWD Beneficiary Certificate (4Ps / Pantawid)" <?= ($kyc['id_type'] ?? '') === 'DSWD Beneficiary Certificate (4Ps / Pantawid)' ? 'selected' : '' ?>>DSWD Beneficiary Certificate (4Ps / Pantawid)</option>
+                                <option value="Certificate of Indigency (Municipal / City Hall)" <?= ($kyc['id_type'] ?? '') === 'Certificate of Indigency (Municipal / City Hall)' ? 'selected' : '' ?>>Certificate of Indigency (Municipal / City Hall)</option>
+                                <option value="Solo Parent ID (DSWD)" <?= ($kyc['id_type'] ?? '') === 'Solo Parent ID (DSWD)' ? 'selected' : '' ?>>Solo Parent ID (DSWD)</option>
+                            </optgroup>
+                            <optgroup label="🏢 Business &amp; Entity Documents">
+                                <option value="Entity Endorsement Letter" <?= ($kyc['id_type'] ?? '') === 'Entity Endorsement Letter' ? 'selected' : '' ?>>Entity Endorsement Letter (NGO / Cooperative / Association)</option>
+                                <option value="DTI Business Name Registration" <?= ($kyc['id_type'] ?? '') === 'DTI Business Name Registration' ? 'selected' : '' ?>>DTI Business Name Registration Certificate</option>
+                                <option value="SEC Certificate of Registration" <?= ($kyc['id_type'] ?? '') === 'SEC Certificate of Registration' ? 'selected' : '' ?>>SEC Certificate of Registration</option>
+                                <option value="Business Permit / Mayor's Permit" <?= ($kyc['id_type'] ?? '') === "Business Permit / Mayor's Permit" ? 'selected' : '' ?>>Business Permit / Mayor's Permit</option>
+                                <option value="CDA Cooperative Registration" <?= ($kyc['id_type'] ?? '') === 'CDA Cooperative Registration' ? 'selected' : '' ?>>CDA Cooperative Registration Certificate</option>
+                                <option value="BIR Certificate of Registration (Form 2303)" <?= ($kyc['id_type'] ?? '') === 'BIR Certificate of Registration (Form 2303)' ? 'selected' : '' ?>>BIR Certificate of Registration (Form 2303)</option>
+                            </optgroup>
+                            <optgroup label="🖼️ Proof of Identity (Alternate)">
+                                <option value="COMELEC Voter Registration Form" <?= ($kyc['id_type'] ?? '') === 'COMELEC Voter Registration Form' ? 'selected' : '' ?>>COMELEC Voter Registration Form</option>
+                                <option value="Government Employee ID" <?= ($kyc['id_type'] ?? '') === 'Government Employee ID' ? 'selected' : '' ?>>Government Employee ID</option>
+                                <option value="Company/Employer ID with Address" <?= ($kyc['id_type'] ?? '') === 'Company/Employer ID with Address' ? 'selected' : '' ?>>Company/Employer ID with Official Address</option>
+                                <option value="Bank or E-Wallet Statement (GCash/Maya)" <?= ($kyc['id_type'] ?? '') === 'Bank or E-Wallet Statement (GCash/Maya)' ? 'selected' : '' ?>>Bank or E-Wallet Statement (GCash / Maya)</option>
+                            </optgroup>
                         </select>
+                        <div class="form-hint">Cannot find your document? Select the closest match and explain in the document notes below.</div>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="kyc-id">ID Number <span class="req" aria-hidden="true">*</span></label>
+                        <label class="form-label" for="kyc-id">ID / Reference Number <span class="req" aria-hidden="true">*</span></label>
                         <input class="form-input" id="kyc-id" type="text" name="identifier" required
-                            placeholder="As printed on your ID"
+                            placeholder="As printed on your document"
                             value="<?= htmlspecialchars($kyc['identifier'] ?? '') ?>">
+                        <div class="form-hint">If your document has no number (e.g. Barangay Clearance), write the date of issuance.</div>
                     </div>
                 </div>
-                <div class="form-hint">All ID information is encrypted and kept strictly confidential — used only for identity verification per RA 9160 (AMLA).</div>
+                <div class="form-hint">All identity information is encrypted and kept strictly confidential — used only for identity verification as required by RA 9160 (AMLA), RA 10173 (Data Privacy Act), and RA 3883 (Business Name Law).</div>
             </div>
         </div>
 
@@ -576,14 +613,56 @@ details summary::-webkit-details-marker { display: none; }
                 <div class="kyc-card-icon">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 </div>
-                <h2 class="kyc-card-title">Upload Documents</h2>
+                <h2 class="kyc-card-title">Upload Supporting Documents</h2>
             </div>
             <div class="kyc-card-body">
+                <!-- Document category checklist -->
+                <div style="margin-bottom:18px">
+                    <div class="form-label" style="margin-bottom:8px">Which documents are you uploading? <span class="req">*</span></div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px">
+                        <?php
+                        $docCategories = [
+                            'id_front'          => 'ID / Document — Front',
+                            'id_back'           => 'ID / Document — Back',
+                            'selfie_with_id'    => 'Selfie Holding Your ID / Document',
+                            'proof_of_address'  => 'Proof of Address (Utility Bill / Barangay Cert.)',
+                            'birth_certificate' => 'Birth Certificate (PSA)',
+                            'barangay_clearance'=> 'Barangay Clearance',
+                            'dti_certificate'   => 'DTI Business Name Certificate',
+                            'sec_certificate'   => 'SEC Certificate of Registration',
+                            'business_permit'   => 'Business Permit / Mayor's Permit',
+                            'bir_cor'           => 'BIR Certificate of Registration (Form 2303)',
+                            'cda_certificate'   => 'CDA Cooperative Registration',
+                            'ncip_certificate'  => 'NCIP Certificate of Membership',
+                            'church_clearance'  => 'Church / Parish Clearance Certificate',
+                            'entity_endorsement'=> 'Entity / Organization Endorsement Letter',
+                            'other'             => 'Other Supporting Document',
+                        ];
+                        $savedDocTypes = (!empty($kyc['doc_types'])) ? (json_decode($kyc['doc_types'], true) ?: []) : [];
+                        foreach ($docCategories as $val => $label):
+                        ?>
+                        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:0.82rem;transition:background var(--trans)"
+                               onmouseover="this.style.background='var(--border)'" onmouseout="this.style.background='var(--surface2)'">
+                            <input type="checkbox" name="doc_types[]" value="<?= htmlspecialchars($val) ?>"
+                                <?= in_array($val, $savedDocTypes) ? 'checked' : '' ?>
+                                style="accent-color:var(--accent)">
+                            <?= htmlspecialchars($label) ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="form-hint" style="margin-top:6px">Check all document types included in your upload below.</div>
+                </div>
+
                 <div class="doc-upload-area" id="docUploadArea" role="button" tabindex="0" aria-label="Upload documents">
                     <input type="file" name="documents[]" id="docFilesInput" multiple accept="image/*,.pdf" tabindex="-1">
                     <div class="upload-icon">📎</div>
                     <div class="upload-title">Click or drag &amp; drop files here</div>
-                    <div class="upload-sub">Required: ID front &amp; back · Selfie holding your ID · Proof of address<br>Accepted: JPG, PNG, PDF · Max 10 MB each · Mandated under RA 9160 (AMLA)</div>
+                    <div class="upload-sub">
+                        Required: ID / Document (front &amp; back) · Selfie holding your ID · Proof of address<br>
+                        Business sellers: include DTI / SEC / Business Permit &amp; BIR COR<br>
+                        Accepted: JPG, PNG, PDF · Max 10 MB each<br>
+                        <span style="color:var(--accent)">Mandated under RA 9160 (AMLA) &amp; RA 10173 (Data Privacy Act)</span>
+                    </div>
                 </div>
                 <div class="doc-previews" id="docPreviews"></div>
             </div>

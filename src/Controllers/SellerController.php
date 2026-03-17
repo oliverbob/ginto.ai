@@ -57,6 +57,16 @@ class SellerController extends \Core\Controller
         $businessName  = trim($_POST['business_name']   ?? '');
         $businessReg   = trim($_POST['business_reg']    ?? '');
 
+        // Sanitise and capture doc_types checkboxes
+        $rawDocTypes = $_POST['doc_types'] ?? [];
+        $allowedDocTypes = [
+            'id_front','id_back','selfie_with_id','proof_of_address',
+            'birth_certificate','barangay_clearance','dti_certificate',
+            'sec_certificate','business_permit','bir_cor','cda_certificate',
+            'ncip_certificate','church_clearance','entity_endorsement','other',
+        ];
+        $docTypes = array_values(array_intersect((array)$rawDocTypes, $allowedDocTypes));
+
         // Handle uploaded documents
         $docs = [];
         if (!empty($_FILES['documents'])) {
@@ -91,6 +101,7 @@ class SellerController extends \Core\Controller
             'id_type'          => $idType ?: null,
             'identifier'       => $identifier ?: null,
             'documents'        => !empty($docs) ? json_encode($docs) : null,
+            'doc_types'        => !empty($docTypes) ? json_encode($docTypes) : null,
             'business_name'    => $businessName ?: null,
             'business_reg'     => $businessReg ?: null,
             'submitted_at'     => date('Y-m-d H:i:s'),
@@ -162,9 +173,47 @@ class SellerController extends \Core\Controller
     public function productNew()
     {
         if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
-        $csrf = generateCsrfToken();
+        $csrf   = generateCsrfToken();
+        $userId = (int)$_SESSION['user_id'];
+        $user   = $this->db->get('users', ['id','role_id','seller_tos_agreed_at'], ['id' => $userId]);
+        $isAdmin = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        // Determine KYC status for non-admins
+        $kycStatus = $isAdmin ? 'approved' : 'none';
+        if (!$isAdmin) {
+            $kycRow    = $this->db->get('kyc_profiles', ['status'], ['user_id' => $userId]);
+            $kycStatus = is_array($kycRow) ? ($kycRow['status'] ?? 'none') : 'none';
+        }
+
+        $tosAgreed = !empty($user['seller_tos_agreed_at']);
+
         $categories = $this->db->select('categories', '*') ?: [];
-        return $this->view('mall/product_form', ['csrf_token' => $csrf, 'categories' => $categories]);
+        return $this->view('mall/product_form', [
+            'csrf_token'  => $csrf,
+            'categories'  => $categories,
+            'kyc_status'  => $kycStatus,
+            'tos_agreed'  => $tosAgreed,
+            'is_admin'    => $isAdmin,
+        ]);
+    }
+
+    /**
+     * AJAX endpoint: seller agrees to Terms of Service.
+     * Stores timestamp server-side so the TOS modal won't be shown again on any device.
+     */
+    public function tosAgree()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); echo json_encode(['ok' => false]); return; }
+        if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['ok' => false, 'error' => 'Login required']); return; }
+
+        $token = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) { http_response_code(400); echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']); return; }
+
+        $userId = (int)$_SESSION['user_id'];
+        $this->db->update('users', ['seller_tos_agreed_at' => date('Y-m-d H:i:s')], ['id' => $userId]);
+
+        header('Content-Type: application/json');
+        echo json_encode(['ok' => true]);
     }
 
     public function productCreate()
