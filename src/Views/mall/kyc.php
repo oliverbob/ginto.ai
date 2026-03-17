@@ -539,7 +539,7 @@ details summary::-webkit-details-marker { display: none; }
                                 <option value="Barangay Clearance" <?= ($kyc['id_type'] ?? '') === 'Barangay Clearance' ? 'selected' : '' ?>>Barangay Clearance</option>
                                 <option value="Barangay Certificate of Residency" <?= ($kyc['id_type'] ?? '') === 'Barangay Certificate of Residency' ? 'selected' : '' ?>>Barangay Certificate of Residency</option>
                                 <option value="Barangay Indigency Certificate" <?= ($kyc['id_type'] ?? '') === 'Barangay Indigency Certificate' ? 'selected' : '' ?>>Barangay Indigency Certificate</option>
-                                <option value="Church/Parish Clearance Certificate" <?= ($kyc['id_type'] ?? '') === 'Church/Parish Clearance Certificate' ? 'selected' : '' ?>>Church / Parish Clearance Certificate</option>
+                                <option value="Church Clearance Certificate" <?= ($kyc['id_type'] ?? '') === 'Church Clearance Certificate' ? 'selected' : '' ?>>Church Clearance Certificate</option>
                                 <option value="Church Baptismal Certificate" <?= ($kyc['id_type'] ?? '') === 'Church Baptismal Certificate' ? 'selected' : '' ?>>Church Baptismal Certificate</option>
                                 <option value="Marriage Certificate (PSA)" <?= ($kyc['id_type'] ?? '') === 'Marriage Certificate (PSA)' ? 'selected' : '' ?>>Marriage Certificate (PSA)</option>
                             </optgroup>
@@ -634,7 +634,7 @@ details summary::-webkit-details-marker { display: none; }
                             'bir_cor'           => 'BIR Certificate of Registration (Form 2303)',
                             'cda_certificate'   => 'CDA Cooperative Registration',
                             'ncip_certificate'  => 'NCIP Certificate of Membership',
-                            'church_clearance'  => 'Church / Parish Clearance Certificate',
+                            'church_clearance'  => 'Church Clearance Certificate',
                             'entity_endorsement'=> 'Entity / Organization Endorsement Letter',
                             'other'             => 'Other Supporting Document',
                         ];
