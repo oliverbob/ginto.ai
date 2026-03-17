@@ -575,6 +575,7 @@ details summary::-webkit-details-marker { display: none; }
                                 ['services',     '🔧', 'Services',     'Service-based: repairs, tutoring, freelance, consultancy'],
                                 ['real_estate',  '🏠', 'Real Estate',  'Property listings for sale, lease, or pre-selling'],
                                 ['rentals',      '🔑', 'Rentals',      'Equipment, vehicles, property, and event item rentals'],
+                                ['multi_purpose','🔀', 'Multi-Purpose / Multi-Type', 'Combines multiple categories — products, services, rentals, and more'],
                             ] as [$val,$emoji,$name,$desc]): ?>
                             <label class="acct-type-card">
                                 <input type="radio" name="_acct_radio" value="<?= $val ?>" <?= $savedAccountType === $val ? 'checked' : '' ?> onchange="document.getElementById('accountTypeInput').value=this.value">

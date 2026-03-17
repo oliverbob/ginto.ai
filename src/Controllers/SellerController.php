@@ -60,7 +60,7 @@ class SellerController extends \Core\Controller
         // Account type (from wizard Step 2)
         $allowedAccountTypes = [
             'personal','livelihood','retailer','wholesale','general_merchandise',
-            'mall','products','services','real_estate','rentals',
+            'mall','products','services','real_estate','rentals','multi_purpose',
             'business','cooperative',
             'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program',
         ];
