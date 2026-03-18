@@ -6,14 +6,14 @@ $title = 'Ginto Gaming';
 if ($game === 'typing') {
     // Full-screen typing game — no layout chrome
     $backUrl = '/gaming';
-    include __DIR__ . '/../layout/header.php';
+    include __DIR__ . '/layout/header.php';
     echo '<style>html,body{margin:0;padding:0;overflow:auto;background:#31363f;}</style>';
     include __DIR__ . '/games/typing.php';
     echo '</body></html>';
     return;
 }
 
-require_once __DIR__ . '/../layout/header.php';
+require_once __DIR__ . '/layout/header.php';
 ?>
 <style>
 html, body {
@@ -52,7 +52,7 @@ html, body {
 </style>
 
 <div class="flex h-screen">
-    <?php include __DIR__ . '/../layout/sidebar.php'; ?>
+    <?php include __DIR__ . '/layout/sidebar.php'; ?>
 
     <!-- Main Content -->
     <div id="gamingContentWrapper" class="flex-1 lg:ml-64">
