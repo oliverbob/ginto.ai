@@ -664,7 +664,7 @@ try {
                         <p class="text-sm" style="color: var(--text-secondary);">After all payouts & operational costs</p>
                       </div>
                     </div>
-                    <span class="text-3xl font-extrabold" style="color: var(--positive-500);">₱151</span>
+                    <span class="text-3xl font-extrabold" style="color: var(--positive-500);">₱51</span>
                   </div>
                   <div class="space-y-4 text-lg">
                     <div class="flex justify-between items-center">
@@ -672,7 +672,11 @@ try {
                       <span class="font-bold" style="color: var(--text-primary);">₱250</span>
                     </div>
                     <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Total Commission Payouts</span>
+                      <span class="font-medium" style="color: var(--text-primary);">Direct Tier Commission (40%)</span>
+                      <span class="font-bold" style="color: #ff4d4f;">- ₱100</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                      <span class="font-medium" style="color: var(--text-primary);">Tiered Commission Payouts (16%)</span>
                       <span class="font-bold" style="color: #ff4d4f;">- ₱24</span>
                     </div>
                     <div class="flex justify-between items-center">
@@ -681,7 +685,7 @@ try {
                     </div>
                     <div class="pt-4 mt-4 flex justify-between items-center" style="border-top: 1px solid var(--border-color);">
                       <span class="font-bold text-xl" style="color: var(--primary-500);">Company Net Profit</span>
-                      <span class="font-extrabold text-2xl" style="color: var(--positive-500);">₱151</span>
+                      <span class="font-extrabold text-2xl" style="color: var(--positive-500);">₱51</span>
                     </div>
                   </div>
                 </div>
