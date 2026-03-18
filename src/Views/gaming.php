@@ -121,11 +121,6 @@ html, body {
                                class="play-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2 px-4 rounded-lg text-center flex items-center justify-center gap-2">
                                 <i class="fas fa-play"></i> Play Now
                             </button>
-                            <!-- No-keyboard warning (shown by JS when no physical keyboard detected) -->
-                            <div id="typing-no-keyboard-msg" class="hidden mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 flex items-start gap-2">
-                                <i class="fas fa-keyboard mt-0.5 shrink-0"></i>
-                                <span>You must connect a physical or Bluetooth keyboard to learn typing skills.</span>
-                            </div>
                         </div>
                     </div>
 
@@ -248,55 +243,45 @@ html, body {
     </div>
 </div>
 
+<!-- Keyboard notice modal -->
+<div id="typing-kb-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 mx-4 max-w-sm w-full text-center border border-gray-200 dark:border-gray-700">
+        <div class="w-14 h-14 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center mx-auto mb-4">
+            <i class="fas fa-keyboard text-indigo-500 text-2xl"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900 dark:text-white mb-2">Keyboard Required</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">This typing game needs a keyboard. Make sure a physical or Bluetooth keyboard is connected before you start.</p>
+        <div class="flex flex-col gap-2">
+            <a href="/gaming?game=typing"
+               id="typing-kb-confirm"
+               class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2 px-4 rounded-lg flex items-center justify-center gap-2">
+                <i class="fas fa-play"></i> I have a keyboard — Let's go!
+            </a>
+            <button id="typing-kb-cancel"
+                    class="w-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-semibold text-sm py-2 px-4 rounded-lg">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
-    /**
-     * Heuristic: a device has a physical keyboard if it has a fine pointer (mouse)
-     * OR if it is not a touch-only device.
-     * A connected Bluetooth keyboard cannot be detected by the browser directly.
-     * We fall back to asking the user to proceed anyway via the button itself.
-     */
-    function likelyHasKeyboard() {
-        // Fine pointer almost always means a physical keyboard (desktop/laptop)
-        if (window.matchMedia('(pointer: fine)').matches) return true;
-        // Coarse-only pointer with no hover = phone/tablet without keyboard
-        if (window.matchMedia('(pointer: coarse) and (hover: none)').matches) return false;
-        // Anything else (hybrid devices, etc.) — optimistically allow
-        return true;
-    }
+    var modal   = document.getElementById('typing-kb-modal');
+    var playBtn = document.getElementById('typing-play-btn');
+    var cancelBtn = document.getElementById('typing-kb-cancel');
 
-    var btn = document.getElementById('typing-play-btn');
-    var noKbMsg = document.getElementById('typing-no-keyboard-msg');
+    playBtn.addEventListener('click', function () {
+        modal.classList.remove('hidden');
+    });
 
-    // Show the warning immediately on page-load for touch-only devices
-    if (!likelyHasKeyboard()) {
-        noKbMsg.classList.remove('hidden');
-        // dim the button to signal unavailability
-        btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
-        btn.classList.add('bg-gray-400', 'dark:bg-gray-600', 'cursor-not-allowed');
-        btn.setAttribute('aria-disabled', 'true');
-    }
+    cancelBtn.addEventListener('click', function () {
+        modal.classList.add('hidden');
+    });
 
-    btn.addEventListener('click', function () {
-        if (!likelyHasKeyboard()) {
-            // Re-show the message (in case it was hidden) and stop
-            noKbMsg.classList.remove('hidden');
-            return;
-        }
-
-        // Attempt to lock orientation to landscape before navigating
-        var locked = false;
-        if (screen.orientation && typeof screen.orientation.lock === 'function') {
-            screen.orientation.lock('landscape').then(function () {
-                locked = true;
-            }).catch(function () {
-                // Lock failed (desktop browsers reject this — that's fine)
-            }).finally(function () {
-                window.location.href = '/gaming?game=typing';
-            });
-        } else {
-            window.location.href = '/gaming?game=typing';
-        }
+    // Close on backdrop click
+    modal.addEventListener('click', function (e) {
+        if (e.target === modal) modal.classList.add('hidden');
     });
 })();
 </script>
