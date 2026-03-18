@@ -338,6 +338,153 @@ class UserController extends \Core\Controller
     }
 
     /**
+     * Settings page (GET /user/settings)
+     */
+    public function settings(?string $success = null, ?string $error = null, array $userOverride = []): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        try {
+            $user = $this->db->get('users', [
+                'id', 'username', 'fullname', 'first_name', 'last_name',
+                'firstname', 'lastname', 'email', 'phone', 'country', 'gender', 'bio'
+            ], ['id' => $userId]);
+        } catch (\Throwable $e) {
+            $user = [];
+        }
+        if (!is_array($user)) $user = [];
+        if ($userOverride) $user = array_merge($user, $userOverride);
+
+        \Ginto\Core\View::view('user/settings', [
+            'title'   => 'Settings',
+            'user'    => $user,
+            'success' => $success,
+            'error'   => $error,
+        ]);
+    }
+
+    /**
+     * Process settings update (POST /user/settings/update)
+     */
+    public function settingsUpdate(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        if (empty($_SESSION['user_id'])) {
+            if (!headers_sent()) header('Location: /login');
+            exit;
+        }
+
+        // CSRF check
+        $token = $_POST['csrf_token'] ?? '';
+        if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+            $this->settings(null, 'Invalid request. Please try again.');
+            return;
+        }
+
+        $userId  = (int)$_SESSION['user_id'];
+        $form    = $_POST['form'] ?? '';
+
+        if ($form === 'profile') {
+            $firstName = trim(strip_tags($_POST['first_name'] ?? ''));
+            $lastName  = trim(strip_tags($_POST['last_name']  ?? ''));
+            $email     = trim($_POST['email']   ?? '');
+            $phone     = trim(strip_tags($_POST['phone']   ?? ''));
+            $country   = strtoupper(trim(strip_tags($_POST['country'] ?? '')));
+            $gender    = trim($_POST['gender']  ?? '');
+            $bio       = trim(strip_tags($_POST['bio'] ?? ''));
+
+            // Validate email
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $this->settings(null, 'Please enter a valid email address.');
+                return;
+            }
+
+            // Check email uniqueness (exclude self)
+            try {
+                $existing = $this->db->get('users', 'id', ['email' => $email, 'id[!]' => $userId]);
+                if ($existing) {
+                    $this->settings(null, 'That email address is already in use.');
+                    return;
+                }
+            } catch (\Throwable $e) {}
+
+            $allowedGenders = ['', 'male', 'female', 'other', 'prefer_not'];
+            if (!in_array($gender, $allowedGenders, true)) $gender = '';
+            if (strlen($bio) > 500) $bio = substr($bio, 0, 500);
+            if ($country && !preg_match('/^[A-Z]{2,5}$/', $country)) $country = '';
+
+            try {
+                $this->db->update('users', [
+                    'first_name' => $firstName ?: null,
+                    'last_name'  => $lastName  ?: null,
+                    'fullname'   => trim($firstName . ' ' . $lastName) ?: null,
+                    'email'      => $email,
+                    'phone'      => $phone ?: null,
+                    'country'    => $country ?: null,
+                    'gender'     => $gender ?: null,
+                    'bio'        => $bio ?: null,
+                ], ['id' => $userId]);
+            } catch (\Throwable $e) {
+                $this->settings(null, 'Could not save changes. Please try again.');
+                return;
+            }
+
+            $this->settings('Profile updated successfully.');
+            return;
+        }
+
+        if ($form === 'password') {
+            $current = $_POST['current_password'] ?? '';
+            $new     = $_POST['new_password']     ?? '';
+            $confirm = $_POST['confirm_password'] ?? '';
+
+            if (strlen($new) < 8) {
+                $this->settings(null, 'New password must be at least 8 characters.');
+                return;
+            }
+            if ($new !== $confirm) {
+                $this->settings(null, 'New passwords do not match.');
+                return;
+            }
+
+            try {
+                $hash = $this->db->get('users', 'password_hash', ['id' => $userId]);
+            } catch (\Throwable $e) {
+                $this->settings(null, 'Could not verify current password.');
+                return;
+            }
+
+            if (!$hash || !password_verify($current, $hash)) {
+                $this->settings(null, 'Current password is incorrect.');
+                return;
+            }
+
+            try {
+                $this->db->update('users', [
+                    'password_hash' => password_hash($new, PASSWORD_BCRYPT)
+                ], ['id' => $userId]);
+            } catch (\Throwable $e) {
+                $this->settings(null, 'Could not update password. Please try again.');
+                return;
+            }
+
+            $this->settings('Password changed successfully.');
+            return;
+        }
+
+        $this->settings(null, 'Unknown form action.');
+    }
+
+    /**
      * API: Default API key status (GET /api/account/default-key/status)
      */
     public function defaultApiKeyStatus(): void

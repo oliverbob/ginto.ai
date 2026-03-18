@@ -1936,6 +1936,20 @@ $router->req('/account/delete/confirm', function() use ($db) {
     $ctrl->deleteAccountConfirm();
 });
 
+// User settings (GET) and update (POST)
+$router->req('/user/settings', function() use ($db) {
+    $ctrl = new \Ginto\Controllers\UserController($db);
+    $ctrl->settings();
+});
+$router->req('/user/settings/update', function() use ($db) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Location: /user/settings');
+        exit;
+    }
+    $ctrl = new \Ginto\Controllers\UserController($db);
+    $ctrl->settingsUpdate();
+});
+
 // Gaming hub — /gaming and /gaming?game=typing
 $router->req('/gaming', function() use ($db) {
     $user = [];
