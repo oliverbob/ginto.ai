@@ -245,8 +245,6 @@ class AuthController
      */
     public function logoutMobile(): void
     {
-        header('Content-Type: application/json');
-
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
 
         // Expire the session cookie in the browser / WebView
@@ -271,7 +269,15 @@ class AuthController
         session_unset();
         session_destroy();
 
-        echo json_encode(['success' => true]);
+        // GET: redirect to /chat-m (browser / WebView navigation)
+        // POST: return JSON (fetch() from mobile app)
+        if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
+            header('Content-Type: application/json');
+            echo json_encode(['success' => true]);
+        } else {
+            if (!headers_sent()) header('Location: /chat-m');
+        }
+        exit;
     }
 
     /**     * Downline view (legacy route)
