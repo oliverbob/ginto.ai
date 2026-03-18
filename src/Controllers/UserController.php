@@ -1584,5 +1584,60 @@ class UserController extends \Core\Controller
             (!empty($session['user_id']) && !empty($session['dashboard_user_' . $session['user_id']]['data']['user']['is_admin']) && $session['dashboard_user_' . $session['user_id']]['data']['user']['is_admin'])
         );
     }
+
+    /**
+     * POST /api/account/change-password
+     * Allows a logged-in user to change their password.
+     */
+    public function changePassword(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+            return;
+        }
+
+        $raw = file_get_contents('php://input');
+        $input = json_decode($raw, true) ?? [];
+
+        // CSRF check
+        $csrfOk = isset($input['csrf_token']) && hash_equals(
+            $_SESSION['csrf_token'] ?? '', (string)$input['csrf_token']
+        );
+        if (!$csrfOk) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Security token mismatch']);
+            return;
+        }
+
+        $currentPassword = $input['current_password'] ?? '';
+        $newPassword     = $input['new_password'] ?? '';
+
+        if (empty($currentPassword) || empty($newPassword)) {
+            echo json_encode(['success' => false, 'error' => 'Both current and new passwords are required']);
+            return;
+        }
+
+        if (strlen($newPassword) < 8) {
+            echo json_encode(['success' => false, 'error' => 'New password must be at least 8 characters']);
+            return;
+        }
+
+        $userId = (int) $_SESSION['user_id'];
+        $user   = $this->db->get('users', ['id', 'password_hash'], ['id' => $userId]);
+
+        if (!$user || !password_verify($currentPassword, $user['password_hash'])) {
+            echo json_encode(['success' => false, 'error' => 'Current password is incorrect']);
+            return;
+        }
+
+        $newHash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+        $this->db->update('users', ['password_hash' => $newHash], ['id' => $userId]);
+
+        echo json_encode(['success' => true]);
+    }
 }
 ?>

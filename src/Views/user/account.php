@@ -130,6 +130,107 @@ $csrf = $_SESSION['csrf_token'] ?? '';
   </div>
 </div>
 
+<!-- ── Change Password ──────────────────────────────────────────────── -->
+<div id="mainContent-pw" class="px-6 pb-8" style="max-width:900px;">
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mt-6" style="max-width:860px;">
+    <h2 class="text-lg font-semibold mb-4">Change Password</h2>
+
+    <div id="pwMsg" class="mb-3 hidden text-sm rounded p-2"></div>
+
+    <form id="changePwForm" class="space-y-4" style="max-width:420px;" novalidate>
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Current Password</label>
+        <input type="password" name="current_password" id="current_password" required
+               placeholder="Current password"
+               class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-amber-500
+                      bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                      border-gray-300 dark:border-gray-600 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">New Password</label>
+        <input type="password" name="new_password" id="new_password" required minlength="8"
+               placeholder="At least 8 characters"
+               class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-amber-500
+                      bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                      border-gray-300 dark:border-gray-600 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs text-gray-500 mb-1">Confirm New Password</label>
+        <input type="password" name="new_password_confirm" id="new_password_confirm" required
+               placeholder="Repeat new password"
+               class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-amber-500
+                      bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100
+                      border-gray-300 dark:border-gray-600 text-sm">
+      </div>
+      <button type="submit" id="changePwBtn"
+              class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-6 py-2 rounded-lg text-sm transition-colors">
+        Update Password
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById('changePwForm');
+  var msg  = document.getElementById('pwMsg');
+  if (!form) return;
+
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    msg.className = 'mb-3 hidden text-sm rounded p-2';
+
+    var current  = form.querySelector('[name="current_password"]').value;
+    var np       = form.querySelector('[name="new_password"]').value;
+    var nc       = form.querySelector('[name="new_password_confirm"]').value;
+    var csrf     = form.querySelector('[name="csrf_token"]').value;
+
+    if (np.length < 8) {
+      showMsg('New password must be at least 8 characters.', false);
+      return;
+    }
+    if (np !== nc) {
+      showMsg('Passwords do not match.', false);
+      return;
+    }
+
+    var btn = document.getElementById('changePwBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    try {
+      var res = await fetch('/api/account/change-password', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ csrf_token: csrf, current_password: current, new_password: np })
+      });
+      var data = await res.json();
+      if (data && data.success) {
+        showMsg('Password updated successfully!', true);
+        form.reset();
+      } else {
+        showMsg((data && data.error) ? data.error : 'Failed to update password.', false);
+      }
+    } catch (err) {
+      showMsg('Error: ' + err.message, false);
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Update Password';
+  });
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.className = 'mb-3 text-sm rounded p-2 ' + (ok
+      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 border border-green-300 dark:border-green-700'
+      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-700');
+  }
+})();
+</script>
+
 <style>
 input[type="text"], #defaultApiKey { flex:1; padding:8px; border-radius:6px; border:1px solid #d1d5db; background:#f8fafc; color:#0f1724; font-size:13px; }
 input[readonly] { cursor: text; }

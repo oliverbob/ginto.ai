@@ -86,6 +86,8 @@ $router->get('/api/code-token', function() {
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');
+$router->req('/forgot-password', 'PasswordResetController@forgotPassword');
+$router->req('/reset-password',  'PasswordResetController@resetPassword');
 $router->req('/transcribe', 'AudioController@transcribe');
 
 // Home page serves chat directly (messenger works on both / and /chat)
@@ -1222,6 +1224,7 @@ $router->req('/api/account/default-key/rotate', 'UserController@rotateDefaultApi
 $router->req('/api/account/keys/list', 'UserController@accountApiKeysList', ['GET']);
 $router->req('/api/account/keys/create', 'UserController@createAccountApiKey', ['POST']);
 $router->req('/api/account/keys/revoke', 'UserController@revokeAccountApiKey', ['POST']);
+$router->req('/api/account/change-password', 'UserController@changePassword', ['POST']);
 
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');

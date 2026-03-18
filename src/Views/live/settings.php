@@ -871,6 +871,14 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                                    value="<?= htmlspecialchars($envValues['APP_URL'] ?? '') ?>"
                                    placeholder="https://ginto.ai">
                         </div>
+
+                        <div class="md:col-span-2">
+                            <label class="label-text">Mail From Address</label>
+                            <input type="email" name="mail_from" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['MAIL_FROM'] ?? '') ?>"
+                                   placeholder="no-reply@yourdomain.com">
+                            <p class="help-text">Outgoing email sender address. Defaults to <code>no-reply@&lt;domain&gt;</code> when left blank. Email sending is only active on live (HTTPS) installs.</p>
+                        </div>
                     </div>
                 </div>
 

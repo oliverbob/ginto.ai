@@ -68,6 +68,9 @@
     <p class="mt-4 text-center text-gray-700 dark:text-gray-300">
         Don't have an account? <a href="/register" class="text-amber-600 dark:text-amber-400 hover:underline">Register here</a>
     </p>
+    <p class="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
+        <a href="/forgot-password" class="text-amber-600 dark:text-amber-400 hover:underline">Forgot your password?</a>
+    </p>
 
 </div>
 </div>
