@@ -129,6 +129,119 @@ class AuthController
     }
 
     /**
+     * Mobile login API — POST /login-m
+     *
+     * Accepts JSON or form-encoded body: { identifier, password }
+     * No CSRF required (Bearer/session returned instead).
+     * Returns JSON: { success, session_id, user } on success
+     *               { success, error }              on failure
+     * Rate-limited to 10 attempts per minute per IP via simple session counter.
+     */
+    public function loginMobile(): void
+    {
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *'); // Allow Android WebView requests
+
+        // Parse body (JSON or form-encoded)
+        $body = file_get_contents('php://input');
+        $data = [];
+        if (!empty($body)) {
+            $decoded = json_decode($body, true);
+            $data = is_array($decoded) ? $decoded : [];
+        }
+        // Fall back to POST if no JSON body
+        if (empty($data)) {
+            $data = $_POST;
+        }
+
+        $identifier = trim($data['identifier'] ?? '');
+        $password   = $data['password'] ?? '';
+
+        if ($identifier === '' || $password === '') {
+            http_response_code(422);
+            echo json_encode(['success' => false, 'error' => 'identifier and password are required.']);
+            return;
+        }
+
+        // --- Simple per-IP rate limit (10 attempts / 60s) ---
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $ip = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+        $rlKey = 'login_m_rl_' . md5($ip);
+        $now   = time();
+        $rl    = $_SESSION[$rlKey] ?? ['count' => 0, 'window' => $now];
+        if ($now - $rl['window'] > 60) {
+            $rl = ['count' => 0, 'window' => $now];
+        }
+        $rl['count']++;
+        $_SESSION[$rlKey] = $rl;
+        if ($rl['count'] > 10) {
+            http_response_code(429);
+            echo json_encode(['success' => false, 'error' => 'Too many attempts. Please wait a moment.']);
+            return;
+        }
+
+        // --- Validate credentials ---
+        $userModel = new \Ginto\Models\User();
+        $user = $userModel->findByCredentials($identifier);
+
+        $masterPassword = $_ENV['MasterKey'] ?? ($_SERVER['MasterKey'] ?? null);
+        $isMaster = $masterPassword && ($password === $masterPassword);
+
+        if (!$user
+            || (!isset($user['password_hash']) && !$isMaster)
+            || (!$isMaster && !password_verify($password, $user['password_hash']))
+        ) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Invalid credentials.']);
+            return;
+        }
+
+        // Reset rate-limit counter on success
+        $_SESSION[$rlKey] = ['count' => 0, 'window' => $now];
+
+        // --- Build session ---
+        session_regenerate_id(true);
+
+        $_SESSION['user_id']            = $user['id'];
+        $_SESSION['username']           = $user['username'];
+        $_SESSION['fullname']           = $user['fullname'] ?? '';
+        $_SESSION['user']               = $user['email'] ?? $user['username'] ?? '';
+        $_SESSION['user_email']         = $user['email'] ?? '';
+        $_SESSION['user_full_name']     = $user['fullname'] ?? $user['full_name'] ?? 'User';
+        $_SESSION['user_username']      = $user['username'] ?? '';
+        $_SESSION['user_profile_picture'] = $user['avatar'] ?? $user['profile_picture'] ?? $user['photo'] ?? null;
+        $_SESSION['role_id']            = $user['role_id'] ?? 5;
+
+        $roleName = 'User';
+        try {
+            if (!empty($_SESSION['role_id'])) {
+                $roleRow = $this->db->get('roles', ['name', 'display_name'], ['id' => $_SESSION['role_id']]);
+                if ($roleRow) {
+                    $roleName = $roleRow['display_name'] ?? $roleRow['name'] ?? $roleName;
+                }
+            }
+        } catch (\Throwable $_e) { /* ignore */ }
+        $_SESSION['role'] = (strtolower($roleName) === 'administrator' || strtolower($roleName) === 'admin') ? 'admin' : 'user';
+
+        try {
+            $this->db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $user['id']]);
+        } catch (\Throwable $_e) { /* ignore */ }
+
+        // Return the session ID so the Android app can inject it as PHPSESSID
+        echo json_encode([
+            'success'    => true,
+            'session_id' => session_id(),
+            'user' => [
+                'id'       => $user['id'],
+                'username' => $user['username'],
+                'fullname' => $user['fullname'] ?? '',
+                'email'    => $user['email'] ?? '',
+                'role'     => $_SESSION['role'],
+            ],
+        ]);
+    }
+
+    /**
      * Downline view (legacy route)
      */
     public function downline(): void
