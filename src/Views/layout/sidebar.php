@@ -56,16 +56,16 @@ require_once __DIR__ . '/../admin/parts/icon_helpers.php';
             <i class="fas fa-sitemap w-5 text-center mr-3 <?= activeIconClass('/user/network-tree', 'text-blue-600 dark:text-blue-400') ?>"></i>
             <span class="font-medium themed-text">Network Tree</span>
         </a>
-        <a href="#" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">
-            <i class="fab fa-bitcoin w-5 text-center mr-3 <?= activeIconClass('/', 'text-amber-500 dark:text-amber-400') ?>"></i>
+        <a href="/user/commissions" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">
+            <i class="fab fa-bitcoin w-5 text-center mr-3 <?= activeIconClass('/user/commissions', 'text-amber-500 dark:text-amber-400') ?>"></i>
             <span class="font-medium themed-text">BTC Earnings</span>
         </a>
         <a href="/dashboard#registrationForm" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">
             <i class="fas fa-user-plus w-5 text-center mr-3 <?= activeIconClass('/dashboard#registrationForm', 'text-green-500 dark:text-green-400') ?>"></i>
             <span class="font-medium themed-text">New Registration</span>
         </a>
-        <a href="#" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">
-            <i class="fas fa-exchange-alt w-5 text-center mr-3 <?= activeIconClass('/', 'text-purple-500 dark:text-purple-400') ?>"></i>
+        <a href="/user/commissions" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">
+            <i class="fas fa-exchange-alt w-5 text-center mr-3 <?= activeIconClass('/user/commissions', 'text-purple-500 dark:text-purple-400') ?>"></i>
             <span class="font-medium themed-text">Transactions</span>
         </a>
         <a href="/user/commissions" class="flex items-center px-4 py-2 themed-hover rounded-lg transition-colors group">

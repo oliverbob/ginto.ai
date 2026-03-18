@@ -247,19 +247,20 @@ $isLoggedIn = $isLoggedIn ?? false;
                     </div>
                     
                     <!-- Share -->
+                    <?php $shareUrl = urlencode((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']); ?>
                     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm">
                         <h3 class="font-bold mb-4">Share This Course</h3>
                         <div class="flex gap-3">
-                            <a href="#" class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600">
+                            <a href="https://www.facebook.com/sharer/sharer.php?u=<?= $shareUrl ?>" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-full bg-blue-500 text-white flex items-center justify-center hover:bg-blue-600">
                                 <i class="fab fa-facebook-f"></i>
                             </a>
-                            <a href="#" class="w-10 h-10 rounded-full bg-sky-500 text-white flex items-center justify-center hover:bg-sky-600">
+                            <a href="https://twitter.com/intent/tweet?url=<?= $shareUrl ?>" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-full bg-sky-500 text-white flex items-center justify-center hover:bg-sky-600">
                                 <i class="fab fa-twitter"></i>
                             </a>
-                            <a href="#" class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600">
+                            <a href="https://wa.me/?text=<?= $shareUrl ?>" target="_blank" rel="noopener noreferrer" class="w-10 h-10 rounded-full bg-green-500 text-white flex items-center justify-center hover:bg-green-600">
                                 <i class="fab fa-whatsapp"></i>
                             </a>
-                            <a href="#" class="w-10 h-10 rounded-full bg-gray-500 text-white flex items-center justify-center hover:bg-gray-600">
+                            <a href="javascript:void(0)" onclick="navigator.clipboard.writeText(window.location.href).then(function(){alert('Link copied!')})" class="w-10 h-10 rounded-full bg-gray-500 text-white flex items-center justify-center hover:bg-gray-600" title="Copy link">
                                 <i class="fas fa-link"></i>
                             </a>
                         </div>

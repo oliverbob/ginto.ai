@@ -482,7 +482,7 @@ try {
   <header class="header-gradient shadow-lg sticky top-0 z-50">
     <nav class="max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-1.5">
       <div class="flex justify-between items-center min-h-0" style="min-height:unset;">
-        <a href="#" class="flex items-center space-x-2">
+        <a href="/" class="flex items-center space-x-2">
           <span class="header-logo-glow" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(31,162,255,0.10);overflow:hidden;border:2px solid var(--primary-500);">
             <img src="/assets/images/ginto.png" alt="Ginto Logo" style="width:24px;height:24px;object-fit:cover;display:block;border-radius:50%;" />
           </span>

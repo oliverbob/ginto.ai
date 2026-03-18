@@ -60,43 +60,43 @@ if (!is_string($profilePicture) || trim($profilePicture) === '') {
                         </div>
                         <span class="ml-2 dark:text-white">Sai Chat</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/code" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-flag"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Sai Business</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/social" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-save"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Saved</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/downline" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-users"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Network & Groups</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-store"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Sell on Sai</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/social" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-calendar"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Sai Events</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/social" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-bookmark"></i>
                         </div>
                         <span class="ml-2 dark:text-white">Saved</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/social" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <div class="w-8 h-8 rounded-full bg-blue-100 dark:bg-dark-500 text-blue-600 dark:text-blue-400 flex items-center justify-center">
                             <i class="fas fa-chevron-down"></i>
                         </div>
@@ -106,15 +106,15 @@ if (!is_string($profilePicture) || trim($profilePicture) === '') {
                 
                 <div class="mt-4 pt-4 border-t border-gray-300 dark:border-dark-600">
                     <h3 class="font-semibold text-gray-500 dark:text-gray-400 px-2 mb-2">Your Shortcuts</h3>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/tier" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <img src="https://picsum.photos/200" alt="Group" class="w-8 h-8 rounded-md">
                         <span class="ml-2 dark:text-white">Why SmartFed?</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/tier" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <img src="https://picsum.photos/201" alt="Group" class="w-8 h-8 rounded-md">
                         <span class="ml-2 dark:text-white">SmartFed for Business</span>
                     </a>
-                    <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                    <a href="/" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                         <img src="https://picsum.photos/202" alt="Group" class="w-8 h-8 rounded-md">
                         <span class="ml-2 dark:text-white">Claim your website!</span>
                     </a>

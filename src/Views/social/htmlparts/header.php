@@ -158,7 +158,7 @@ $nav_items = [
                     <a id="userDropdownProfileLink" href="/profile" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Profile</a>
                     <a href="/dashboard" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Dashboard</a>
                     <a href="/smartfi" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">SmartFi</a>
-                    <a href="#" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Settings</a>
+                    <a href="/user/settings" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Settings</a>
                     <button id="darkModeToggle" class="block w-full text-left px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">
                         <span class="light-mode-text">Dark Mode</span>
                         <span class="dark-mode-text hidden">Light Mode</span>

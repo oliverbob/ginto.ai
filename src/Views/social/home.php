@@ -174,14 +174,14 @@ if ($isUserLoggedIn) {
                     <div class="mt-2">
                         <h3 class="font-semibold text-gray-500 dark:text-gray-400 px-2">Sponsored</h3>
                         <div class="mt-2 space-y-2">
-                            <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                            <a href="/tier" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                                 <img src="/assets/client/img/ad<?=mt_rand(1, 9)?>.png" alt="Ad" class="w-10 h-10 rounded-md">
                                 <div class="ml-2">
                                     <p class="font-medium dark:text-white">Filipino? Earn 10% profit sharing on ads!</p>
                                     <p class="text-xs text-gray-500 dark:text-gray-400">Join Smartfed.ai Premium</p>
                                 </div>
                             </a>
-                            <a href="#" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
+                            <a href="/tier" class="flex items-center p-2 hover:bg-gray-200 dark:hover:bg-dark-600 rounded-lg">
                                 <img src="/assets/client/img/ad<?=mt_rand(1, 9)?>.png" alt="Ad" class="w-10 h-10 rounded-md">
                                 <div class="ml-2">
                                     <p class="font-medium dark:text-white">Become a SmartFed leader</p>
@@ -354,7 +354,7 @@ if ($isUserLoggedIn) {
                             <i class="fas fa-shield-alt mr-2"></i>
                             <span>Secure & Encrypted Payment via PayPal</span>
                         </div>
-                        <p>By subscribing, you agree to our <a href="#" class="text-purple-500 hover:underline">Terms of Service</a> and <a href="#" class="text-purple-500 hover:underline">Privacy Policy</a>.</p>
+                        <p>By subscribing, you agree to our <a href="/privacy" class="text-purple-500 hover:underline">Terms of Service</a> and <a href="/privacy" class="text-purple-500 hover:underline">Privacy Policy</a>.</p>
                         <p class="mt-1">You can manage or cancel your subscription anytime through your PayPal account.</p>
                     </div>
                 </div>
@@ -381,7 +381,7 @@ if ($isUserLoggedIn) {
             <a href="/gaming" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Search">
                 <i class="fas fa-gamepad text-xl"></i>
             </a>
-            <a href="#" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Menu">
+            <a href="/dashboard" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Menu">
                 <i class="fas fa-bars text-xl"></i>
             </a>
         </div>

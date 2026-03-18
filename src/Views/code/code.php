@@ -1339,7 +1339,7 @@ if ($isUserLoggedIn) {
                         <div id="paypal-button-container-P-43S89794RD1094113NAV52CA-modal" class="mx-auto w-full max-w-xs"></div>
                         <div class="mt-8 text-xs text-gray-500 dark:text-gray-400 text-center">
                             <div class="flex items-center justify-center text-green-600 dark:text-green-400 mb-2"><i class="fas fa-shield-alt mr-2"></i><span>Secure & Encrypted Payment via PayPal</span></div>
-                            <p>By subscribing, you agree to our <a href="#" class="text-purple-500 hover:underline">Terms of Service</a> and <a href="#" class="text-purple-500 hover:underline">Privacy Policy</a>.</p>
+                            <p>By subscribing, you agree to our <a href="/privacy" class="text-purple-500 hover:underline">Terms of Service</a> and <a href="/privacy" class="text-purple-500 hover:underline">Privacy Policy</a>.</p>
                             <p class="mt-1">You can manage or cancel your subscription anytime through your PayPal account.</p>
                         </div>
                     </div>

@@ -261,7 +261,7 @@ require_once __DIR__ . '/../layout/header.php';
                             <i class="fas fa-store mr-3" style="color: #ffc107;"></i>
                             <span>ePower Mall</span>
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                        <a href="/user/commissions" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
                             <i class="fab fa-bitcoin mr-3 text-amber-500"></i>
                             <span>BTC Earnings</span>
                         </a>
@@ -269,11 +269,11 @@ require_once __DIR__ . '/../layout/header.php';
                             <i class="fas fa-user-plus mr-3 text-green-500 dark:text-green-400"></i>
                             <span>New Registration</span>
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                        <a href="/user/commissions" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
                             <i class="fas fa-exchange-alt mr-3 text-purple-500 dark:text-purple-400"></i>
                             <span>Transactions</span>
                         </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
+                        <a href="/user/settings" class="flex items-center px-4 py-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700/50 rounded-lg transition-colors duration-200">
                             <i class="fas fa-cog mr-3 text-gray-500 dark:text-gray-400"></i>
                             <span>Settings</span>
                         </a>

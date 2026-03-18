@@ -241,7 +241,7 @@
         <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div class="flex justify-between items-center">
             <!-- Logo/Brand -->
-            <a href="#" class="flex items-center space-x-3">
+            <a href="/" class="flex items-center space-x-3">
                 <i class="fas fa-network-wired text-3xl text-indigo-300"></i>
                 <span class="text-2xl font-bold">SmartFi Rewards</span>
             </a>
@@ -954,10 +954,10 @@
                 </div>
               </div>
               <div class="space-y-4 max-w-md mx-auto">
-                <a href="#" class="block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
+                <a href="/dashboard" class="block bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors">
                   Go to Dashboard <i class="fas fa-tachometer-alt ml-2"></i>
                 </a>
-                <a href="#" class="block bg-white hover:bg-gray-50 text-indigo-600 font-semibold py-3 px-6 rounded-lg border border-indigo-600 transition-colors">
+                <a href="/downline" class="block bg-white hover:bg-gray-50 text-indigo-600 font-semibold py-3 px-6 rounded-lg border border-indigo-600 transition-colors">
                   Invite Friends <i class="fas fa-user-plus ml-2"></i>
                 </a>
               </div>
@@ -1115,16 +1115,16 @@
             Building financial futures through sustainable network marketing since 2025.
           </p>
           <div class="flex space-x-4">
-            <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-facebook-f text-xl"></i>
             </a>
-            <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-twitter text-xl"></i>
             </a>
-            <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-instagram text-xl"></i>
             </a>
-            <a href="#" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-youtube text-xl"></i>
             </a>
           </div>
@@ -1133,7 +1133,7 @@
         <div>
           <h4 class="text-white font-bold text-lg mb-4">Quick Links</h4>
           <ul class="space-y-3">
-            <li><a href="#" class="hover:text-white transition-colors">Home</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">Home</a></li>
             <li><a href="#program-overview" class="hover:text-white transition-colors">Program</a></li>
             <li><a href="#earnings-estimator" class="hover:text-white transition-colors">Earnings Calculator</a></li>
             <li><a href="#how-it-works" class="hover:text-white transition-colors">Join Now</a></li>
@@ -1144,21 +1144,21 @@
         <div>
           <h4 class="text-white font-bold text-lg mb-4">Company</h4>
           <ul class="space-y-3">
-            <li><a href="#" class="hover:text-white transition-colors">About Us</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Leadership</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Careers</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Blog</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Contact</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">About Us</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">Leadership</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">Careers</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">Blog</a></li>
+            <li><a href="/" class="hover:text-white transition-colors">Contact</a></li>
           </ul>
         </div>
 
         <div>
           <h4 class="text-white font-bold text-lg mb-4">Legal</h4>
           <ul class="space-y-3">
-            <li><a href="#" class="hover:text-white transition-colors">Terms of Service</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Privacy Policy</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Refund Policy</a></li>
-            <li><a href="#" class="hover:text-white transition-colors">Compliance</a></li>
+            <li><a href="/privacy" class="hover:text-white transition-colors">Terms of Service</a></li>
+            <li><a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a></li>
+            <li><a href="/privacy" class="hover:text-white transition-colors">Refund Policy</a></li>
+            <li><a href="/privacy" class="hover:text-white transition-colors">Compliance</a></li>
           </ul>
         </div>
       </div>
