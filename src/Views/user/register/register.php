@@ -676,7 +676,7 @@ try {
                       <span class="font-bold" style="color: #ff4d4f;">- ₱100</span>
                     </div>
                     <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Tiered Commission Payouts (16%)</span>
+                      <span class="font-medium" style="color: var(--text-primary);">Tiered Commission Payouts (9.6%)</span>
                       <span class="font-bold" style="color: #ff4d4f;">- ₱24</span>
                     </div>
                     <div class="flex justify-between items-center">
