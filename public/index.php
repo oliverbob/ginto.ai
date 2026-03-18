@@ -1917,6 +1917,11 @@ $router->req('/mall/upload', function() {
 // accidental repository dumps for generic prompts. Use a dedicated UI
 // action if you want an explicit repository description.
 
+// Privacy Policy (Google Play / public)
+$router->req('/privacy', function() {
+    \Ginto\Core\View::view('privacy', ['title' => 'Privacy Policy | Ginto']);
+});
+
 // Start routing
 $router->dispatch($_SERVER['REQUEST_URI']);
 // Local dev helper: lightweight endpoint to POST a test chat message and proxy to the MCP

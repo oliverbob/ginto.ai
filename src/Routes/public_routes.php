@@ -7,13 +7,6 @@ use Ginto\Helpers\TransactionHelper;
 
 // --- Public routes --------------------------------------------------------
 
-// Privacy Policy
-req($router, '/privacy', function() {
-    \Ginto\Core\View::view('privacy', [
-        'title' => 'Privacy Policy | Ginto',
-    ]);
-});
-
 // Root redirect
 req($router, '/', function() {
     if (!empty($_SESSION['role']) && $_SESSION['role'] === 'admin') {
