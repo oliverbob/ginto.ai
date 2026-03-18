@@ -140,7 +140,6 @@ class AuthController
     public function loginMobile(): void
     {
         header('Content-Type: application/json');
-        header('Access-Control-Allow-Origin: *'); // Allow Android WebView requests
 
         // Parse body (JSON or form-encoded)
         $body = file_get_contents('php://input');
