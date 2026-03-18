@@ -1936,6 +1936,15 @@ $router->req('/account/delete/confirm', function() use ($db) {
     $ctrl->deleteAccountConfirm();
 });
 
+// Gaming hub — /gaming and /gaming?game=typing
+$router->req('/gaming', function() use ($db) {
+    $user = [];
+    if (isset($_SESSION['user_id'])) {
+        $user = $db->get('users', '*', ['id' => (int)$_SESSION['user_id']]) ?: [];
+    }
+    \Ginto\Core\View::view('gaming', ['title' => 'Ginto Gaming', 'user' => $user]);
+});
+
 // Start routing
 $router->dispatch($_SERVER['REQUEST_URI']);
 // Local dev helper: lightweight endpoint to POST a test chat message and proxy to the MCP
