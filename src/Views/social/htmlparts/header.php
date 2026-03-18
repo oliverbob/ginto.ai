@@ -154,7 +154,7 @@ $nav_items = [
                 </button>
                 <div id="userDropdown" class="absolute right-0 mt-2 w-48 bg-white dark:bg-dark-700 rounded-md shadow-lg py-1 hidden z-50">
                     <a href="/" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Home</a>
-                    <a href="/sai/" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Sai</a>
+                    <a href="/" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Sai</a>
                     <a id="userDropdownProfileLink" href="/profile" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Profile</a>
                     <a href="/dashboard" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">Dashboard</a>
                     <a href="/smartfi" class="block px-4 py-2 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-dark-600">SmartFi</a>
