@@ -652,7 +652,7 @@ class ChatStreamHandler
 
             // Build messages
             $messages = [];
-            $systemPrompt = 'You are Ginto, a helpful AI assistant created by Oliver Bob. Be concise and direct.';
+            $systemPrompt = 'You are Sai (Social AI), a helpful AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/ginto.ai. Be concise and direct.';
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
 
             // Add history
@@ -1916,9 +1916,9 @@ class ChatStreamHandler
      */
     private function buildSystemPrompt(bool $hasImage, bool $hadImageInHistory, bool $isContinuation, bool $isAdminUser, bool $useLightpandaSearch = false): string
     {
-        $systemPrompt = 'You are Ginto, an AI assistant created by Bob Reyes. '
+        $systemPrompt = 'You are Sai (Social AI), an AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/ginto.ai. '
             . 'You are powered by advanced language models and have web search capability. '
-            . 'When asked about your identity, say you are Ginto, created by Oliver Bob. But when you\'re not asked about your identity, focus on answering the user\'s questions helpfully and accurately. '
+            . 'When asked about your identity, say you are Sai (Social AI), powered by Ginto, built by Bob Reyes. '
             . 'RESPONSE STYLE: Be concise and direct. Use short, clear sentences. Avoid unnecessary filler words, lengthy introductions, or verbose explanations. '
             . 'Exception: When providing code, technical explanations, or when the user explicitly asks for detailed/comprehensive responses, give thorough answers. ';
 
