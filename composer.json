@@ -18,7 +18,8 @@
         "php-mcp/client": "^1.0",
         "guzzlehttp/guzzle": "^7.10",
         "erusev/parsedown-extra": "^0.8.1",
-        "cboden/ratchet": "^0.4.4"
+        "cboden/ratchet": "^0.4.4",
+        "phpmailer/phpmailer": "^7.0"
     },
     "autoload": {
         "psr-4": {
