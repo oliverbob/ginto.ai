@@ -86,7 +86,8 @@ $router->get('/api/code-token', function() {
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');
-$router->post('/login-m', 'AuthController@loginMobile');  // Mobile app JSON login
+$router->post('/login-m',  'AuthController@loginMobile');   // Mobile app JSON login
+$router->post('/logout-m', 'AuthController@logoutMobile');  // Mobile app JSON logout
 $router->req('/forgot-password', 'PasswordResetController@forgotPassword');
 $router->req('/reset-password',  'PasswordResetController@resetPassword');
 $router->req('/transcribe', 'AudioController@transcribe');

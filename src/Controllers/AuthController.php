@@ -240,8 +240,41 @@ class AuthController
         ]);
     }
 
-    /**
-     * Downline view (legacy route)
+    /**     * Mobile logout — destroys the session and returns JSON (no redirect).
+     * Called by the Android app via fetch() inside the WebView.
+     */
+    public function logoutMobile(): void
+    {
+        header('Content-Type: application/json');
+
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        // Expire the session cookie in the browser / WebView
+        if (ini_get('session.use_cookies')) {
+            $params = session_get_cookie_params();
+            if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
+                setcookie(session_name(), '', [
+                    'expires'  => time() - 42000,
+                    'path'     => $params['path'] ?? '/',
+                    'domain'   => $params['domain'] ?? '',
+                    'secure'   => $params['secure'] ?? false,
+                    'httponly' => $params['httponly'] ?? true,
+                    'samesite' => 'Lax',
+                ]);
+            } else {
+                $cookieHeader = session_name() . '=; Path=' . ($params['path'] ?? '/') . '; Expires=' . gmdate('D, d-M-Y H:i:s T', time() - 42000) . (($params['secure'] ?? false) ? '; Secure' : '') . '; HttpOnly; SameSite=Lax';
+                header('Set-Cookie: ' . $cookieHeader, false);
+            }
+        }
+
+        $_SESSION = [];
+        session_unset();
+        session_destroy();
+
+        echo json_encode(['success' => true]);
+    }
+
+    /**     * Downline view (legacy route)
      */
     public function downline(): void
     {
