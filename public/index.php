@@ -1936,6 +1936,19 @@ $router->req('/account/delete/confirm', function() use ($db) {
     $ctrl->deleteAccountConfirm();
 });
 
+// SmartFi revenue calculator
+$router->req('/smartfi', function() use ($db) {
+    $user = [];
+    if (!empty($_SESSION['user_id'])) {
+        $u = $db->get('users', ['id', 'public_id', 'username'], ['id' => (int)$_SESSION['user_id']]);
+        if (is_array($u)) {
+            $user = $u;
+            $_SESSION['user_public_id'] = $u['public_id'] ?? $u['id'];
+        }
+    }
+    \Ginto\Core\View::view('smartfi', ['title' => 'SmartFi | Ginto']);
+});
+
 // User settings (GET) and update (POST)
 $router->req('/user/settings', function() use ($db) {
     $ctrl = new \Ginto\Controllers\UserController($db);

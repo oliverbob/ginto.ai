@@ -381,7 +381,7 @@ if ($isUserLoggedIn) {
             <a href="/gaming" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Search">
                 <i class="fas fa-gamepad text-xl"></i>
             </a>
-            <a href="/dashboard" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Menu">
+            <a href="#" id="footerMenuBtn" class="p-3 text-gray-500 dark:text-gray-400" aria-label="Menu">
                 <i class="fas fa-bars text-xl"></i>
             </a>
         </div>
@@ -740,5 +740,19 @@ if ($isUserLoggedIn) {
 <script src="/assets/client/js/contacts.js"></script>
 <script src="/assets/client/js/feedmanager.js"></script>
 <script src="/assets/client/js/mediamanager.js"></script>
+<script>
+// Wire footer hamburger → same dropdown as header profile picture
+(function() {
+    var btn = document.getElementById('footerMenuBtn');
+    var userMenuBtn = document.getElementById('userMenuBtn');
+    if (btn && userMenuBtn) {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            userMenuBtn.click();
+        });
+    }
+})();
+</script>
 </body>
 </html>
