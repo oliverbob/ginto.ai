@@ -185,9 +185,11 @@ class PasswordResetController
             'expires_at' => $expiresAt,
         ]);
 
-        $appUrl = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
-        $resetUrl = $appUrl . '/reset-password?token=' . urlencode($token);
-        $domain   = MailHelper::siteDomain();
+        // Build URL from CADDY_DOMAIN because APP_URL is http://localhost
+        // on installs proxied by Caddy (the normal production setup).
+        $domain  = MailHelper::siteDomain();
+        $baseUrl = 'https://' . $domain;
+        $resetUrl = $baseUrl . '/reset-password?token=' . urlencode($token);
         $username = htmlspecialchars($user['username'] ?? $user['email'], ENT_QUOTES, 'UTF-8');
 
         $html = <<<HTML

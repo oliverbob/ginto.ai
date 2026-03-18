@@ -2248,12 +2248,14 @@ setup_env() {
     
     # Set APP_URL based on Caddy mode
     if [[ "$CADDY_LIVE_MODE" == "yes" ]]; then
+        update_env_var "CADDY_DOMAIN" "$CADDY_DOMAIN"
         update_env_var "APP_URL" "https://$CADDY_DOMAIN"
         # Default mail-from address for live installs (only set if not already present)
         if ! grep -q "^MAIL_FROM=" "$env_file" 2>/dev/null; then
             update_env_var "MAIL_FROM" "no-reply@$CADDY_DOMAIN"
         fi
     else
+        update_env_var "CADDY_DOMAIN" "localhost"
         update_env_var "APP_URL" "http://localhost"
     fi
     

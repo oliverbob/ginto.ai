@@ -866,6 +866,14 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         </div>
 
                         <div class="md:col-span-2">
+                            <label class="label-text">Public Domain (CADDY_DOMAIN)</label>
+                            <input type="text" name="site_domain" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['CADDY_DOMAIN'] ?? '') ?>"
+                                   placeholder="yourdomain.com">
+                            <p class="help-text">The real public-facing domain Caddy is configured to serve. This is the source of truth for email sending and password reset links. Set to <code>localhost</code> for local installs.</p>
+                        </div>
+
+                        <div class="md:col-span-2">
                             <label class="label-text">Site URL</label>
                             <input type="text" name="site_url" class="input-field" 
                                    value="<?= htmlspecialchars($envValues['APP_URL'] ?? '') ?>"
@@ -877,7 +885,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             <input type="email" name="mail_from" class="input-field"
                                    value="<?= htmlspecialchars($envValues['MAIL_FROM'] ?? '') ?>"
                                    placeholder="no-reply@yourdomain.com">
-                            <p class="help-text">Outgoing email sender address. Defaults to <code>no-reply@&lt;domain&gt;</code> when left blank. Email sending is only active on live (HTTPS) installs.</p>
+                            <p class="help-text">Outgoing email sender address. Defaults to <code>no-reply@&lt;CADDY_DOMAIN&gt;</code> when left blank. Email sending is only active when Public Domain is set to a non-localhost domain.</p>
                         </div>
                     </div>
                 </div>

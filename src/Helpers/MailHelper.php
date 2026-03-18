@@ -4,41 +4,46 @@ namespace Ginto\Helpers;
 /**
  * MailHelper - Simple email sending utility for Ginto.
  *
- * Sends email only when the installation is "live" (APP_URL starts with https://).
- * The "from" address is built from MAIL_FROM in .env, or falls back to
- * no-reply@<domain derived from APP_URL>.
+ * Ginto runs on localhost and is proxied by Caddy to a real domain.
+ * APP_URL is therefore usually "http://localhost", so CADDY_DOMAIN is used
+ * as the authoritative public-facing domain and to determine whether this
+ * is a live (internet-facing) install.
  *
- * Uses PHP's native mail() which relies on the server's MTA (postfix/sendmail),
- * which is always present on a properly configured VPS/live install.
+ * The "from" address is built from MAIL_FROM in .env, or falls back to
+ * no-reply@<CADDY_DOMAIN>.
+ *
+ * Uses PHP's native mail() which relies on the server's MTA (postfix/sendmail).
  */
 class MailHelper
 {
     /**
-     * Returns true when the app is running in a live (HTTPS) environment.
-     */
-    public static function isLive(): bool
-    {
-        $appUrl = $_ENV['APP_URL'] ?? getenv('APP_URL') ?? '';
-        return strpos($appUrl, 'https://') === 0;
-    }
-
-    /**
-     * Derive the site domain from APP_URL or CADDY_DOMAIN.
+     * Returns the public domain for this install (from CADDY_DOMAIN).
+     * Returns empty string for local/dev installs.
      */
     public static function siteDomain(): string
     {
-        $appUrl = $_ENV['APP_URL'] ?? getenv('APP_URL') ?? '';
-        if ($appUrl && strpos($appUrl, 'https://') === 0) {
-            $domain = preg_replace('#^https?://([^/]+).*$#', '$1', $appUrl);
-            if ($domain) {
-                return $domain;
-            }
-        }
-        $caddyDomain = $_ENV['CADDY_DOMAIN'] ?? getenv('CADDY_DOMAIN') ?? '';
+        // CADDY_DOMAIN is the real public domain set during installation.
+        $caddyDomain = trim($_ENV['CADDY_DOMAIN'] ?? getenv('CADDY_DOMAIN') ?? '');
         if ($caddyDomain && $caddyDomain !== 'localhost') {
             return $caddyDomain;
         }
-        return 'ginto.ai';
+        // Fallback: derive from APP_URL if it happens to be an https:// address.
+        $appUrl = trim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '');
+        if ($appUrl && strpos($appUrl, 'https://') === 0) {
+            $domain = preg_replace('#^https?://([^/]+).*$#', '$1', $appUrl);
+            if ($domain && $domain !== 'localhost') {
+                return $domain;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Returns true when a real public domain is configured (live install).
+     */
+    public static function isLive(): bool
+    {
+        return self::siteDomain() !== '';
     }
 
     /**
