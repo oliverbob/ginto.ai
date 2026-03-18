@@ -1387,6 +1387,10 @@ $router->req('/editor/file', 'EditorController@file');
 // Chat routes
 $router->get('/chat', 'ChatController@index');
 $router->post('/chat', 'ChatController@stream');
+
+// Mobile WebView embed route — no header, no sidebar, no drawer JS
+$router->get('/chat-m', 'ChatController@chatMobile');
+$router->post('/chat-m', 'ChatController@stream');
 $router->req('/chat/create_sandbox', 'ChatController@createSandbox', ['POST']);
 
 // Live Settings (v2 install - admin configuration panel)

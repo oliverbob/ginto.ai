@@ -752,6 +752,45 @@ class ChatController
     }
 
     /**
+     * Mobile WebView chat page (GET /chat-m)
+     *
+     * Stripped-down version of index() for embedding in Android/iOS WebViews.
+     * No header, no sidebar, no drawer JavaScript.
+     */
+    public function chatMobile(): void
+    {
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = UserController::isAdmin();
+        $sandboxId = $_SESSION['sandbox_id'] ?? null;
+
+        if (function_exists('generateCsrfToken')) {
+            $csrf_token = generateCsrfToken();
+        } else {
+            if (empty($_SESSION['csrf_token'])) {
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            }
+            $csrf_token = $_SESSION['csrf_token'];
+        }
+
+        $paymentStatus = null;
+        if ($isLoggedIn) {
+            $paymentStatus = $this->db->get('users', 'payment_status', ['id' => $_SESSION['user_id']]);
+            $_SESSION['payment_status'] = $paymentStatus;
+        }
+
+        \Ginto\Core\View::view('chat-m/chat-m', [
+            'title' => 'Ginto AI',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'userId' => $isLoggedIn ? $_SESSION['user_id'] : null,
+            'sandboxId' => $sandboxId,
+            'csrf_token' => $csrf_token,
+            'paymentStatus' => $paymentStatus
+        ]);
+        exit;
+    }
+
+    /**
      * Handle streaming chat request (POST /chat)
      */
     public function stream(): void

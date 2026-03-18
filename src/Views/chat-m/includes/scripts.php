@@ -1,0 +1,413 @@
+<?php
+/**
+ * Chat Page Scripts — Mobile WebView version (/chat-m)
+ *
+ * Differences from chat/includes/scripts.php:
+ * - toggleSidebar() removed (no drawer)
+ * - toggleSidebarCollapse() removed (no sidebar collapse)
+ * - restoreSidebarState() IIFE removed
+ * - window resize sidebar handler removed
+ * - Event listeners for mobile-menu-toggle, sidebar-close-mobile,
+ *   sidebar-collapse-toggle, sidebar-expand-toggle removed
+ */
+?>
+<!-- Theme & Settings Toggle Scripts -->
+<script>
+  // Theme toggle functionality
+  (function initTheme() {
+    const html = document.documentElement;
+    const themeToggle = document.getElementById('theme-toggle');
+    const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+    
+    // Check for saved preference - default to dark if not set
+    const savedTheme = localStorage.getItem('ginto-theme');
+    if (savedTheme) {
+      html.classList.toggle('dark', savedTheme === 'dark');
+    } else {
+      // Default to dark mode (already set in HTML, just ensure it's there)
+      html.classList.add('dark');
+    }
+    
+    // Toggle theme function
+    function toggleTheme() {
+      const isDark = html.classList.toggle('dark');
+      localStorage.setItem('ginto-theme', isDark ? 'dark' : 'light');
+    }
+    
+    // Toggle theme on button click (desktop and mobile)
+    themeToggle?.addEventListener('click', toggleTheme);
+    mobileThemeToggle?.addEventListener('click', toggleTheme);
+  })();
+
+  // NOTE: No sidebar / drawer functions in this mobile-embed build.
+  // toggleSidebar(), toggleSidebarCollapse(), restoreSidebarState() are intentionally omitted.
+
+  document.getElementById('mobile-settings')?.addEventListener('click', () => openSettings('settings'));
+  
+  function closeSettings() {
+    document.getElementById('settings-panel').classList.add('translate-x-full');
+    document.getElementById('settings-overlay').classList.add('hidden');
+  }
+  
+  function openSettings(tab = 'settings') {
+    document.getElementById('settings-panel').classList.remove('translate-x-full');
+    document.getElementById('settings-overlay').classList.remove('hidden');
+    switchTab(tab);
+  }
+  
+  function switchTab(tabName) {
+    const tabSettings = document.getElementById('tab-settings');
+    const tabMcp = document.getElementById('tab-mcp');
+    const tabAdmin = document.getElementById('tab-admin');
+    const panelSettings = document.getElementById('panel-settings');
+    const panelMcp = document.getElementById('panel-mcp');
+    const panelAdmin = document.getElementById('panel-admin');
+    const title = document.getElementById('settings-panel-title');
+    
+    // Helper to deactivate all tabs
+    const deactivateAll = () => {
+      [tabSettings, tabMcp, tabAdmin].forEach(t => {
+        if (t) {
+          t.classList.remove('text-indigo-600', 'dark:text-indigo-400', 'border-indigo-600', 'dark:border-indigo-400');
+          t.classList.add('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+        }
+      });
+      [panelSettings, panelMcp, panelAdmin].forEach(p => {
+        if (p) p.classList.add('hidden');
+      });
+    };
+    
+    // Helper to activate a tab
+    const activateTab = (tab, panel, titleText) => {
+      if (tab) {
+        tab.classList.add('text-indigo-600', 'dark:text-indigo-400', 'border-indigo-600', 'dark:border-indigo-400');
+        tab.classList.remove('text-gray-500', 'dark:text-gray-400', 'border-transparent');
+      }
+      if (panel) panel.classList.remove('hidden');
+      if (title) title.textContent = titleText;
+    };
+    
+    deactivateAll();
+    
+    if (tabName === 'mcp') {
+      activateTab(tabMcp, panelMcp, 'MCP Tools');
+    } else if (tabName === 'admin') {
+      activateTab(tabAdmin, panelAdmin, 'API Keys');
+      loadApiKeys(); // Load keys when opening admin tab
+    } else {
+      activateTab(tabSettings, panelSettings, 'Settings');
+    }
+  }
+  
+  // Settings button opens Settings tab
+  document.getElementById('toggle-settings')?.addEventListener('click', () => openSettings('settings'));
+  
+  // MCP Available button opens MCP tab
+  document.getElementById('open-mcp-tab')?.addEventListener('click', () => openSettings('mcp'));
+  
+  // Tab click handlers
+  document.getElementById('tab-settings')?.addEventListener('click', () => switchTab('settings'));
+  document.getElementById('tab-mcp')?.addEventListener('click', () => switchTab('mcp'));
+  document.getElementById('tab-admin')?.addEventListener('click', () => switchTab('admin'));
+
+  // Inline mobile + Add API Key handler
+  document.addEventListener('click', function(e) {
+    if (e.target && (e.target.id === 'add-provider-inline-mobile' || e.target.closest('#add-provider-inline-mobile'))) {
+      e.preventDefault(); e.stopPropagation();
+      try {
+        openSettings('admin');
+        if (typeof window.prefillAddApiKeyForm === 'function') {
+          setTimeout(() => window.prefillAddApiKeyForm(''), 0);
+        }
+      } catch (_) {
+        window.location.href = '/settings';
+      }
+    }
+  });
+
+  // ============= Toast Notification System =============
+  function showToast(message, type = 'success', duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `
+      pointer-events-auto max-w-sm w-full px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 ease-out
+      translate-x-full opacity-0 flex items-start gap-3
+      ${type === 'success' 
+        ? 'bg-green-600 text-white' 
+        : type === 'error' 
+          ? 'bg-red-600 text-white' 
+          : 'bg-gray-800 text-white'}
+    `;
+    
+    const icon = type === 'success' 
+      ? `<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+         </svg>`
+      : type === 'error'
+        ? `<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+           </svg>`
+        : `<svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+           </svg>`;
+    
+    toast.innerHTML = `
+      ${icon}
+      <div class="flex-1 text-sm font-medium">${message}</div>
+      <button onclick="this.parentElement.remove()" class="flex-shrink-0 p-1 rounded hover:bg-white/20 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    `;
+    
+    container.appendChild(toast);
+    
+    // Animate in
+    requestAnimationFrame(() => {
+      toast.classList.remove('translate-x-full', 'opacity-0');
+      toast.classList.add('translate-x-0', 'opacity-100');
+    });
+    
+    // Auto remove after duration
+    setTimeout(() => {
+      toast.classList.remove('translate-x-0', 'opacity-100');
+      toast.classList.add('translate-x-full', 'opacity-0');
+      setTimeout(() => toast.remove(), 300);
+    }, duration);
+  }
+</script>
+
+<?php
+// Sub-scripts reused from the standard chat includes
+$chatIncludes = dirname(dirname(__DIR__)) . '/chat/includes';
+?>
+<?php include $chatIncludes . '/scripts-modals.php'; ?>
+<?php include $chatIncludes . '/scripts-api-keys.php'; ?>
+<?php include $chatIncludes . '/scripts-editor.php'; ?>
+<?php include $chatIncludes . '/scripts-sandbox-wizard.php'; ?>
+<?php include $chatIncludes . '/scripts-vnc-console.php'; ?>
+<?php include $chatIncludes . '/scripts-prompts.php'; ?>
+<?php include $chatIncludes . '/scripts-transaction-modal.php'; ?>
+<?php include $chatIncludes . '/scripts-model-selector.php'; ?>
+<?php include $chatIncludes . '/scripts-openwebui.php'; ?>
+
+<?php if (!empty($isAdmin)): ?>
+<script>
+// Create admin minimized tab inside shared minimized container so it participates in stacking order
+(function() {
+  try {
+    const container = document.getElementById('iframe-minimized-container');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.id = 'admin-minimized-tab';
+    div.className = 'minimized-tab admin-minimized-tab flex items-center bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg cursor-pointer';
+    div.title = 'Admin Console (toggle)';
+    div.innerHTML = `
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="Admin Console (toggle)">
+        <div class="w-5 h-5 flex-shrink-0">A</div>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">Admin Console</span>
+      </button>
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0" title="Close">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    `;
+    container.insertBefore(div, container.firstChild);
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.getElementById('admin-console-overlay');
+      if (!overlay) return;
+      if (overlay.classList.contains('hidden')) {
+        overlay.classList.remove('hidden');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    });
+  } catch (e) {
+    console.warn('Failed to inject admin minimized tab', e);
+  }
+})();
+</script>
+<?php endif; ?>
+
+<?php if (empty($isAdmin) && !empty($_SESSION['user_id'])): ?>
+<script>
+(function() {
+  try {
+    const container = document.getElementById('iframe-minimized-container');
+    if (!container) return;
+    const div = document.createElement('div');
+    div.id = 'user-minimized-tab';
+    div.className = 'minimized-tab user-minimized-tab flex items-center bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg cursor-pointer';
+    div.title = 'User Console (toggle)';
+    div.innerHTML = `
+      <button class="flex items-center justify-center gap-2 p-3 flex-shrink-0" title="User Console (toggle)">
+        <div class="w-5 h-5 flex-shrink-0">U</div>
+        <span class="tab-title text-sm font-medium whitespace-nowrap">User Console</span>
+      </button>
+      <button class="tab-close text-white/70 hover:text-red-300 transition-colors flex-shrink-0" title="Close">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+      </button>
+    `;
+    container.insertBefore(div, container.firstChild);
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const overlay = document.getElementById('user-console-overlay');
+      if (!overlay) return;
+      const wasHidden = overlay.classList.contains('hidden');
+      overlay.classList.toggle('hidden');
+      if (wasHidden) loadUserConsole();
+    });
+  } catch (e) {
+    console.warn('Failed to inject user minimized tab', e);
+  }
+})();
+</script>
+<?php endif; ?>
+
+<?php if (!empty($_SESSION['user_id'])): ?>
+<script>
+function renderUserConsole(data) {
+  const providerEl = document.getElementById('user-console-provider');
+  const modelEl = document.getElementById('user-console-model');
+  const tokensEl = document.getElementById('user-console-tokens');
+  const usageEl = document.getElementById('user-console-usage');
+  if (!providerEl || !modelEl || !tokensEl || !usageEl) return;
+
+  providerEl.textContent = data.provider || '-';
+  modelEl.textContent = data.model || '-';
+  tokensEl.textContent = (typeof data.tokens_left !== 'undefined' && data.tokens_left !== null) ? data.tokens_left : '-';
+
+  let html = '';
+  if (data.masked_key) {
+    html += '<div class="mb-2 text-xs text-gray-500">Key: ' + data.masked_key + '</div>';
+  }
+  if (data.recent && data.recent.length) {
+    html += '<div class="text-xs text-gray-500 mb-1">Recent usage:</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.recent.forEach(r => {
+      const when = r.minute_bucket || r.date || '';
+      html += '<li>' + when + ' — reqs: ' + (r.requests_count||0) + ', tokens: ' + (r.tokens_used||0) + '</li>';
+    });
+    html += '</ul>';
+  } else {
+    html += '<div class="text-xs text-gray-400">No recent usage.</div>';
+  }
+
+  if (data.key_recent && data.key_recent.length) {
+    html += '<div class="text-xs text-gray-500 mt-2 mb-1">Recent per-key usage (local):</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.key_recent.forEach(k => {
+      const when = k.minute_bucket || k.date || '';
+      html += '<li>' + when + ' — key: ' + (k.key_id || '-') + ', reqs: ' + (k.requests_count||0) + ', tokens: ' + (k.tokens_used||0) + '</li>';
+    });
+    html += '</ul>';
+  }
+
+  if (data.key_totals && data.key_totals.length) {
+    html += '<div class="text-xs text-gray-500 mt-2 mb-1">Per-key totals (local):</div>';
+    html += '<ul class="text-xs list-disc list-inside">';
+    data.key_totals.forEach(t => {
+      html += '<li>Key ID: ' + (t.key_id || '-') + ' — total reqs: ' + (t.requests_total||0) + ', total tokens: ' + (t.tokens_total||0) + '</li>';
+    });
+    html += '</ul>';
+  }
+
+  usageEl.innerHTML = html;
+}
+
+async function loadUserConsole() {
+  try {
+    const res = await fetch('/api/console/logs', { credentials: 'same-origin', cache: 'no-cache' });
+    if (!res.ok) {
+      let msg = 'Failed to load';
+      try { const t = await res.text(); msg = t || msg; } catch(_) {}
+      if (res.status === 403) throw new Error('Not authenticated (session missing)');
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    if (!data.success) throw new Error(data.error || 'No data');
+    renderUserConsole(data);
+  } catch (e) {
+    const usageEl = document.getElementById('user-console-usage');
+    if (usageEl) usageEl.textContent = 'Error loading console: ' + e.message;
+  }
+}
+
+document.addEventListener('click', function(e) {
+  if (e.target && e.target.id === 'user-console-refresh') {
+    loadUserConsole();
+  }
+  if (e.target && e.target.id === 'user-console-close') {
+    const overlay = document.getElementById('user-console-overlay');
+    if (overlay) overlay.classList.add('hidden');
+  }
+});
+</script>
+<?php endif; ?>
+
+<!-- Ginto Setup Config for chat.js -->
+<script>
+<?php
+  // Check if this is a fresh install (no .installed marker)
+  $installedExists = file_exists(ROOT_PATH . '/.installed') || file_exists(dirname(ROOT_PATH) . '/storage/.installed');
+  
+  // Check if any model is configured (has API key or local LLM URL)
+  $hasModel = !empty($_ENV['GROQ_API_KEY']) 
+           || !empty($_ENV['CEREBRAS_API_KEY']) 
+           || !empty($_ENV['OPENROUTER_API_KEY']) 
+           || !empty($_ENV['LOCAL_LLM_URL']);
+  
+  // Check if database tables exist, users exist, and if anyone has logged in before
+  $hasTables = false;
+  $hasUsers = false;
+  $anyoneLoggedIn = false;
+  try {
+    $db = \Ginto\Core\Database::getInstance();
+    $userCount = $db->count('users');
+    $hasTables = true;
+    $hasUsers = $userCount > 0;
+    if ($hasUsers) {
+      $loggedInCount = $db->count('users', ['last_login[!]' => null]);
+      $anyoneLoggedIn = $loggedInCount > 0;
+    }
+  } catch (\Exception $e) {
+    $hasTables = false;
+    $hasUsers = false;
+    $anyoneLoggedIn = false;
+  }
+  $isAdmin = false;
+  if (class_exists('Ginto\\Controllers\\UserController')) {
+    try { $isAdmin = \Ginto\Controllers\UserController::isAdmin(); } catch (\Throwable $_) { $isAdmin = false; }
+  }
+?>
+  window.GINTO_SETUP = {
+    isInstalled: <?= $installedExists ? 'true' : 'false' ?>,
+    hasModel: <?= $hasModel ? 'true' : 'false' ?>,
+    isLoggedIn: <?= !empty($_SESSION['user_id']) ? 'true' : 'false' ?>,
+    isAdmin: <?= $isAdmin ? 'true' : 'false' ?>,
+    hasTables: <?= $hasTables ? 'true' : 'false' ?>,
+    hasUsers: <?= $hasUsers ? 'true' : 'false' ?>,
+    anyoneLoggedIn: <?= $anyoneLoggedIn ? 'true' : 'false' ?>
+  };
+</script>
+
+<?php if (isset($_SESSION['user_id'])): ?>
+<!-- Ginto Config for Messenger Popup -->
+<script>
+  window.GINTO_CONFIG = {
+    userId: <?= (int)$_SESSION['user_id'] ?>,
+    csrfToken: '<?= htmlspecialchars($_SESSION['csrf_token'] ?? '', ENT_QUOTES) ?>'
+  };
+</script>
+<script src="/assets/js/messenger/messenger-multi-chat.js?v=<?= time() ?>"></script>
+<?php endif; ?>
+
+<script src="/assets/js/ui-components.js"></script>
+<script src="/assets/js/chat.js?v=<?= time() ?>"></script>
