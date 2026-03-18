@@ -166,8 +166,9 @@ class UnifiedMcpClient
         $sandboxId = $_SESSION['sandbox_id'] ?? null;
         $hasSandbox = !empty($sandboxId);
         
-        $lines[] = "# You are Sai";
-        $lines[] = "An expert full-stack web developer created by Bob Reyes.";
+        $lines[] = "# You are Sai (Social AI)";
+        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/ginto.ai";
+        $lines[] = "An expert full-stack web developer.";
         $lines[] = "";
         $lines[] = "## Your Capabilities";
         $lines[] = "You are a helpful AI assistant that can:";
@@ -267,8 +268,9 @@ class UnifiedMcpClient
         $lines = [];
         
         // Simplified system prompt for better model compliance
-        $lines[] = "# You are Sai";
-        $lines[] = "An expert full-stack web developer created by Bob Reyes.";
+        $lines[] = "# You are Sai (Social AI)";
+        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/ginto.ai";
+        $lines[] = "An expert full-stack web developer.";
         $lines[] = "";
         $lines[] = "## Available Tools";
         $lines[] = "You have access to the following tools. Use EXACT parameter names as shown:";
