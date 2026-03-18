@@ -885,7 +885,55 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             <input type="email" name="mail_from" class="input-field"
                                    value="<?= htmlspecialchars($envValues['MAIL_FROM'] ?? '') ?>"
                                    placeholder="no-reply@yourdomain.com">
-                            <p class="help-text">Outgoing email sender address. Defaults to <code>no-reply@&lt;CADDY_DOMAIN&gt;</code> when left blank. Email sending is only active when Public Domain is set to a non-localhost domain.</p>
+                            <p class="help-text">Sender address for outgoing emails. Defaults to <code>no-reply@&lt;CADDY_DOMAIN&gt;</code> when blank.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section-card mt-6">
+                    <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                        <i class="fas fa-envelope mr-2 text-amber-500"></i>Email / SMTP Configuration
+                    </h2>
+                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Configure an SMTP relay to send password reset and notification emails. Port 25 is blocked by most cloud providers — use port 587 (STARTTLS) or 465 (SSL). Leave Host blank to use the server MTA (mail()).</p>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="md:col-span-2">
+                            <label class="label-text">SMTP Host</label>
+                            <input type="text" name="smtp_host" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['SMTP_HOST'] ?? '') ?>"
+                                   placeholder="smtp.gmail.com">
+                            <p class="help-text">e.g. <code>smtp.gmail.com</code>, <code>smtp.mailgun.org</code>. Leave blank to use server mail().</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">SMTP Port</label>
+                            <input type="number" name="smtp_port" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['SMTP_PORT'] ?? '587') ?>"
+                                   placeholder="587">
+                            <p class="help-text">587 = STARTTLS (recommended), 465 = SSL</p>
+                        </div>
+
+                        <div>
+                            <label class="label-text">SMTP Encryption</label>
+                            <select name="smtp_secure" class="input-field">
+                                <option value="tls" <?= (($envValues['SMTP_SECURE'] ?? 'tls') === 'tls') ? 'selected' : '' ?>>STARTTLS (port 587)</option>
+                                <option value="ssl" <?= (($envValues['SMTP_SECURE'] ?? 'tls') === 'ssl') ? 'selected' : '' ?>>SSL (port 465)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="label-text">SMTP Username</label>
+                            <input type="text" name="smtp_user" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['SMTP_USER'] ?? '') ?>"
+                                   placeholder="your@email.com">
+                        </div>
+
+                        <div>
+                            <label class="label-text">SMTP Password / App Password</label>
+                            <input type="password" name="smtp_pass" class="input-field"
+                                   value="<?= htmlspecialchars($envValues['SMTP_PASS'] ?? '') ?>"
+                                   placeholder="••••••••••••">
+                            <p class="help-text">For Gmail, use a 16-character <a href="https://myaccount.google.com/apppasswords" target="_blank" class="text-amber-600 hover:underline">App Password</a> (requires 2FA enabled).</p>
                         </div>
                     </div>
                 </div>

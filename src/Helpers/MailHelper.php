@@ -1,18 +1,27 @@
 <?php
 namespace Ginto\Helpers;
 
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception as PHPMailerException;
+
 /**
- * MailHelper - Simple email sending utility for Ginto.
+ * MailHelper - Email sending utility for Ginto.
  *
- * Ginto runs on localhost and is proxied by Caddy to a real domain.
- * APP_URL is therefore usually "http://localhost", so CADDY_DOMAIN is used
- * as the authoritative public-facing domain and to determine whether this
- * is a live (internet-facing) install.
+ * Uses PHPMailer over SMTP (port 587/465) when SMTP_HOST is configured.
+ * Falls back to PHP mail() otherwise.
  *
- * The "from" address is built from MAIL_FROM in .env, or falls back to
- * no-reply@<CADDY_DOMAIN>.
+ * Live detection is based on CADDY_DOMAIN being set to a non-localhost value,
+ * since APP_URL is typically http://localhost (Caddy proxies the real domain).
  *
- * Uses PHP's native mail() which relies on the server's MTA (postfix/sendmail).
+ * .env keys used:
+ *   CADDY_DOMAIN  – public domain (set by installer or /live settings)
+ *   MAIL_FROM     – sender address (e.g. no-reply@yourdomain.com)
+ *   SMTP_HOST     – SMTP server hostname (e.g. smtp.gmail.com)
+ *   SMTP_PORT     – SMTP port (587 for STARTTLS, 465 for SSL) default 587
+ *   SMTP_USER     – SMTP username
+ *   SMTP_PASS     – SMTP password / app-password
+ *   SMTP_SECURE   – 'tls' (STARTTLS, default) or 'ssl'
  */
 class MailHelper
 {
@@ -51,25 +60,23 @@ class MailHelper
      */
     public static function fromAddress(): string
     {
-        $configured = $_ENV['MAIL_FROM'] ?? getenv('MAIL_FROM') ?? '';
+        $configured = trim($_ENV['MAIL_FROM'] ?? getenv('MAIL_FROM') ?? '');
         if ($configured && filter_var($configured, FILTER_VALIDATE_EMAIL)) {
             return $configured;
         }
-        return 'no-reply@' . self::siteDomain();
+        $domain = self::siteDomain();
+        return $domain ? 'no-reply@' . $domain : '';
     }
 
     /**
-     * Send an email. Returns true on success, false if not live or send fails.
-     *
-     * @param string $to      Recipient email address
-     * @param string $subject Email subject
-     * @param string $htmlBody HTML message body
-     * @param string $textBody Plain-text fallback (optional)
+     * Send an email via SMTP (PHPMailer) if SMTP_HOST is set,
+     * otherwise falls back to PHP mail().
+     * Returns false silently when not a live install.
      */
     public static function send(string $to, string $subject, string $htmlBody, string $textBody = ''): bool
     {
         if (!self::isLive()) {
-            error_log('[MailHelper] Email not sent (not a live install): ' . $subject . ' -> ' . $to);
+            error_log('[MailHelper] Not a live install, skipping email: ' . $subject . ' -> ' . $to);
             return false;
         }
 
@@ -78,16 +85,69 @@ class MailHelper
             return false;
         }
 
-        $from = self::fromAddress();
-        $domain = self::siteDomain();
-
         if (empty($textBody)) {
             $textBody = strip_tags($htmlBody);
         }
 
-        $boundary = 'ginto_' . bin2hex(random_bytes(8));
+        $smtpHost = trim($_ENV['SMTP_HOST'] ?? getenv('SMTP_HOST') ?? '');
 
-        $headers = implode("\r\n", [
+        if ($smtpHost) {
+            return self::sendViaSMTP($to, $subject, $htmlBody, $textBody, $smtpHost);
+        }
+
+        return self::sendViaMail($to, $subject, $htmlBody, $textBody);
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: PHPMailer SMTP
+    // -------------------------------------------------------------------------
+
+    private static function sendViaSMTP(string $to, string $subject, string $htmlBody, string $textBody, string $smtpHost): bool
+    {
+        $from       = self::fromAddress();
+        $smtpPort   = (int) ($_ENV['SMTP_PORT'] ?? getenv('SMTP_PORT') ?? 587);
+        $smtpUser   = $_ENV['SMTP_USER'] ?? getenv('SMTP_USER') ?? '';
+        $smtpPass   = $_ENV['SMTP_PASS'] ?? getenv('SMTP_PASS') ?? '';
+        $smtpSecure = strtolower(trim($_ENV['SMTP_SECURE'] ?? getenv('SMTP_SECURE') ?? 'tls'));
+
+        $mail = new PHPMailer(true);
+        try {
+            $mail->isSMTP();
+            $mail->Host       = $smtpHost;
+            $mail->Port       = $smtpPort;
+            $mail->SMTPAuth   = ($smtpUser !== '');
+            $mail->Username   = $smtpUser;
+            $mail->Password   = $smtpPass;
+            $mail->SMTPSecure = ($smtpSecure === 'ssl') ? PHPMailer::ENCRYPTION_SMTPS : PHPMailer::ENCRYPTION_STARTTLS;
+
+            $mail->setFrom($from, 'Ginto');
+            $mail->addAddress($to);
+            $mail->Subject  = $subject;
+            $mail->CharSet  = 'UTF-8';
+            $mail->isHTML(true);
+            $mail->Body     = $htmlBody;
+            $mail->AltBody  = $textBody;
+
+            $mail->send();
+            error_log('[MailHelper] SMTP sent: ' . $subject . ' -> ' . $to);
+            return true;
+        } catch (PHPMailerException $e) {
+            error_log('[MailHelper] SMTP error: ' . $e->getMessage() . ' | ' . $subject . ' -> ' . $to);
+            return false;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Private: native mail() fallback
+    // -------------------------------------------------------------------------
+
+    private static function sendViaMail(string $to, string $subject, string $htmlBody, string $textBody): bool
+    {
+        $from   = self::fromAddress();
+        $domain = self::siteDomain();
+
+        $boundary = 'ginto_' . bin2hex(random_bytes(8));
+        $headers  = implode("\r\n", [
             'MIME-Version: 1.0',
             'Content-Type: multipart/alternative; boundary="' . $boundary . '"',
             'From: Ginto <' . $from . '>',
@@ -107,13 +167,11 @@ class MailHelper
         $body .= "--{$boundary}--";
 
         $result = @mail($to, $subject, $body, $headers, '-f' . $from);
-
         if ($result) {
-            error_log('[MailHelper] Sent: ' . $subject . ' -> ' . $to);
+            error_log('[MailHelper] mail() sent: ' . $subject . ' -> ' . $to);
         } else {
-            error_log('[MailHelper] Failed to send: ' . $subject . ' -> ' . $to);
+            error_log('[MailHelper] mail() failed: ' . $subject . ' -> ' . $to);
         }
-
         return (bool) $result;
     }
 }
