@@ -1691,11 +1691,39 @@ class UserController extends \Core\Controller
         }
 
         $userId = (int)$_SESSION['user_id'];
-        $user = $this->db->get('users', ['id', 'password_hash'], ['id' => $userId]);
+        $user = $this->db->get('users', ['id', 'password_hash', 'referrer_id'], ['id' => $userId]);
 
         if (!$user || !password_verify($password, (string)($user['password_hash'] ?? ''))) {
             echo json_encode(['success' => false, 'error' => 'Incorrect password']);
             return;
+        }
+
+        // Re-parent all direct downlines to this user's own upline before deletion.
+        // e.g. deleted user was: upline → deleted → [A, B, C]
+        // becomes:               upline → [A, B, C]
+        $uplineId = isset($user['referrer_id']) && $user['referrer_id'] ? (int)$user['referrer_id'] : null;
+
+        try {
+            // 1. Re-point direct downline users to the upline (or NULL if top-level)
+            if ($uplineId !== null) {
+                $this->db->update('users', ['referrer_id' => $uplineId], ['referrer_id' => $userId]);
+            } else {
+                $this->db->update('users', ['referrer_id' => null], ['referrer_id' => $userId]);
+            }
+
+            // 2. Update the referrals table to reflect the new sponsor relationship
+            if ($uplineId !== null) {
+                $this->db->update('referrals', ['referrer_id' => $uplineId], ['referrer_id' => $userId]);
+            } else {
+                // No upline — remove orphaned referral rows rather than leaving broken refs
+                $this->db->delete('referrals', ['referrer_id' => $userId]);
+            }
+
+            // 3. Remove the deleted user's own referral record (they were someone's downline)
+            $this->db->delete('referrals', ['referred_id' => $userId]);
+        } catch (\Throwable $e) {
+            error_log('deleteAccount: re-parent downlines failed for user ' . $userId . ': ' . $e->getMessage());
+            // Non-fatal — continue with deletion
         }
 
         // Soft-delete: mark as deleted, anonymise PII, revoke sessions
