@@ -1922,6 +1922,20 @@ $router->req('/privacy', function() {
     \Ginto\Core\View::view('privacy', ['title' => 'Privacy Policy | Ginto']);
 });
 
+// Delete account — confirmation page (GET) and execution (POST)
+$router->req('/account/delete', function() use ($db) {
+    $ctrl = new \Ginto\Controllers\UserController($db);
+    $ctrl->deleteAccount();
+});
+$router->req('/account/delete/confirm', function() use ($db) {
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        header('Location: /account/delete');
+        exit;
+    }
+    $ctrl = new \Ginto\Controllers\UserController($db);
+    $ctrl->deleteAccountConfirm();
+});
+
 // Start routing
 $router->dispatch($_SERVER['REQUEST_URI']);
 // Local dev helper: lightweight endpoint to POST a test chat message and proxy to the MCP

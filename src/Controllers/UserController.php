@@ -1639,5 +1639,92 @@ class UserController extends \Core\Controller
 
         echo json_encode(['success' => true]);
     }
+
+    /**
+     * GET /account/delete — show confirmation page
+     */
+    public function deleteAccount(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        if (empty($_SESSION['user_id'])) {
+            header('Location: /login');
+            exit;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        $user = $this->db->get('users', ['id', 'username', 'email'], ['id' => $userId]);
+
+        \Ginto\Core\View::view('user/delete-account', [
+            'title'      => 'Delete Account | Ginto',
+            'user'       => is_array($user) ? $user : ['id' => $userId],
+            'csrf_token' => generateCsrfToken(),
+        ]);
+    }
+
+    /**
+     * POST /account/delete/confirm — actually delete after CSRF + password check
+     */
+    public function deleteAccountConfirm(): void
+    {
+        header('Content-Type: application/json');
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Not authenticated']);
+            return;
+        }
+
+        // CSRF
+        $token = $_POST['csrf_token'] ?? '';
+        if (!function_exists('validateCsrfToken') || !validateCsrfToken($token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Security token mismatch']);
+            return;
+        }
+
+        // Password confirmation
+        $password = $_POST['password'] ?? '';
+        if ($password === '') {
+            echo json_encode(['success' => false, 'error' => 'Password is required to confirm deletion']);
+            return;
+        }
+
+        $userId = (int)$_SESSION['user_id'];
+        $user = $this->db->get('users', ['id', 'password_hash'], ['id' => $userId]);
+
+        if (!$user || !password_verify($password, (string)($user['password_hash'] ?? ''))) {
+            echo json_encode(['success' => false, 'error' => 'Incorrect password']);
+            return;
+        }
+
+        // Soft-delete: mark as deleted, anonymise PII, revoke sessions
+        try {
+            $anon = 'deleted_' . bin2hex(random_bytes(8));
+            $this->db->update('users', [
+                'username'      => $anon,
+                'email'         => $anon . '@deleted.invalid',
+                'password_hash' => '',
+                'fullname'      => '',
+                'phone'         => '',
+                'deleted_at'    => date('Y-m-d H:i:s'),
+            ], ['id' => $userId]);
+        } catch (\Throwable $e) {
+            // deleted_at column may not exist — fall back to hard delete
+            try {
+                $this->db->delete('users', ['id' => $userId]);
+            } catch (\Throwable $e2) {
+                http_response_code(500);
+                echo json_encode(['success' => false, 'error' => 'Could not delete account']);
+                return;
+            }
+        }
+
+        // Destroy session
+        $_SESSION = [];
+        session_destroy();
+
+        echo json_encode(['success' => true]);
+    }
 }
 ?>
