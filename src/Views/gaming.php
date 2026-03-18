@@ -117,10 +117,15 @@ html, body {
                                 <li><i class="fas fa-check text-green-500 mr-1"></i>Animated keyboard display</li>
                                 <li><i class="fas fa-check text-green-500 mr-1"></i>Mechanical key click sounds</li>
                             </ul>
-                            <a href="/gaming?game=typing"
+                            <button id="typing-play-btn"
                                class="play-btn w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm py-2 px-4 rounded-lg text-center flex items-center justify-center gap-2">
                                 <i class="fas fa-play"></i> Play Now
-                            </a>
+                            </button>
+                            <!-- No-keyboard warning (shown by JS when no physical keyboard detected) -->
+                            <div id="typing-no-keyboard-msg" class="hidden mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 rounded-lg px-3 py-2 flex items-start gap-2">
+                                <i class="fas fa-keyboard mt-0.5 shrink-0"></i>
+                                <span>You must connect a physical or Bluetooth keyboard to learn typing skills.</span>
+                            </div>
                         </div>
                     </div>
 
@@ -243,5 +248,57 @@ html, body {
     </div>
 </div>
 
+<script>
+(function () {
+    /**
+     * Heuristic: a device has a physical keyboard if it has a fine pointer (mouse)
+     * OR if it is not a touch-only device.
+     * A connected Bluetooth keyboard cannot be detected by the browser directly.
+     * We fall back to asking the user to proceed anyway via the button itself.
+     */
+    function likelyHasKeyboard() {
+        // Fine pointer almost always means a physical keyboard (desktop/laptop)
+        if (window.matchMedia('(pointer: fine)').matches) return true;
+        // Coarse-only pointer with no hover = phone/tablet without keyboard
+        if (window.matchMedia('(pointer: coarse) and (hover: none)').matches) return false;
+        // Anything else (hybrid devices, etc.) — optimistically allow
+        return true;
+    }
+
+    var btn = document.getElementById('typing-play-btn');
+    var noKbMsg = document.getElementById('typing-no-keyboard-msg');
+
+    // Show the warning immediately on page-load for touch-only devices
+    if (!likelyHasKeyboard()) {
+        noKbMsg.classList.remove('hidden');
+        // dim the button to signal unavailability
+        btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+        btn.classList.add('bg-gray-400', 'dark:bg-gray-600', 'cursor-not-allowed');
+        btn.setAttribute('aria-disabled', 'true');
+    }
+
+    btn.addEventListener('click', function () {
+        if (!likelyHasKeyboard()) {
+            // Re-show the message (in case it was hidden) and stop
+            noKbMsg.classList.remove('hidden');
+            return;
+        }
+
+        // Attempt to lock orientation to landscape before navigating
+        var locked = false;
+        if (screen.orientation && typeof screen.orientation.lock === 'function') {
+            screen.orientation.lock('landscape').then(function () {
+                locked = true;
+            }).catch(function () {
+                // Lock failed (desktop browsers reject this — that's fine)
+            }).finally(function () {
+                window.location.href = '/gaming?game=typing';
+            });
+        } else {
+            window.location.href = '/gaming?game=typing';
+        }
+    });
+})();
+</script>
 </body>
 </html>
