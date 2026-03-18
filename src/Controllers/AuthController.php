@@ -269,13 +269,26 @@ class AuthController
         session_unset();
         session_destroy();
 
-        // GET: redirect to /chat-m (browser / WebView navigation)
-        // POST: return JSON (fetch() from mobile app)
+        // POST: return JSON (fetch() from Android app)
+        // GET: serve an HTML page that clears localStorage then redirects to /chat-m
         if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST') {
             header('Content-Type: application/json');
             echo json_encode(['success' => true]);
         } else {
-            if (!headers_sent()) header('Location: /chat-m');
+            header('Content-Type: text/html; charset=utf-8');
+            echo <<<'HTML'
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<title>Logging out…</title></head><body>
+<script>
+try {
+    var keys = ['ginto_conversations_v2','ginto_conversations','ginto_disabled_tools'];
+    keys.forEach(function(k){ localStorage.removeItem(k); });
+    sessionStorage.clear();
+} catch(e) {}
+window.location.replace('/chat-m');
+</script>
+</body></html>
+HTML;
         }
         exit;
     }
