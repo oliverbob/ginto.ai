@@ -380,6 +380,36 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       border-color: transparent;
     }
 
+    .ginto-pay-option {
+      border: 2px solid #d4af37;
+      box-shadow: 0 0 0 1px rgba(245, 214, 123, 0.45), 0 8px 20px rgba(212, 175, 55, 0.18);
+      background: linear-gradient(115deg, var(--bg-card) 72%, rgba(245, 214, 123, 0.38) 100%);
+    }
+    .ginto-pay-logo {
+      width: 1.3rem;
+      height: 1.3rem;
+      object-fit: contain;
+      border-radius: 9999px;
+      box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.55), 0 0 8px rgba(245, 214, 123, 0.4);
+      background: #ffffff;
+    }
+    .ginto-pay-badge {
+      background: linear-gradient(135deg, #b8860b 0%, #d4af37 40%, #f5d67b 100%);
+      color: #2b2110;
+      border: 1px solid rgba(139, 105, 20, 0.6);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .payment-modal-tab.ginto-pay-tab.active {
+      color: #2b2110;
+      border-color: #b8860b;
+      background: linear-gradient(135deg, #b8860b 0%, #d4af37 42%, #f5d67b 100%);
+      box-shadow: 0 10px 24px rgba(184, 134, 11, 0.35);
+    }
+    .payment-modal-tab.ginto-pay-tab .ginto-pay-logo {
+      width: 1rem;
+      height: 1rem;
+    }
+
     @media (min-width: 640px) {
       .payment-modal-shell {
         padding: 1.5rem 1rem 3rem;
@@ -1112,13 +1142,14 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <?php if ($paymongoEnabled): ?>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container ginto-pay-option" data-radio="ginto-pay">
                   <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" loading="lazy" onerror="this.style.display='none'">
                     <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
                     <span>
                       Ginto Pay
-                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">Fast Card Checkout</span>
+                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1 ginto-pay-badge">Fast Card Checkout</span>
                     </span>
                   </label>
                 </div>
@@ -2337,7 +2368,7 @@ if (empty($paypalClientId)) {
     'crypto_usdt_bep20':    { icon: 'fab fa-bitcoin',     color: '#f0b90b', label: 'Crypto'        },
     'paymongo_qrph':        { icon: 'fas fa-qrcode',      color: '#f97316', label: 'QR 1 Month'   },
     'paymongo_qrph_annual': { icon: 'fas fa-qrcode',      color: '#16a34a', label: 'QR 12 Months' },
-    'ginto_pay':            { icon: 'fas fa-credit-card', color: '#6366f1', label: 'Ginto Pay'     }
+    'ginto_pay':            { icon: 'fas fa-credit-card', color: '#d4af37', label: 'Ginto Pay', isGold: true }
   };
 
   function buildPaymentModal() {
@@ -2383,7 +2414,16 @@ if (empty($paypalClientId)) {
     var info = PAYMENT_METHOD_INFO[value] || { icon: 'fas fa-credit-card', color: 'var(--primary-500)', label: 'Payment' };
     var iconEl = document.getElementById('pmodal-icon');
     var titleEl = document.getElementById('pmodal-title');
-    if (iconEl) iconEl.innerHTML = '<i class="' + info.icon + '" style="color:' + info.color + '"></i>';
+    if (iconEl) {
+      if (value === 'ginto_pay') {
+        iconEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:0.35rem;">' +
+          '<img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
+          '<i class="' + info.icon + '" style="color:#d4af37"></i>' +
+        '</span>';
+      } else {
+        iconEl.innerHTML = '<i class="' + info.icon + '" style="color:' + info.color + '"></i>';
+      }
+    }
     if (titleEl) titleEl.textContent = info.label;
     // Rebuild method thumbnail tabs
     var tabs = document.getElementById('pmodal-tabs');
@@ -2396,11 +2436,21 @@ if (empty($paypalClientId)) {
         var btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'payment-modal-tab' + (active ? ' active' : '');
+        if (radio.value === 'ginto_pay') {
+          btn.classList.add('ginto-pay-tab');
+        }
         btn.style.borderColor = active ? mi.color : 'var(--border-color)';
         if (active) {
-          btn.style.background = 'linear-gradient(135deg, ' + mi.color + ', #111827)';
+          if (radio.value !== 'ginto_pay') {
+            btn.style.background = 'linear-gradient(135deg, ' + mi.color + ', #111827)';
+          }
         }
-        btn.innerHTML = '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
+        if (radio.value === 'ginto_pay') {
+          btn.innerHTML = '<img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
+            '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
+        } else {
+          btn.innerHTML = '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
+        }
         btn.addEventListener('click', function() {
           radio.checked = true;
           radio.dispatchEvent(new Event('change', { bubbles: true }));
