@@ -30,6 +30,81 @@ class CsrfMiddleware
         '/logout-m',          // Mobile app JSON logout — kills session, CSRF not applicable
     ];
 
+    /**
+     * Additional skip paths registered at runtime.
+     * Use addSkipPaths() to merge environment values or other sources during bootstrap.
+     */
+    private static array $customSkipPaths = [];
+
+    /**
+     * Cached list parsed from the CSRF_WHITELIST environment variable.
+     */
+    private static ?array $envSkipPaths = null;
+
+    /**
+     * Register extra paths that should bypass CSRF validation.
+     */
+    public static function addSkipPaths(array $paths): void
+    {
+        $merged = self::$customSkipPaths;
+        foreach ($paths as $path) {
+            $normalized = self::normalizePath((string)$path);
+            if ($normalized === '') {
+                continue;
+            }
+            $merged[] = $normalized;
+        }
+        self::$customSkipPaths = array_values(array_unique($merged));
+    }
+
+    private static function isPathWhitelisted(string $path): bool
+    {
+        return in_array($path, self::getEffectiveSkipPaths(), true);
+    }
+
+    private static function getEffectiveSkipPaths(): array
+    {
+        return array_values(array_unique(array_merge(
+            self::$skipPaths,
+            self::$customSkipPaths,
+            self::getEnvSkipPaths()
+        )));
+    }
+
+    private static function getEnvSkipPaths(): array
+    {
+        if (self::$envSkipPaths !== null) {
+            return self::$envSkipPaths;
+        }
+        $raw = getenv('CSRF_WHITELIST') ?: ($_ENV['CSRF_WHITELIST'] ?? '');
+        if (!$raw) {
+            return self::$envSkipPaths = [];
+        }
+        $parts = preg_split('/[\r\n,]+/', $raw);
+        $paths = [];
+        if (is_array($parts)) {
+            foreach ($parts as $part) {
+                $normalized = self::normalizePath((string)$part);
+                if ($normalized !== '') {
+                    $paths[] = $normalized;
+                }
+            }
+        }
+        return self::$envSkipPaths = array_values(array_unique($paths));
+    }
+
+    private static function normalizePath(string $path): string
+    {
+        $trimmed = trim($path);
+        if ($trimmed === '') {
+            return '';
+        }
+        if ($trimmed[0] !== '/') {
+            $trimmed = '/' . ltrim($trimmed, '/');
+        }
+        return $trimmed;
+    }
+
     public function handle()
     {
         $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
@@ -40,6 +115,7 @@ class CsrfMiddleware
 
             // Check if this path should skip CSRF
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+            $path = self::normalizePath($path);
             // Log received token & session token (temp debug)
             $received = $_POST['_csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '(none)';
             error_log('CsrfMiddleware: path=' . $path . ' method=' . $method . ' received_token=' . (is_string($received) ? substr($received,0,64) : '(array)'));
@@ -88,7 +164,7 @@ class CsrfMiddleware
                 }
                 // else fall through and require CSRF token below
             }
-            if (in_array($path, self::$skipPaths)) {
+            if (self::isPathWhitelisted($path)) {
                 return;
             }
             // Accept common token names used across the app: '_csrf' (admin), 'csrf_token' (public forms)
