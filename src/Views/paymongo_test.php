@@ -64,6 +64,11 @@ $csrfToken = $csrf_token ?? '';
     &#x2705; Payment Confirmed!<br>
     <small style="color:#86efac; font-weight:400;">The QR was paid successfully.</small>
   </div>
+
+  <details style="margin-top:20px;">
+    <summary style="cursor:pointer; font-size:0.8rem; color:#666;">Raw API response</summary>
+    <pre id="debug-output" style="margin-top:8px; background:#0a0a0a; border:1px solid #333; border-radius:6px; padding:12px; font-size:0.72rem; color:#aaa; overflow-x:auto; white-space:pre-wrap; word-break:break-all;">(none yet)</pre>
+  </details>
 </div>
 
 <script>
@@ -106,6 +111,7 @@ $csrfToken = $csrf_token ?? '';
     .then(function(r) { return r.json(); })
     .then(function(data) {
       console.log('Init response:', data);
+      document.getElementById('debug-output').textContent = JSON.stringify(data, null, 2);
       if (!data.success) {
         showError(data.message || 'Failed to generate QR.');
         return;
