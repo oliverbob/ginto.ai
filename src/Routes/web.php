@@ -1216,6 +1216,8 @@ $router->req('/paymongo-payments', 'PaymentController@paymongoPayments');
 $router->req('/api/payments/paymongo-qrph-init', 'PaymentController@paymongoQrphInit');
 $router->req('/api/payments/paymongo-qrph-status', 'PaymentController@paymongoQrphStatus');
 $router->req('/api/payments/ginto-pay-init', 'PaymentController@gintoPayInit');
+$router->req('/api/payments/gintopay-init', 'PaymentController@gintoPayStandaloneInit');
+$router->get('/api/payments/gintopay-status', 'PaymentController@gintoPayStandaloneStatus');
 $router->get('/register/awaiting', 'PaymentController@gintoPayAwaiting');
 $router->get('/api/payments/ginto-pay-status', 'PaymentController@gintoPayStatus');
 $router->get('/register/complete', 'PaymentController@gintoPayComplete');
@@ -1223,6 +1225,10 @@ $router->get('/register/complete', 'PaymentController@gintoPayComplete');
 $router->get('/paymongo', function() {
     if (!defined('IS_ADMIN') || !IS_ADMIN) { http_response_code(403); exit; }
     \Ginto\Core\View::view('paymongo_test', ['csrf_token' => generateCsrfToken(true)]);
+});
+$router->get('/gintopay', function() {
+    if (!defined('IS_ADMIN') || !IS_ADMIN) { http_response_code(403); exit; }
+    \Ginto\Core\View::view('gintopay_test', ['csrf_token' => generateCsrfToken(true)]);
 });
 $router->req('/api/user/payment-details', 'PaymentController@paymentDetails');
 $router->req('/api/payment/check-status/{paymentId}', 'PaymentController@checkStatus');

@@ -100,13 +100,14 @@ class PayMongoHandler
     }
 
     /**
-     * Create a Payment Intent for QRPH
+     * Create a Payment Intent.
      *
-     * @param int    $amountCentavos  Amount in centavos (multiply PHP amount × 100)
-     * @param string $description     Description for the payment
+     * @param int    $amountCentavos         Amount in centavos (multiply PHP amount × 100)
+     * @param string $description            Description for the payment
+     * @param array  $paymentMethodAllowed   e.g. ['qrph'] or ['card']
      * @return array ['success' => bool, 'pi_id' => string, 'client_key' => string, 'status' => string] | ['success' => false, 'message' => string]
      */
-    public function createPaymentIntent(int $amountCentavos, string $description = 'Ginto Membership'): array
+    public function createPaymentIntent(int $amountCentavos, string $description = 'Ginto Membership', array $paymentMethodAllowed = ['qrph']): array
     {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
@@ -116,7 +117,7 @@ class PayMongoHandler
             'data' => [
                 'attributes' => [
                     'amount'                  => $amountCentavos,
-                    'payment_method_allowed'  => ['qrph'],
+                    'payment_method_allowed'  => $paymentMethodAllowed,
                     'payment_method_options'  => ['card' => ['request_three_d_secure' => 'any']],
                     'currency'                => 'PHP',
                     'capture_type'            => 'automatic',
@@ -147,6 +148,54 @@ class PayMongoHandler
             'client_key' => $clientKey,
             'status'     => $status,
         ];
+    }
+
+    /**
+     * Create a card payment method.
+     *
+     * @param array $card    ['number','exp_month','exp_year','cvc']
+     * @param array $billing ['name','email','phone']
+     * @return array ['success' => bool, 'pm_id' => string] | ['success' => false, 'message' => string]
+     */
+    public function createCardPaymentMethod(array $card, array $billing): array
+    {
+        if (empty($this->secretKey)) {
+            return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        $body = [
+            'data' => [
+                'attributes' => [
+                    'type'    => 'card',
+                    'details' => [
+                        'card_number' => $card['number'] ?? '',
+                        'exp_month'   => (int)($card['exp_month'] ?? 0),
+                        'exp_year'    => (int)($card['exp_year'] ?? 0),
+                        'cvc'         => $card['cvc'] ?? '',
+                    ],
+                    'billing' => [
+                        'name'  => $billing['name'] ?? 'Ginto User',
+                        'email' => $billing['email'] ?? '',
+                        'phone' => $billing['phone'] ?? '',
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $this->request('POST', '/payment_methods', $body);
+
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            $msg = $response['errors'][0]['detail'] ?? 'Failed to create card payment method.';
+            error_log('PayMongo createCardPaymentMethod error: ' . json_encode($response));
+            return ['success' => false, 'message' => $msg];
+        }
+
+        $pmId = $response['data']['id'] ?? null;
+        if (!$pmId) {
+            return ['success' => false, 'message' => 'Invalid card payment method response.'];
+        }
+
+        return ['success' => true, 'pm_id' => $pmId];
     }
 
     /**
@@ -255,6 +304,7 @@ class PayMongoHandler
             'status'    => $status,
             'qr_image'  => $qrImage,
             'qr_string' => $qrString,
+            'next_action' => $nextAction,
             'pi_id'     => $response['data']['id'] ?? $piId,
         ];
     }
@@ -364,7 +414,7 @@ class PayMongoHandler
         $amountCentavos = $amountPhp * 100;
 
         // Step 1: Create Payment Intent
-        $piResult = $this->createPaymentIntent($amountCentavos, $description);
+        $piResult = $this->createPaymentIntent($amountCentavos, $description, ['qrph']);
         if (!$piResult['success']) {
             return $piResult;
         }
@@ -391,6 +441,58 @@ class PayMongoHandler
             'qr_image'  => $attachResult['qr_image'],
             'qr_string' => $attachResult['qr_string'],
             'status'    => $attachResult['status'],
+        ];
+    }
+
+    /**
+     * Card initialization flow without hosted checkout redirect.
+     *
+     * 1. Create card-enabled Payment Intent
+     * 2. Create card Payment Method from submitted card data
+     * 3. Attach Payment Method to charge card
+     *
+     * @return array ['success'=>bool,'pi_id'=>string,'payment_id'=>?string,'status'=>string,'next_action'=>array]
+     */
+    public function initCardPayment(
+        int $amountPhp,
+        string $email,
+        string $name,
+        string $phone,
+        string $description,
+        array $card
+    ): array {
+        $amountCentavos = $amountPhp * 100;
+
+        $piResult = $this->createPaymentIntent($amountCentavos, $description, ['card']);
+        if (!$piResult['success']) {
+            return $piResult;
+        }
+
+        $piId      = $piResult['pi_id'];
+        $clientKey = $piResult['client_key'];
+
+        $pmResult = $this->createCardPaymentMethod($card, [
+            'name'  => $name,
+            'email' => $email,
+            'phone' => $phone,
+        ]);
+        if (!$pmResult['success']) {
+            return $pmResult;
+        }
+
+        $attachResult = $this->attachPaymentMethod($piId, $pmResult['pm_id'], $clientKey);
+        if (!$attachResult['success']) {
+            return $attachResult;
+        }
+
+        $statusResult = $this->getPaymentIntentStatus($piId);
+
+        return [
+            'success'      => true,
+            'pi_id'        => $piId,
+            'status'       => $attachResult['status'] ?? ($statusResult['status'] ?? 'unknown'),
+            'payment_id'   => $statusResult['payment_id'] ?? null,
+            'next_action'  => $attachResult['next_action'] ?? [],
         ];
     }
 

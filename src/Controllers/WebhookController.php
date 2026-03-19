@@ -772,6 +772,7 @@ class WebhookController
     {
         $attributes = $event['data']['attributes']['data']['attributes'] ?? [];
         $piId       = $attributes['payment_intent_id'] ?? '';
+        $paymentId  = $event['data']['attributes']['data']['id'] ?? null;
         $amount     = (int)($attributes['amount'] ?? 0); // centavos
 
         if (empty($piId)) {
@@ -792,6 +793,22 @@ class WebhookController
             'payment_method'    => 'paymongo_qrph',
             'status'            => 'pending',
         ]);
+
+        // Standalone GintoPay card flow uses payment_intent_id as tracking key in pending_registrations.
+        $pending = $this->db->get('pending_registrations', '*', [
+            'checkout_session_id' => $piId,
+            'status'              => 'pending',
+        ]);
+
+        if ($pending) {
+            $this->processPendingRegistration(
+                $pending,
+                $piId,
+                $piId,
+                $paymentId,
+                'payment.paid_webhook'
+            );
+        }
     }
 
     /**
@@ -863,17 +880,35 @@ class WebhookController
             return;
         }
 
-        $regData = json_decode($pending['reg_data'], true);
-        if (empty($regData)) {
-            error_log("GintoPay webhook: corrupt reg_data for cs_id={$checkoutSessionId}");
+        $this->processPendingRegistration(
+            $pending,
+            $checkoutSessionId,
+            $paymentIntentId,
+            $gatewayPaymentId,
+            'checkout_session.payment.paid'
+        );
+    }
+
+    /**
+     * Create account/subscription/payment records from a pending registration row.
+     */
+    private function processPendingRegistration(
+        array $pending,
+        string $paymentReference,
+        ?string $paymentIntentId,
+        ?string $gatewayPaymentId,
+        string $sourceEvent
+    ): void {
+        $regData = json_decode($pending['reg_data'] ?? '', true);
+        if (empty($regData) || !is_array($regData)) {
+            error_log("GintoPay webhook: corrupt reg_data for ref={$paymentReference}");
             $this->db->update('pending_registrations', ['status' => 'failed'], ['id' => $pending['id']]);
             return;
         }
 
-        // Guard against duplicate processing (race condition)
-        $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $checkoutSessionId]);
+        // Guard against duplicate processing
+        $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $paymentReference]);
         if ($existing) {
-            error_log("GintoPay webhook: already have payment record for cs_id={$checkoutSessionId}, marking pending as completed");
             $this->db->update('pending_registrations', [
                 'status'       => 'completed',
                 'processed_at' => date('Y-m-d H:i:s'),
@@ -893,7 +928,6 @@ class WebhookController
         $publicId    = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
         try {
-            // Create user account
             $this->db->insert('users', [
                 'email'             => $regData['email'],
                 'username'          => $regData['username'],
@@ -910,7 +944,7 @@ class WebhookController
 
             $userId = $this->db->id();
             if (!$userId) {
-                error_log("GintoPay webhook: failed to insert user for cs_id={$checkoutSessionId}");
+                error_log("GintoPay webhook: failed to insert user for ref={$paymentReference}");
                 return;
             }
 
@@ -923,13 +957,13 @@ class WebhookController
                 'fullname'            => $regData['fullname'],
                 'phone'               => $regData['phone'],
                 'country'             => $regData['country'],
-                'paymongo_session_id' => $checkoutSessionId,
+                'paymongo_session_id' => (strpos($paymentReference, 'cs_') === 0) ? $paymentReference : null,
                 'paymongo_pi_id'      => $paymentIntentId,
                 'paymongo_payment_id' => $gatewayPaymentId,
                 'payment_gateway'     => 'paymongo',
                 'payment_type'        => 'card',
                 'duration'            => $duration,
-                'source'              => 'webhook',
+                'source'              => $sourceEvent,
             ]);
 
             $this->db->insert('subscription_payments', array_merge([
@@ -940,21 +974,20 @@ class WebhookController
                 'amount'             => $amountPhp,
                 'currency'           => 'PHP',
                 'payment_method'     => 'ginto_pay_card',
-                'payment_reference'  => $checkoutSessionId,
+                'payment_reference'  => $paymentReference,
                 'gateway_payment_id' => $gatewayPaymentId,
                 'status'             => 'paid',
                 'notes'              => $paymentNotes,
                 'transaction_id'     => $transactionId,
             ], $auditData));
 
-            $paymentId = $this->db->id();
-            if (!$paymentId) {
+            $paymentRowId = $this->db->id();
+            if (!$paymentRowId) {
                 $this->db->delete('users', ['id' => $userId]);
-                error_log("GintoPay webhook: failed to insert payment record for cs_id={$checkoutSessionId}");
+                error_log("GintoPay webhook: failed to insert payment for ref={$paymentReference}");
                 return;
             }
 
-            // Create subscription record
             $this->db->insert('user_subscriptions', [
                 'user_id'            => $userId,
                 'plan_id'            => $planId,
@@ -962,7 +995,7 @@ class WebhookController
                 'started_at'         => $now,
                 'expires_at'         => $expiresAt,
                 'payment_method'     => 'ginto_pay_card',
-                'payment_reference'  => $checkoutSessionId,
+                'payment_reference'  => $paymentReference,
                 'gateway_payment_id' => $gatewayPaymentId,
                 'amount_paid'        => $amountPhp,
                 'currency'           => 'PHP',
@@ -973,21 +1006,18 @@ class WebhookController
 
             $subscriptionId = $this->db->id();
             if ($subscriptionId) {
-                $this->db->update('subscription_payments', ['subscription_id' => $subscriptionId], ['id' => $paymentId]);
+                $this->db->update('subscription_payments', ['subscription_id' => $subscriptionId], ['id' => $paymentRowId]);
             }
 
-            // Mark pending registration as processed
             $this->db->update('pending_registrations', [
                 'status'       => 'completed',
                 'user_id'      => $userId,
                 'processed_at' => $now,
             ], ['id' => $pending['id']]);
 
-            error_log("GintoPay webhook: account created user_id={$userId}, payment_id={$paymentId}, cs_id={$checkoutSessionId}");
-
+            error_log("GintoPay webhook: account created user_id={$userId}, payment_id={$paymentRowId}, ref={$paymentReference}");
         } catch (\Throwable $e) {
-            error_log('GintoPay webhook handleGintoPayCheckoutPaid error: ' . $e->getMessage());
-            // Do NOT mark as completed — allow retry
+            error_log('GintoPay webhook processPendingRegistration error: ' . $e->getMessage());
         }
     }
 

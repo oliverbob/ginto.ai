@@ -1802,6 +1802,211 @@ class PaymentController
     }
 
     /**
+     * Standalone Ginto Pay (Card) init for isolated debugging at /gintopay.
+     * Charges card via PayMongo Payment Intent API (no hosted checkout redirect),
+     * then waits for webhook to finalize account/subscription creation.
+     */
+    public function gintoPayStandaloneInit(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        header('Content-Type: application/json');
+        $this->validateAjaxRequest();
+        $this->validateCsrf();
+
+        $required = [
+            'username', 'email', 'password', 'country', 'phone',
+            'amount', 'tier', 'card_number', 'exp_month', 'exp_year', 'cvc'
+        ];
+        foreach ($required as $field) {
+            if (empty(trim((string)($_POST[$field] ?? '')))) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => "Missing required field: {$field}"]);
+                exit;
+            }
+        }
+
+        $amountPhp = (int)($_POST['amount'] ?? 0);
+        if ($amountPhp <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid payment amount.']);
+            exit;
+        }
+
+        $email = filter_var(trim((string)$_POST['email']), FILTER_SANITIZE_EMAIL);
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid email address.']);
+            exit;
+        }
+
+        if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Ginto Pay is not configured.']);
+            exit;
+        }
+
+        $fullname = trim(strip_tags((string)(($_POST['firstname'] ?? '') . ' ' . ($_POST['lastname'] ?? ''))));
+        if ($fullname === '') {
+            $fullname = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_POST['username'] ?? 'user'));
+        }
+
+        $duration = in_array($_POST['duration'] ?? '', ['1m', '12m'], true) ? $_POST['duration'] : '1m';
+        $tier     = strip_tags(trim((string)($_POST['tier'] ?? 'Membership')));
+
+        $cardNumber = preg_replace('/[^0-9]/', '', (string)($_POST['card_number'] ?? ''));
+        $expMonth   = preg_replace('/[^0-9]/', '', (string)($_POST['exp_month'] ?? ''));
+        $expYear    = preg_replace('/[^0-9]/', '', (string)($_POST['exp_year'] ?? ''));
+        $cvc        = preg_replace('/[^0-9]/', '', (string)($_POST['cvc'] ?? ''));
+
+        if (strlen($cardNumber) < 13 || strlen($cardNumber) > 19) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid card number.']);
+            exit;
+        }
+
+        if ((int)$expMonth < 1 || (int)$expMonth > 12 || strlen($expYear) < 2 || strlen($cvc) < 3) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid card expiry or CVC.']);
+            exit;
+        }
+
+        try {
+            $regData = [
+                'username'      => preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_POST['username'] ?? '')),
+                'email'         => $email,
+                'password_hash' => password_hash((string)($_POST['password'] ?? ''), PASSWORD_DEFAULT),
+                'firstname'     => strip_tags(trim((string)($_POST['firstname'] ?? ''))),
+                'lastname'      => strip_tags(trim((string)($_POST['lastname'] ?? ''))),
+                'fullname'      => $fullname,
+                'phone'         => preg_replace('/[^0-9+\-\s]/', '', (string)($_POST['phone'] ?? '')),
+                'country'       => preg_replace('/[^a-zA-Z]/', '', (string)($_POST['country'] ?? '')),
+                'package'       => strip_tags(trim((string)($_POST['package'] ?? 'go'))),
+                'amount'        => $amountPhp,
+                'currency'      => 'PHP',
+                'duration'      => $duration,
+                'tier'          => $tier,
+                'referrer_id'   => $this->resolveReferrerId(),
+                'promo_code'    => preg_replace('/[^a-zA-Z0-9\-_]/', '', (string)($_POST['promo_code'] ?? '')),
+                'source'        => 'gintopay_standalone',
+            ];
+
+            $description = 'Ginto ' . $tier . ' Membership';
+
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $result = $handler->initCardPayment(
+                $amountPhp,
+                $email,
+                $fullname,
+                $regData['phone'],
+                $description,
+                [
+                    'number'    => $cardNumber,
+                    'exp_month' => $expMonth,
+                    'exp_year'  => $expYear,
+                    'cvc'       => $cvc,
+                ]
+            );
+
+            if (!$result['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => $result['message'] ?? 'Unable to initialize card payment.']);
+                exit;
+            }
+
+            $piId = $result['pi_id'] ?? '';
+            if ($piId === '') {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => 'Missing payment intent ID.']);
+                exit;
+            }
+
+            $expiresAt = date('Y-m-d H:i:s', strtotime('+2 hours'));
+            $this->db->insert('pending_registrations', [
+                'checkout_session_id' => $piId,
+                'reg_data'            => json_encode($regData),
+                'amount'              => $amountPhp,
+                'duration'            => $duration,
+                'status'              => 'pending',
+                'expires_at'          => $expiresAt,
+            ]);
+
+            $nextActionUrl = $result['next_action']['redirect']['url']
+                ?? $result['next_action']['url']
+                ?? null;
+
+            echo json_encode([
+                'success'         => true,
+                'pi_id'           => $piId,
+                'status'          => $result['status'] ?? 'unknown',
+                'requires_action' => !empty($nextActionUrl),
+                'next_action_url' => $nextActionUrl,
+                'message'         => 'Payment initialized. Waiting for webhook confirmation.',
+            ]);
+            exit;
+
+        } catch (\Throwable $e) {
+            error_log('GintoPay standalone init error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
+            exit;
+        }
+    }
+
+    /**
+     * Standalone status endpoint for /gintopay.
+     */
+    public function gintoPayStandaloneStatus(): void
+    {
+        header('Content-Type: application/json');
+
+        $piId = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_GET['pi_id'] ?? ''));
+        if ($piId === '') {
+            echo json_encode(['processed' => false, 'failed' => true, 'message' => 'Missing payment intent ID.']);
+            exit;
+        }
+
+        $pending = $this->db->get('pending_registrations', ['status', 'user_id', 'expires_at'], [
+            'checkout_session_id' => $piId,
+        ]);
+
+        if (!$pending) {
+            echo json_encode(['processed' => false, 'failed' => false]);
+            exit;
+        }
+
+        if ($pending['status'] === 'completed' && !empty($pending['user_id'])) {
+            echo json_encode([
+                'processed' => true,
+                'failed'    => false,
+                'redirect'  => '/chat',
+            ]);
+            exit;
+        }
+
+        if ($pending['status'] === 'failed') {
+            echo json_encode([
+                'processed' => false,
+                'failed'    => true,
+                'message'   => 'Payment processing failed.',
+            ]);
+            exit;
+        }
+
+        if (!empty($pending['expires_at']) && strtotime((string)$pending['expires_at']) < time()) {
+            echo json_encode([
+                'processed' => false,
+                'failed'    => true,
+                'message'   => 'Payment session expired.',
+            ]);
+            exit;
+        }
+
+        echo json_encode(['processed' => false, 'failed' => false]);
+        exit;
+    }
+
+    /**
      * Ginto Pay (Card) Initialization
      * Validates registration form data, stores it in session, creates a PayMongo
      * Checkout Session for card payment, and returns the checkout URL.
