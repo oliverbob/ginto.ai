@@ -241,7 +241,7 @@ $walletTransactions = $wallet_transactions ?? [];
         padding: 0 18px;
     }
 }
-@media (max-width: 767px) {
+@media (max-width: 350px) {
     .wallet-actions {
         flex-direction: column;
         align-items: stretch;
