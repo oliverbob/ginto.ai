@@ -397,10 +397,11 @@ class PayMongoHandler
             return false;
         }
 
-        // Reject events older than 5 minutes (replay attack prevention)
-        if (abs(time() - (int)$timestamp) > 300) {
-            return false;
-        }
+        // NOTE: Do NOT reject based on timestamp age.
+        // PayMongo retries webhooks with the SAME original signature/timestamp (sometimes hours later).
+        // A tight replay window (e.g. 5 min) causes all retried events to be rejected with 401,
+        // which is what disables the webhook on PayMongo's side.
+        // HMAC verification alone is sufficient to ensure authenticity.
 
         $signedPayload = $timestamp . '.' . $rawBody;
         $expected = hash_hmac('sha256', $signedPayload, $secret);

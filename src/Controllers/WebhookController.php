@@ -713,12 +713,13 @@ class WebhookController
 
         $rawBody = file_get_contents('php://input');
         if (empty($rawBody)) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Empty body']);
+            // Return 200; empty-body deliveries should be acknowledged, not rejected.
+            http_response_code(200);
+            echo json_encode(['status' => 'ok', 'note' => 'empty body']);
             exit();
         }
 
-        // Verify webhook signature
+        // Verify webhook signature — the ONLY legitimate reason to return non-200.
         $sigHeader = $_SERVER['HTTP_PAYMONGO_SIGNATURE'] ?? '';
         if (!\Ginto\Handlers\PayMongoHandler::verifyWebhookSignature($sigHeader, $rawBody)) {
             error_log('PayMongo webhook: invalid signature');
@@ -729,8 +730,10 @@ class WebhookController
 
         $event = json_decode($rawBody, true);
         if (json_last_error() !== JSON_ERROR_NONE || empty($event['data']['type'])) {
-            http_response_code(400);
-            echo json_encode(['error' => 'Invalid JSON']);
+            // Acknowledge with 200; malformed but authenticated payloads should not disable the endpoint.
+            error_log('PayMongo webhook: invalid JSON or missing data.type — body: ' . substr($rawBody, 0, 500));
+            http_response_code(200);
+            echo json_encode(['status' => 'ok', 'note' => 'unrecognised payload']);
             exit();
         }
 
@@ -749,15 +752,14 @@ class WebhookController
                     $this->handleGintoPayCheckoutPaid($event);
                     break;
                 default:
-                    // Acknowledge unknown events
+                    // Acknowledge unknown events with 200 — do not return non-2xx for event types we don't handle.
                     error_log("PayMongo webhook: unhandled event type {$eventType}");
                     break;
             }
         } catch (\Throwable $e) {
-            error_log('PayMongo webhook error: ' . $e->getMessage());
-            http_response_code(500);
-            echo json_encode(['error' => 'Internal error']);
-            exit();
+            // Log the error but still return 200 so PayMongo does not disable the webhook.
+            // A 500 response causes PayMongo to retry and eventually disable the endpoint.
+            error_log('PayMongo webhook error: ' . $e->getMessage() . ' | event: ' . $eventType);
         }
 
         http_response_code(200);
