@@ -259,6 +259,140 @@ $walletTransactions = $wallet_transactions ?? [];
         flex: 1 1 auto;
     }
 }
+/* ── Wallet Top-up Confirmation Modal ── */
+@keyframes wtIn {
+    from { opacity:0; transform:scale(0.9) translateY(22px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+}
+.wt-overlay {
+    position:fixed; inset:0; z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.76);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    padding:16px;
+}
+.wt-card {
+    background:linear-gradient(155deg,#0d1117 0%,#141a2b 55%,#1b2040 100%);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:28px; width:100%; max-width:420px;
+    box-shadow:0 40px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+    animation:wtIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    overflow:hidden;
+    position:relative;
+}
+.wt-close-btn {
+    position:absolute; top:14px; right:14px; z-index:2;
+    width:32px; height:32px;
+    border:none; background:none; padding:0;
+    color:var(--muted); font-size:1.35rem; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:color 0.15s;
+}
+.wt-close-btn:hover { color:var(--text); }
+.wt-card.is-scrollable {
+    max-height:min(92vh, 860px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+}
+.wt-head { padding:20px 22px 10px; text-align:center; position:relative; }
+.wt-glow {
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:260px; height:130px;
+    background:radial-gradient(ellipse at 50% 0%, rgba(214,180,75,0.18), transparent 70%);
+    pointer-events:none;
+}
+.wt-method-icon {
+    width:64px; height:64px; border-radius:20px;
+    margin:0 auto 10px;
+    display:flex; align-items:center; justify-content:center;
+}
+.wt-method-icon img {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+.wt-sector { font-size:0.74rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:2px; }
+.wt-method-name { font-size:1.45rem; font-weight:800; line-height:1.2; }
+.wt-amount-box {
+    margin:10px 28px; padding:12px 14px; border-radius:18px;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+    text-align:center;
+}
+.wt-amount-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700; margin-bottom:6px; }
+.wt-amount {
+    font-size:2rem; font-weight:900; line-height:1;
+    background:linear-gradient(135deg,#f5d67b 0%,#d4af37 40%,#b8860b 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.wt-breakdown { margin:0 28px 16px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); }
+.wt-breakdown-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.wt-breakdown-row:last-child { margin-bottom:0; }
+.wt-breakdown-label { font-size:0.87rem; color:var(--text); }
+.wt-breakdown-value { font-size:0.87rem; font-weight:800; color:var(--text); }
+.wt-qr-box { margin:0 28px 16px; text-align:center; }
+.wt-qr-box img { max-width:200px; width:100%; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px; margin:0 auto 10px; display:block; }
+.wt-actions { padding:0 28px 28px; display:flex; gap:12px; }
+.wt-btn {
+    flex:1; padding:14px 16px; border-radius:16px; font-size:0.9rem; font-weight:800;
+    border:none; cursor:pointer; transition:all 0.18s ease;
+}
+.wt-btn-cancel {
+    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12);
+    color:var(--text);
+}
+.wt-btn-cancel:hover {
+    background:rgba(255,255,255,0.14); border-color:rgba(255,255,255,0.2);
+}
+.wt-btn-confirm {
+    background:linear-gradient(135deg,#f5d67b 0%,#d4af37 40%,#b8860b 100%);
+    color:#1a1200; box-shadow:0 4px 16px rgba(214,180,75,0.3);
+}
+.wt-btn-confirm:hover {
+    background:linear-gradient(135deg,#fde047 0%,#f5d67b 40%,#d4af37 100%);
+    box-shadow:0 6px 22px rgba(214,180,75,0.4);
+    transform:translateY(-1px);
+}
+.wt-btn:disabled {
+    opacity:0.6; cursor:not-allowed; transform:none !important;
+}
+@media (max-width: 640px) {
+    .wt-overlay {
+        align-items:flex-end;
+        padding:0;
+        overflow:auto;
+    }
+    .wt-card {
+        max-width:100%;
+        border-radius:22px 22px 0 0;
+        max-height:100vh;
+        min-height:60vh;
+        overflow-y:auto;
+        padding-bottom:max(10px, env(safe-area-inset-bottom));
+    }
+    .wt-head { padding:10px 12px 6px; }
+    .wt-glow {
+        width:180px;
+        height:86px;
+    }
+    .wt-method-icon {
+        width:36px;
+        height:36px;
+        border-radius:12px;
+        margin:0 auto 6px;
+    }
+    .wt-sector {
+        font-size:0.62rem;
+        margin-bottom:1px;
+    }
+    .wt-method-name {
+        font-size:0.9rem;
+    }
+    .wt-amount-box,
+    .wt-breakdown,
+    .wt-qr-box { margin-left:16px; margin-right:16px; }
+    .wt-actions { padding:0 16px 20px; }
+}
 </style>
 
 <section class="wallet-layout">
@@ -400,6 +534,38 @@ $walletTransactions = $wallet_transactions ?? [];
     </div>
 </section>
 
+<!-- ── Wallet Top-up Confirmation Modal ── -->
+<div id="wtModal" class="wt-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Wallet top-up confirmation">
+    <div class="wt-card">
+        <button type="button" class="wt-close-btn" id="wtCloseBtn" aria-label="Close modal">&times;</button>
+        <div class="wt-head">
+            <div class="wt-glow"></div>
+            <div class="wt-method-icon" id="wtMethodIcon"></div>
+            <div class="wt-sector">Wallet Top-up</div>
+            <div class="wt-method-name" id="wtMethodName"></div>
+        </div>
+        <div class="wt-amount-box">
+            <div class="wt-amount-label">Total Amount</div>
+            <div class="wt-amount" id="wtAmount"></div>
+        </div>
+        <div class="wt-breakdown">
+            <div class="wt-breakdown-row">
+                <span class="wt-breakdown-label">Wallet Credit</span>
+                <span class="wt-breakdown-value" id="wtCredit"></span>
+            </div>
+            <div class="wt-breakdown-row">
+                <span class="wt-breakdown-label">Service Fee</span>
+                <span class="wt-breakdown-value" id="wtFee"></span>
+            </div>
+        </div>
+        <div class="wt-qr-box" id="wtQrBox" style="display:none;"></div>
+        <div class="wt-actions">
+            <button type="button" class="wt-btn wt-btn-cancel" id="wtCancelBtn">Cancel</button>
+            <button type="button" class="wt-btn wt-btn-confirm" id="wtConfirmBtn">Confirm Top-up</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     const csrfToken = <?= json_encode($csrf_token ?? '') ?>;
@@ -415,9 +581,43 @@ $walletTransactions = $wallet_transactions ?? [];
     const toggleTopupBtn = document.getElementById('toggleTopupBtn');
     const closeTopupBtn = document.getElementById('closeTopupBtn');
     const methodButtons = Array.from(document.querySelectorAll('.wallet-method-card'));
+    const wtModal = document.getElementById('wtModal');
+    const wtCloseBtn = document.getElementById('wtCloseBtn');
+    const wtCancelBtn = document.getElementById('wtCancelBtn');
+    const wtConfirmBtn = document.getElementById('wtConfirmBtn');
+    const wtMethodIcon = document.getElementById('wtMethodIcon');
+    const wtMethodName = document.getElementById('wtMethodName');
+    const wtAmount = document.getElementById('wtAmount');
+    const wtCredit = document.getElementById('wtCredit');
+    const wtFee = document.getElementById('wtFee');
+    const wtQrBox = document.getElementById('wtQrBox');
     let selectedMethod = 'ginto_pay_qr';
     let currentSessionRef = '';
     let statusPoll = null;
+
+    const methodMeta = {
+        ginto_pay_qr: {
+            confirmLabel: 'Generate QR & Pay',
+            helper: 'Use your GCash / Maya / QR PH app to scan and complete the payment.',
+            name: 'QR Code Payment',
+            iconBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
+            iconHtml: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>',
+        },
+        ginto_pay_card: {
+            confirmLabel: 'Pay with Card',
+            helper: 'You will be redirected to PayMongo secure card checkout.',
+            name: 'Credit/Debit Card',
+            iconBg: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
+            iconHtml: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+        },
+        paypal: {
+            confirmLabel: 'Continue to PayPal',
+            helper: 'A PayPal order will be created for this wallet top-up.',
+            name: 'PayPal',
+            iconBg: 'linear-gradient(135deg, #0070ba, #003087)',
+            iconHtml: '<svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M7.076 21.337H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.622 1.562 1.035.992 1.449 2.467 1.149 4.162a6.681 6.681 0 0 1-.672 2.806 6.212 6.212 0 0 1-1.752 2.04c-1.466 1.001-3.586 1.52-6.198 1.52H9.66c-.51 0-.995.196-1.355.52a1.63 1.63 0 0 0-.386.535l-.453 2.27a.641.641 0 0 1-.633.522H7.076zm1.913-10.223h3.137c1.424 0 2.686-.28 3.595-.84.896-.553 1.297-1.478 1.297-2.733 0-1.332-.44-2.197-1.325-2.576-.896-.387-2.176-.58-3.694-.58H9.66c-.51 0-.995.196-1.355.52a1.63 1.63 0 0 0-.386.535l-.453 2.27a.641.641 0 0 1-.633.522zm-.98 6.676h2.324c.51 0 .995-.196 1.355-.52.36-.324.542-.806.542-1.36 0-.56-.182-1.042-.542-1.366-.36-.324-.845-.52-1.355-.52H7.99a.641.641 0 0 1-.633-.522l-.453-2.27a1.63 1.63 0 0 0-.386-.535c-.36-.324-.845-.52-1.355-.52H2.47a.641.641 0 0 1-.633-.74L4.944.901C5.026.382 5.474 0 5.998 0h7.46c2.57 0 4.578.543 5.622 1.562 1.035.992 1.449 2.467 1.149 4.162a6.681 6.681 0 0 1-.672 2.806 6.212 6.212 0 0 1-1.752 2.04c-1.466 1.001-3.586 1.52-6.198 1.52H9.66c-.51 0-.995.196-1.355.52a1.63 1.63 0 0 0-.386.535l-.453 2.27a.641.641 0 0 1-.633.522H7.076z"/></svg>',
+        },
+    };
 
     toggleTopupBtn.addEventListener('click', function () {
         const isOpen = topupPanel.style.display !== 'none';
@@ -453,6 +653,38 @@ $walletTransactions = $wallet_transactions ?? [];
         return method === 'paypal';
     }
 
+    function openModal() {
+        const meta = methodMeta[selectedMethod] || {};
+        const credit = Math.max(0, Number(amountInput.value || 0));
+        let fee = 0;
+        if (credit > 0) {
+            if (isPayMongoMethod(selectedMethod)) {
+                fee = 25;
+            } else if (isPayPalMethod(selectedMethod)) {
+                fee = 25 + (credit * 0.05);
+            }
+        }
+        const gross = credit + fee;
+
+        wtMethodIcon.style.background = meta.iconBg || '';
+        wtMethodIcon.innerHTML = meta.iconHtml || '';
+        wtMethodName.textContent = meta.name || selectedMethod;
+        wtAmount.textContent = formatPrice(gross);
+        wtCredit.textContent = formatPrice(credit);
+        wtFee.textContent = formatPrice(fee);
+        wtQrBox.style.display = 'none';
+        wtQrBox.innerHTML = '';
+        wtConfirmBtn.textContent = meta.confirmLabel || 'Confirm Top-up';
+        wtConfirmBtn.disabled = false;
+        wtModal.style.display = 'flex';
+    }
+
+    function closeModal() {
+        wtModal.style.display = 'none';
+        wtQrBox.innerHTML = '';
+        if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
+    }
+
     function updateTopupBreakdown() {
         const credit = Math.max(0, Number(amountInput.value || 0));
         let fee = 0;
@@ -467,6 +699,25 @@ $walletTransactions = $wallet_transactions ?? [];
         topupGrossEl.textContent = formatPrice(gross);
         topupFeeEl.textContent = formatPrice(fee);
         topupCreditEl.textContent = formatPrice(credit);
+    }
+
+    function applySelectedMethodUI() {
+        const meta = methodMeta[selectedMethod] || {};
+        topupBtn.textContent = meta.confirmLabel || 'Confirm Top Up';
+
+        methodButtons.forEach(function (button) {
+            button.classList.toggle('is-selected', button.dataset.method === selectedMethod);
+        });
+
+        setError('');
+        qrWrap.style.display = 'none';
+        qrWrap.innerHTML = '';
+        if (meta.helper) {
+            setInfo(meta.helper);
+        } else {
+            setInfo('');
+        }
+        updateTopupBreakdown();
     }
 
     function beginStatusPoll() {
@@ -538,17 +789,17 @@ $walletTransactions = $wallet_transactions ?? [];
     methodButtons.forEach(function (button) {
         button.addEventListener('click', function () {
             selectedMethod = button.dataset.method;
-            methodButtons.forEach(function (item) {
-                const active = item === button;
-                item.classList.toggle('is-selected', active);
-                item.style.borderColor = active ? '#d6b44b' : '';
-            });
-            updateTopupBreakdown();
+            applySelectedMethodUI();
+            openModal();
         });
     });
 
     amountInput.addEventListener('input', updateTopupBreakdown);
-    updateTopupBreakdown();
+    applySelectedMethodUI();
+
+    wtCloseBtn.addEventListener('click', closeModal);
+    wtCancelBtn.addEventListener('click', closeModal);
+    wtConfirmBtn.addEventListener('click', startTopup);
 
     topupBtn.addEventListener('click', startTopup);
 })();
