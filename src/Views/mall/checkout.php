@@ -198,6 +198,114 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     background:rgba(255,255,255,0.08);
     transform:translateY(-1px);
 }
+.co-card-box {
+    margin:0 28px 16px;
+    padding:16px;
+    border-radius:18px;
+    background:rgba(255,255,255,0.03);
+    border:1px solid rgba(255,255,255,0.08);
+}
+.co-card-grid {
+    display:grid;
+    grid-template-columns:repeat(2, minmax(0,1fr));
+    gap:10px;
+}
+.co-card-grid .co-card-span-2 {
+    grid-column:1 / -1;
+}
+.co-card-label {
+    display:block;
+    font-size:0.72rem;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--muted);
+    font-weight:700;
+    margin-bottom:6px;
+}
+.co-card-field {
+    width:100%;
+    padding:11px 12px;
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:#101a2f;
+    color:#e9efff;
+    font:inherit;
+}
+.co-card-help {
+    margin-top:10px;
+    font-size:0.8rem;
+    line-height:1.5;
+    color:var(--muted);
+}
+.co-card-status {
+    margin-top:10px;
+    font-size:0.82rem;
+    line-height:1.5;
+    color:var(--muted);
+}
+.co-otp-backdrop {
+    position:fixed;
+    inset:0;
+    z-index:10000;
+    background:rgba(0,0,0,0.82);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:12px;
+}
+.co-otp-modal {
+    width:min(960px, 96vw);
+    height:min(760px, 92vh);
+    background:#0b1220;
+    border:1px solid rgba(255,255,255,0.12);
+    border-radius:16px;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+}
+.co-otp-head {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:10px;
+    padding:10px 12px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.co-otp-title {
+    font-size:0.95rem;
+    font-weight:800;
+}
+.co-otp-actions {
+    display:flex;
+    gap:8px;
+}
+.co-otp-btn {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:8px 10px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:rgba(255,255,255,0.04);
+    color:var(--text);
+    text-decoration:none;
+    font-size:0.8rem;
+    font-weight:700;
+    cursor:pointer;
+}
+.co-otp-frame {
+    width:100%;
+    height:100%;
+    border:0;
+    background:#fff;
+}
+.co-otp-fallback {
+    display:none;
+    padding:10px 12px;
+    font-size:0.8rem;
+    color:#d29922;
+    border-top:1px solid rgba(255,255,255,0.08);
+}
 .co-pp-box { margin:0 28px 16px; }
 .co-actions { padding:4px 28px 26px; display:flex; flex-direction:column; gap:10px; }
 .co-btn-confirm {
@@ -469,6 +577,33 @@ body.light .co-qr-action-btn:hover {
     background:#f8fbff;
     color:#0f172a;
 }
+body.light .co-card-box {
+    background:#f8fbff;
+    border-color:#dbe6f7;
+}
+body.light .co-card-label,
+body.light .co-card-help,
+body.light .co-card-status { color:#64748b; }
+body.light .co-card-field {
+    background:#ffffff;
+    color:#0f172a;
+    border-color:#cbd5e1;
+}
+body.light .co-otp-modal {
+    background:#ffffff;
+    border-color:#dbe6f7;
+}
+body.light .co-otp-head {
+    border-bottom-color:#dbe6f7;
+}
+body.light .co-otp-btn {
+    border-color:#cbd5e1;
+    background:#ffffff;
+    color:#334155;
+}
+body.light .co-otp-fallback {
+    border-top-color:#dbe6f7;
+}
 body.light .co-qr-loading {
     background:#f8fbff;
     border-color:#dbe6f7;
@@ -528,7 +663,8 @@ body.light .co-qr-spinner {
     .co-amount-box,
     .co-ship-box,
     .co-qr-box,
-    .co-pp-box { margin-left:16px; margin-right:16px; }
+    .co-pp-box,
+    .co-card-box { margin-left:16px; margin-right:16px; }
     .co-amount-box,
     .co-ship-box { display:none; }
     .co-qr-box { margin-top:8px; margin-bottom:8px; }
@@ -560,6 +696,20 @@ body.light .co-qr-spinner {
         line-height:1.35;
         margin-top:4px !important;
     }
+    .co-card-box {
+        margin-top:8px;
+        margin-bottom:8px;
+        padding:12px;
+    }
+    .co-card-grid {
+        grid-template-columns:repeat(3, minmax(0,1fr));
+    }
+    .co-card-grid .co-card-span-2 {
+        grid-column:1 / -1;
+    }
+    .co-card-field {
+        padding:10px 10px;
+    }
     .co-actions {
         position:sticky;
         bottom:0;
@@ -570,6 +720,11 @@ body.light .co-qr-spinner {
     }
     .co-btn-confirm { padding:11px 16px; }
     .co-btn-cancel { padding:10px 16px; }
+    .co-otp-modal {
+        width:100%;
+        height:100%;
+        border-radius:0;
+    }
     body.light .co-actions {
         background:linear-gradient(180deg,rgba(255,255,255,0), rgba(255,255,255,0.92) 28%, rgba(255,255,255,0.98) 100%);
     }
@@ -810,10 +965,46 @@ body.light .co-qr-spinner {
         <div id="coPpBox" class="co-pp-box" style="display:none;">
             <div id="coPpContainer"></div>
         </div>
+        <div id="coCardBox" class="co-card-box" style="display:none;">
+            <div class="co-card-grid">
+                <label class="co-card-span-2">
+                    <span class="co-card-label">Card Number</span>
+                    <input id="coCardNumber" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="4120 0000 0000 0007">
+                </label>
+                <label>
+                    <span class="co-card-label">Exp Month</span>
+                    <input id="coCardExpMonth" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-exp-month" placeholder="12">
+                </label>
+                <label>
+                    <span class="co-card-label">Exp Year</span>
+                    <input id="coCardExpYear" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-exp-year" placeholder="2030">
+                </label>
+                <label>
+                    <span class="co-card-label">CVC</span>
+                    <input id="coCardCvc" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123">
+                </label>
+            </div>
+            <div class="co-card-help">Card payments are processed directly in Ginto Pay. If your bank requires OTP or 3DS verification, it will open inside this checkout flow.</div>
+            <div id="coCardStatus" class="co-card-status"></div>
+        </div>
         <div class="co-actions">
             <button id="coConfirm" class="co-btn-confirm">Confirm &amp; Pay</button>
             <button id="coCancel" class="co-btn-cancel">Cancel</button>
         </div>
+    </div>
+</div>
+
+<div id="coOtpBackdrop" class="co-otp-backdrop" aria-hidden="true">
+    <div class="co-otp-modal" role="dialog" aria-modal="true" aria-label="Card verification">
+        <div class="co-otp-head">
+            <div class="co-otp-title">Complete Card Verification</div>
+            <div class="co-otp-actions">
+                <a id="coOtpOpenNewTab" class="co-otp-btn" href="#" target="_blank" rel="noopener">Open in new tab</a>
+                <button id="coOtpClose" type="button" class="co-otp-btn">Close</button>
+            </div>
+        </div>
+        <iframe id="coOtpFrame" class="co-otp-frame" title="PayMongo OTP Verification"></iframe>
+        <div id="coOtpFallback" class="co-otp-fallback">Embedded verification may be blocked by browser security headers. Use “Open in new tab”.</div>
     </div>
 </div>
 
@@ -1029,8 +1220,7 @@ body.light .co-qr-spinner {
                 return;
             }
             if (selectedMethod === 'ginto_pay_card') {
-                const card = await api('/api/mall/checkout/paymongo-card-init', { session_ref: currentSessionRef });
-                window.location.href = card.redirect_url;
+                throw new Error('Direct card checkout is available in the payment modal.');
                 return;
             }
             if (selectedMethod === 'paypal') {
@@ -1059,14 +1249,20 @@ body.light .co-qr-spinner {
                 if (json.status === 'completed') {
                     clearCart();
                     window.clearInterval(statusPoll);
+                    closeOtpModal();
                     const coQrStatusEl = document.getElementById('coQrStatus');
                     if (coQrStatusEl) coQrStatusEl.textContent = 'Payment confirmed! Redirecting…';
+                    if (coCardStatus) coCardStatus.textContent = 'Payment confirmed. Redirecting to your orders...';
                     qrStatus.textContent = 'Payment confirmed. Redirecting to your orders...';
                     window.location.href = '/mall/orders';
                     return;
                 }
                 if (json.status === 'failed') {
                     window.clearInterval(statusPoll);
+                    closeOtpModal();
+                    if (coCardStatus) coCardStatus.textContent = 'Payment failed before webhook confirmation.';
+                    coConfirm.disabled = false;
+                    coConfirm.textContent = pmMeta.ginto_pay_card.confirmLabel;
                     setError('Payment failed or expired before webhook confirmation. Please try again.');
                     return;
                 }
@@ -1147,8 +1343,19 @@ body.light .co-qr-spinner {
     const coQrLoading  = document.getElementById('coQrLoading');
     const coQrDownload = document.getElementById('coQrDownload');
     const coQrRefresh  = document.getElementById('coQrRefresh');
+    const coCardBox    = document.getElementById('coCardBox');
+    const coCardNumber = document.getElementById('coCardNumber');
+    const coCardExpMonth = document.getElementById('coCardExpMonth');
+    const coCardExpYear = document.getElementById('coCardExpYear');
+    const coCardCvc    = document.getElementById('coCardCvc');
+    const coCardStatus = document.getElementById('coCardStatus');
     const coPpBox      = document.getElementById('coPpBox');
     const coPpContainer = document.getElementById('coPpContainer');
+    const coOtpBackdrop = document.getElementById('coOtpBackdrop');
+    const coOtpFrame = document.getElementById('coOtpFrame');
+    const coOtpFallback = document.getElementById('coOtpFallback');
+    const coOtpOpenNewTab = document.getElementById('coOtpOpenNewTab');
+    const coOtpClose = document.getElementById('coOtpClose');
 
     function validateShipping() {
         const required = [
@@ -1171,6 +1378,65 @@ body.light .co-qr-spinner {
         return missing;
     }
 
+    function openOtpModal(url) {
+        if (!url) return;
+        coOtpOpenNewTab.href = url;
+        coOtpFallback.style.display = 'none';
+        coOtpBackdrop.style.display = 'flex';
+        coOtpBackdrop.setAttribute('aria-hidden', 'false');
+        coOtpFrame.src = url;
+        window.setTimeout(function () {
+            if (coOtpBackdrop.style.display === 'flex') {
+                coOtpFallback.style.display = 'block';
+            }
+        }, 4500);
+    }
+
+    function closeOtpModal() {
+        coOtpBackdrop.style.display = 'none';
+        coOtpBackdrop.setAttribute('aria-hidden', 'true');
+        coOtpFrame.src = 'about:blank';
+        coOtpFallback.style.display = 'none';
+    }
+
+    function cardPayloadFromForm() {
+        return {
+            number: (coCardNumber.value || '').replace(/[^0-9]/g, ''),
+            exp_month: (coCardExpMonth.value || '').replace(/[^0-9]/g, ''),
+            exp_year: (coCardExpYear.value || '').replace(/[^0-9]/g, ''),
+            cvc: (coCardCvc.value || '').replace(/[^0-9]/g, ''),
+        };
+    }
+
+    function billingPayloadFromShipping() {
+        const shipping = shippingPayload();
+        return {
+            line1: shipping.address_line1,
+            line2: shipping.address_line2,
+            city: shipping.city,
+            state: shipping.province,
+            postal_code: shipping.postal_code,
+            country: shipping.country || 'PH',
+        };
+    }
+
+    function validateCardForm() {
+        const card = cardPayloadFromForm();
+        if (card.number.length < 13 || card.number.length > 19) {
+            throw new Error('Enter a valid card number.');
+        }
+        if (Number(card.exp_month) < 1 || Number(card.exp_month) > 12) {
+            throw new Error('Enter a valid expiry month.');
+        }
+        if (card.exp_year.length < 2) {
+            throw new Error('Enter a valid expiry year.');
+        }
+        if (card.cvc.length < 3) {
+            throw new Error('Enter a valid CVC.');
+        }
+        return card;
+    }
+
     function openModal() {
         const meta    = pmMeta[selectedMethod] || {};
         const summary = cartSummary();
@@ -1189,8 +1455,10 @@ body.light .co-qr-spinner {
         coConfirm.disabled       = false;
         coConfirm.style.display  = '';
         coQrBox.style.display    = 'none';
+        coCardBox.style.display  = selectedMethod === 'ginto_pay_card' ? 'block' : 'none';
         coPpBox.style.display    = 'none';
         coPpContainer.innerHTML  = '';
+        coCardStatus.textContent = selectedMethod === 'ginto_pay_card' ? 'Enter card details to pay directly inside Ginto Pay.' : '';
         coCancel.textContent     = 'Cancel';
         coModal.style.display    = 'flex';
     }
@@ -1198,6 +1466,7 @@ body.light .co-qr-spinner {
     function closeModal() {
         coModal.style.display   = 'none';
         coPpContainer.innerHTML = '';
+        closeOtpModal();
         if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
     }
 
@@ -1251,6 +1520,27 @@ body.light .co-qr-spinner {
         }
     }
 
+    async function startCardFlowInModal() {
+        const card = validateCardForm();
+        coConfirm.disabled = true;
+        coCardStatus.textContent = 'Initializing secure card payment...';
+
+        const result = await api('/api/mall/checkout/paymongo-card-init', {
+            session_ref: currentSessionRef,
+            card: card,
+            billing: billingPayloadFromShipping(),
+        });
+
+        coCardStatus.textContent = result.requires_action
+            ? 'Verification required. Complete the OTP or 3DS step to continue.'
+            : 'Payment initialized. Waiting for webhook confirmation...';
+        coConfirm.textContent = 'Waiting for Confirmation…';
+        if (result.requires_action && result.next_action_url) {
+            openOtpModal(result.next_action_url);
+        }
+        beginStatusPoll();
+    }
+
     methods.forEach(function (button) {
         button.addEventListener('click', function () {
             selectedMethod = button.dataset.method;
@@ -1297,9 +1587,7 @@ body.light .co-qr-spinner {
                 return;
             }
             if (selectedMethod === 'ginto_pay_card') {
-                const card = await api('/api/mall/checkout/paymongo-card-init', { session_ref: currentSessionRef });
-                closeModal();
-                window.location.href = card.redirect_url;
+                await startCardFlowInModal();
                 return;
             }
             if (selectedMethod === 'paypal') {
@@ -1312,12 +1600,22 @@ body.light .co-qr-spinner {
                 return;
             }
         } catch (err) {
+            if (selectedMethod === 'ginto_pay_card') {
+                coConfirm.disabled = false;
+                coConfirm.textContent = pmMeta.ginto_pay_card.confirmLabel;
+                coCardStatus.textContent = err.message;
+                return;
+            }
             closeModal();
             setError(err.message);
         }
     });
 
     coCancel.addEventListener('click', closeModal);
+    coOtpClose.addEventListener('click', closeOtpModal);
+    coOtpBackdrop.addEventListener('click', function (e) {
+        if (e.target === coOtpBackdrop) closeOtpModal();
+    });
     coQrRefresh.addEventListener('click', function () {
         startQrFlowInModal(true);
     });

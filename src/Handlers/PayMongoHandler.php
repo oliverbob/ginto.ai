@@ -473,7 +473,7 @@ class PayMongoHandler
      * @return array ['success'=>bool,'pi_id'=>string,'payment_id'=>?string,'status'=>string,'next_action'=>array]
      */
     public function initCardPayment(
-        int $amountPhp,
+        float $amountPhp,
         string $email,
         string $name,
         string $phone,
@@ -481,7 +481,7 @@ class PayMongoHandler
         array $card,
         array $billingAddress = []
     ): array {
-        $amountCentavos = $amountPhp * 100;
+        $amountCentavos = (int)round($amountPhp * 100);
 
         $piResult = $this->createPaymentIntent($amountCentavos, $description, ['card']);
         if (!$piResult['success']) {

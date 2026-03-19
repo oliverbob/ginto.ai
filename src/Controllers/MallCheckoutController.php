@@ -193,7 +193,12 @@ class MallCheckoutController extends Controller
         $this->validateCsrfFromPayload($input);
 
         try {
-            $result = $this->commerce->initializePayMongoCardCheckout((string)($input['session_ref'] ?? ''), $userId);
+            $result = $this->commerce->initializePayMongoCardCheckout(
+                (string)($input['session_ref'] ?? ''),
+                $userId,
+                is_array($input['card'] ?? null) ? $input['card'] : [],
+                is_array($input['billing'] ?? null) ? $input['billing'] : []
+            );
             $this->json($result);
         } catch (\Throwable $e) {
             $this->jsonError($e->getMessage(), 422);

@@ -275,7 +275,7 @@ class MallCommerceService
         ];
     }
 
-    public function initializePayMongoCardCheckout(string $sessionRef, int $buyerId): array
+    public function initializePayMongoCardCheckout(string $sessionRef, int $buyerId, array $cardInput = [], array $billingInput = []): array
     {
         $session = $this->getPaymentSession($sessionRef, $buyerId);
         if (!$session || $session['payment_method'] !== 'ginto_pay_card') {
@@ -287,39 +287,66 @@ class MallCommerceService
 
         $buyer = $this->db->get('users', ['fullname', 'username', 'email', 'phone'], ['id' => $buyerId]);
         $handler = new PayMongoHandler();
-        $appUrl = rtrim((string)($_ENV['APP_URL'] ?? getenv('APP_URL') ?? 'https://ginto.ai'), '/');
         $description = 'Ginto Mall Order ' . $sessionRef;
-        $amountCentavos = (int)round(((float)$session['amount_total']) * 100);
-        $successUrl = $appUrl . '/mall/checkout?session_ref=' . urlencode($sessionRef) . '&status=success';
-        $cancelUrl = $appUrl . '/mall/checkout?session_ref=' . urlencode($sessionRef) . '&status=cancelled';
+        $amountPhp = (float)$session['amount_total'];
 
-        $checkout = $handler->createCheckoutSession(
-            $amountCentavos,
-            $description,
-            (string)($buyer['fullname'] ?: $buyer['username'] ?: 'Ginto Buyer'),
+        $cardNumber = preg_replace('/[^0-9]/', '', (string)($cardInput['number'] ?? ''));
+        $expMonth = preg_replace('/[^0-9]/', '', (string)($cardInput['exp_month'] ?? ''));
+        $expYear = preg_replace('/[^0-9]/', '', (string)($cardInput['exp_year'] ?? ''));
+        $cvc = preg_replace('/[^0-9]/', '', (string)($cardInput['cvc'] ?? ''));
+
+        if (strlen($cardNumber) < 13 || strlen($cardNumber) > 19) {
+            throw new \RuntimeException('Invalid card number.');
+        }
+        if ((int)$expMonth < 1 || (int)$expMonth > 12 || strlen($expYear) < 2 || strlen($cvc) < 3) {
+            throw new \RuntimeException('Invalid card expiry or CVC.');
+        }
+
+        $billingAddress = [
+            'line1' => trim(strip_tags((string)($billingInput['line1'] ?? ''))),
+            'line2' => trim(strip_tags((string)($billingInput['line2'] ?? ''))),
+            'city' => trim(strip_tags((string)($billingInput['city'] ?? ''))),
+            'state' => trim(strip_tags((string)($billingInput['state'] ?? ''))),
+            'postal_code' => preg_replace('/[^a-zA-Z0-9\-\s]/', '', (string)($billingInput['postal_code'] ?? '')),
+            'country' => strtoupper(preg_replace('/[^a-zA-Z]/', '', (string)($billingInput['country'] ?? 'PH'))),
+        ];
+
+        $result = $handler->initCardPayment(
+            $amountPhp,
             (string)($buyer['email'] ?? ''),
-            $successUrl,
-            $cancelUrl,
-            (string)($buyer['phone'] ?? '')
+            (string)($buyer['fullname'] ?: $buyer['username'] ?: 'Ginto Buyer'),
+            (string)($buyer['phone'] ?? ''),
+            $description,
+            [
+                'number' => $cardNumber,
+                'exp_month' => $expMonth,
+                'exp_year' => $expYear,
+                'cvc' => $cvc,
+            ],
+            $billingAddress
         );
 
-        if (empty($checkout['success'])) {
-            throw new \RuntimeException($checkout['message'] ?? 'Unable to start card checkout.');
+        if (empty($result['success'])) {
+            throw new \RuntimeException($result['message'] ?? 'Unable to start card checkout.');
         }
 
         $this->db->update('mall_payment_sessions', [
             'status' => 'processing',
             'gateway' => 'paymongo',
-            'gateway_reference' => $checkout['session_id'],
-            'gateway_payload_json' => json_encode($checkout),
+            'gateway_reference' => $result['pi_id'],
+            'gateway_payment_id' => $result['payment_id'] ?? null,
+            'gateway_payload_json' => json_encode($result),
             'updated_at' => date('Y-m-d H:i:s'),
         ], ['session_ref' => $sessionRef]);
 
         return [
             'success' => true,
             'session_ref' => $sessionRef,
-            'redirect_url' => $checkout['checkout_url'],
-            'checkout_session_id' => $checkout['session_id'],
+            'pi_id' => $result['pi_id'],
+            'status' => $result['status'] ?? 'processing',
+            'payment_id' => $result['payment_id'] ?? null,
+            'requires_action' => !empty($result['next_action']['redirect']['url'] ?? $result['next_action']['url'] ?? null),
+            'next_action_url' => $result['next_action']['redirect']['url'] ?? $result['next_action']['url'] ?? null,
         ];
     }
 
