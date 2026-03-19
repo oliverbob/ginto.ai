@@ -65,6 +65,38 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     animation:coIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
     overflow:hidden;
 }
+.co-card.is-scrollable {
+    max-height:min(92vh, 860px);
+    overflow-y:auto;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+}
+.co-card,
+.co-otp-modal {
+    scrollbar-width:thin;
+    scrollbar-color:rgba(212,175,55,0.55) rgba(255,255,255,0.06);
+}
+.co-card::-webkit-scrollbar,
+.co-otp-modal::-webkit-scrollbar {
+    width:10px;
+}
+.co-card::-webkit-scrollbar-track,
+.co-otp-modal::-webkit-scrollbar-track {
+    background:rgba(255,255,255,0.05);
+    border-radius:999px;
+}
+.co-card::-webkit-scrollbar-thumb,
+.co-otp-modal::-webkit-scrollbar-thumb {
+    background:linear-gradient(180deg, rgba(245,214,123,0.78), rgba(184,134,11,0.82));
+    border-radius:999px;
+    border:2px solid transparent;
+    background-clip:padding-box;
+}
+.co-card::-webkit-scrollbar-thumb:hover,
+.co-otp-modal::-webkit-scrollbar-thumb:hover {
+    background:linear-gradient(180deg, rgba(250,223,136,0.92), rgba(184,134,11,0.96));
+    background-clip:padding-box;
+}
 .co-head { padding:20px 22px 10px; text-align:center; position:relative; }
 .co-glow {
     position:absolute; top:0; left:50%; transform:translateX(-50%);
@@ -528,6 +560,19 @@ body.light .co-card {
     border:1px solid #dbe6f7;
     box-shadow:0 40px 80px rgba(15,23,42,0.18), 0 0 0 1px rgba(15,23,42,0.04);
 }
+body.light .co-card,
+body.light .co-otp-modal {
+    scrollbar-color:rgba(161,98,7,0.55) rgba(148,163,184,0.14);
+}
+body.light .co-card::-webkit-scrollbar-track,
+body.light .co-otp-modal::-webkit-scrollbar-track {
+    background:rgba(148,163,184,0.14);
+}
+body.light .co-card::-webkit-scrollbar-thumb,
+body.light .co-otp-modal::-webkit-scrollbar-thumb {
+    background:linear-gradient(180deg, rgba(217,167,48,0.82), rgba(161,98,7,0.9));
+    background-clip:padding-box;
+}
 body.light .co-glow {
     background:radial-gradient(ellipse at 50% 0%, rgba(214,180,75,0.12), transparent 70%);
 }
@@ -637,6 +682,9 @@ body.light .co-qr-spinner {
         min-height:auto;
         overflow-y:auto;
         padding-bottom:max(10px, env(safe-area-inset-bottom));
+    }
+    .co-card.is-scrollable {
+        max-height:100vh;
     }
     .co-head { padding:10px 12px 6px; }
     .co-glow {
@@ -1460,6 +1508,7 @@ body.light .co-qr-spinner {
         coPpContainer.innerHTML  = '';
         coCardStatus.textContent = selectedMethod === 'ginto_pay_card' ? 'Enter card details to pay directly inside Ginto Pay.' : '';
         coCancel.textContent     = 'Cancel';
+        coModal.querySelector('.co-card').classList.toggle('is-scrollable', selectedMethod === 'ginto_pay_card');
         coModal.style.display    = 'flex';
     }
 
@@ -1467,6 +1516,7 @@ body.light .co-qr-spinner {
         coModal.style.display   = 'none';
         coPpContainer.innerHTML = '';
         closeOtpModal();
+        coModal.querySelector('.co-card').classList.remove('is-scrollable');
         if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
     }
 
