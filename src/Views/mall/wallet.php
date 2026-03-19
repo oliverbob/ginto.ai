@@ -13,10 +13,15 @@ $walletTransactions = $wallet_transactions ?? [];
     position: relative;
     overflow: hidden;
     border-radius: 28px;
-    padding: 30px 28px 28px;
+    padding: 20px 16px 20px;
     background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 45%, #312e81 75%, #4338ca 100%);
     border: 1px solid rgba(99,102,241,0.35);
     box-shadow: 0 12px 52px rgba(67,56,202,0.35), 0 2px 8px rgba(0,0,0,0.5);
+}
+@media (min-width: 480px) {
+    .gw-card {
+        padding: 30px 28px 28px;
+    }
 }
 .gw-card::before {
     content: '';
@@ -51,12 +56,17 @@ $walletTransactions = $wallet_transactions ?? [];
     padding: 4px 10px;
 }
 .gw-balance {
-    font-size: 2.8rem;
+    font-size: 2.2rem;
     font-weight: 900;
     line-height: 1;
     color: #fff;
     letter-spacing: -0.04em;
     margin: 14px 0 4px;
+}
+@media (min-width: 480px) {
+    .gw-balance {
+        font-size: 2.8rem;
+    }
 }
 .gw-balance-sub {
     font-size: 0.76rem;
@@ -71,7 +81,7 @@ $walletTransactions = $wallet_transactions ?? [];
     gap: 7px;
     padding: 9px 16px;
     border-radius: 12px;
-    font-size: 0.82rem;
+    font-size: 0.75rem;
     font-weight: 700;
     text-decoration: none;
     cursor: pointer;
@@ -79,6 +89,11 @@ $walletTransactions = $wallet_transactions ?? [];
     letter-spacing: 0.01em;
     transition: all 0.18s ease;
     white-space: nowrap;
+}
+@media (min-width: 480px) {
+    .gw-btn {
+        font-size: 0.82rem;
+    }
 }
 .gw-btn-ghost {
     background: rgba(255,255,255,0.09);
@@ -111,8 +126,13 @@ $walletTransactions = $wallet_transactions ?? [];
     border: 1px solid var(--border);
     background: var(--surface);
     border-radius: 24px;
-    padding: 22px 24px;
+    padding: 16px 18px;
     overflow: hidden;
+}
+@media (min-width: 480px) {
+    .topup-panel {
+        padding: 22px 24px;
+    }
 }
 .topup-method-btn {
     display: flex;
@@ -188,7 +208,20 @@ $walletTransactions = $wallet_transactions ?? [];
 .txn-debit .txn-icon { background: rgba(239,68,68,0.12); color: #f87171; }
 </style>
 
-<section style="max-width:1200px;margin:30px auto 72px;padding:0 18px;display:grid;grid-template-columns:minmax(320px,0.9fr) minmax(0,1.1fr);gap:20px;align-items:start;">
+<section style="max-width:1200px;margin:20px auto 40px;padding:0 12px;display:grid;grid-template-columns:1fr;gap:20px;align-items:start;" id="wallet-section">
+    <style>
+        @media (min-width: 480px) {
+            #wallet-section {
+                margin: 30px auto 72px;
+                padding: 0 18px;
+            }
+        }
+        @media (min-width: 768px) {
+            #wallet-section {
+                grid-template-columns: minmax(320px,0.9fr) minmax(0,1.1fr);
+            }
+        }
+    </style>
     <div style="display:flex;flex-direction:column;gap:16px;">
 
         <!-- Premium Wallet Card -->
@@ -240,7 +273,14 @@ $walletTransactions = $wallet_transactions ?? [];
                 </label>
                 <div>
                     <div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:9px;">Payment Method</div>
-                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;" id="payment-methods-grid">
+                        <style>
+                            @media (min-width: 480px) {
+                                #payment-methods-grid {
+                                    grid-template-columns: repeat(3, minmax(0,1fr));
+                                }
+                            }
+                        </style>
                         <button type="button" class="topup-method-btn is-selected wallet-method-card" data-method="ginto_pay_qr">
                             GCash / QR
                             <span class="sub">Ginto Pay</span>
@@ -255,7 +295,14 @@ $walletTransactions = $wallet_transactions ?? [];
                         </button>
                     </div>
                 </div>
-                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);font-size:0.76rem;">
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);font-size:0.76rem;" id="breakdown-grid">
+                    <style>
+                        @media (min-width: 480px) {
+                            #breakdown-grid {
+                                grid-template-columns: repeat(3, minmax(0,1fr));
+                            }
+                        }
+                    </style>
                     <div>
                         <div style="color:var(--muted);">You pay</div>
                         <div id="topupGross" style="font-weight:800;color:var(--text);margin-top:3px;">₱0.00</div>
