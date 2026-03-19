@@ -109,6 +109,8 @@ class MallCheckoutController extends Controller
             'title' => 'Ginto Wallet',
             'csrf_token' => generateCsrfToken(),
             'wallet' => $walletSummary['account'],
+            // Keep header wallet balance in sync across mall views
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
             'wallet_transactions' => $walletSummary['transactions'],
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
