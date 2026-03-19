@@ -1838,7 +1838,16 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             
             try {
                 const formData = new FormData(e.target);
-                const data = Object.fromEntries(formData.entries());
+                const data = {};
+                for (const [key, value] of formData.entries()) {
+                    if (key.endsWith('[]')) {
+                        const k = key.slice(0, -2);
+                        if (!data[k]) data[k] = [];
+                        data[k].push(value);
+                    } else {
+                        data[key] = value;
+                    }
+                }
                 const csrfToken = data.csrf_token;
                 
                 const response = await fetch('/live', {
