@@ -1398,7 +1398,20 @@ class UserController extends \Core\Controller
         $userData['package_amount'] = isset($postData['package_amount']) ? floatval($postData['package_amount']) : (isset($postData['amount']) ? floatval($postData['amount']) : null);
         $userData['package_currency'] = isset($postData['package_currency']) ? preg_replace('/[^A-Z]/', '', strtoupper($postData['package_currency'])) : (isset($postData['currency']) ? preg_replace('/[^A-Z]/', '', strtoupper($postData['currency'])) : 'PHP');
         $userData['pay_method'] = isset($postData['pay_method']) ? strip_tags($postData['pay_method']) : (isset($postData['payment_method']) ? strip_tags($postData['payment_method']) : null);
-        
+
+        // Block PayMongo QRPH from using the generic /register endpoint.
+        // PayMongo payments must go through /paymongo-payments which verifies
+        // the payment intent status before creating the account.
+        if (in_array($userData['pay_method'], ['paymongo_qrph', 'paymongo'], true)) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => 'PayMongo payment must be completed via the QR code flow. Please scan the QR code and wait for confirmation.',
+            ]);
+            exit;
+        }
+
         // PayPal payment info
         if (!empty($postData['paypal_order_id'])) {
             $userData['paypal_order_id'] = preg_replace('/[^a-zA-Z0-9]/', '', $postData['paypal_order_id']);

@@ -1742,6 +1742,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               var qrph = document.getElementById('paymongo-qrph-details');
               if (qrph) {
                 qrph.classList.remove('hidden');
+                document.getElementById('complete-purchase').classList.add('hidden');
                 if (typeof initPaymongoQrph === 'function') { initPaymongoQrph(); }
               }
             }
@@ -2062,6 +2063,12 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
         if (!payment) {
           e.preventDefault();
           showModal('Payment Method Required', 'Please select a payment method.', 'fas fa-credit-card');
+          return;
+        }
+        // PayMongo uses its own confirm button — block standard form submit
+        if (payment.value === 'paymongo_qrph') {
+          e.preventDefault();
+          showModal('Scan QR to Pay', 'Please scan the QRPH QR code using GCash, Maya, or your bank app and wait for payment confirmation before completing registration.', 'fas fa-qrcode', 'text-orange-500');
           return;
         }
         document.getElementById('selectedPayMethod').value = payment.value;
@@ -3011,13 +3018,17 @@ if (empty($paypalClientId)) {
   }
 
   window.initPaymongoQrph = function() {
-    if (paymongoQrphInit && !paymongoQrphPaid) {
-      // Already initialized and not paid, just show the QR section
+    if (paymongoQrphPaid) {
+      // Already paid — show confirmed state
+      showQrphSection('paymongo-qrph-confirmed');
+      var confirmBtn = getEl('confirm-paymongo-payment');
+      if (confirmBtn) { confirmBtn.classList.remove('hidden'); confirmBtn.disabled = false; }
       return;
     }
-    if (paymongoQrphPaid) {
-      // Already paid, show confirmed state
-      showQrphSection('paymongo-qrph-confirmed');
+    if (paymongoQrphInit && paymongoCurrentPiId) {
+      // QR was already generated but not yet paid — show it and resume polling
+      showQrphSection('paymongo-qrph-qr');
+      startPolling(paymongoCurrentPiId);
       return;
     }
 
