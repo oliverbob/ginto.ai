@@ -684,13 +684,13 @@ $walletTransactions = $wallet_transactions ?? [];
             wtQrBox.style.display = 'block';
             wtQrBox.innerHTML = ''
                 + '<div style="display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 0;">'
-                + '<button type="button" id="wtDownloadQrBtn" class="wt-btn wt-btn-confirm" style="width:220px;">Download QR</button>'
+                + '<button type="button" id="wtGenerateQrBtn" class="wt-btn wt-btn-confirm" style="width:220px;">Generate QR</button>'
                 + '<div id="wtQrStatus" style="font-size:0.92rem;color:var(--muted);margin-top:8px;">Click to generate and download the QR image.</div>'
                 + '<div id="wtQrPreview" style="margin-top:10px;width:100%;text-align:center;"></div>'
                 + '</div>';
             // attach handler
             setTimeout(function () {
-                const dl = document.getElementById('wtDownloadQrBtn');
+                const dl = document.getElementById('wtGenerateQrBtn');
                 if (dl) dl.addEventListener('click', downloadQr);
             }, 20);
 
@@ -720,10 +720,20 @@ $walletTransactions = $wallet_transactions ?? [];
             // fetch qr
             const qr = await api('/api/mall/checkout/paymongo-qr-init', { session_ref: currentSessionRef });
             if (qr.qr_image) {
-                // show preview and trigger download
-                previewEl.innerHTML = '<img src="' + qr.qr_image + '" alt="Wallet QR" style="max-width:260px;width:100%;border-radius:12px;border:1px solid var(--border);background:#fff;padding:8px;">'
-                    + '<div style="margin-top:8px;"><a href="' + qr.qr_image + '" download="ginto-wallet-qr.png" class="wt-btn wt-btn-confirm" style="display:inline-block;padding:8px 12px;border-radius:10px;text-decoration:none;color:#1a1200;font-weight:800;background:linear-gradient(135deg,#f5d67b,#d4af37);">Download QR</a></div>';
-                statusEl.textContent = 'QR ready. You may download or scan.';
+                // programmatically download the QR image
+                try {
+                    const a = document.createElement('a');
+                    a.href = qr.qr_image;
+                    a.download = 'ginto-wallet-qr.png';
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    // also show preview
+                    previewEl.innerHTML = '<img src="' + qr.qr_image + '" alt="Wallet QR" style="max-width:260px;width:100%;border-radius:12px;border:1px solid var(--border);background:#fff;padding:8px;">';
+                    statusEl.textContent = 'Download started. Scan or check your downloads.';
+                } catch (e) {
+                    statusEl.textContent = 'Download failed. You can scan the QR preview.';
+                }
             } else if (qr.qr_string) {
                 previewEl.innerHTML = '<div style="color:var(--muted);">' + qr.qr_string + '</div>';
                 statusEl.textContent = 'QR string ready. Use your QR app to scan.';
