@@ -1216,6 +1216,8 @@ $router->req('/paymongo-payments', 'PaymentController@paymongoPayments');
 $router->req('/api/payments/paymongo-qrph-init', 'PaymentController@paymongoQrphInit');
 $router->req('/api/payments/paymongo-qrph-status', 'PaymentController@paymongoQrphStatus');
 $router->req('/api/payments/ginto-pay-init', 'PaymentController@gintoPayInit');
+$router->get('/register/awaiting', 'PaymentController@gintoPayAwaiting');
+$router->get('/api/payments/ginto-pay-status', 'PaymentController@gintoPayStatus');
 $router->get('/register/complete', 'PaymentController@gintoPayComplete');
 // TEMP: PayMongo QRPH test page — remove after testing
 $router->get('/paymongo', function() {

@@ -1881,7 +1881,7 @@ class PaymentController
             ];
 
             $appUrl     = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
-            $successUrl = $appUrl . '/register/complete?session_id={CHECKOUT_SESSION_ID}';
+            $successUrl = $appUrl . '/register/awaiting?session_id={CHECKOUT_SESSION_ID}';
             $cancelUrl  = $appUrl . '/register';
 
             $durationLabel = ($duration === '12m') ? '12-Month' : '1-Month';
@@ -1905,6 +1905,19 @@ class PaymentController
 
             $_SESSION['ginto_pay_session_id'] = $result['session_id'];
 
+            // Persist registration data to DB so webhook handler can create the user
+            // without needing access to this PHP session.
+            $regDataJson = json_encode($_SESSION['ginto_pay_reg']);
+            $expiresAt   = date('Y-m-d H:i:s', strtotime('+2 hours'));
+            $this->db->insert('pending_registrations', [
+                'checkout_session_id' => $result['session_id'],
+                'reg_data'            => $regDataJson,
+                'amount'              => $amountPhp,
+                'duration'            => $duration,
+                'status'              => 'pending',
+                'expires_at'          => $expiresAt,
+            ]);
+
             echo json_encode([
                 'success'      => true,
                 'checkout_url' => $result['checkout_url'],
@@ -1917,6 +1930,148 @@ class PaymentController
             echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
             exit;
         }
+    }
+
+    /**
+     * Ginto Pay Awaiting Page
+     * Shown after PayMongo redirects back from the hosted checkout.
+     * The actual account creation is handled by the webhook; this page
+     * polls /api/payments/ginto-pay-status until the account is ready.
+     */
+    public function gintoPayAwaiting(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        $sessionId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['session_id'] ?? '');
+        if (empty($sessionId)) {
+            $appUrl = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
+            header('Location: ' . $appUrl . '/register?error=' . urlencode('Missing session ID.'));
+            exit;
+        }
+
+        $appUrl = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
+        $sessionIdEsc = htmlspecialchars($sessionId, ENT_QUOTES, 'UTF-8');
+        echo <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Received – Ginto AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+               background: #0f0f0f; color: #fff; display: flex; align-items: center;
+               justify-content: center; min-height: 100vh; }
+        .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 16px;
+                padding: 48px 40px; text-align: center; max-width: 460px; width: 90%; }
+        .spinner { width: 56px; height: 56px; border: 4px solid #333;
+                   border-top-color: #a78bfa; border-radius: 50%;
+                   animation: spin 0.9s linear infinite; margin: 0 auto 28px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        h1 { font-size: 1.5rem; margin-bottom: 10px; }
+        p  { color: #999; line-height: 1.6; }
+        .status { margin-top: 20px; font-size: 0.85rem; color: #666; }
+        .success-icon { display: none; font-size: 3rem; margin-bottom: 18px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="spinner" id="spinner"></div>
+        <div class="success-icon" id="success-icon">✅</div>
+        <h1 id="title">Payment Received!</h1>
+        <p id="message">We're setting up your account. This usually takes just a few seconds…</p>
+        <p class="status" id="status-text">Checking status…</p>
+    </div>
+    <script>
+        const sessionId = '{$sessionIdEsc}';
+        const apiUrl    = '/api/payments/ginto-pay-status?session_id=' + encodeURIComponent(sessionId);
+        let   attempts  = 0;
+        const maxAttempts = 40; // ~80 seconds
+
+        function check() {
+            fetch(apiUrl)
+                .then(r => r.json())
+                .then(data => {
+                    attempts++;
+                    if (data.processed) {
+                        document.getElementById('spinner').style.display = 'none';
+                        document.getElementById('success-icon').style.display = 'block';
+                        document.getElementById('title').textContent = 'Account Ready!';
+                        document.getElementById('message').textContent = 'Redirecting you to Ginto AI…';
+                        document.getElementById('status-text').textContent = '';
+                        setTimeout(() => { window.location.href = data.redirect || '/chat'; }, 1500);
+                    } else if (data.failed) {
+                        document.getElementById('spinner').style.display = 'none';
+                        document.getElementById('title').textContent = 'Payment Issue';
+                        document.getElementById('message').textContent = data.message || 'Something went wrong. Please contact support.';
+                        document.getElementById('status-text').textContent = '';
+                    } else if (attempts < maxAttempts) {
+                        document.getElementById('status-text').textContent = 'Still checking… (attempt ' + attempts + ')';
+                        setTimeout(check, 2000);
+                    } else {
+                        document.getElementById('spinner').style.display = 'none';
+                        document.getElementById('title').textContent = 'Taking Longer Than Expected';
+                        document.getElementById('message').textContent = 'Your payment was received. Your account will be ready shortly. Please check your email or try logging in.';
+                        document.getElementById('status-text').textContent = '';
+                    }
+                })
+                .catch(() => {
+                    attempts++;
+                    if (attempts < maxAttempts) setTimeout(check, 3000);
+                });
+        }
+
+        setTimeout(check, 2000);
+    </script>
+</body>
+</html>
+HTML;
+        exit;
+    }
+
+    /**
+     * Ginto Pay Status Polling Endpoint
+     * JSON API called by the /register/awaiting page to check if account creation is done.
+     */
+    public function gintoPayStatus(): void
+    {
+        header('Content-Type: application/json');
+
+        $sessionId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['session_id'] ?? '');
+        if (empty($sessionId)) {
+            echo json_encode(['processed' => false, 'failed' => true, 'message' => 'Missing session ID.']);
+            exit;
+        }
+
+        $pending = $this->db->get('pending_registrations', ['status', 'user_id', 'expires_at'], [
+            'checkout_session_id' => $sessionId,
+        ]);
+
+        if (!$pending) {
+            // Row may not exist if init failed; wait gracefully
+            echo json_encode(['processed' => false, 'failed' => false]);
+            exit;
+        }
+
+        if ($pending['status'] === 'completed' && $pending['user_id']) {
+            echo json_encode(['processed' => true, 'redirect' => '/chat']);
+            exit;
+        }
+
+        if ($pending['status'] === 'failed') {
+            echo json_encode(['processed' => false, 'failed' => true, 'message' => 'Payment processing failed. Please contact support.']);
+            exit;
+        }
+
+        // Check expiry
+        if (strtotime($pending['expires_at']) < time()) {
+            echo json_encode(['processed' => false, 'failed' => true, 'message' => 'Session expired. Please try registering again.']);
+            exit;
+        }
+
+        echo json_encode(['processed' => false, 'failed' => false]);
+        exit;
     }
 
     /**
