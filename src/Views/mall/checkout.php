@@ -141,6 +141,14 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     -webkit-box-shadow:0 0 0 1000px #101a2f inset;
     transition:background-color 5000s ease-in-out 0s;
 }
+body.light .pf-input:-webkit-autofill,
+body.light .pf-input:-webkit-autofill:hover,
+body.light .pf-input:-webkit-autofill:focus {
+    -webkit-text-fill-color:#0f172a;
+    -webkit-box-shadow:0 0 0 1000px #ffffff inset;
+    transition:background-color 5000s ease-in-out 0s;
+    caret-color:#0f172a;
+}
 .pf-input.field-error {
     border-color:rgba(239,68,68,0.7) !important;
     box-shadow:0 0 0 3px rgba(239,68,68,0.12) !important;
