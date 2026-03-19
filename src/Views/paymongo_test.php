@@ -205,7 +205,7 @@ $csrfToken = $csrf_token ?? '';
     el.style.color = color === 'orange' ? '#f97316' : color === 'green' ? '#4ade80' : color === 'red' ? '#f87171' : '#888';
   }
 
-  function show(id) { document.getElementById(id).style.display = ''; }
+  function show(id) { document.getElementById(id).style.display = 'block'; }
   function hide(id) { document.getElementById(id).style.display = 'none'; }
 })();
 </script>
