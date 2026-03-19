@@ -68,16 +68,15 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 }
 .co-close-btn {
     position:absolute; top:14px; right:14px; z-index:2;
-    width:32px; height:32px; border-radius:50%;
-    border:1px solid rgba(255,255,255,0.14);
-    background:rgba(255,255,255,0.07);
-    color:var(--muted); font-size:1.15rem; line-height:1;
+    width:32px; height:32px;
+    border:none; background:none; padding:0;
+    color:var(--muted); font-size:1.35rem; line-height:1;
     cursor:pointer; display:flex; align-items:center; justify-content:center;
-    transition:background 0.15s, color 0.15s;
+    transition:color 0.15s;
 }
-.co-close-btn:hover { background:rgba(255,255,255,0.15); color:var(--text); }
-body.light .co-close-btn { border-color:#d2def2; background:#f8fbff; color:#64748b; }
-body.light .co-close-btn:hover { background:#eff5ff; color:#0f172a; }
+.co-close-btn:hover { color:var(--text); }
+body.light .co-close-btn { color:#94a3b8; }
+body.light .co-close-btn:hover { color:#0f172a; }
 .co-card.is-scrollable {
     max-height:min(92vh, 860px);
     overflow-y:auto;
