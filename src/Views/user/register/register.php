@@ -399,6 +399,26 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       border: 1px solid rgba(139, 105, 20, 0.6);
       text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
     }
+    .payment-method-container {
+      align-items: center;
+    }
+    .payment-method-container label {
+      min-width: 0;
+      width: 100%;
+      flex-wrap: wrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      line-height: 1.25;
+    }
+    .payment-method-container label > span,
+    .payment-method-container label > div,
+    .payment-method-container .inline-flex {
+      min-width: 0;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
     .payment-modal-tab.ginto-pay-tab.active {
       color: #2b2110;
       border-color: #b8860b;
@@ -1178,7 +1198,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                   <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
-                    PayPal
+                    <span class="sr-only">PayPal</span>
                   </label>
                 </div>
                 <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
