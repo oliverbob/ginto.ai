@@ -765,9 +765,17 @@ $walletTransactions = $wallet_transactions ?? [];
             currentSessionRef = create.session_ref;
             if (selectedMethod === 'ginto_pay_qr') {
                 const qr = await api('/api/mall/checkout/paymongo-qr-init', { session_ref: currentSessionRef });
-                qrWrap.style.display = 'block';
-                qrWrap.innerHTML = '<h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to top up</h3>'
-                    + (qr.qr_image ? '<img src="' + qr.qr_image + '" alt="Wallet top-up QR" style="max-width:320px;width:min(100%,320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;">' : '<div style="color:var(--muted);font-size:0.84rem;">' + (qr.qr_string || 'QR code ready.') + '</div>');
+                // prefer rendering QR inside the confirmation modal
+                try {
+                    wtQrBox.style.display = 'block';
+                    wtQrBox.innerHTML = '<h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to top up</h3>'
+                        + (qr.qr_image ? '<img src="' + qr.qr_image + '" alt="Wallet top-up QR" style="max-width:320px;width:min(100%,320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;">' : '<div style="color:var(--muted);font-size:0.84rem;">' + (qr.qr_string || 'QR code ready.') + '</div>');
+                } catch (_) {
+                    // fallback to page QR area if modal elements are not available
+                    qrWrap.style.display = 'block';
+                    qrWrap.innerHTML = '<h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to top up</h3>'
+                        + (qr.qr_image ? '<img src="' + qr.qr_image + '" alt="Wallet top-up QR" style="max-width:320px;width:min(100%,320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;">' : '<div style="color:var(--muted);font-size:0.84rem;">' + (qr.qr_string || 'QR code ready.') + '</div>');
+                }
                 setInfo('Scan the QR code and keep this page open. You pay ' + formatPrice(create.amount) + ', fee ' + formatPrice(create.fee) + ', wallet credit ' + formatPrice(create.credit_amount) + '.');
                 beginStatusPoll();
             } else if (selectedMethod === 'ginto_pay_card') {
