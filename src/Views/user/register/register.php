@@ -330,22 +330,6 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       box-shadow: 0 2px 8px rgba(31, 162, 255, 0.10);
     }
 
-    .payment-method-container {
-      min-height: 74px;
-      border-width: 2px;
-      padding: 1rem;
-    }
-    .payment-method-container label {
-      font-size: 0.96rem;
-      line-height: 1.35;
-      width: 100%;
-    }
-    .payment-method-container input[type="radio"] {
-      width: 1.2rem;
-      height: 1.2rem;
-      flex-shrink: 0;
-    }
-
     .payment-modal-shell {
       display: flex;
       align-items: flex-start;
@@ -1126,9 +1110,9 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             </div>
             <div>
               <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
-              <div class="space-y-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <?php if ($paymongoEnabled): ?>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
                   <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
@@ -1138,7 +1122,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
                   <input type="radio" name="payment_method" id="paymongo-qrph" value="paymongo_qrph" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
@@ -1148,7 +1132,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
                   <input type="radio" name="payment_method" id="paymongo-qrph-annual" value="paymongo_qrph_annual" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paymongo-qrph-annual" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
@@ -1159,21 +1143,21 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                   </label>
                 </div>
                 <?php endif; ?>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
                   <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
                     PayPal
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
                   <input type="radio" name="payment_method" id="credit-card" value="credit_card" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="credit-card" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-credit-card text-lg" style="color: var(--primary-500);"></i>
                     Credit/Debit Card
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
                   <input type="radio" name="payment_method" id="gcash" value="gcash" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="gcash" class="ml-3 block font-medium" style="color: var(--text-primary);">
                     <span class="inline-flex items-center gap-2">
@@ -1182,14 +1166,14 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
                   <input type="radio" name="payment_method" id="bank-transfer" value="bank_transfer" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="bank-transfer" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-university text-lg" style="color: var(--primary-500);"></i>
                     Bank Transfer / Deposit
                   </label>
                 </div>
-                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
                   <input type="radio" name="payment_method" id="crypto-usdt" value="crypto_usdt_bep20" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="crypto-usdt" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fab fa-bitcoin text-lg" style="color: #f0b90b;"></i>
