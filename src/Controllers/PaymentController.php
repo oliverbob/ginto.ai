@@ -23,6 +23,28 @@ class PaymentController
     }
 
     /**
+     * Restrict standalone test flows (e.g. /gintopay) to authenticated admins.
+     */
+    private function requireAdminForStandaloneGintoPay(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        if (empty($_SESSION['user_id'])) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Authentication required.']);
+            exit;
+        }
+
+        if (!defined('IS_ADMIN') || !IS_ADMIN) {
+            http_response_code(403);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'message' => 'Admin access required.']);
+            exit;
+        }
+    }
+
+    /**
      * Common validation for payment registration
      */
     protected function validateAjaxRequest(): bool
@@ -1809,6 +1831,7 @@ class PaymentController
     public function gintoPayStandaloneInit(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+        $this->requireAdminForStandaloneGintoPay();
 
         header('Content-Type: application/json');
         $this->validateAjaxRequest();
@@ -1984,6 +2007,7 @@ class PaymentController
      */
     public function gintoPayStandaloneStatus(): void
     {
+        $this->requireAdminForStandaloneGintoPay();
         header('Content-Type: application/json');
 
         $piId = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_GET['pi_id'] ?? ''));
