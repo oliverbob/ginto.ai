@@ -446,12 +446,8 @@ class MallCommerceService
         }
 
         $feeAmount = $this->isPayMongoTopupMethod($normalizedMethod) ? self::PAYMONGO_TOPUP_FEE_PHP : 0.00;
-        if ($feeAmount > 0 && $amount <= $feeAmount) {
-            throw new \RuntimeException('Top-up amount must be greater than ₱' . number_format($feeAmount, 2) . ' to cover the PayMongo processing fee.');
-        }
-
-        $grossAmount = round($amount, 2);
-        $creditAmount = round($grossAmount - $feeAmount, 2);
+        $creditAmount = round($amount, 2);
+        $grossAmount = round($creditAmount + $feeAmount, 2);
 
         $sessionRef = $this->generateSessionRef('WTU');
         $now = date('Y-m-d H:i:s');
@@ -467,9 +463,10 @@ class MallCommerceService
             'amount_total' => $grossAmount,
             'status' => 'pending',
             'payload_json' => json_encode([
-                'topup_amount' => $grossAmount,
+                'topup_amount' => $creditAmount,
                 'topup_fee' => round($feeAmount, 2),
                 'topup_credit_amount' => $creditAmount,
+                'topup_total_amount' => $grossAmount,
                 'fee_policy' => $feeAmount > 0 ? 'fixed_paymongo_fee' : 'no_fee',
             ]),
             'expires_at' => $expiresAt,
@@ -530,16 +527,16 @@ class MallCommerceService
 
             if ($session['purpose'] === 'wallet_topup') {
                 $payload = json_decode((string)($session['payload_json'] ?? '{}'), true) ?: [];
-                $grossAmount = round((float)($payload['topup_amount'] ?? $session['amount_total'] ?? 0), 2);
+                $grossAmount = round((float)($payload['topup_total_amount'] ?? $session['amount_total'] ?? 0), 2);
                 $feeAmount = round((float)($payload['topup_fee'] ?? 0), 2);
-                $creditAmount = round((float)($payload['topup_credit_amount'] ?? ($grossAmount - $feeAmount)), 2);
+                $creditAmount = round((float)($payload['topup_credit_amount'] ?? $payload['topup_amount'] ?? ($grossAmount - $feeAmount)), 2);
 
                 if ($creditAmount <= 0) {
                     throw new \RuntimeException('Wallet top-up credit amount is invalid.');
                 }
 
                 $creditDescription = $feeAmount > 0
-                    ? 'Ginto Wallet top-up (net of ₱' . number_format($feeAmount, 2) . ' PayMongo fee)'
+                    ? 'Ginto Wallet top-up (plus ₱' . number_format($feeAmount, 2) . ' Ginto Cash In fee)'
                     : 'Ginto Wallet top-up';
 
                 $this->applyWalletCredit(

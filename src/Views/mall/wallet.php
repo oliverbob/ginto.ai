@@ -450,9 +450,9 @@ $walletTransactions = $wallet_transactions ?? [];
     }
 
     function updateTopupBreakdown() {
-        const gross = Math.max(0, Number(amountInput.value || 0));
-        const fee = isPayMongoMethod(selectedMethod) && gross > 0 ? 25 : 0;
-        const credit = Math.max(0, gross - fee);
+        const credit = Math.max(0, Number(amountInput.value || 0));
+        const fee = isPayMongoMethod(selectedMethod) && credit > 0 ? 25 : 0;
+        const gross = credit + fee;
         topupGrossEl.textContent = formatPrice(gross);
         topupFeeEl.textContent = formatPrice(fee);
         topupCreditEl.textContent = formatPrice(credit);
