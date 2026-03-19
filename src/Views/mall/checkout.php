@@ -65,7 +65,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     animation:coIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
     overflow:hidden;
 }
-.co-head { padding:28px 28px 20px; text-align:center; position:relative; }
+.co-head { padding:20px 22px 10px; text-align:center; position:relative; }
 .co-glow {
     position:absolute; top:0; left:50%; transform:translateX(-50%);
     width:260px; height:130px;
@@ -74,12 +74,17 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 }
 .co-method-icon {
     width:64px; height:64px; border-radius:20px;
-    margin:0 auto 14px;
+    margin:0 auto 10px;
     display:flex; align-items:center; justify-content:center;
 }
-.co-sector { font-size:0.74rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:4px; }
+.co-method-icon img {
+    width:100%;
+    height:100%;
+    object-fit:contain;
+}
+.co-sector { font-size:0.74rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:2px; }
 .co-method-name { font-size:1.45rem; font-weight:800; line-height:1.2; }
-.co-divider { height:1px; background:rgba(255,255,255,0.07); margin:0 28px; }
+.co-divider { display:none; }
 .co-mobile-summary {
     display:none;
     margin:12px 28px 0;
@@ -111,13 +116,13 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     text-overflow:ellipsis;
 }
 .co-amount-box {
-    margin:16px 28px; padding:18px 20px; border-radius:18px;
+    margin:10px 28px; padding:12px 14px; border-radius:18px;
     background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
     text-align:center;
 }
 .co-amount-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700; margin-bottom:6px; }
 .co-amount {
-    font-size:2.5rem; font-weight:900; line-height:1;
+    font-size:2rem; font-weight:900; line-height:1;
     background:linear-gradient(135deg,#f5d67b 0%,#d4af37 40%,#b8860b 100%);
     -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
 }
@@ -498,28 +503,27 @@ body.light .co-qr-spinner {
         overflow-y:auto;
         padding-bottom:max(10px, env(safe-area-inset-bottom));
     }
-    .co-head { padding:14px 14px 10px; }
+    .co-head { padding:10px 12px 6px; }
     .co-glow {
         width:180px;
         height:86px;
     }
     .co-method-icon {
-        width:52px;
-        height:52px;
-        border-radius:16px;
-        margin:0 auto 10px;
+        width:36px;
+        height:36px;
+        border-radius:12px;
+        margin:0 auto 6px;
     }
     .co-sector {
-        font-size:0.66rem;
-        margin-bottom:2px;
+        font-size:0.62rem;
+        margin-bottom:1px;
     }
     .co-method-name {
-        font-size:1.05rem;
+        font-size:0.9rem;
     }
-    .co-divider { margin:0 16px; }
     .co-mobile-summary {
         display:grid;
-        margin:10px 16px 0;
+        margin:6px 16px 0;
     }
     .co-amount-box,
     .co-ship-box,
@@ -527,7 +531,7 @@ body.light .co-qr-spinner {
     .co-pp-box { margin-left:16px; margin-right:16px; }
     .co-amount-box,
     .co-ship-box { display:none; }
-    .co-qr-box { margin-top:12px; margin-bottom:12px; }
+    .co-qr-box { margin-top:8px; margin-bottom:8px; }
     .co-qr-loading {
         min-height:132px;
         padding:14px 12px;
@@ -540,10 +544,10 @@ body.light .co-qr-spinner {
         font-size:0.78rem;
         max-width:220px;
     }
-    .co-qr-box img { max-width:136px; padding:6px; margin-bottom:8px; }
+    .co-qr-box img { max-width:124px; padding:5px; margin-bottom:6px; }
     .co-qr-actions {
         gap:8px;
-        margin-top:6px;
+        margin-top:4px;
     }
     .co-qr-action-btn {
         min-width:0;
@@ -554,7 +558,7 @@ body.light .co-qr-spinner {
     .co-qr-box #coQrStatus {
         font-size:0.74rem !important;
         line-height:1.35;
-        margin-top:6px !important;
+        margin-top:4px !important;
     }
     .co-actions {
         position:sticky;
@@ -564,8 +568,8 @@ body.light .co-qr-spinner {
         background:linear-gradient(180deg,rgba(15,23,42,0), rgba(15,23,42,0.9) 28%, rgba(15,23,42,0.98) 100%);
         backdrop-filter:blur(10px);
     }
-    .co-btn-confirm { padding:12px 16px; }
-    .co-btn-cancel { padding:11px 16px; }
+    .co-btn-confirm { padding:11px 16px; }
+    .co-btn-cancel { padding:10px 16px; }
     body.light .co-actions {
         background:linear-gradient(180deg,rgba(255,255,255,0), rgba(255,255,255,0.92) 28%, rgba(255,255,255,0.98) 100%);
     }
@@ -1102,8 +1106,8 @@ body.light .co-qr-spinner {
     const pmMeta = {
         ginto_pay_qr: {
             name: 'Ginto Pay',
-            iconBg: 'linear-gradient(135deg,#92650a,#d4af37)',
-            iconHtml: '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;"><img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div>',
+            iconBg: 'transparent',
+            iconHtml: '<img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:contain;">',
             confirmLabel: 'Generate QR & Pay',
         },
         ginto_pay_card: {
