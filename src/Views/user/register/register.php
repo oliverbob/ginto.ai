@@ -1466,11 +1466,14 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                       <span id="paymongo-status-text">Waiting for payment...</span>
                     </div>
                     
-                    <!-- Refresh QR button -->
-                    <div class="text-center">
+                    <!-- Refresh QR button + Download -->
+                    <div class="text-center flex items-center justify-center gap-4">
                       <button type="button" id="paymongo-refresh-qr" class="text-xs text-orange-300 hover:text-orange-100 underline">
                         <i class="fas fa-sync-alt mr-1"></i> Refresh QR Code
                       </button>
+                      <a id="paymongo-download-qr" download="qrph-payment.png" class="text-xs text-orange-300 hover:text-orange-100 underline cursor-pointer">
+                        <i class="fas fa-download mr-1"></i> Download QR
+                      </a>
                     </div>
                   </div>
                   
@@ -3026,6 +3029,7 @@ if (empty($paypalClientId)) {
   var paymongoQrphPaid = false;      // Has payment been confirmed?
   var paymongoPollingTimer = null;
   var paymongoCurrentPiId = null;
+  var paymongoCurrentDuration = null; // '1m' or '12m' — regenerate if changed
   var PAYMONGO_POLL_INTERVAL = 3000; // 3 seconds
 
   function getEl(id) { return document.getElementById(id); }
@@ -3096,11 +3100,22 @@ if (empty($paypalClientId)) {
       if (confirmBtn) { confirmBtn.classList.remove('hidden'); confirmBtn.disabled = false; }
       return;
     }
-    if (paymongoQrphInit && paymongoCurrentPiId) {
-      // QR was already generated but not yet paid — show it and resume polling
+    // Determine what duration we need now
+    var selectedMethodNow = document.querySelector('input[name="payment_method"]:checked');
+    var wantDuration = (selectedMethodNow && selectedMethodNow.value === 'paymongo_qrph_annual') ? '12m' : '1m';
+
+    if (paymongoQrphInit && paymongoCurrentPiId && paymongoCurrentDuration === wantDuration) {
+      // QR already generated for same duration — show it and resume polling
       showQrphSection('paymongo-qrph-qr');
       startPolling(paymongoCurrentPiId);
       return;
+    }
+
+    // Different duration (or first time) — reset and regenerate
+    if (paymongoQrphInit && paymongoCurrentDuration !== wantDuration) {
+      stopPolling();
+      paymongoQrphInit = false;
+      paymongoCurrentPiId = null;
     }
 
     showQrphSection('paymongo-qrph-loading');
@@ -3168,17 +3183,21 @@ if (empty($paypalClientId)) {
       }
 
       paymongoCurrentPiId = data.pi_id;
+      paymongoCurrentDuration = wantDuration;
       paymongoQrphInit = true;
 
       // Show QR code
       var qrImg = getEl('paymongo-qr-image');
       if (qrImg && data.qr_image) {
         qrImg.src = data.qr_image;
+        // Wire up download link
+        var dlLink = getEl('paymongo-download-qr');
+        if (dlLink) dlLink.href = data.qr_image;
       }
 
       var amountEl = getEl('paymongo-qr-amount');
       if (amountEl) {
-        amountEl.textContent = '₱' + amountPhp.toLocaleString();
+        amountEl.textContent = '₱' + amountPhp.toLocaleString() + (wantDuration === '12m' ? ' (12 months)' : ' (1 month)');
       }
 
       showQrphSection('paymongo-qrph-qr');
