@@ -46,14 +46,14 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
         </div>
 
         <!-- Actions -->
-        <div class="header-actions" style="margin-left:auto">
+        <div class="header-actions">
             <?php if ($isLoggedIn): ?>
-            <a class="action-btn" href="/wallet" aria-label="Open Ginto Wallet" title="Ginto Wallet balance: ₱<?= number_format($mallWalletBalance, 2) ?>" style="text-decoration:none;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;padding:0 10px;min-width:42px;">
+            <a class="action-btn wallet-btn" href="/wallet" aria-label="Open Ginto Wallet" title="Ginto Wallet balance: ₱<?= number_format($mallWalletBalance, 2) ?>">
                 <span aria-hidden="true">₱</span>
-                <span class="wallet-balance-text" style="font-size:0.75rem;font-weight:700;"><?= number_format($mallWalletBalance, 2) ?></span>
+                <span class="wallet-balance-text"><?= number_format($mallWalletBalance, 2) ?></span>
             </a>
 
-            <a class="action-btn" href="/mall/orders" aria-label="Open mall orders" title="My Mall Orders" style="text-decoration:none;">
+            <a class="action-btn" href="/mall/orders" aria-label="Open mall orders" title="My Mall Orders">
                 <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                     <path d="M3 7h18"/>
                     <path d="M6 3h12l1 4H5l1-4z"/>
@@ -62,7 +62,7 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
                 </svg>
             </a>
 
-            <div style="position:relative;">
+            <div class="notify-wrap">
                 <button class="action-btn" id="mallNotifyToggle" aria-label="Open mall notifications" title="Mall notifications">
                     <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5"/>

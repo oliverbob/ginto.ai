@@ -64,6 +64,8 @@ img { display: block; max-width: 100%; }
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
+    overflow-x: auto;
+    scrollbar-width: thin;
 }
 body.light .site-header { background: rgba(255,255,255,0.92); }
 
@@ -76,7 +78,9 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     display: flex;
     align-items: center;
     gap: 6px;
-    overflow: visible;
+    flex-wrap: nowrap;
+    min-width: 100%;
+    width: max-content;
 }
 
 /* Hamburger (hidden on desktop, shown via media query) */
@@ -198,6 +202,27 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     align-items: center;
     gap: 6px;
     margin-left: auto;
+    flex-shrink: 0;
+    flex-wrap: nowrap;
+}
+.wallet-btn {
+    text-decoration: none;
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: auto;
+    padding: 0 10px;
+    min-width: 42px;
+}
+.wallet-balance-text {
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.notify-wrap {
+    position: relative;
+    flex-shrink: 0;
 }
 .action-btn {
     position: relative;
@@ -871,6 +896,19 @@ input[type="file"].form-input { padding: 7px 12px; }
 @media (max-width: 767px) {
     :root { --header-h: 56px; }
 
+    .site-header {
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+    }
+    .site-header::-webkit-scrollbar {
+        height: 4px;
+    }
+    .site-header::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 999px;
+    }
+
     /* Hamburger visible on mobile */
     .hamburger { display: flex; }
 
@@ -928,7 +966,7 @@ input[type="file"].form-input { padding: 7px 12px; }
 /* ========== ULTRA-NARROW MOBILE <= 360px ========== */
 @media (max-width: 360px) {
     .header-inner {
-        padding: 0 6px;
+        padding: 0 8px;
         gap: 4px;
     }
 
@@ -944,9 +982,7 @@ input[type="file"].form-input { padding: 7px 12px; }
         height: 34px;
     }
 
-    .header-actions {
-        gap: 2px;
-    }
+    .header-actions { gap: 2px; }
 
     .wallet-balance-text {
         display: none;
