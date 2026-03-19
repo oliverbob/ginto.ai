@@ -675,7 +675,7 @@ class MallCommerceService
         $this->db->pdo->beginTransaction();
         try {
             $this->db->delete('mall_order_items', ['order_id' => $orderIds]);
-            $this->db->delete('mall_order_history', ['order_id' => $orderIds]);
+            $this->db->delete('mall_order_status_history', ['order_id' => $orderIds]);
             $this->db->delete('mall_orders', ['id' => $orderIds]);
             $this->db->pdo->commit();
         } catch (\Throwable $e) {
