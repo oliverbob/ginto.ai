@@ -225,21 +225,26 @@ class PayMongoHandler
         $qrImage  = '';
         $qrString = '';
         $nextAction = $attrs['next_action'] ?? [];
-        if (($nextAction['type'] ?? '') === 'display_qr_code') {
+        $nextType   = $nextAction['type'] ?? '';
+
+        if ($nextType === 'consume_qr') {
+            // PayMongo QRPH: QR data is under next_action.code
+            $code     = $nextAction['code'] ?? [];
+            $qrImage  = $code['image_url'] ?? '';   // base64 data URI
+            $qrString = $code['id']        ?? '';   // QR code identifier
+        } elseif ($nextType === 'display_qr_code') {
+            // Legacy path (kept for compatibility)
             $displayDetails = $nextAction['display_details'] ?? [];
             $qrImage  = $displayDetails['qr_image']  ?? '';
             $qrString = $displayDetails['qr_string'] ?? '';
         }
 
         return [
-            'success'      => true,
-            'status'       => $status,
-            'qr_image'     => $qrImage,
-            'qr_string'    => $qrString,
-            'pi_id'        => $response['data']['id'] ?? $piId,
-            '_next_action' => $nextAction,
-            '_attrs_keys'  => array_keys($attrs),
-            '_raw_data'    => $response['data'] ?? null,
+            'success'   => true,
+            'status'    => $status,
+            'qr_image'  => $qrImage,
+            'qr_string' => $qrString,
+            'pi_id'     => $response['data']['id'] ?? $piId,
         ];
     }
 
@@ -362,14 +367,12 @@ class PayMongoHandler
         }
 
         return [
-            'success'      => true,
-            'pi_id'        => $piId,
-            'pm_id'        => $pmId,
-            'qr_image'     => $attachResult['qr_image'],
-            'qr_string'    => $attachResult['qr_string'],
-            'status'       => $attachResult['status'],
-            '_next_action' => $attachResult['_next_action'] ?? null,
-            '_attrs_keys'  => $attachResult['_attrs_keys'] ?? null,
+            'success'   => true,
+            'pi_id'     => $piId,
+            'pm_id'     => $pmId,
+            'qr_image'  => $attachResult['qr_image'],
+            'qr_string' => $attachResult['qr_string'],
+            'status'    => $attachResult['status'],
         ];
     }
 }
