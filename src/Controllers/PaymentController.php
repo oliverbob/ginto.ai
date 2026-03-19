@@ -1859,6 +1859,12 @@ class PaymentController
         $expMonth   = preg_replace('/[^0-9]/', '', (string)($_POST['exp_month'] ?? ''));
         $expYear    = preg_replace('/[^0-9]/', '', (string)($_POST['exp_year'] ?? ''));
         $cvc        = preg_replace('/[^0-9]/', '', (string)($_POST['cvc'] ?? ''));
+        $addressLine1 = strip_tags(trim((string)($_POST['billing_line1'] ?? '')));
+        $addressLine2 = strip_tags(trim((string)($_POST['billing_line2'] ?? '')));
+        $billingCity  = strip_tags(trim((string)($_POST['billing_city'] ?? '')));
+        $billingState = strip_tags(trim((string)($_POST['billing_state'] ?? '')));
+        $billingPostalCode = preg_replace('/[^a-zA-Z0-9\-\s]/', '', (string)($_POST['billing_postal_code'] ?? ''));
+        $billingCountry = strtoupper(preg_replace('/[^a-zA-Z]/', '', (string)($_POST['billing_country'] ?? ($_POST['country'] ?? 'PH'))));
 
         if (strlen($cardNumber) < 13 || strlen($cardNumber) > 19) {
             http_response_code(400);
@@ -1889,6 +1895,12 @@ class PaymentController
                 'tier'          => $tier,
                 'referrer_id'   => $this->resolveReferrerId(),
                 'promo_code'    => preg_replace('/[^a-zA-Z0-9\-_]/', '', (string)($_POST['promo_code'] ?? '')),
+                'billing_line1' => $addressLine1,
+                'billing_line2' => $addressLine2,
+                'billing_city'  => $billingCity,
+                'billing_state' => $billingState,
+                'billing_postal_code' => $billingPostalCode,
+                'billing_country' => $billingCountry,
                 'source'        => 'gintopay_standalone',
             ];
 
@@ -1906,6 +1918,14 @@ class PaymentController
                     'exp_month' => $expMonth,
                     'exp_year'  => $expYear,
                     'cvc'       => $cvc,
+                ],
+                [
+                    'line1'       => $addressLine1,
+                    'line2'       => $addressLine2,
+                    'city'        => $billingCity,
+                    'state'       => $billingState,
+                    'postal_code' => $billingPostalCode,
+                    'country'     => $billingCountry,
                 ]
             );
 
@@ -1942,6 +1962,8 @@ class PaymentController
                 'status'          => $result['status'] ?? 'unknown',
                 'requires_action' => !empty($nextActionUrl),
                 'next_action_url' => $nextActionUrl,
+                'billing_name'    => $fullname,
+                'billing_email'   => $email,
                 'message'         => 'Payment initialized. Waiting for webhook confirmation.',
             ]);
             exit;
@@ -2101,7 +2123,16 @@ class PaymentController
                 strip_tags($fullname),
                 $email,
                 $successUrl,
-                $cancelUrl
+                $cancelUrl,
+                preg_replace('/[^0-9+\-\s]/', '', $_POST['phone'] ?? ''),
+                [
+                    'line1'       => strip_tags(trim($_POST['billing_line1'] ?? '')),
+                    'line2'       => strip_tags(trim($_POST['billing_line2'] ?? '')),
+                    'city'        => strip_tags(trim($_POST['billing_city'] ?? '')),
+                    'state'       => strip_tags(trim($_POST['billing_state'] ?? '')),
+                    'postal_code' => preg_replace('/[^a-zA-Z0-9\-\s]/', '', $_POST['billing_postal_code'] ?? ''),
+                    'country'     => strtoupper(preg_replace('/[^a-zA-Z]/', '', $_POST['billing_country'] ?? ($_POST['country'] ?? 'PH'))),
+                ]
             );
 
             if (!$result['success']) {

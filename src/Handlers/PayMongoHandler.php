@@ -154,13 +154,36 @@ class PayMongoHandler
      * Create a card payment method.
      *
      * @param array $card    ['number','exp_month','exp_year','cvc']
-     * @param array $billing ['name','email','phone']
+    * @param array $billing ['name','email','phone','address']
      * @return array ['success' => bool, 'pm_id' => string] | ['success' => false, 'message' => string]
      */
     public function createCardPaymentMethod(array $card, array $billing): array
     {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        $billingPayload = [
+            'name'  => $billing['name'] ?? 'Ginto User',
+            'email' => $billing['email'] ?? '',
+            'phone' => $billing['phone'] ?? '',
+        ];
+
+        if (!empty($billing['address']) && is_array($billing['address'])) {
+            $address = array_filter([
+                'line1'       => $billing['address']['line1'] ?? '',
+                'line2'       => $billing['address']['line2'] ?? '',
+                'city'        => $billing['address']['city'] ?? '',
+                'state'       => $billing['address']['state'] ?? '',
+                'postal_code' => $billing['address']['postal_code'] ?? '',
+                'country'     => $billing['address']['country'] ?? '',
+            ], static function($value) {
+                return $value !== null && $value !== '';
+            });
+
+            if (!empty($address)) {
+                $billingPayload['address'] = $address;
+            }
         }
 
         $body = [
@@ -173,11 +196,7 @@ class PayMongoHandler
                         'exp_year'    => (int)($card['exp_year'] ?? 0),
                         'cvc'         => $card['cvc'] ?? '',
                     ],
-                    'billing' => [
-                        'name'  => $billing['name'] ?? 'Ginto User',
-                        'email' => $billing['email'] ?? '',
-                        'phone' => $billing['phone'] ?? '',
-                    ],
+                    'billing' => $billingPayload,
                 ],
             ],
         ];
@@ -459,7 +478,8 @@ class PayMongoHandler
         string $name,
         string $phone,
         string $description,
-        array $card
+        array $card,
+        array $billingAddress = []
     ): array {
         $amountCentavos = $amountPhp * 100;
 
@@ -475,6 +495,7 @@ class PayMongoHandler
             'name'  => $name,
             'email' => $email,
             'phone' => $phone,
+            'address' => $billingAddress,
         ]);
         if (!$pmResult['success']) {
             return $pmResult;
@@ -516,20 +537,40 @@ class PayMongoHandler
         string $name,
         string $email,
         string $successUrl,
-        string $cancelUrl
+        string $cancelUrl,
+        string $phone = '',
+        array $billingAddress = []
     ): array {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
         }
 
+        $billingPayload = [
+            'name'    => $name,
+            'email'   => $email,
+            'phone'   => $phone,
+        ];
+
+        if (!empty($billingAddress)) {
+            $address = array_filter([
+                'line1'       => $billingAddress['line1'] ?? '',
+                'line2'       => $billingAddress['line2'] ?? '',
+                'city'        => $billingAddress['city'] ?? '',
+                'state'       => $billingAddress['state'] ?? '',
+                'postal_code' => $billingAddress['postal_code'] ?? '',
+                'country'     => $billingAddress['country'] ?? '',
+            ], static function($value) {
+                return $value !== null && $value !== '';
+            });
+            if (!empty($address)) {
+                $billingPayload['address'] = $address;
+            }
+        }
+
         $body = [
             'data' => [
                 'attributes' => [
-                    'billing'              => [
-                        'name'    => $name,
-                        'email'   => $email,
-                        'phone'   => '',
-                    ],
+                    'billing'              => $billingPayload,
                     'line_items'           => [
                         [
                             'currency'    => 'PHP',

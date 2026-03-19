@@ -80,6 +80,38 @@ $csrfToken = $csrf_token ?? '';
       </div>
     </div>
 
+    <div class="field">
+      <label>Billing Address Line 1</label>
+      <input id="billing_line1" value="123 Sample Street">
+    </div>
+
+    <div class="field">
+      <label>Billing Address Line 2 (optional)</label>
+      <input id="billing_line2" value="">
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Billing City</label>
+        <input id="billing_city" value="Makati">
+      </div>
+      <div class="field">
+        <label>Billing State/Province</label>
+        <input id="billing_state" value="Metro Manila">
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="field">
+        <label>Billing Postal Code</label>
+        <input id="billing_postal_code" value="1200">
+      </div>
+      <div class="field">
+        <label>Billing Country (ISO2)</label>
+        <input id="billing_country" value="PH">
+      </div>
+    </div>
+
     <div class="grid">
       <div class="field">
         <label>Package</label>
@@ -173,7 +205,7 @@ $csrfToken = $csrf_token ?? '';
 
     const fd = new FormData();
     fd.append('csrf_token', csrf);
-    ['username','email','password','phone','firstname','lastname','country','tier','package','amount','card_number','cvc','exp_month','exp_year'].forEach(function(k){
+    ['username','email','password','phone','firstname','lastname','country','tier','package','amount','card_number','cvc','exp_month','exp_year','billing_line1','billing_line2','billing_city','billing_state','billing_postal_code','billing_country'].forEach(function(k){
       fd.append(k, byId(k).value || '');
     });
     fd.append('duration', '1m');
