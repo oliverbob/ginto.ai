@@ -751,7 +751,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             foreach ($availableProcessors as $key => $proc):
                                 $checked = in_array($key, $activeProcessors, true) ? 'checked' : '';
                             ?>
-                            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" style="border-color: var(--border-color);">
+                            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" style="border-color: rgba(128,128,128,0.25);">
                                 <input type="checkbox" name="active_payment_processors[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"
                                     class="h-4 w-4 rounded" style="accent-color: var(--primary-500);" <?= $checked ?>>
                                 <span class="flex items-center gap-2 text-sm font-medium" style="color: var(--text-primary);">
@@ -763,7 +763,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         </div>
                     </div>
 
-                    <hr class="mt-6 mb-5" style="border-color: var(--border-color);">
+                    <hr class="mt-6 mb-5" style="border-color: rgba(128,128,128,0.25);">
 
                     <!-- PayPal Section -->
                     <h3 class="text-base font-semibold mb-4 flex items-center gap-2" style="color: var(--text-primary);">
@@ -818,7 +818,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         </div>
                     </div>
 
-                    <hr class="mt-6 mb-5" style="border-color: var(--border-color);">
+                    <hr class="mt-6 mb-5" style="border-color: rgba(128,128,128,0.25);">
 
                     <!-- PayMongo Section -->
                     <h3 class="text-base font-semibold mb-2 flex items-center gap-2" style="color: var(--text-primary);">
