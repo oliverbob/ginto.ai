@@ -449,6 +449,7 @@
             if (themeIcon) themeIcon.textContent = '☀️';
         }
         try { localStorage.setItem('epower_theme', theme); } catch (e) {}
+        document.dispatchEvent(new CustomEvent('mall:theme-changed', { detail: { theme: theme } }));
     }
     if (themeToggle) {
         themeToggle.addEventListener('click', function () {

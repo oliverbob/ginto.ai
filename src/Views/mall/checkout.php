@@ -615,6 +615,38 @@ body.light #coQrFallback { color:#64748b; }
     const checkoutTotal = document.getElementById('checkoutTotal');
     const checkoutStoreCount = document.getElementById('checkoutStoreCount');
 
+    function isWebkitAutofilled(el) {
+        try {
+            return el.matches(':-webkit-autofill');
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function repaintAutofillForTheme() {
+        const isLight = document.body.classList.contains('light');
+        const bg = isLight ? '#ffffff' : '#101a2f';
+        const text = isLight ? '#0f172a' : '#e9efff';
+
+        document.querySelectorAll('#checkoutShippingForm .pf-input').forEach(function (el) {
+            el.style.setProperty('--pf-autofill-bg', bg);
+            el.style.setProperty('--pf-autofill-text', text);
+            el.style.setProperty('--pf-autofill-caret', text);
+
+            if (!isWebkitAutofilled(el)) {
+                el.style.webkitTextFillColor = '';
+                el.style.removeProperty('-webkit-box-shadow');
+                el.style.removeProperty('box-shadow');
+                return;
+            }
+
+            el.style.webkitTextFillColor = text;
+            el.style.caretColor = text;
+            el.style.setProperty('-webkit-box-shadow', '0 0 0 1000px ' + bg + ' inset', 'important');
+            el.style.setProperty('box-shadow', '0 0 0 1000px ' + bg + ' inset', 'important');
+        });
+    }
+
     function readCart() {
         try {
             return JSON.parse(localStorage.getItem(cartKey) || '[]');
@@ -1011,6 +1043,24 @@ body.light #coQrFallback { color:#64748b; }
         if (e.target === coModal && coQrBox.style.display === 'none') closeModal();
     });
 
+    document.addEventListener('mall:theme-changed', function () {
+        repaintAutofillForTheme();
+        requestAnimationFrame(repaintAutofillForTheme);
+    });
+
+    if (window.MutationObserver) {
+        const bodyObserver = new MutationObserver(function (mutations) {
+            for (let i = 0; i < mutations.length; i++) {
+                if (mutations[i].attributeName === 'class') {
+                    repaintAutofillForTheme();
+                    requestAnimationFrame(repaintAutofillForTheme);
+                    break;
+                }
+            }
+        });
+        bodyObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    }
+
     function renderPayPalInModal() {
         if (!window.paypal) { closeModal(); setError('PayPal is not available right now.'); return; }
         coPpContainer.innerHTML = '';
@@ -1031,6 +1081,9 @@ body.light #coQrFallback { color:#64748b; }
     }
 
     renderSummary();
+    repaintAutofillForTheme();
+    setTimeout(repaintAutofillForTheme, 80);
+    setTimeout(repaintAutofillForTheme, 320);
 
     if (query.get('status') === 'success' && currentSessionRef) {
         setInfo('We are finalizing your payment. This usually takes a few seconds.');
