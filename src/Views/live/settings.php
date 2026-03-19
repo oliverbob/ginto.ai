@@ -868,15 +868,6 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                                 </button>
                             </div>
                         </div>
-                        <div>
-                            <label class="label-text">Test Webhook Secret</label>
-                            <div class="relative">
-                                <input type="password" id="paymongo_webhook_secret_test" name="paymongo_webhook_secret_test" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_WEBHOOK_SECRET_TEST'] ?? '') ?>" placeholder="whsec_test_...">
-                                <button type="button" onclick="togglePassword('paymongo_webhook_secret_test')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                    <i id="paymongo_webhook_secret_test_icon" class="fas fa-eye"></i>
-                                </button>
-                            </div>
-                        </div>
                     </div>
 
                     <p class="help-text mt-6">Note: Storing secrets in the .env is convenient for local/sandbox environments; consider secure secret storage for production.</p>
