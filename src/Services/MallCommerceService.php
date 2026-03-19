@@ -11,7 +11,9 @@ class MallCommerceService
 {
     private $db;
 
-    private const PAYMONGO_TOPUP_FEE_PHP = 25.00;
+    private const MIN_TOPUP_FEE_PHP = 25.00;
+    private const PAYPAL_TOPUP_FEE_PERCENT_DEFAULT = 0.044;
+    private const PAYPAL_TOPUP_FEE_FIXED_PHP_DEFAULT = 15.00;
 
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off' => 12.00,
@@ -445,7 +447,7 @@ class MallCommerceService
             throw new \RuntimeException('Unsupported top-up payment method.');
         }
 
-        $feeAmount = $this->isPayMongoTopupMethod($normalizedMethod) ? self::PAYMONGO_TOPUP_FEE_PHP : 0.00;
+        $feeAmount = $this->calculateTopupFeeAmount($normalizedMethod, $amount);
         $creditAmount = round($amount, 2);
         $grossAmount = round($creditAmount + $feeAmount, 2);
 
@@ -467,7 +469,7 @@ class MallCommerceService
                 'topup_fee' => round($feeAmount, 2),
                 'topup_credit_amount' => $creditAmount,
                 'topup_total_amount' => $grossAmount,
-                'fee_policy' => $feeAmount > 0 ? 'fixed_paymongo_fee' : 'no_fee',
+                'fee_policy' => $this->topupFeePolicyName($normalizedMethod, $feeAmount),
             ]),
             'expires_at' => $expiresAt,
             'created_at' => $now,
@@ -1175,6 +1177,60 @@ class MallCommerceService
     private function isPayMongoTopupMethod(string $paymentMethod): bool
     {
         return in_array($paymentMethod, ['ginto_pay_qr', 'ginto_pay_card'], true);
+    }
+
+    private function calculateTopupFeeAmount(string $paymentMethod, float $creditAmount): float
+    {
+        $creditAmount = round(max(0, $creditAmount), 2);
+        if ($creditAmount <= 0) {
+            return 0.00;
+        }
+
+        if ($this->isPayMongoTopupMethod($paymentMethod)) {
+            return self::MIN_TOPUP_FEE_PHP;
+        }
+
+        if ($paymentMethod === 'paypal') {
+            $processorFee = round(
+                ($creditAmount * $this->paypalTopupFeePercent()) + $this->paypalTopupFeeFixedPhp(),
+                2
+            );
+            return round(max(self::MIN_TOPUP_FEE_PHP, $processorFee), 2);
+        }
+
+        return 0.00;
+    }
+
+    private function topupFeePolicyName(string $paymentMethod, float $feeAmount): string
+    {
+        if ($feeAmount <= 0) {
+            return 'no_fee';
+        }
+
+        if ($this->isPayMongoTopupMethod($paymentMethod)) {
+            return 'fixed_minimum_fee';
+        }
+
+        if ($paymentMethod === 'paypal') {
+            return 'paypal_or_minimum_fee';
+        }
+
+        return 'fixed_minimum_fee';
+    }
+
+    private function paypalTopupFeePercent(): float
+    {
+        $raw = (float)($_ENV['PAYPAL_TOPUP_FEE_PERCENT'] ?? getenv('PAYPAL_TOPUP_FEE_PERCENT') ?? self::PAYPAL_TOPUP_FEE_PERCENT_DEFAULT);
+        if ($raw > 1) {
+            $raw = $raw / 100;
+        }
+        return max(0.0, min($raw, 1.0));
+    }
+
+    private function paypalTopupFeeFixedPhp(): float
+    {
+        $raw = (float)($_ENV['PAYPAL_TOPUP_FEE_FIXED_PHP'] ?? getenv('PAYPAL_TOPUP_FEE_FIXED_PHP') ?? self::PAYPAL_TOPUP_FEE_FIXED_PHP_DEFAULT);
+        return round(max(0, $raw), 2);
     }
 
     private function addOrderHistory(int $orderId, ?int $actorUserId, string $actorType, ?string $fromStatus, string $toStatus, string $message): void

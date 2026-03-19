@@ -322,12 +322,12 @@ $walletTransactions = $wallet_transactions ?? [];
                             }
                         </style>
                         <button type="button" class="topup-method-btn is-selected wallet-method-card" data-method="ginto_pay_qr">
-                            GCash / QR
+                            GCash / QR Ph / Maya
                             <span class="sub">Ginto Pay</span>
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="ginto_pay_card">
                             Credit / Debit
-                            <span class="sub">via PayMongo</span>
+                            <span class="sub">via Ginto Pay Card</span>
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="paypal">
                             PayPal
