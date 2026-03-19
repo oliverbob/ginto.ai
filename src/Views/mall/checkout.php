@@ -96,6 +96,34 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 .co-ship-text { font-size:0.87rem; line-height:1.65; color:var(--text); }
 .co-qr-box { margin:0 28px 16px; text-align:center; }
 .co-qr-box img { max-width:200px; width:100%; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px; margin:0 auto 10px; display:block; }
+.co-qr-actions {
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    flex-wrap:wrap;
+    margin:8px 0 0;
+}
+.co-qr-action-btn {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-width:122px;
+    padding:9px 12px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,0.14);
+    background:rgba(255,255,255,0.04);
+    color:var(--text);
+    font-size:0.82rem;
+    font-weight:700;
+    text-decoration:none;
+    cursor:pointer;
+    transition:border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.co-qr-action-btn:hover {
+    border-color:rgba(255,255,255,0.24);
+    background:rgba(255,255,255,0.08);
+    transform:translateY(-1px);
+}
 .co-pp-box { margin:0 28px 16px; }
 .co-actions { padding:4px 28px 26px; display:flex; flex-direction:column; gap:10px; }
 .co-btn-confirm {
@@ -351,6 +379,16 @@ body.light .co-btn-cancel:hover {
 }
 body.light #coQrStatus,
 body.light #coQrFallback { color:#64748b; }
+body.light .co-qr-action-btn {
+    border-color:#cbd5e1;
+    background:#ffffff;
+    color:#334155;
+}
+body.light .co-qr-action-btn:hover {
+    border-color:#93c5fd;
+    background:#f8fbff;
+    color:#0f172a;
+}
 
 @media (max-width: 980px) {
     section[style*="grid-template-columns:minmax(0,1.3fr)"] {
@@ -364,6 +402,31 @@ body.light #coQrFallback { color:#64748b; }
 }
 
 @media (max-width: 640px) {
+    .co-overlay {
+        align-items:flex-start;
+        padding:10px;
+        overflow:auto;
+    }
+    .co-card {
+        max-width:100%;
+        border-radius:20px;
+        max-height:calc(100vh - 20px);
+        overflow-y:auto;
+    }
+    .co-head { padding:20px 16px 14px; }
+    .co-divider { margin:0 16px; }
+    .co-amount-box,
+    .co-ship-box,
+    .co-qr-box,
+    .co-pp-box { margin-left:16px; margin-right:16px; }
+    .co-amount-box { padding:12px 12px; margin-top:12px; margin-bottom:12px; }
+    .co-amount { font-size:2.05rem; }
+    .co-ship-box { padding:12px; margin-bottom:12px; }
+    .co-ship-text { font-size:0.84rem; line-height:1.5; }
+    .co-qr-box img { max-width:170px; padding:8px; margin-bottom:8px; }
+    .co-actions { padding:4px 16px 16px; gap:8px; }
+    .co-btn-confirm { padding:12px 16px; }
+    .co-btn-cancel { padding:11px 16px; }
     .checkout-hero {
         padding:22px 18px !important;
     }
@@ -577,6 +640,10 @@ body.light #coQrFallback { color:#64748b; }
         <div id="coQrBox" class="co-qr-box" style="display:none;">
             <img id="coQrImg" src="" alt="Ginto Pay QR" style="display:none;">
             <div id="coQrFallback" style="font-size:0.8rem;color:var(--muted);display:none;"></div>
+            <div class="co-qr-actions">
+                <a id="coQrDownload" class="co-qr-action-btn" href="#" download="ginto-pay-qr.png" style="display:none;">Download QR</a>
+                <button id="coQrRefresh" type="button" class="co-qr-action-btn">Refresh QR</button>
+            </div>
             <div id="coQrStatus" style="font-size:0.84rem;color:var(--muted);margin-top:8px;"></div>
         </div>
         <div id="coPpBox" class="co-pp-box" style="display:none;">
@@ -908,6 +975,8 @@ body.light #coQrFallback { color:#64748b; }
     const coQrImg      = document.getElementById('coQrImg');
     const coQrFallback = document.getElementById('coQrFallback');
     const coQrStatus   = document.getElementById('coQrStatus');
+    const coQrDownload = document.getElementById('coQrDownload');
+    const coQrRefresh  = document.getElementById('coQrRefresh');
     const coPpBox      = document.getElementById('coPpBox');
     const coPpContainer = document.getElementById('coPpContainer');
 
@@ -960,6 +1029,47 @@ body.light #coQrFallback { color:#64748b; }
         if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
     }
 
+    function renderQrInModal(qr) {
+        if (qr.qr_image) {
+            coQrImg.src = qr.qr_image;
+            coQrImg.style.display = 'block';
+            coQrFallback.style.display = 'none';
+            coQrDownload.style.display = 'inline-flex';
+            coQrDownload.href = qr.qr_image;
+        } else {
+            coQrImg.style.display = 'none';
+            coQrFallback.style.display = 'block';
+            coQrFallback.textContent = qr.qr_string || 'Open your banking app to complete the payment.';
+            coQrDownload.style.display = 'none';
+            coQrDownload.removeAttribute('href');
+        }
+    }
+
+    async function startQrFlowInModal(forceNewSession) {
+        coConfirm.style.display = 'none';
+        coPpBox.style.display   = 'none';
+        coQrBox.style.display   = 'block';
+        coCancel.textContent    = 'Close';
+        coQrStatus.textContent  = forceNewSession ? 'Refreshing QR...' : 'Preparing QR...';
+        coQrRefresh.disabled    = true;
+
+        try {
+            if (forceNewSession || !currentSessionRef) {
+                const session = await createSession();
+                currentSessionRef = session.session_ref;
+            }
+            const qr = await api('/api/mall/checkout/paymongo-qr-init', { session_ref: currentSessionRef });
+            renderQrInModal(qr);
+            coQrStatus.textContent = 'Scan with your banking app — this will update automatically when payment is confirmed.';
+            beginStatusPoll();
+        } catch (err) {
+            setError(err.message);
+            coQrStatus.textContent = 'Unable to generate QR. Tap Refresh QR to try again.';
+        } finally {
+            coQrRefresh.disabled = false;
+        }
+    }
+
     methods.forEach(function (button) {
         button.addEventListener('click', function () {
             selectedMethod = button.dataset.method;
@@ -980,6 +1090,9 @@ body.light #coQrFallback { color:#64748b; }
                 return;
             }
             openModal();
+            if (selectedMethod === 'ginto_pay_qr') {
+                startQrFlowInModal(true);
+            }
         });
     });
 
@@ -999,22 +1112,7 @@ body.light #coQrFallback { color:#64748b; }
                 return;
             }
             if (selectedMethod === 'ginto_pay_qr') {
-                coConfirm.textContent = 'Generating QR…';
-                const qr = await api('/api/mall/checkout/paymongo-qr-init', { session_ref: currentSessionRef });
-                coConfirm.style.display = 'none';
-                coQrBox.style.display   = 'block';
-                coCancel.textContent    = 'Close';
-                coQrStatus.textContent  = 'Scan with your banking app — this will update automatically when payment is confirmed.';
-                if (qr.qr_image) {
-                    coQrImg.src           = qr.qr_image;
-                    coQrImg.style.display = 'block';
-                    coQrFallback.style.display = 'none';
-                } else {
-                    coQrImg.style.display      = 'none';
-                    coQrFallback.style.display = 'block';
-                    coQrFallback.textContent   = qr.qr_string || 'Open your banking app to complete the payment.';
-                }
-                beginStatusPoll();
+                await startQrFlowInModal(false);
                 return;
             }
             if (selectedMethod === 'ginto_pay_card') {
@@ -1039,6 +1137,9 @@ body.light #coQrFallback { color:#64748b; }
     });
 
     coCancel.addEventListener('click', closeModal);
+    coQrRefresh.addEventListener('click', function () {
+        startQrFlowInModal(true);
+    });
     coModal.addEventListener('click', function (e) {
         if (e.target === coModal && coQrBox.style.display === 'none') closeModal();
     });
