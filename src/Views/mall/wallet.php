@@ -327,7 +327,7 @@ $walletTransactions = $wallet_transactions ?? [];
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="ginto_pay_card">
                             Credit / Debit
-                            <span class="sub">via Ginto Pay Card</span>
+                            <span class="sub">Ginto Pay</span>
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="paypal">
                             PayPal
