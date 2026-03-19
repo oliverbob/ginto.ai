@@ -1059,6 +1059,12 @@ body.light .co-qr-spinner {
                     if (coQrStatusEl) coQrStatusEl.textContent = 'Payment confirmed! Redirecting…';
                     qrStatus.textContent = 'Payment confirmed. Redirecting to your orders...';
                     window.location.href = '/mall/orders';
+                    return;
+                }
+                if (json.status === 'failed') {
+                    window.clearInterval(statusPoll);
+                    setError('Payment failed or expired before webhook confirmation. Please try again.');
+                    return;
                 }
             } catch (_) {}
         }, 5000);
@@ -1358,7 +1364,7 @@ body.light .co-qr-spinner {
     setTimeout(repaintAutofillForTheme, 320);
 
     if (query.get('status') === 'success' && currentSessionRef) {
-        setInfo('We are finalizing your payment. This usually takes a few seconds.');
+        setInfo('Card payment received. Waiting for secure webhook confirmation before finalizing your order.');
         beginStatusPoll();
     } else if (query.get('status') === 'cancelled') {
         setError('Payment was cancelled before completion.');

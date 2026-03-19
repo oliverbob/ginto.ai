@@ -559,6 +559,14 @@ class MallCommerceService
             return ['success' => true, 'status' => 'pending'];
         }
 
+        // Hosted Ginto Pay card checkout is finalized by PayMongo webhook using
+        // checkout_session.payment.paid. The gateway_reference here is a checkout
+        // session ID, not a payment intent ID, so status polling should wait for
+        // the webhook instead of querying the payment intent endpoint.
+        if (($session['payment_method'] ?? '') === 'ginto_pay_card') {
+            return ['success' => true, 'status' => ($session['status'] ?: 'processing')];
+        }
+
         $handler = new PayMongoHandler();
         $status = $handler->getPaymentIntentStatus((string)$session['gateway_reference']);
         if (empty($status['success'])) {
