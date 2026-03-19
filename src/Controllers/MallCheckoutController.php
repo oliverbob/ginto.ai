@@ -66,6 +66,29 @@ class MallCheckoutController extends Controller
             ? (string)($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? getenv('PAYPAL_CLIENT_ID_SANDBOX') ?? '')
             : (string)($_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID') ?? '');
 
+        // Load user's saved addresses for pre-filling checkout forms
+        $savedShipping = [];
+        $savedHome = [];
+        try {
+            $userRow = $this->db->get('users', [
+                'shipping_address_json', 'home_address_json',
+                'first_name', 'last_name', 'fullname', 'phone',
+            ], ['id' => $userId]);
+            if ($userRow) {
+                $savedShipping = json_decode((string)($userRow['shipping_address_json'] ?? 'null'), true) ?: [];
+                $savedHome     = json_decode((string)($userRow['home_address_json']     ?? 'null'), true) ?: [];
+                // Supplement from profile fields if not stored in address
+                if (empty($savedShipping['full_name'])) {
+                    $savedShipping['full_name'] = trim(
+                        ($userRow['first_name'] ?? '') . ' ' . ($userRow['last_name'] ?? '')
+                    ) ?: ($userRow['fullname'] ?? '');
+                }
+                if (empty($savedShipping['phone'])) {
+                    $savedShipping['phone'] = $userRow['phone'] ?? '';
+                }
+            }
+        } catch (\Throwable $e) {}
+
         $this->view('mall/checkout', [
             'title' => 'Checkout - Ginto Mall',
             'csrf_token' => generateCsrfToken(),
@@ -73,6 +96,8 @@ class MallCheckoutController extends Controller
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
             'paypal_client_id' => $paypalClientId,
+            'saved_shipping' => $savedShipping,
+            'saved_home' => $savedHome,
         ]);
     }
 

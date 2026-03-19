@@ -119,6 +119,108 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
                 </form>
             </div>
 
+            <!-- Addresses -->
+            <div class="settings-card">
+                <h2 class="text-base font-bold themed-text mb-1">Addresses</h2>
+                <p class="text-sm themed-text-secondary mb-4">Saved addresses for faster checkout and billing.</p>
+                <form method="POST" action="/user/settings/update" id="addressForm">
+                    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+                    <input type="hidden" name="form" value="address">
+
+                    <h3 class="text-sm font-semibold themed-text mb-3" style="display:flex;align-items:center;gap:8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        Shipping / Delivery Address
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        <div style="grid-column:1/-1;">
+                            <label class="settings-label" for="sa_addr1">Address Line 1</label>
+                            <input id="sa_addr1" name="ship_address_line1" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['address_line1'] ?? '') ?>"
+                                   placeholder="House number, street, barangay" autocomplete="address-line1">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="settings-label" for="sa_addr2">Address Line 2 <span class="font-normal text-gray-400">(optional)</span></label>
+                            <input id="sa_addr2" name="ship_address_line2" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['address_line2'] ?? '') ?>"
+                                   placeholder="Apartment, building, landmark" autocomplete="address-line2">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="sa_city">City / Municipality</label>
+                            <input id="sa_city" name="ship_city" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['city'] ?? '') ?>"
+                                   placeholder="Quezon City" autocomplete="address-level2">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="sa_province">Province / State</label>
+                            <input id="sa_province" name="ship_province" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['province'] ?? '') ?>"
+                                   placeholder="Metro Manila" autocomplete="address-level1">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="sa_postal">Postal Code</label>
+                            <input id="sa_postal" name="ship_postal_code" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['postal_code'] ?? '') ?>"
+                                   placeholder="1100" autocomplete="postal-code">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="sa_country">Country</label>
+                            <input id="sa_country" name="ship_country" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['shipping_address']['country'] ?? 'PH') ?>"
+                                   placeholder="PH" maxlength="5" autocomplete="country">
+                        </div>
+                    </div>
+
+                    <hr class="section-divider">
+
+                    <h3 class="text-sm font-semibold themed-text mb-3 mt-4" style="display:flex;align-items:center;gap:8px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                        Home Address
+                    </h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                        <div style="grid-column:1/-1;">
+                            <label class="settings-label" for="ha_addr1">Address Line 1</label>
+                            <input id="ha_addr1" name="home_address_line1" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['address_line1'] ?? '') ?>"
+                                   placeholder="House number, street, barangay" autocomplete="address-line1">
+                        </div>
+                        <div style="grid-column:1/-1;">
+                            <label class="settings-label" for="ha_addr2">Address Line 2 <span class="font-normal text-gray-400">(optional)</span></label>
+                            <input id="ha_addr2" name="home_address_line2" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['address_line2'] ?? '') ?>"
+                                   placeholder="Apartment, building, landmark" autocomplete="address-line2">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="ha_city">City / Municipality</label>
+                            <input id="ha_city" name="home_city" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['city'] ?? '') ?>"
+                                   placeholder="Quezon City" autocomplete="address-level2">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="ha_province">Province / State</label>
+                            <input id="ha_province" name="home_province" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['province'] ?? '') ?>"
+                                   placeholder="Metro Manila" autocomplete="address-level1">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="ha_postal">Postal Code</label>
+                            <input id="ha_postal" name="home_postal_code" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['postal_code'] ?? '') ?>"
+                                   placeholder="1100" autocomplete="postal-code">
+                        </div>
+                        <div>
+                            <label class="settings-label" for="ha_country">Country</label>
+                            <input id="ha_country" name="home_country" type="text" class="settings-input"
+                                   value="<?= htmlspecialchars($user['home_address']['country'] ?? 'PH') ?>"
+                                   placeholder="PH" maxlength="5" autocomplete="country">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary" id="saveAddressBtn">
+                        <i class="fas fa-map-marker-alt mr-1"></i> Save Addresses
+                    </button>
+                </form>
+            </div>
+
             <!-- Change Password -->
             <div class="settings-card">
                 <h2 class="text-base font-bold themed-text mb-4">Change Password</h2>
@@ -165,7 +267,7 @@ html, body { height: 100%; margin: 0; padding: 0; overflow: hidden; }
 <script>
 (function() {
     // Disable submit button while form is submitting to prevent double-clicks
-    ['profileForm', 'passwordForm'].forEach(function(id) {
+    ['profileForm', 'passwordForm', 'addressForm'].forEach(function(id) {
         var form = document.getElementById(id);
         if (!form) return;
         form.addEventListener('submit', function() {

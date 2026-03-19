@@ -1,6 +1,8 @@
 <?php
 $wallet = $wallet ?? [];
 $paypalClientId = trim((string)($paypal_client_id ?? ''));
+$savedShipping  = $saved_shipping ?? [];
+$savedHome      = $saved_home ?? [];
 ?>
 <!doctype html>
 <html lang="en">
@@ -275,6 +277,29 @@ body.light .co-close-btn:hover { color:#0f172a; }
     color:#e9efff;
     font:inherit;
 }
+.co-bill-toggle {
+    display:flex; align-items:center; gap:8px;
+    margin:14px 0 0;
+    font-size:0.82rem; color:var(--muted); cursor:pointer; user-select:none;
+}
+.co-bill-toggle input[type=checkbox] { accent-color:#d4af37; width:14px; height:14px; cursor:pointer; flex-shrink:0; }
+.co-bill-section-title {
+    font-size:0.72rem; font-weight:800; text-transform:uppercase;
+    letter-spacing:0.12em; color:var(--muted); margin:14px 0 8px;
+}
+.co-bill-fields {
+    display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+    margin-top:10px;
+}
+.co-bill-fields .co-card-span-2 { grid-column:1 / -1; }
+.co-bill-use-home {
+    font-size:0.78rem; color:rgba(214,180,75,0.85);
+    background:none; border:none; cursor:pointer; padding:0; text-decoration:underline;
+    margin-top:4px; display:inline-block;
+}
+.co-bill-use-home:hover { color:#f5d67b; }
+body.light .co-bill-use-home { color:#b8860b; }
+body.light .co-bill-use-home:hover { color:#92650a; }
 .co-card-help {
     margin-top:10px;
     font-size:0.8rem;
@@ -1049,6 +1074,45 @@ body.light .co-qr-spinner {
                     <input id="coCardCvc" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-csc" placeholder="123">
                 </label>
             </div>
+
+            <!-- Billing Address -->
+            <div class="co-bill-section-title">Billing Address</div>
+            <label class="co-bill-toggle">
+                <input type="checkbox" id="coCardSameAsShip" checked>
+                <span>Same as shipping address</span>
+            </label>
+            <div id="coBillFields" class="co-bill-fields" style="display:none;">
+                <label class="co-card-span-2">
+                    <span class="co-card-label">Address Line 1</span>
+                    <input id="coBillAddr1" class="co-card-field" type="text" autocomplete="billing address-line1" placeholder="Street, Barangay">
+                </label>
+                <label class="co-card-span-2">
+                    <span class="co-card-label">Address Line 2 <span style="font-weight:normal;opacity:0.6;">(optional)</span></span>
+                    <input id="coBillAddr2" class="co-card-field" type="text" autocomplete="billing address-line2" placeholder="Apartment, unit">
+                </label>
+                <label>
+                    <span class="co-card-label">City</span>
+                    <input id="coBillCity" class="co-card-field" type="text" autocomplete="billing address-level2" placeholder="Quezon City">
+                </label>
+                <label>
+                    <span class="co-card-label">State / Province</span>
+                    <input id="coBillState" class="co-card-field" type="text" autocomplete="billing address-level1" placeholder="Metro Manila">
+                </label>
+                <label>
+                    <span class="co-card-label">Postal Code</span>
+                    <input id="coBillPostal" class="co-card-field" type="text" autocomplete="billing postal-code" placeholder="1100">
+                </label>
+                <label>
+                    <span class="co-card-label">Country</span>
+                    <input id="coBillCountry" class="co-card-field" type="text" autocomplete="billing country" placeholder="PH" value="PH" maxlength="10">
+                </label>
+                <?php if (!empty($savedHome['address_line1'])): ?>
+                <div class="co-card-span-2">
+                    <button type="button" class="co-bill-use-home" id="coUseHomeAddr">Use saved home address</button>
+                </div>
+                <?php endif; ?>
+            </div>
+
             <div class="co-card-help">Card payments are processed directly in Ginto Pay. If your bank requires OTP or 3DS verification, it will open inside this checkout flow.</div>
             <div id="coCardStatus" class="co-card-status"></div>
         </div>
@@ -1475,16 +1539,51 @@ body.light .co-qr-spinner {
         };
     }
 
+    const profileShipping = <?= json_encode($savedShipping) ?>;
+    const profileHome = <?= json_encode($savedHome) ?>;
+
+    // Pre-fill shipping form from saved profile address (only empty fields)
+    (function prefillShipping() {
+        const map = {
+            shipFullName: profileShipping.full_name,
+            shipPhone: profileShipping.phone,
+            shipAddress1: profileShipping.address_line1,
+            shipAddress2: profileShipping.address_line2,
+            shipCity: profileShipping.city,
+            shipProvince: profileShipping.province,
+            shipPostalCode: profileShipping.postal_code,
+            shipCountry: profileShipping.country,
+        };
+        Object.keys(map).forEach(function(id) {
+            if (!map[id]) return;
+            var el = document.getElementById(id);
+            if (el && !el.value) el.value = map[id];
+        });
+    })();
+
     function billingPayloadFromShipping() {
-        const shipping = shippingPayload();
+        const sameAsShip = document.getElementById('coCardSameAsShip');
+        const cardName = (coCardName && coCardName.value.trim()) ? coCardName.value.trim() : '';
+        if (!sameAsShip || sameAsShip.checked) {
+            const shipping = shippingPayload();
+            return {
+                name: cardName || shipping.full_name,
+                line1: shipping.address_line1,
+                line2: shipping.address_line2,
+                city: shipping.city,
+                state: shipping.province,
+                postal_code: shipping.postal_code,
+                country: shipping.country || 'PH',
+            };
+        }
         return {
-            name: (coCardName && coCardName.value.trim()) ? coCardName.value.trim() : shipping.full_name,
-            line1: shipping.address_line1,
-            line2: shipping.address_line2,
-            city: shipping.city,
-            state: shipping.province,
-            postal_code: shipping.postal_code,
-            country: shipping.country || 'PH',
+            name: cardName,
+            line1: document.getElementById('coBillAddr1').value.trim(),
+            line2: document.getElementById('coBillAddr2').value.trim(),
+            city: document.getElementById('coBillCity').value.trim(),
+            state: document.getElementById('coBillState').value.trim(),
+            postal_code: document.getElementById('coBillPostal').value.trim(),
+            country: document.getElementById('coBillCountry').value.trim() || 'PH',
         };
     }
 
@@ -1687,6 +1786,31 @@ body.light .co-qr-spinner {
     coQrRefresh.addEventListener('click', function () {
         startQrFlowInModal(true);
     });
+
+    const coCardSameAsShip = document.getElementById('coCardSameAsShip');
+    const coBillFields = document.getElementById('coBillFields');
+    if (coCardSameAsShip && coBillFields) {
+        coCardSameAsShip.addEventListener('change', function() {
+            coBillFields.style.display = this.checked ? 'none' : 'grid';
+        });
+    }
+    const coUseHomeAddr = document.getElementById('coUseHomeAddr');
+    if (coUseHomeAddr && profileHome && profileHome.address_line1) {
+        coUseHomeAddr.addEventListener('click', function() {
+            var f = {
+                coBillAddr1: profileHome.address_line1,
+                coBillAddr2: profileHome.address_line2 || '',
+                coBillCity: profileHome.city || '',
+                coBillState: profileHome.province || '',
+                coBillPostal: profileHome.postal_code || '',
+                coBillCountry: profileHome.country || 'PH',
+            };
+            Object.keys(f).forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = f[id];
+            });
+        });
+    }
 
     document.addEventListener('mall:theme-changed', function () {
         repaintAutofillForTheme();

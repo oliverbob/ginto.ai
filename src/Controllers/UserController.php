@@ -354,12 +354,16 @@ class UserController extends \Core\Controller
         try {
             $user = $this->db->get('users', [
                 'id', 'username', 'fullname', 'first_name', 'last_name',
-                'firstname', 'lastname', 'email', 'phone', 'country', 'gender', 'bio'
+                'firstname', 'lastname', 'email', 'phone', 'country', 'gender', 'bio',
+                'shipping_address_json', 'home_address_json',
             ], ['id' => $userId]);
         } catch (\Throwable $e) {
             $user = [];
         }
         if (!is_array($user)) $user = [];
+        // Decode JSON address fields
+        $user['shipping_address'] = json_decode((string)($user['shipping_address_json'] ?? 'null'), true) ?: [];
+        $user['home_address']     = json_decode((string)($user['home_address_json']     ?? 'null'), true) ?: [];
         if ($userOverride) $user = array_merge($user, $userOverride);
 
         \Ginto\Core\View::view('user/settings', [
@@ -442,7 +446,35 @@ class UserController extends \Core\Controller
             return;
         }
 
-        if ($form === 'password') {
+        if ($form === 'address') {
+            $shipping = [
+                'address_line1' => trim(strip_tags($_POST['ship_address_line1'] ?? '')),
+                'address_line2' => trim(strip_tags($_POST['ship_address_line2'] ?? '')),
+                'city'          => trim(strip_tags($_POST['ship_city']          ?? '')),
+                'province'      => trim(strip_tags($_POST['ship_province']      ?? '')),
+                'postal_code'   => trim(strip_tags($_POST['ship_postal_code']   ?? '')),
+                'country'       => strtoupper(trim(strip_tags($_POST['ship_country'] ?? ''))) ?: 'PH',
+            ];
+            $home = [
+                'address_line1' => trim(strip_tags($_POST['home_address_line1'] ?? '')),
+                'address_line2' => trim(strip_tags($_POST['home_address_line2'] ?? '')),
+                'city'          => trim(strip_tags($_POST['home_city']          ?? '')),
+                'province'      => trim(strip_tags($_POST['home_province']      ?? '')),
+                'postal_code'   => trim(strip_tags($_POST['home_postal_code']   ?? '')),
+                'country'       => strtoupper(trim(strip_tags($_POST['home_country'] ?? ''))) ?: 'PH',
+            ];
+            try {
+                $this->db->update('users', [
+                    'shipping_address_json' => json_encode($shipping),
+                    'home_address_json'     => json_encode($home),
+                ], ['id' => $userId]);
+            } catch (\Throwable $e) {
+                $this->settings(null, 'Could not save addresses. Please try again.');
+                return;
+            }
+            $this->settings('Addresses saved successfully.');
+            return;
+        }
             $current = $_POST['current_password'] ?? '';
             $new     = $_POST['new_password']     ?? '';
             $confirm = $_POST['confirm_password'] ?? '';
