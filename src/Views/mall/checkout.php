@@ -8,6 +8,114 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 <?php if ($paypalClientId !== ''): ?>
 <script src="https://www.paypal.com/sdk/js?client-id=<?= htmlspecialchars($paypalClientId, ENT_QUOTES, 'UTF-8') ?>&currency=PHP&intent=capture&components=buttons"></script>
 <?php endif; ?>
+<style>
+/* ── Payment method cards ── */
+.pm-card {
+    position:relative; text-align:left; display:flex; align-items:center;
+    gap:14px; padding:16px 18px; border-radius:20px;
+    border:1.5px solid rgba(255,255,255,0.09);
+    background:rgba(255,255,255,0.03);
+    cursor:pointer; width:100%;
+    transition:transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    overflow:hidden;
+}
+.pm-card:hover {
+    border-color:rgba(255,255,255,0.2);
+    transform:translateY(-2px);
+    box-shadow:0 10px 28px rgba(0,0,0,0.28);
+}
+.pm-card.is-selected {
+    border-color:rgba(214,180,75,0.7);
+    background:rgba(214,180,75,0.055);
+    box-shadow:0 0 0 1px rgba(214,180,75,0.15), 0 10px 28px rgba(214,180,75,0.1);
+}
+.pm-icon { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pm-body { flex:1; min-width:0; }
+.pm-name { font-weight:800; font-size:0.95rem; line-height:1.2; }
+.pm-desc { font-size:0.77rem; color:var(--muted); margin-top:3px; }
+.pm-check {
+    width:22px; height:22px; border-radius:50%;
+    border:1.5px solid rgba(255,255,255,0.16);
+    display:flex; align-items:center; justify-content:center;
+    font-size:0.72rem; color:transparent; flex-shrink:0;
+    transition:all 0.18s ease;
+}
+.pm-card.is-selected .pm-check {
+    background:linear-gradient(135deg,#b8860b,#f5d67b);
+    border-color:transparent; color:#1a1200; font-weight:900;
+}
+/* ── Checkout confirmation modal ── */
+@keyframes coIn {
+    from { opacity:0; transform:scale(0.9) translateY(22px); }
+    to   { opacity:1; transform:scale(1) translateY(0); }
+}
+.co-overlay {
+    position:fixed; inset:0; z-index:9999;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(0,0,0,0.76);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    padding:16px;
+}
+.co-card {
+    background:linear-gradient(155deg,#0d1117 0%,#141a2b 55%,#1b2040 100%);
+    border:1px solid rgba(255,255,255,0.1);
+    border-radius:28px; width:100%; max-width:420px;
+    box-shadow:0 40px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
+    animation:coIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
+    overflow:hidden;
+}
+.co-head { padding:28px 28px 20px; text-align:center; position:relative; }
+.co-glow {
+    position:absolute; top:0; left:50%; transform:translateX(-50%);
+    width:260px; height:130px;
+    background:radial-gradient(ellipse at 50% 0%, rgba(214,180,75,0.18), transparent 70%);
+    pointer-events:none;
+}
+.co-method-icon {
+    width:64px; height:64px; border-radius:20px;
+    margin:0 auto 14px;
+    display:flex; align-items:center; justify-content:center;
+}
+.co-sector { font-size:0.74rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:4px; }
+.co-method-name { font-size:1.45rem; font-weight:800; line-height:1.2; }
+.co-divider { height:1px; background:rgba(255,255,255,0.07); margin:0 28px; }
+.co-amount-box {
+    margin:16px 28px; padding:18px 20px; border-radius:18px;
+    background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+    text-align:center;
+}
+.co-amount-label { font-size:0.72rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700; margin-bottom:6px; }
+.co-amount {
+    font-size:2.5rem; font-weight:900; line-height:1;
+    background:linear-gradient(135deg,#f5d67b 0%,#d4af37 40%,#b8860b 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+.co-ship-box { margin:0 28px 16px; padding:14px 16px; border-radius:16px; background:rgba(255,255,255,0.025); border:1px solid rgba(255,255,255,0.06); }
+.co-ship-label { font-size:0.7rem; text-transform:uppercase; letter-spacing:0.12em; color:var(--muted); font-weight:700; margin-bottom:7px; }
+.co-ship-text { font-size:0.87rem; line-height:1.65; color:var(--text); }
+.co-qr-box { margin:0 28px 16px; text-align:center; }
+.co-qr-box img { max-width:200px; width:100%; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px; margin:0 auto 10px; display:block; }
+.co-pp-box { margin:0 28px 16px; }
+.co-actions { padding:4px 28px 26px; display:flex; flex-direction:column; gap:10px; }
+.co-btn-confirm {
+    width:100%; padding:14px 20px; border-radius:14px; border:none;
+    background:linear-gradient(135deg,#b8860b 0%,#d4af37 45%,#f5d67b 100%);
+    color:#1a1200; font-size:1rem; font-weight:800; cursor:pointer;
+    transition:transform 0.18s, box-shadow 0.18s;
+    box-shadow:0 8px 24px rgba(184,134,11,0.28); letter-spacing:0.01em;
+}
+.co-btn-confirm:hover:not(:disabled) { transform:translateY(-2px); box-shadow:0 14px 32px rgba(184,134,11,0.38); }
+.co-btn-confirm:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+.co-btn-cancel {
+    width:100%; padding:12px 20px; border-radius:14px;
+    border:1px solid rgba(255,255,255,0.1); background:transparent;
+    color:var(--muted); font-size:0.9rem; font-weight:700; cursor:pointer;
+    transition:border-color 0.18s, color 0.18s;
+}
+.co-btn-cancel:hover { border-color:rgba(255,255,255,0.22); color:var(--text); }
+/* ── Shipping field error highlight ── */
+.pf-input.field-error { border-color:var(--danger) !important; box-shadow:0 0 0 2px rgba(239,68,68,0.18); }
+</style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 
@@ -72,48 +180,47 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
                 <div style="font-size:0.82rem;color:var(--muted);">Available: Ginto Pay, PayPal, and Ginto Wallet</div>
             </div>
 
-            <div id="paymentMethodGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;">
-                <button type="button" class="checkout-method-card is-selected" data-method="ginto_pay_qr" style="text-align:left;border:2px solid #d6b44b;background:linear-gradient(110deg, rgba(255,255,255,0.94), rgba(255,240,188,0.88));border-radius:28px;padding:22px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;box-shadow:0 0 0 1px rgba(214,180,75,0.08), 0 18px 40px rgba(214,180,75,0.08);">
-                    <span style="width:22px;height:22px;border-radius:50%;border:2px solid rgba(43,57,91,0.4);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="checkout-method-radio" style="width:10px;height:10px;border-radius:50%;background:#304da3;display:block;"></span>
-                    </span>
-                    <div style="display:flex;align-items:center;gap:14px;">
-                        <img src="/assets/images/ginto.png" alt="Ginto Pay" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:1px solid rgba(0,0,0,0.08);">
-                        <div>
-                            <div style="font-size:1.55rem;font-weight:800;line-height:1.1;">Ginto Pay</div>
-                            <div style="font-size:0.95rem;color:#3b537a;font-weight:600;">QR checkout via InstaPay / PESONet</div>
-                        </div>
+            <div id="paymentMethodGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
+                <button type="button" class="pm-card is-selected" data-method="ginto_pay_qr">
+                    <div class="pm-icon" style="background:linear-gradient(135deg,#92650a,#d4af37);"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"><img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
+                    <div class="pm-body">
+                        <div class="pm-name">Ginto Pay</div>
+                        <div class="pm-desc">QR · InstaPay / PESONet</div>
                     </div>
+                    <div class="pm-check">✓</div>
                 </button>
 
-                <button type="button" class="checkout-method-card" data-method="ginto_pay_card" style="text-align:left;border:2px solid rgba(48,77,163,0.2);background:linear-gradient(110deg, rgba(255,255,255,0.96), rgba(104,178,255,0.16));border-radius:28px;padding:22px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;">
-                    <span style="width:22px;height:22px;border-radius:50%;border:2px solid rgba(43,57,91,0.4);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="checkout-method-radio" style="width:10px;height:10px;border-radius:50%;background:transparent;display:block;"></span>
-                    </span>
-                    <div>
-                        <div style="font-size:1.55rem;font-weight:800;line-height:1.1;">Ginto Pay - Card</div>
-                        <div style="font-size:0.95rem;color:#3b537a;font-weight:600;">Hosted credit or debit card checkout</div>
+                <button type="button" class="pm-card" data-method="ginto_pay_card">
+                    <div class="pm-icon" style="background:linear-gradient(135deg,#1e3a8a,#3b82f6);">
+                        <svg width="26" height="20" viewBox="0 0 26 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="26" height="20" rx="4" fill="none"/><rect y="3" width="26" height="6" fill="rgba(255,255,255,0.32)"/><rect x="2" y="12" width="10" height="2.5" rx="1.2" fill="white"/><rect x="2" y="15.5" width="6" height="2" rx="1" fill="rgba(255,255,255,0.55)"/></svg>
                     </div>
+                    <div class="pm-body">
+                        <div class="pm-name">Card</div>
+                        <div class="pm-desc">Credit / debit via PayMongo</div>
+                    </div>
+                    <div class="pm-check">✓</div>
                 </button>
 
-                <button type="button" class="checkout-method-card" data-method="paypal" style="text-align:left;border:2px solid rgba(48,77,163,0.2);background:linear-gradient(110deg, rgba(255,255,255,0.96), rgba(104,178,255,0.16));border-radius:28px;padding:22px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;">
-                    <span style="width:22px;height:22px;border-radius:50%;border:2px solid rgba(43,57,91,0.4);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="checkout-method-radio" style="width:10px;height:10px;border-radius:50%;background:transparent;display:block;"></span>
-                    </span>
-                    <div style="display:flex;align-items:center;gap:14px;">
-                        <strong style="font-size:1.7rem;font-style:italic;color:#123a8f;line-height:1;">PayPal</strong>
-                        <div style="font-size:0.95rem;color:#3b537a;font-weight:600;">Global checkout and card backup</div>
+                <button type="button" class="pm-card" data-method="paypal">
+                    <div class="pm-icon" style="background:linear-gradient(135deg,#003087,#0070e0);">
+                        <svg width="56" height="18" viewBox="0 0 56 18" xmlns="http://www.w3.org/2000/svg"><text x="2" y="13" font-family="Arial,Helvetica,sans-serif" font-style="italic" font-weight="800" font-size="13" fill="#fff">PayPal</text></svg>
                     </div>
+                    <div class="pm-body">
+                        <div class="pm-name">PayPal</div>
+                        <div class="pm-desc">Global · card backup</div>
+                    </div>
+                    <div class="pm-check">✓</div>
                 </button>
 
-                <button type="button" class="checkout-method-card" data-method="wallet" style="text-align:left;border:2px solid rgba(48,77,163,0.2);background:linear-gradient(110deg, rgba(255,255,255,0.96), rgba(104,178,255,0.16));border-radius:28px;padding:22px 24px;display:flex;align-items:center;gap:16px;cursor:pointer;">
-                    <span style="width:22px;height:22px;border-radius:50%;border:2px solid rgba(43,57,91,0.4);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;">
-                        <span class="checkout-method-radio" style="width:10px;height:10px;border-radius:50%;background:transparent;display:block;"></span>
-                    </span>
-                    <div>
-                        <div style="font-size:1.55rem;font-weight:800;line-height:1.1;">Ginto Wallet</div>
-                        <div style="font-size:0.95rem;color:#3b537a;font-weight:600;">Balance: ₱<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></div>
+                <button type="button" class="pm-card" data-method="wallet">
+                    <div class="pm-icon" style="background:linear-gradient(135deg,#064e3b,#10b981);">
+                        <svg width="22" height="20" viewBox="0 0 24 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="5" width="22" height="14" rx="3" stroke="white" stroke-width="1.8"/><path d="M1 9h22" stroke="white" stroke-width="1.8"/><circle cx="16.5" cy="14" r="1.5" fill="white"/><path d="M5 5V4a3 3 0 013-3h8a3 3 0 013 3v1" stroke="white" stroke-width="1.8" stroke-linecap="round"/></svg>
                     </div>
+                    <div class="pm-body">
+                        <div class="pm-name">Ginto Wallet</div>
+                        <div class="pm-desc">Balance: ₱<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></div>
+                    </div>
+                    <div class="pm-check">✓</div>
                 </button>
             </div>
 
@@ -131,9 +238,10 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
                 <div id="qrStatus" style="font-size:0.86rem;color:var(--muted);">Waiting for payment confirmation…</div>
             </div>
 
-            <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:18px;">
-                <button type="button" id="startCheckoutBtn" class="btn btn-primary" style="padding:12px 28px;">Start Payment</button>
-                <a href="/mall/wallet" class="btn btn-secondary">Top Up Wallet</a>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
+                <button type="button" id="startCheckoutBtn" style="display:none;" aria-hidden="true"></button>
+                <a href="/mall/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Wallet</a>
+                <span style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
             </div>
         </div>
     </div>
@@ -172,6 +280,39 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     </aside>
 </section>
 
+<!-- ── Checkout Confirmation Modal ── -->
+<div id="coModal" class="co-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Payment confirmation">
+    <div class="co-card">
+        <div class="co-head">
+            <div class="co-glow"></div>
+            <div id="coIcon" class="co-method-icon"></div>
+            <div class="co-sector">Pay with</div>
+            <div id="coName" class="co-method-name"></div>
+        </div>
+        <div class="co-divider"></div>
+        <div class="co-amount-box">
+            <div class="co-amount-label">Total Due</div>
+            <div id="coAmount" class="co-amount">₱0.00</div>
+        </div>
+        <div class="co-ship-box">
+            <div class="co-ship-label">Delivering to</div>
+            <div id="coShip" class="co-ship-text">—</div>
+        </div>
+        <div id="coQrBox" class="co-qr-box" style="display:none;">
+            <img id="coQrImg" src="" alt="Ginto Pay QR" style="display:none;">
+            <div id="coQrFallback" style="font-size:0.8rem;color:var(--muted);display:none;"></div>
+            <div id="coQrStatus" style="font-size:0.84rem;color:var(--muted);margin-top:8px;"></div>
+        </div>
+        <div id="coPpBox" class="co-pp-box" style="display:none;">
+            <div id="coPpContainer"></div>
+        </div>
+        <div class="co-actions">
+            <button id="coConfirm" class="co-btn-confirm">Confirm &amp; Pay</button>
+            <button id="coCancel" class="co-btn-cancel">Cancel</button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function () {
     const csrfToken = <?= json_encode($csrf_token ?? '') ?>;
@@ -183,7 +324,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     let currentPayPalOrderId = '';
     let statusPoll = null;
 
-    const methods = Array.from(document.querySelectorAll('.checkout-method-card'));
+    const methods = Array.from(document.querySelectorAll('.pm-card'));
     const startBtn = document.getElementById('startCheckoutBtn');
     const errorBox = document.getElementById('checkoutError');
     const infoBox = document.getElementById('checkoutInfo');
@@ -382,6 +523,8 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
                 if (json.status === 'completed') {
                     clearCart();
                     window.clearInterval(statusPoll);
+                    const coQrStatusEl = document.getElementById('coQrStatus');
+                    if (coQrStatusEl) coQrStatusEl.textContent = 'Payment confirmed! Redirecting…';
                     qrStatus.textContent = 'Payment confirmed. Redirecting to your orders...';
                     window.location.href = '/mall/orders';
                 }
@@ -417,29 +560,199 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
         }).render('#paypalButtonsContainer');
     }
 
+    // ── Payment method display metadata ──
+    const pmMeta = {
+        ginto_pay_qr: {
+            name: 'Ginto Pay',
+            iconBg: 'linear-gradient(135deg,#92650a,#d4af37)',
+            iconHtml: '<div style="width:32px;height:32px;border-radius:50%;overflow:hidden;"><img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div>',
+            confirmLabel: 'Generate QR & Pay',
+        },
+        ginto_pay_card: {
+            name: 'Ginto Pay — Card',
+            iconBg: 'linear-gradient(135deg,#1e3a8a,#3b82f6)',
+            iconHtml: '<svg width="28" height="22" viewBox="0 0 26 20" fill="none"><rect width="26" height="20" rx="4"/><rect y="3" width="26" height="6" fill="rgba(255,255,255,0.32)"/><rect x="2" y="12" width="10" height="2.5" rx="1.2" fill="white"/></svg>',
+            confirmLabel: 'Pay with Card',
+        },
+        paypal: {
+            name: 'PayPal',
+            iconBg: 'linear-gradient(135deg,#003087,#0070e0)',
+            iconHtml: '<svg width="60" height="20" viewBox="0 0 60 20"><text x="2" y="14" font-family="Arial" font-style="italic" font-weight="800" font-size="14" fill="#fff">PayPal</text></svg>',
+            confirmLabel: 'Continue to PayPal',
+        },
+        wallet: {
+            name: 'Ginto Wallet',
+            iconBg: 'linear-gradient(135deg,#064e3b,#10b981)',
+            iconHtml: '<svg width="24" height="22" viewBox="0 0 24 20" fill="none"><rect x="1" y="5" width="22" height="14" rx="3" stroke="white" stroke-width="1.8"/><path d="M1 9h22" stroke="white" stroke-width="1.8"/><circle cx="16.5" cy="14" r="1.5" fill="white"/></svg>',
+            confirmLabel: 'Pay with Wallet',
+        },
+    };
+
+    // ── Modal DOM refs ──
+    const coModal      = document.getElementById('coModal');
+    const coIcon       = document.getElementById('coIcon');
+    const coName       = document.getElementById('coName');
+    const coAmount     = document.getElementById('coAmount');
+    const coShip       = document.getElementById('coShip');
+    const coConfirm    = document.getElementById('coConfirm');
+    const coCancel     = document.getElementById('coCancel');
+    const coQrBox      = document.getElementById('coQrBox');
+    const coQrImg      = document.getElementById('coQrImg');
+    const coQrFallback = document.getElementById('coQrFallback');
+    const coQrStatus   = document.getElementById('coQrStatus');
+    const coPpBox      = document.getElementById('coPpBox');
+    const coPpContainer = document.getElementById('coPpContainer');
+
+    function validateShipping() {
+        const required = [
+            { id: 'shipFullName', label: 'Full Name' },
+            { id: 'shipPhone',    label: 'Phone' },
+            { id: 'shipAddress1', label: 'Address Line 1' },
+            { id: 'shipCity',     label: 'City' },
+        ];
+        document.querySelectorAll('#checkoutShippingForm .pf-input').forEach(function (el) {
+            el.classList.remove('field-error');
+        });
+        const missing = [];
+        required.forEach(function (f) {
+            const el = document.getElementById(f.id);
+            if (!el || !el.value.trim()) {
+                missing.push(f.label);
+                if (el) el.classList.add('field-error');
+            }
+        });
+        return missing;
+    }
+
+    function openModal() {
+        const meta    = pmMeta[selectedMethod] || {};
+        const summary = cartSummary();
+        const s       = shippingPayload();
+        coIcon.style.background = meta.iconBg || '';
+        coIcon.innerHTML        = meta.iconHtml || '';
+        coName.textContent      = meta.name || selectedMethod;
+        coAmount.textContent    = formatPrice(summary.total, summary.currency);
+        coShip.innerHTML = '<strong>' + esc(s.full_name) + '</strong>'
+            + (s.phone ? ' &middot; ' + esc(s.phone) : '') + '<br>'
+            + esc(s.address_line1) + (s.address_line2 ? ', ' + esc(s.address_line2) : '') + '<br>'
+            + [s.city, s.province, s.postal_code].filter(Boolean).map(esc).join(', ');
+        coConfirm.textContent    = meta.confirmLabel || 'Confirm & Pay';
+        coConfirm.disabled       = false;
+        coConfirm.style.display  = '';
+        coQrBox.style.display    = 'none';
+        coPpBox.style.display    = 'none';
+        coPpContainer.innerHTML  = '';
+        coCancel.textContent     = 'Cancel';
+        coModal.style.display    = 'flex';
+    }
+
+    function closeModal() {
+        coModal.style.display   = 'none';
+        coPpContainer.innerHTML = '';
+        if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
+    }
+
     methods.forEach(function (button) {
         button.addEventListener('click', function () {
             selectedMethod = button.dataset.method;
             methods.forEach(function (item) {
-                const active = item === button;
-                item.classList.toggle('is-selected', active);
-                item.style.borderColor = active ? '#d6b44b' : 'rgba(48,77,163,0.2)';
-                const dot = item.querySelector('.checkout-method-radio');
-                if (dot) dot.style.background = active ? '#304da3' : 'transparent';
+                item.classList.toggle('is-selected', item === button);
             });
             setError('');
-            setInfo(selectedMethod === 'wallet' && walletBalance <= 0 ? 'Your wallet balance is currently empty.' : '');
-            if (selectedMethod !== 'paypal') {
-                paypalWrap.style.display = 'none';
-                paypalButtonsContainer.innerHTML = '';
+            setInfo('');
+            // Validate shipping before showing modal
+            const missing = validateShipping();
+            if (missing.length) {
+                setError('Please fill in: ' + missing.join(', ') + '.');
+                document.getElementById('checkoutShippingForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return;
             }
-            if (selectedMethod !== 'ginto_pay_qr') {
-                qrWrap.style.display = 'none';
+            if (selectedMethod === 'wallet' && walletBalance <= 0) {
+                setError('Your Ginto Wallet balance is ₱0.00. Please top up first.');
+                return;
             }
+            openModal();
         });
     });
 
     startBtn.addEventListener('click', startPayment);
+
+    coConfirm.addEventListener('click', async function () {
+        coConfirm.disabled     = true;
+        coConfirm.textContent  = 'Processing…';
+        setError('');
+        setInfo('');
+        try {
+            const session = await createSession();
+            currentSessionRef = session.session_ref;
+            if (selectedMethod === 'wallet') {
+                clearCart(); closeModal();
+                window.location.href = '/mall/orders';
+                return;
+            }
+            if (selectedMethod === 'ginto_pay_qr') {
+                coConfirm.textContent = 'Generating QR…';
+                const qr = await api('/api/mall/checkout/paymongo-qr-init', { session_ref: currentSessionRef });
+                coConfirm.style.display = 'none';
+                coQrBox.style.display   = 'block';
+                coCancel.textContent    = 'Close';
+                coQrStatus.textContent  = 'Scan with your banking app — this will update automatically when payment is confirmed.';
+                if (qr.qr_image) {
+                    coQrImg.src           = qr.qr_image;
+                    coQrImg.style.display = 'block';
+                    coQrFallback.style.display = 'none';
+                } else {
+                    coQrImg.style.display      = 'none';
+                    coQrFallback.style.display = 'block';
+                    coQrFallback.textContent   = qr.qr_string || 'Open your banking app to complete the payment.';
+                }
+                beginStatusPoll();
+                return;
+            }
+            if (selectedMethod === 'ginto_pay_card') {
+                const card = await api('/api/mall/checkout/paymongo-card-init', { session_ref: currentSessionRef });
+                closeModal();
+                window.location.href = card.redirect_url;
+                return;
+            }
+            if (selectedMethod === 'paypal') {
+                const ppData = await api('/api/mall/checkout/paypal-order', { session_ref: currentSessionRef });
+                currentPayPalOrderId    = ppData.paypal_order_id;
+                coConfirm.style.display = 'none';
+                coPpBox.style.display   = 'block';
+                coCancel.textContent    = 'Cancel';
+                renderPayPalInModal();
+                return;
+            }
+        } catch (err) {
+            closeModal();
+            setError(err.message);
+        }
+    });
+
+    coCancel.addEventListener('click', closeModal);
+    coModal.addEventListener('click', function (e) {
+        if (e.target === coModal && coQrBox.style.display === 'none') closeModal();
+    });
+
+    function renderPayPalInModal() {
+        if (!window.paypal) { closeModal(); setError('PayPal is not available right now.'); return; }
+        coPpContainer.innerHTML = '';
+        window.paypal.Buttons({
+            createOrder: function () { return currentPayPalOrderId; },
+            onApprove: async function () {
+                try {
+                    await api('/api/mall/checkout/paypal-capture', {
+                        session_ref:     currentSessionRef,
+                        paypal_order_id: currentPayPalOrderId,
+                    });
+                    clearCart(); closeModal();
+                    window.location.href = '/mall/orders';
+                } catch (err) { closeModal(); setError(err.message); }
+            },
+            onError: function () { closeModal(); setError('PayPal payment failed.'); },
+        }).render('#coPpContainer');
+    }
 
     renderSummary();
 
