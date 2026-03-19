@@ -1846,7 +1846,10 @@ class PaymentController
             exit;
         }
 
-        $fullname = trim(strip_tags((string)(($_POST['firstname'] ?? '') . ' ' . ($_POST['lastname'] ?? ''))));
+        $fullname = trim(strip_tags((string)(
+            $_POST['fullname']
+            ?? (($_POST['firstname'] ?? '') . ' ' . ($_POST['lastname'] ?? ''))
+        )));
         if ($fullname === '') {
             $fullname = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_POST['username'] ?? 'user'));
         }

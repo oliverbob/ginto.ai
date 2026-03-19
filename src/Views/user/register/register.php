@@ -1687,7 +1687,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     <span>Ginto Pay</span>
                     <span class="text-xs px-2 py-0.5 rounded font-bold" style="background: #6366f1; color: #fff;">Credit / Debit Card</span>
                   </h5>
-                  <p class="text-xs text-center opacity-80 mb-4">Pay securely with your Visa, Mastercard, or any major card. You will be redirected to our secure payment page.</p>
+                  <p class="text-xs text-center opacity-80 mb-4">Pay securely with your card. If OTP is required, verification opens in-page.</p>
 
                   <div class="bg-white/10 backdrop-blur rounded p-3 mb-4 text-center">
                     <p class="text-xs opacity-70 mb-0.5">Amount to Pay</p>
@@ -1695,9 +1695,45 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     <p class="text-xs opacity-60 mt-1" id="ginto-pay-duration-label">1-Month Subscription</p>
                   </div>
 
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Card Number</label>
+                      <input type="text" id="ginto-card-number" class="w-full px-3 py-2 rounded" placeholder="4240 3204 8016 5087" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">CVC</label>
+                      <input type="text" id="ginto-card-cvc" class="w-full px-3 py-2 rounded" placeholder="123" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Exp Month</label>
+                      <input type="text" id="ginto-card-exp-month" class="w-full px-3 py-2 rounded" placeholder="06" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Exp Year</label>
+                      <input type="text" id="ginto-card-exp-year" class="w-full px-3 py-2 rounded" placeholder="2030" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Billing Address Line 1</label>
+                      <input type="text" id="ginto-billing-line1" class="w-full px-3 py-2 rounded" placeholder="Street address" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Billing City</label>
+                      <input type="text" id="ginto-billing-city" class="w-full px-3 py-2 rounded" placeholder="City" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Billing State/Province</label>
+                      <input type="text" id="ginto-billing-state" class="w-full px-3 py-2 rounded" placeholder="State" style="color:#111;">
+                    </div>
+                    <div>
+                      <label class="block text-xs mb-1 opacity-80">Billing Postal Code</label>
+                      <input type="text" id="ginto-billing-postal" class="w-full px-3 py-2 rounded" placeholder="9000" style="color:#111;">
+                    </div>
+                  </div>
+
                   <button type="button" id="ginto-pay-btn" class="w-full font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2" style="background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">
                     <i class="fas fa-lock mr-1"></i> Pay with Ginto Pay
                   </button>
+                  <p id="ginto-pay-status" class="text-xs mt-2 opacity-80 hidden"></p>
                   <p class="text-xs text-center opacity-50 mt-2">
                     <i class="fas fa-shield-alt mr-1"></i> Secured by PayMongo. We never see your card details.
                   </p>
@@ -1705,6 +1741,19 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     <i class="fas fa-exclamation-circle text-red-300 mb-1 block text-lg"></i>
                     <span id="ginto-pay-error-msg">An error occurred. Please try again.</span>
                   </div>
+                </div>
+              </div>
+
+              <div id="ginto-otp-backdrop" class="hidden fixed inset-0 z-50 items-center justify-center" style="background: rgba(0,0,0,0.75);">
+                <div class="w-[96vw] max-w-4xl h-[90vh] rounded-lg overflow-hidden" style="background: #0b1220; border: 1px solid #334155;">
+                  <div class="flex items-center justify-between px-3 py-2" style="border-bottom: 1px solid #334155;">
+                    <div class="text-sm font-semibold">Complete OTP Verification</div>
+                    <div class="flex items-center gap-2">
+                      <a id="ginto-otp-open-tab" href="#" target="_blank" rel="noopener" class="text-xs underline" style="color:#93c5fd;">Open in new tab</a>
+                      <button type="button" id="ginto-otp-close" class="px-2 py-1 text-xs rounded" style="background:#1e293b;">Close</button>
+                    </div>
+                  </div>
+                  <iframe id="ginto-otp-iframe" title="Ginto OTP" class="w-full h-[calc(90vh-44px)]" style="background:#fff;"></iframe>
                 </div>
               </div>
               <?php endif; ?>
@@ -3608,6 +3657,69 @@ if (empty($paypalClientId)) {
   }
 
   var gintoPayBtn = document.getElementById('ginto-pay-btn');
+  var gintoPayCurrentPiId = null;
+  var gintoPayPollTimer = null;
+
+  function openGintoOtpModal(url) {
+    var backdrop = document.getElementById('ginto-otp-backdrop');
+    var iframe = document.getElementById('ginto-otp-iframe');
+    var openTab = document.getElementById('ginto-otp-open-tab');
+    if (!backdrop || !iframe || !openTab) return;
+    openTab.href = url;
+    iframe.src = url;
+    backdrop.classList.remove('hidden');
+    backdrop.classList.add('flex');
+  }
+
+  function closeGintoOtpModal() {
+    var backdrop = document.getElementById('ginto-otp-backdrop');
+    var iframe = document.getElementById('ginto-otp-iframe');
+    if (!backdrop || !iframe) return;
+    backdrop.classList.add('hidden');
+    backdrop.classList.remove('flex');
+    iframe.src = 'about:blank';
+  }
+
+  function stopGintoPayPolling() {
+    if (gintoPayPollTimer) {
+      clearInterval(gintoPayPollTimer);
+      gintoPayPollTimer = null;
+    }
+  }
+
+  function startGintoPayPolling(piId) {
+    stopGintoPayPolling();
+    var statusEl = document.getElementById('ginto-pay-status');
+    if (statusEl) {
+      statusEl.classList.remove('hidden');
+      statusEl.textContent = 'Waiting for webhook confirmation...';
+    }
+    gintoPayPollTimer = setInterval(function() {
+      fetch('/api/payments/gintopay-status?pi_id=' + encodeURIComponent(piId))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.processed) {
+            stopGintoPayPolling();
+            closeGintoOtpModal();
+            if (statusEl) statusEl.textContent = 'Payment verified. Redirecting...';
+            window.location.href = data.redirect || '/chat';
+          } else if (data.failed) {
+            stopGintoPayPolling();
+            var errEl = document.getElementById('ginto-pay-error');
+            var errMsg = document.getElementById('ginto-pay-error-msg');
+            if (errEl) errEl.classList.remove('hidden');
+            if (errMsg) errMsg.textContent = data.message || 'Payment verification failed.';
+            if (statusEl) statusEl.textContent = '';
+            gintoPayBtn.disabled = false;
+            gintoPayBtn.innerHTML = '<i class="fas fa-lock mr-1"></i> Pay with Ginto Pay';
+          }
+        })
+        .catch(function() {
+          // Keep polling silently
+        });
+    }, 3000);
+  }
+
   if (gintoPayBtn) {
     gintoPayBtn.addEventListener('click', function() {
       var form = document.getElementById('wizardRegisterForm');
@@ -3628,6 +3740,14 @@ if (empty($paypalClientId)) {
       var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : window.selectedTier;
       var amountPhp = tier ? parseInt(tier.recurringPhp || tier.pricePhp || 0, 10) : 0;
       var tierName  = tier ? (tier.name || 'Membership') : 'Membership';
+      var cardNumber = ((document.getElementById('ginto-card-number') || {}).value || '').replace(/\s+/g, '');
+      var cardCvc = ((document.getElementById('ginto-card-cvc') || {}).value || '').trim();
+      var expMonth = ((document.getElementById('ginto-card-exp-month') || {}).value || '').trim();
+      var expYear = ((document.getElementById('ginto-card-exp-year') || {}).value || '').trim();
+      var billLine1 = ((document.getElementById('ginto-billing-line1') || {}).value || '').trim();
+      var billCity = ((document.getElementById('ginto-billing-city') || {}).value || '').trim();
+      var billState = ((document.getElementById('ginto-billing-state') || {}).value || '').trim();
+      var billPostal = ((document.getElementById('ginto-billing-postal') || {}).value || '').trim();
 
       if (amountPhp <= 0) {
         var errEl = document.getElementById('ginto-pay-error');
@@ -3637,15 +3757,43 @@ if (empty($paypalClientId)) {
         return;
       }
 
+      if (!cardNumber || !cardCvc || !expMonth || !expYear) {
+        var cardErrEl = document.getElementById('ginto-pay-error');
+        var cardErrMsg = document.getElementById('ginto-pay-error-msg');
+        if (cardErrEl) cardErrEl.classList.remove('hidden');
+        if (cardErrMsg) cardErrMsg.textContent = 'Please complete your card details.';
+        return;
+      }
+
+      if (!billLine1 || !billCity || !billState || !billPostal) {
+        var billErrEl = document.getElementById('ginto-pay-error');
+        var billErrMsg = document.getElementById('ginto-pay-error-msg');
+        if (billErrEl) billErrEl.classList.remove('hidden');
+        if (billErrMsg) billErrMsg.textContent = 'Please complete billing address details.';
+        return;
+      }
+
       gintoPayBtn.disabled = true;
-      gintoPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Preparing secure checkout...';
+      gintoPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Initializing payment...';
+
+      var errElReset = document.getElementById('ginto-pay-error');
+      if (errElReset) errElReset.classList.add('hidden');
 
       var formData = new FormData(form);
       formData.set('amount', amountPhp);
       formData.set('tier', tierName);
       formData.set('duration', '1m');
+      formData.set('card_number', cardNumber);
+      formData.set('cvc', cardCvc);
+      formData.set('exp_month', expMonth);
+      formData.set('exp_year', expYear);
+      formData.set('billing_line1', billLine1);
+      formData.set('billing_city', billCity);
+      formData.set('billing_state', billState);
+      formData.set('billing_postal_code', billPostal);
+      formData.set('billing_country', (form.querySelector('[name="country"]') || {}).value || 'PH');
 
-      fetch('/api/payments/ginto-pay-init', {
+      fetch('/api/payments/gintopay-init', {
         method: 'POST',
         headers: { 'X-Requested-With': 'XMLHttpRequest' },
         body: formData
@@ -3661,8 +3809,14 @@ if (empty($paypalClientId)) {
           if (errMsg) errMsg.textContent = data.message || 'Could not initialize checkout. Please try again.';
           return;
         }
-        // Redirect to PayMongo hosted checkout
-        window.location.href = data.checkout_url;
+
+        gintoPayCurrentPiId = data.pi_id;
+
+        if (data.requires_action && data.next_action_url) {
+          openGintoOtpModal(data.next_action_url);
+        }
+
+        startGintoPayPolling(gintoPayCurrentPiId);
       })
       .catch(function(err) {
         console.error('Ginto Pay init error:', err);
@@ -3673,6 +3827,20 @@ if (empty($paypalClientId)) {
         if (errEl) errEl.classList.remove('hidden');
         if (errMsg) errMsg.textContent = 'Network error. Please check your connection and try again.';
       });
+    });
+  }
+
+  var gintoOtpCloseBtn = document.getElementById('ginto-otp-close');
+  if (gintoOtpCloseBtn) {
+    gintoOtpCloseBtn.addEventListener('click', closeGintoOtpModal);
+  }
+
+  var gintoOtpBackdrop = document.getElementById('ginto-otp-backdrop');
+  if (gintoOtpBackdrop) {
+    gintoOtpBackdrop.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'ginto-otp-backdrop') {
+        closeGintoOtpModal();
+      }
     });
   }
 
