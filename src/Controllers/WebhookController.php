@@ -919,12 +919,11 @@ class WebhookController
         $planIdMap   = ['free' => 1, 'go' => 2, 'plus' => 3, 'pro' => 4, 'starter' => 1, 'professional' => 2, 'executive' => 3, 'gold' => 4, 'platinum' => 5];
         $packageName = strtolower($regData['package'] ?? 'go');
         $planId      = $planIdMap[$packageName] ?? 2;
-        $duration    = $regData['duration'] ?? ($pending['duration'] ?? '1m');
+        // Ginto Pay subscriptions are monthly-only.
+        $duration    = '1m';
         $amountPhp   = (float)($pending['amount'] ?? $regData['amount'] ?? 0);
         $now         = date('Y-m-d H:i:s');
-        $expiresAt   = ($duration === '1m')
-            ? date('Y-m-d H:i:s', strtotime('+1 month'))
-            : date('Y-m-d H:i:s', strtotime('+1 year'));
+        $expiresAt   = date('Y-m-d H:i:s', strtotime('+1 month'));
         $publicId    = substr(md5(uniqid(mt_rand(), true)), 0, 12);
 
         try {
@@ -999,7 +998,7 @@ class WebhookController
                 'gateway_payment_id' => $gatewayPaymentId,
                 'amount_paid'        => $amountPhp,
                 'currency'           => 'PHP',
-                'auto_renew'         => 0,
+                'auto_renew'         => 1,
                 'created_at'         => $now,
                 'updated_at'         => $now,
             ]);

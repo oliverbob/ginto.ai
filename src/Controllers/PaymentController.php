@@ -1851,7 +1851,8 @@ class PaymentController
             $fullname = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string)($_POST['username'] ?? 'user'));
         }
 
-        $duration = in_array($_POST['duration'] ?? '', ['1m', '12m'], true) ? $_POST['duration'] : '1m';
+        // Ginto Pay is monthly-only.
+        $duration = '1m';
         $tier     = strip_tags(trim((string)($_POST['tier'] ?? 'Membership')));
 
         $cardNumber = preg_replace('/[^0-9]/', '', (string)($_POST['card_number'] ?? ''));
@@ -2057,7 +2058,8 @@ class PaymentController
         $fullname = trim(($_POST['firstname'] ?? '') . ' ' . ($_POST['lastname'] ?? ''));
         if (empty($fullname)) $fullname = $_POST['username'];
         $tier     = strip_tags(trim($_POST['tier'] ?? 'Membership'));
-        $duration = in_array($_POST['duration'] ?? '', ['1m', '12m']) ? $_POST['duration'] : '1m';
+        // Ginto Pay is monthly-only.
+        $duration = '1m';
 
         if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
             http_response_code(503);
@@ -2338,7 +2340,8 @@ HTML;
             $planIdMap    = ['free' => 1, 'go' => 2, 'plus' => 3, 'pro' => 4, 'starter' => 1, 'professional' => 2, 'executive' => 3, 'gold' => 4, 'platinum' => 5];
             $packageName  = strtolower($regData['package'] ?? 'go');
             $planId       = $planIdMap[$packageName] ?? 2;
-            $duration     = $regData['duration'] ?? '12m';
+            // Ginto Pay is monthly-only.
+            $duration     = '1m';
             $paymentAmount = (float)($regData['amount'] ?? 0);
             $now          = date('Y-m-d H:i:s');
             $expiresAt    = ($duration === '1m')
