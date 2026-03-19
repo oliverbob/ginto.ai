@@ -2249,6 +2249,7 @@ if (empty($paypalClientId)) {
     var bankDetails = document.getElementById('bank-transfer-details');
     var cryptoDetails = document.getElementById('crypto-usdt-details');
     var paymongoDetails = document.getElementById('paymongo-qrph-details');
+    var gintoPayDetails = document.getElementById('ginto-pay-details');
     
     if (paypalContainer) paypalContainer.classList.add('hidden');
     if (cardContainer) cardContainer.classList.add('hidden');
@@ -2258,6 +2259,7 @@ if (empty($paypalClientId)) {
     if (bankDetails) bankDetails.classList.add('hidden');
     if (cryptoDetails) cryptoDetails.classList.add('hidden');
     if (paymongoDetails) paymongoDetails.classList.add('hidden');
+    if (gintoPayDetails) gintoPayDetails.classList.add('hidden');
   };
   
   // Toggle bank SWIFT/codes visibility
@@ -2760,17 +2762,27 @@ if (empty($paypalClientId)) {
           loadCryptoInfo();
         }
         // Don't show complete-purchase, crypto has its own confirm button
-      } else if (this.value === 'paymongo_qrph') {
+      } else if (this.value === 'paymongo_qrph' || this.value === 'paymongo_qrph_annual') {
         // Show PayMongo QRPH details
         var qrphDetails = document.getElementById('paymongo-qrph-details');
         if (qrphDetails) {
           qrphDetails.classList.remove('hidden');
-          // Initialize QRPH if not already done
+          // Initialize QRPH (reads selected radio value to determine 1m vs 12m)
           if (typeof initPaymongoQrph === 'function') {
             initPaymongoQrph();
           }
         }
         // Don't show complete-purchase - PayMongo has its own confirm button
+      } else if (this.value === 'ginto_pay') {
+        // Show Ginto Pay (card) details
+        var gintoPayDetails = document.getElementById('ginto-pay-details');
+        if (gintoPayDetails) {
+          gintoPayDetails.classList.remove('hidden');
+          if (typeof window.updateGintoPayDisplay === 'function') {
+            window.updateGintoPayDisplay();
+          }
+        }
+        // Don't show complete-purchase - Ginto Pay redirects externally
       }
     });
   });
