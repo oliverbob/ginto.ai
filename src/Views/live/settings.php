@@ -730,9 +730,46 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                     <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
                         <i class="fas fa-shopping-cart mr-2 text-green-500"></i>Ecommerce Configuration
                     </h2>
-                    <p class="help-text mb-4">Add PayPal configuration. Webhook and API credentials (if present). Avoid storing secrets in public repos.</p>
+                    <p class="help-text mb-4">Configure payment gateways and credentials. Avoid storing secrets in public repos.</p>
 
-                    <div class="grid md:grid-cols-2 gap-6">
+                    <!-- Active Payment Processors -->
+                    <div class="mb-6">
+                        <label class="label-text font-semibold mb-3 block">Active Payment Processors</label>
+                        <p class="help-text mb-3">Select which payment gateways are available to users on the registration and checkout pages.</p>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <?php
+                            $activeProcessors = array_map('trim', explode(',', $envValues['ACTIVE_PAYMENT_PROCESSORS'] ?? 'paypal,gcash,bank_transfer,crypto'));
+                            $availableProcessors = [
+                                'paypal'         => ['label' => 'PayPal', 'icon' => 'fab fa-paypal', 'color' => 'text-blue-600'],
+                                'paymongo'       => ['label' => 'PayMongo (QRPH)', 'icon' => 'fas fa-qrcode', 'color' => 'text-orange-500'],
+                                'maya'           => ['label' => 'Maya (PayMaya)', 'icon' => 'fas fa-mobile-alt', 'color' => 'text-green-500'],
+                                'gcash'          => ['label' => 'GCash', 'icon' => 'fas fa-mobile-alt', 'color' => 'text-blue-500'],
+                                'stripe'         => ['label' => 'Stripe', 'icon' => 'fab fa-stripe', 'color' => 'text-indigo-500'],
+                                'crypto'         => ['label' => 'Crypto (USDT BEP20)', 'icon' => 'fab fa-bitcoin', 'color' => 'text-yellow-500'],
+                                'bank_transfer'  => ['label' => 'Bank Transfer', 'icon' => 'fas fa-university', 'color' => 'text-gray-600'],
+                            ];
+                            foreach ($availableProcessors as $key => $proc):
+                                $checked = in_array($key, $activeProcessors, true) ? 'checked' : '';
+                            ?>
+                            <label class="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" style="border-color: var(--border-color);">
+                                <input type="checkbox" name="active_payment_processors[]" value="<?= htmlspecialchars($key, ENT_QUOTES, 'UTF-8') ?>"
+                                    class="h-4 w-4 rounded" style="accent-color: var(--primary-500);" <?= $checked ?>>
+                                <span class="flex items-center gap-2 text-sm font-medium" style="color: var(--text-primary);">
+                                    <i class="<?= htmlspecialchars($proc['icon'], ENT_QUOTES, 'UTF-8') ?> <?= htmlspecialchars($proc['color'], ENT_QUOTES, 'UTF-8') ?>"></i>
+                                    <?= htmlspecialchars($proc['label'], ENT_QUOTES, 'UTF-8') ?>
+                                </span>
+                            </label>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+
+                    <hr class="my-6" style="border-color: var(--border-color);">
+
+                    <!-- PayPal Section -->
+                    <h3 class="text-base font-semibold mb-4 flex items-center gap-2" style="color: var(--text-primary);">
+                        <i class="fab fa-paypal text-blue-600"></i> PayPal Configuration
+                    </h3>
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
                         <div>
                             <label class="label-text">PayPal Webhook ID</label>
                             <input type="text" name="paypal_webhook_id" class="input-field" value="<?= htmlspecialchars($envValues['PAYPAL_WEBHOOK_ID'] ?? '') ?>" placeholder="">
@@ -780,7 +817,32 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                             </div>
                         </div>
                     </div>
-                    <p class="help-text mt-4">Note: Storing secrets in the .env is convenient for local/sandbox environments; consider secure secret storage for production.</p>
+
+                    <hr class="my-6" style="border-color: var(--border-color);">
+
+                    <!-- PayMongo Section -->
+                    <h3 class="text-base font-semibold mb-2 flex items-center gap-2" style="color: var(--text-primary);">
+                        <i class="fas fa-qrcode text-orange-500"></i> PayMongo Configuration
+                        <span class="text-xs font-normal px-2 py-0.5 rounded" style="background: linear-gradient(90deg,#f97316,#fb923c); color: #fff;">QRPH</span>
+                    </h3>
+                    <p class="help-text mb-4">PayMongo enables QRPH (InstaPay/PESONet QR) payments. Get keys from <a href="https://dashboard.paymongo.com" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">dashboard.paymongo.com</a>.</p>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="label-text">PayMongo Public Key</label>
+                            <input type="text" name="paymongo_public_key" class="input-field" value="<?= htmlspecialchars($envValues['PAYMONGO_PUBLIC_KEY'] ?? '') ?>" placeholder="pk_live_... or pk_test_...">
+                        </div>
+                        <div>
+                            <label class="label-text">PayMongo Secret Key</label>
+                            <div class="relative">
+                                <input type="password" id="paymongo_secret_key" name="paymongo_secret_key" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_SECRET_KEY'] ?? '') ?>" placeholder="sk_live_... or sk_test_...">
+                                <button type="button" onclick="togglePassword('paymongo_secret_key')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <i id="paymongo_secret_key_icon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="help-text mt-6">Note: Storing secrets in the .env is convenient for local/sandbox environments; consider secure secret storage for production.</p>
                 </div>
             </div>
 

@@ -606,7 +606,8 @@ class LiveController
                 'file_cdn_base_url' => 'FILE_CDN_BASE_URL',
                 'datacenter' => 'DATACENTER',
             
-            // Ecommerce / PayPal
+            // Ecommerce / PayPal / PayMongo
+            'active_payment_processors_str' => 'ACTIVE_PAYMENT_PROCESSORS',
             'paypal_webhook_id' => 'PAYPAL_WEBHOOK_ID',
             'paypal_client_id' => 'PAYPAL_CLIENT_ID',
             'paypal_client_secret' => 'PAYPAL_CLIENT_SECRET',
@@ -614,6 +615,8 @@ class LiveController
             'paypal_internal_api_key' => 'PAYPAL_INTERNAL_API_KEY',
             'paypal_client_id_sandbox' => 'PAYPAL_CLIENT_ID_SANDBOX',
             'paypal_client_secret_sandbox' => 'PAYPAL_CLIENT_SECRET_SANDBOX',
+            'paymongo_public_key' => 'PAYMONGO_PUBLIC_KEY',
+            'paymongo_secret_key' => 'PAYMONGO_SECRET_KEY',
 
             // Local LLM
             'local_llm_url' => 'LOCAL_LLM_URL',
@@ -654,6 +657,21 @@ class LiveController
             'expected_users' => 'EXPECTED_USERS',
         ];
         
+        // Handle active_payment_processors[] checkbox array -> comma-separated string
+        $allowedProcessors = ['paypal', 'paymongo', 'maya', 'gcash', 'stripe', 'crypto', 'bank_transfer'];
+        $selectedProcessors = [];
+        if (!empty($data['active_payment_processors']) && is_array($data['active_payment_processors'])) {
+            foreach ($data['active_payment_processors'] as $proc) {
+                $proc = (string)$proc;
+                if (in_array($proc, $allowedProcessors, true)) {
+                    $selectedProcessors[] = $proc;
+                }
+            }
+        }
+        $data['active_payment_processors'] = implode(',', $selectedProcessors);
+        // Map the scalar key for the keyMap
+        $data['active_payment_processors_str'] = $data['active_payment_processors'];
+
         // Handle checkbox fields (convert to true/false)
         $data['openwebui_enabled'] = isset($data['openwebui_enabled']) && $data['openwebui_enabled'] ? 'true' : 'false';
         $data['sdcpu_active'] = isset($data['sdcpu_active']) && $data['sdcpu_active'] ? 'true' : 'false';
@@ -722,7 +740,7 @@ class LiveController
         
         // Group settings logically
         $groups = [
-            'Ecommerce' => ['PAYPAL_WEBHOOK_ID', 'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_ENVIRONMENT', 'PAYPAL_INTERNAL_API_KEY', 'PAYPAL_CLIENT_ID_SANDBOX', 'PAYPAL_CLIENT_SECRET_SANDBOX'],
+            'Ecommerce' => ['ACTIVE_PAYMENT_PROCESSORS', 'PAYPAL_WEBHOOK_ID', 'PAYPAL_CLIENT_ID', 'PAYPAL_CLIENT_SECRET', 'PAYPAL_ENVIRONMENT', 'PAYPAL_INTERNAL_API_KEY', 'PAYPAL_CLIENT_ID_SANDBOX', 'PAYPAL_CLIENT_SECRET_SANDBOX', 'PAYMONGO_PUBLIC_KEY', 'PAYMONGO_SECRET_KEY'],
             'Datacenter' => ['B2_ACCOUNT_ID', 'B2_APP_KEY', 'B2_BUCKET_ID', 'B2_BUCKET_NAME', 'FILE_CDN_BASE_URL', 'DATACENTER'],
             'Site Configuration' => ['APP_NAME', 'APP_DESCRIPTION', 'CADDY_DOMAIN', 'APP_URL', 'TIMEZONE', 'MAIL_FROM', 'SMTP_HOST', 'SMTP_PORT', 'SMTP_SECURE', 'SMTP_USER', 'SMTP_PASS', 'APP_ENV', 'APP_DEBUG', 'OPENWEBUI_ENABLED', 'SDCPU_ACTIVE', 'SDCPU_TUNNEL', 'GROQ_VISION_FOR_ALL_MODELS', 'IMAGEGEN_PROFILE', 'IMAGEGEN_COMPUTE_MODE', 'IMAGEGEN_STEPS', 'IMAGEGEN_GUIDANCE_SCALE', 'IMAGEGEN_WIDTH', 'IMAGEGEN_HEIGHT', 'IMAGEGEN_MODEL_ID'],
             'Database' => ['DB_HOST', 'DB_PORT', 'DB_NAME', 'DB_USER', 'DB_PASS', 'DB_GUEST_USER', 'DB_GUEST_PASSWORD'],
@@ -757,7 +775,7 @@ class LiveController
             if ($groupContent) {
                 // Special header for Ecommerce / PayPal config
                 if ($groupName === 'Ecommerce') {
-                    $content .= "# -------------------------------------------------------\n# PayPal Configuration\n# Webhook and API credentials (if present). Avoid storing secrets in public repos.\n# -------------------------------------------------------\n";
+                    $content .= "# -------------------------------------------------------\n# Payment Gateways (PayPal / PayMongo / etc.)\n# API credentials (if present). Avoid storing secrets in public repos.\n# -------------------------------------------------------\n";
                 } elseif ($groupName === 'Datacenter') {
                     $content .= "# -------------------------------------------------------\n# Backblaze B2 / CDN\n# Backblaze / CDN configuration used for file uploads/serving.\n# -------------------------------------------------------\n";
                 }

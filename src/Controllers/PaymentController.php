@@ -1442,4 +1442,319 @@ class PaymentController
         echo json_encode($response);
         exit;
     }
+
+    /**
+     * PayMongo QRPH Initialization
+     * Creates a payment intent + QRPH payment method, returns QR code image.
+     */
+    public function paymongoQrphInit(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+            exit;
+        }
+
+        if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] !== 'XMLHttpRequest') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid request']);
+            exit;
+        }
+
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.']);
+            exit;
+        }
+
+        // Input validation
+        $amountRaw = $_POST['amount'] ?? '';
+        $email     = filter_var(trim($_POST['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+        $name      = strip_tags(trim($_POST['name'] ?? 'Ginto User'));
+        $phone     = preg_replace('/[^0-9+\-\s]/', '', $_POST['phone'] ?? '');
+        $tier      = strip_tags(trim($_POST['tier'] ?? 'Membership'));
+
+        if (!is_numeric($amountRaw) || (int)$amountRaw <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid payment amount.']);
+            exit;
+        }
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Valid email is required.']);
+            exit;
+        }
+
+        $amountPhp = (int)$amountRaw;
+
+        if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'PayMongo is not configured. Please contact support.']);
+            exit;
+        }
+
+        try {
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $description = 'Ginto ' . $tier . ' Membership';
+            $result = $handler->initQrph($amountPhp, $email, $name, $phone, $description);
+
+            if (!$result['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => $result['message']]);
+                exit;
+            }
+
+            // Store PI ID in session for later verification (prevents forgery)
+            $_SESSION['paymongo_pi_id']     = $result['pi_id'];
+            $_SESSION['paymongo_pi_amount'] = $amountPhp;
+            $_SESSION['paymongo_pi_tier']   = $tier;
+            $_SESSION['paymongo_pi_email']  = $email;
+
+            echo json_encode([
+                'success'   => true,
+                'pi_id'     => $result['pi_id'],
+                'qr_image'  => $result['qr_image'],
+                'qr_string' => $result['qr_string'],
+                'status'    => $result['status'],
+            ]);
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('PayMongo QRPH init error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
+            exit;
+        }
+    }
+
+    /**
+     * PayMongo QRPH Status Poll
+     * Returns current payment intent status.
+     */
+    public function paymongoQrphStatus(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        header('Content-Type: application/json');
+
+        if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] !== 'XMLHttpRequest') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid request']);
+            exit;
+        }
+
+        $piId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['pi_id'] ?? '');
+
+        if (empty($piId)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Missing payment intent ID.']);
+            exit;
+        }
+
+        // Verify the PI ID matches what was created in this session
+        if (empty($_SESSION['paymongo_pi_id']) || $_SESSION['paymongo_pi_id'] !== $piId) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Session mismatch.']);
+            exit;
+        }
+
+        if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'PayMongo not configured.']);
+            exit;
+        }
+
+        try {
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $result = $handler->getPaymentIntentStatus($piId);
+
+            if (!$result['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => $result['message']]);
+                exit;
+            }
+
+            echo json_encode([
+                'success' => true,
+                'status'  => $result['status'],
+                'paid'    => ($result['status'] === 'succeeded'),
+            ]);
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('PayMongo QRPH status error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'An error occurred.']);
+            exit;
+        }
+    }
+
+    /**
+     * PayMongo QRPH Payment Registration
+     * Verifies payment is succeeded, then creates the user account.
+     */
+    public function paymongoPayments(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        $this->validateAjaxRequest();
+        header('Content-Type: application/json');
+
+        try {
+            $this->validateCsrf();
+            $this->validateRequired(['username', 'email', 'password', 'country', 'phone']);
+
+            // Validate the PI ID from POST against session
+            $piId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_POST['pi_id'] ?? '');
+
+            if (empty($piId) || empty($_SESSION['paymongo_pi_id']) || $_SESSION['paymongo_pi_id'] !== $piId) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Invalid or missing payment reference. Please restart the payment process.']);
+                exit;
+            }
+
+            // Verify expected amount matches
+            $expectedAmount = (int)($_SESSION['paymongo_pi_amount'] ?? 0);
+            $submittedAmount = (int)($_POST['package_amount'] ?? 0);
+            if ($expectedAmount <= 0 || $expectedAmount !== $submittedAmount) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Payment amount mismatch. Please contact support.']);
+                exit;
+            }
+
+            if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+                http_response_code(503);
+                echo json_encode(['success' => false, 'message' => 'PayMongo not configured.']);
+                exit;
+            }
+
+            // Verify payment is actually succeeded via API
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $statusResult = $handler->getPaymentIntentStatus($piId);
+
+            if (!$statusResult['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => 'Could not verify payment. Please try again.']);
+                exit;
+            }
+
+            if ($statusResult['status'] !== 'succeeded') {
+                http_response_code(402);
+                echo json_encode(['success' => false, 'message' => 'Payment has not been completed yet. Please scan the QR code and pay first.']);
+                exit;
+            }
+
+            // Check for duplicate PI (prevent double registration)
+            $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $piId]);
+            if ($existing) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'message' => 'This payment has already been used to register an account.']);
+                exit;
+            }
+
+            $this->checkExistingUser();
+
+            // Create user and payment record with 'paid' status (auto-verified)
+            $referrerId  = $this->resolveReferrerId();
+            $fullname    = $this->getFullName();
+            $planId      = $this->getPlanId();
+            $passwordHash = password_hash($_POST['password'], PASSWORD_DEFAULT);
+            $publicId    = substr(md5(uniqid(mt_rand(), true)), 0, 12);
+
+            $this->db->insert('users', [
+                'email'          => $_POST['email'],
+                'username'       => $_POST['username'],
+                'password_hash'  => $passwordHash,
+                'fullname'       => $fullname,
+                'phone'          => $_POST['phone'],
+                'country'        => $_POST['country'],
+                'referrer_id'    => $referrerId,
+                'public_id'      => $publicId,
+                'payment_status' => 'paid',
+                'created_at'     => date('Y-m-d H:i:s'),
+            ]);
+
+            $userId = $this->db->id();
+
+            if (!$userId) {
+                error_log('PayMongo: Failed to create user account for PI ' . $piId);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to create account. Please contact support.']);
+                exit;
+            }
+
+            $paymentNotes = json_encode([
+                'email'             => $_POST['email'],
+                'username'          => $_POST['username'],
+                'fullname'          => $fullname,
+                'phone'             => $_POST['phone'],
+                'country'           => $_POST['country'],
+                'referrer_id'       => $referrerId,
+                'paymongo_pi_id'    => $piId,
+                'payment_gateway'   => 'paymongo',
+                'payment_type'      => 'qrph',
+            ]);
+
+            $transactionId = \Ginto\Helpers\TransactionHelper::generateTransactionId($this->db);
+            $auditData     = \Ginto\Helpers\TransactionHelper::captureAuditData();
+            $paymentAmount = (float)($_POST['package_amount'] ?? $expectedAmount);
+
+            $this->db->insert('subscription_payments', array_merge([
+                'user_id'           => $userId,
+                'subscription_id'   => null,
+                'plan_id'           => $planId,
+                'type'              => 'registration',
+                'amount'            => $paymentAmount,
+                'currency'          => 'PHP',
+                'payment_method'    => 'paymongo_qrph',
+                'payment_reference' => $piId,
+                'status'            => 'paid',
+                'notes'             => $paymentNotes,
+                'receipt_filename'  => null,
+                'receipt_path'      => null,
+                'transaction_id'    => $transactionId,
+            ], $auditData));
+
+            $paymentId = $this->db->id();
+
+            if (!$paymentId) {
+                $this->db->delete('users', ['id' => $userId]);
+                error_log('PayMongo: Failed to insert payment record for user ' . $userId);
+                http_response_code(500);
+                echo json_encode(['success' => false, 'message' => 'Failed to save payment record. Please contact support.']);
+                exit;
+            }
+
+            // Clear PayMongo session data
+            unset($_SESSION['paymongo_pi_id'], $_SESSION['paymongo_pi_amount'], $_SESSION['paymongo_pi_tier'], $_SESSION['paymongo_pi_email']);
+
+            // Log in the user
+            $_SESSION['user_id']        = $userId;
+            $_SESSION['username']       = $_POST['username'];
+            $_SESSION['email']          = $_POST['email'];
+            $_SESSION['payment_status'] = 'paid';
+
+            error_log("PayMongo QRPH registration complete: user_id={$userId}, payment_id={$paymentId}, pi_id={$piId}");
+
+            echo json_encode([
+                'success'    => true,
+                'message'    => 'Payment confirmed! Your account is now active.',
+                'payment_id' => $paymentId,
+                'user_id'    => $userId,
+                'redirect'   => '/chat',
+            ]);
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('PayMongo registration error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
+            exit;
+        }
+    }
 }

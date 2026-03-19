@@ -42,6 +42,11 @@ try {
     // Fallback to empty - subscriptions won't work without plan IDs
     error_log('Failed to load PayPal plan IDs from database: ' . $e->getMessage());
 }
+
+// Active payment processors - comma-separated list from env
+$activeProcessorsRaw = $_ENV['ACTIVE_PAYMENT_PROCESSORS'] ?? getenv('ACTIVE_PAYMENT_PROCESSORS') ?? 'paypal,gcash,bank_transfer,crypto';
+$activeProcessors = array_map('trim', explode(',', $activeProcessorsRaw));
+$paymongoEnabled = in_array('paymongo', $activeProcessors, true);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -58,6 +63,8 @@ try {
     // Subscription pricing configuration passed from PHP
     window.GINTO_PRICING = <?= json_encode($pricingConfig) ?>;
     window.GINTO_PAYPAL_PLANS = <?= json_encode($paypalPlanIds) ?>;
+    window.GINTO_ACTIVE_PROCESSORS = <?= json_encode($activeProcessors) ?>;
+    window.GINTO_PAYMONGO_ENABLED = <?= $paymongoEnabled ? 'true' : 'false' ?>;
   </script>
   <link rel="icon" type="image/png" href="/assets/images/ginto.png">
   <link href="/assets/css/tailwind.css" rel="stylesheet">
@@ -1082,6 +1089,18 @@ try {
                     <span>Crypto <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background: linear-gradient(135deg, #f0b90b 0%, #d4a00a 100%); color: #000;">USDT BEP20</span></span>
                   </label>
                 </div>
+                <?php if ($paymongoEnabled): ?>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
+                  <input type="radio" name="payment_method" id="paymongo-qrph" value="paymongo_qrph" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
+                    <span>
+                      QRPH
+                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: #fff;">InstaPay / PESONet</span>
+                    </span>
+                  </label>
+                </div>
+                <?php endif; ?>
               </div>
               
               <!-- PayPal Button Container (PayPal balance only) -->
@@ -1387,6 +1406,78 @@ try {
                   <i class="fas fa-check-circle"></i> Confirm USDT Payment
                 </button>
               </div>
+              
+              <?php if ($paymongoEnabled): ?>
+              <!-- PayMongo QRPH Payment Details -->
+              <div id="paymongo-qrph-details" class="mt-4 hidden">
+                <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%); color: white; border: 2px solid #f97316;">
+                  <h5 class="font-semibold text-base mb-3 flex items-center justify-center gap-2">
+                    <i class="fas fa-qrcode" style="color: #f97316;"></i>
+                    <span>QRPH Payment</span>
+                    <span class="text-xs px-2 py-0.5 rounded font-bold" style="background: #f97316; color: #fff;">InstaPay / PESONet</span>
+                  </h5>
+                  
+                  <p class="text-xs text-center opacity-80 mb-4">Scan the QR code below using any bank app, GCash, Maya, or any QR Ph-enabled app.</p>
+                  
+                  <!-- Loading State -->
+                  <div id="paymongo-qrph-loading" class="text-center py-6">
+                    <div class="animate-spin w-8 h-8 border-4 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"></div>
+                    <p class="text-sm opacity-80">Generating QR code...</p>
+                  </div>
+                  
+                  <!-- QR Code Display -->
+                  <div id="paymongo-qrph-qr" class="hidden">
+                    <!-- QR Image -->
+                    <div class="flex justify-center mb-4">
+                      <div class="bg-white p-3 rounded-lg shadow-lg">
+                        <img id="paymongo-qr-image" src="" alt="QRPH QR Code" class="w-48 h-48 object-contain">
+                      </div>
+                    </div>
+                    
+                    <!-- Amount -->
+                    <div class="bg-white/10 backdrop-blur rounded p-3 mb-3 text-center">
+                      <p class="text-xs opacity-70 mb-0.5">Amount to Pay</p>
+                      <p class="font-bold text-xl text-orange-300" id="paymongo-qr-amount">₱0</p>
+                    </div>
+                    
+                    <!-- Status Polling -->
+                    <div id="paymongo-status-banner" class="text-center py-2 px-3 rounded mb-3 text-sm font-medium" style="background: rgba(249,115,22,0.2);">
+                      <i class="fas fa-clock mr-1 text-orange-300"></i>
+                      <span id="paymongo-status-text">Waiting for payment...</span>
+                    </div>
+                    
+                    <!-- Refresh QR button -->
+                    <div class="text-center">
+                      <button type="button" id="paymongo-refresh-qr" class="text-xs text-orange-300 hover:text-orange-100 underline">
+                        <i class="fas fa-sync-alt mr-1"></i> Refresh QR Code
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <!-- Error State -->
+                  <div id="paymongo-qrph-error" class="hidden bg-red-500/30 border border-red-400 rounded p-3 text-center text-sm">
+                    <i class="fas fa-exclamation-circle text-red-300 mb-2 block text-xl"></i>
+                    <span id="paymongo-qrph-error-msg">Failed to generate QR code. Please try again.</span>
+                    <br>
+                    <button type="button" id="paymongo-retry-btn" class="mt-2 px-4 py-1 rounded text-xs font-bold" style="background: #f97316; color: #fff;">
+                      <i class="fas fa-redo mr-1"></i> Retry
+                    </button>
+                  </div>
+                  
+                  <!-- Payment Confirmed State -->
+                  <div id="paymongo-qrph-confirmed" class="hidden text-center py-4">
+                    <i class="fas fa-check-circle text-green-400 text-4xl mb-3 block"></i>
+                    <p class="font-bold text-green-300 text-lg mb-1">Payment Confirmed!</p>
+                    <p class="text-sm opacity-80">Creating your account...</p>
+                  </div>
+                </div>
+                
+                <!-- Confirm QRPH Payment Button (shown after QR is paid) -->
+                <button type="button" id="confirm-paymongo-payment" class="w-full mt-4 font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2 hidden" style="background: linear-gradient(90deg, #f97316 0%, #fb923c 100%); color: #fff;">
+                  <i class="fas fa-check-circle"></i> Complete Registration
+                </button>
+              </div>
+              <?php endif; ?>
             </div>
           </div>
           <div class="mt-8 flex justify-between">
@@ -1647,6 +1738,12 @@ try {
             } else if (paymentMethod.value === 'gcash') {
               document.getElementById('gcash-details').classList.remove('hidden');
               document.getElementById('complete-purchase').classList.remove('hidden');
+            } else if (paymentMethod.value === 'paymongo_qrph') {
+              var qrph = document.getElementById('paymongo-qrph-details');
+              if (qrph) {
+                qrph.classList.remove('hidden');
+                if (typeof initPaymongoQrph === 'function') { initPaymongoQrph(); }
+              }
             }
           }
         }
@@ -2058,6 +2155,8 @@ if (empty($paypalClientId)) {
   
   // Make showPayPalButton globally accessible
   window.showPayPalButton = showPayPalButton;
+  // Make getSelectedTier globally accessible (used by PayMongo and other handlers)
+  window.getSelectedTier = getSelectedTier;
   
   // Helper function to copy to clipboard
   window.copyToClipboard = function(text) {
@@ -2084,6 +2183,7 @@ if (empty($paypalClientId)) {
     var gcashDetails = document.getElementById('gcash-details');
     var bankDetails = document.getElementById('bank-transfer-details');
     var cryptoDetails = document.getElementById('crypto-usdt-details');
+    var paymongoDetails = document.getElementById('paymongo-qrph-details');
     
     if (paypalContainer) paypalContainer.classList.add('hidden');
     if (cardContainer) cardContainer.classList.add('hidden');
@@ -2092,6 +2192,7 @@ if (empty($paypalClientId)) {
     if (gcashDetails) gcashDetails.classList.add('hidden');
     if (bankDetails) bankDetails.classList.add('hidden');
     if (cryptoDetails) cryptoDetails.classList.add('hidden');
+    if (paymongoDetails) paymongoDetails.classList.add('hidden');
   };
   
   // Toggle bank SWIFT/codes visibility
@@ -2594,6 +2695,17 @@ if (empty($paypalClientId)) {
           loadCryptoInfo();
         }
         // Don't show complete-purchase, crypto has its own confirm button
+      } else if (this.value === 'paymongo_qrph') {
+        // Show PayMongo QRPH details
+        var qrphDetails = document.getElementById('paymongo-qrph-details');
+        if (qrphDetails) {
+          qrphDetails.classList.remove('hidden');
+          // Initialize QRPH if not already done
+          if (typeof initPaymongoQrph === 'function') {
+            initPaymongoQrph();
+          }
+        }
+        // Don't show complete-purchase - PayMongo has its own confirm button
       }
     });
   });
@@ -2826,6 +2938,257 @@ if (empty($paypalClientId)) {
   }
 })();
 
+<?php if ($paymongoEnabled): ?>
+<script>
+(function() {
+  'use strict';
+
+  // PayMongo QRPH Payment Handler
+  var paymongoQrphInit = false;      // Has QR been generated?
+  var paymongoQrphPaid = false;      // Has payment been confirmed?
+  var paymongoPollingTimer = null;
+  var paymongoCurrentPiId = null;
+  var PAYMONGO_POLL_INTERVAL = 3000; // 3 seconds
+
+  function getEl(id) { return document.getElementById(id); }
+
+  function showQrphSection(sectionId) {
+    ['paymongo-qrph-loading', 'paymongo-qrph-qr', 'paymongo-qrph-error', 'paymongo-qrph-confirmed'].forEach(function(id) {
+      var el = getEl(id);
+      if (el) el.classList.add('hidden');
+    });
+    var target = getEl(sectionId);
+    if (target) target.classList.remove('hidden');
+  }
+
+  function stopPolling() {
+    if (paymongoPollingTimer) {
+      clearInterval(paymongoPollingTimer);
+      paymongoPollingTimer = null;
+    }
+  }
+
+  function startPolling(piId) {
+    stopPolling();
+    paymongoPollingTimer = setInterval(function() {
+      if (!piId) { stopPolling(); return; }
+
+      fetch('/api/payments/paymongo-qrph-status?pi_id=' + encodeURIComponent(piId), {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.success) {
+          console.warn('PayMongo status check failed:', data.message);
+          return;
+        }
+
+        if (data.paid) {
+          stopPolling();
+          paymongoQrphPaid = true;
+
+          // Update status banner
+          var banner = getEl('paymongo-status-banner');
+          if (banner) {
+            banner.style.background = 'rgba(34,197,94,0.2)';
+            banner.innerHTML = '<i class="fas fa-check-circle mr-1 text-green-400"></i><span class="text-green-300 font-bold">Payment Received!</span>';
+          }
+
+          // Show confirmed state and complete button
+          showQrphSection('paymongo-qrph-confirmed');
+          var confirmBtn = getEl('confirm-paymongo-payment');
+          if (confirmBtn) {
+            confirmBtn.classList.remove('hidden');
+            confirmBtn.disabled = false;
+          }
+        }
+      })
+      .catch(function(err) {
+        console.error('PayMongo poll error:', err);
+      });
+    }, PAYMONGO_POLL_INTERVAL);
+  }
+
+  window.initPaymongoQrph = function() {
+    if (paymongoQrphInit && !paymongoQrphPaid) {
+      // Already initialized and not paid, just show the QR section
+      return;
+    }
+    if (paymongoQrphPaid) {
+      // Already paid, show confirmed state
+      showQrphSection('paymongo-qrph-confirmed');
+      return;
+    }
+
+    showQrphSection('paymongo-qrph-loading');
+    paymongoQrphInit = false;
+
+    var form = document.getElementById('wizardRegisterForm');
+    if (!form) return;
+
+    var email    = form.querySelector('input[name="email"]').value.trim();
+    var username = form.querySelector('input[name="username"]').value.trim();
+    var password = form.querySelector('input[name="password"]').value;
+    var phone    = (form.querySelector('input[name="phone"]') || {}).value || '';
+    var fullname = ((form.querySelector('input[name="firstname"]') || {}).value || '') + ' ' +
+                   ((form.querySelector('input[name="lastname"]') || {}).value || '');
+    fullname = fullname.trim() || username;
+
+    if (!email || !username || !password) {
+      showQrphSection('paymongo-qrph-error');
+      var errMsg = getEl('paymongo-qrph-error-msg');
+      if (errMsg) errMsg.textContent = 'Please complete Steps 1 & 2 before proceeding with payment.';
+      return;
+    }
+
+    var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : null;
+    var amountPhp = tier ? parseInt(tier.firstPhp || tier.pricePhp || 0, 10) : 0;
+    var tierName  = tier ? (tier.name || 'Membership') : 'Membership';
+
+    if (amountPhp <= 0) {
+      showQrphSection('paymongo-qrph-error');
+      var errMsg = getEl('paymongo-qrph-error-msg');
+      if (errMsg) errMsg.textContent = 'Please select a membership tier first.';
+      return;
+    }
+
+    // Get CSRF token
+    var csrfInput = form.querySelector('input[name="csrf_token"]');
+    var csrfToken = csrfInput ? csrfInput.value : '';
+
+    var formData = new FormData();
+    formData.append('csrf_token', csrfToken);
+    formData.append('amount', amountPhp);
+    formData.append('email', email);
+    formData.append('name', fullname);
+    formData.append('phone', phone);
+    formData.append('tier', tierName);
+
+    fetch('/api/payments/paymongo-qrph-init', {
+      method: 'POST',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      body: formData
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.success) {
+        showQrphSection('paymongo-qrph-error');
+        var errMsg = getEl('paymongo-qrph-error-msg');
+        if (errMsg) errMsg.textContent = data.message || 'Failed to generate QR code.';
+        return;
+      }
+
+      paymongoCurrentPiId = data.pi_id;
+      paymongoQrphInit = true;
+
+      // Show QR code
+      var qrImg = getEl('paymongo-qr-image');
+      if (qrImg && data.qr_image) {
+        qrImg.src = data.qr_image;
+      }
+
+      var amountEl = getEl('paymongo-qr-amount');
+      if (amountEl) {
+        amountEl.textContent = '₱' + amountPhp.toLocaleString();
+      }
+
+      showQrphSection('paymongo-qrph-qr');
+
+      // Start polling for payment
+      startPolling(data.pi_id);
+    })
+    .catch(function(err) {
+      console.error('PayMongo QRPH init error:', err);
+      showQrphSection('paymongo-qrph-error');
+      var errMsg = getEl('paymongo-qrph-error-msg');
+      if (errMsg) errMsg.textContent = 'Network error. Please check your connection and try again.';
+    });
+  };
+
+  // Retry button
+  var retryBtn = getEl('paymongo-retry-btn');
+  if (retryBtn) {
+    retryBtn.addEventListener('click', function() {
+      paymongoQrphInit = false;
+      stopPolling();
+      window.initPaymongoQrph();
+    });
+  }
+
+  // Refresh QR button
+  var refreshBtn = getEl('paymongo-refresh-qr');
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() {
+      paymongoQrphInit = false;
+      stopPolling();
+      window.initPaymongoQrph();
+    });
+  }
+
+  // Confirm QRPH Payment - complete registration after confirmed payment
+  var confirmPaymongoBtn = getEl('confirm-paymongo-payment');
+  if (confirmPaymongoBtn) {
+    confirmPaymongoBtn.addEventListener('click', function() {
+      if (!paymongoQrphPaid || !paymongoCurrentPiId) {
+        window.showModal('Payment Not Confirmed', 'Your payment has not been confirmed yet. Please scan the QR code and complete the payment first.', 'fas fa-exclamation-circle', 'text-yellow-500');
+        return;
+      }
+
+      var form = document.getElementById('wizardRegisterForm');
+      var formData = new FormData(form);
+
+      var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : null;
+      var amountPhp = tier ? parseInt(tier.firstPhp || tier.pricePhp || 0, 10) : 0;
+
+      formData.set('package', tier ? tier.name : 'Membership');
+      formData.set('package_amount', amountPhp);
+      formData.set('package_currency', 'PHP');
+      formData.set('pay_method', 'paymongo_qrph');
+      formData.set('payment_method', 'paymongo_qrph');
+      formData.set('pi_id', paymongoCurrentPiId);
+
+      confirmPaymongoBtn.disabled = true;
+      confirmPaymongoBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Completing Registration...';
+
+      fetch('/paymongo-payments', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(result) {
+        if (result.success) {
+          var redirectUrl = result.redirect || '/chat';
+          window.showModal(
+            'Welcome to Ginto!',
+            result.message || 'Your account is now active! You\'re ready to start.',
+            'fas fa-check-circle',
+            'text-green-500',
+            function() { window.location.href = redirectUrl; }
+          );
+        } else {
+          confirmPaymongoBtn.disabled = false;
+          confirmPaymongoBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Complete Registration';
+          window.showModal('Registration Error', result.message || 'Could not complete registration. Please contact support.', 'fas fa-exclamation-circle', 'text-red-500');
+        }
+      })
+      .catch(function(err) {
+        console.error('PayMongo registration error:', err);
+        confirmPaymongoBtn.disabled = false;
+        confirmPaymongoBtn.innerHTML = '<i class="fas fa-check-circle mr-2"></i> Complete Registration';
+        window.showModal('Network Error', 'Could not connect to server. Please try again.', 'fas fa-exclamation-triangle', 'text-red-500');
+      });
+    });
+  }
+
+  // Stop polling when leaving the page
+  window.addEventListener('beforeunload', stopPolling);
+})();
+</script>
+<?php endif; ?>
+
+<script>
 // Smooth scroll only on click, not on page load
 document.querySelectorAll('a[href^="#"]').forEach(anchor => {
   anchor.addEventListener('click', function(e) {
