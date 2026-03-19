@@ -149,14 +149,22 @@ $walletTransactions = $wallet_transactions ?? [];
     width: 100%;
     padding: 11px 14px;
     border-radius: 12px;
-    border: 1.5px solid var(--border);
-    background: var(--surface2);
-    color: var(--text);
+    border: 1.5px solid rgba(255,255,255,0.16);
+    background: #101a2f;
+    color: #e9efff;
     font-size: 0.92rem;
     box-sizing: border-box;
-    transition: border-color 0.18s;
+    transition: border-color 0.18s, box-shadow 0.18s;
 }
-.pf-input:focus { outline: none; border-color: rgba(99,102,241,0.6); }
+.pf-input::placeholder { color: rgba(233,239,255,0.56); }
+.pf-input:focus { outline: none; border-color: rgba(214,180,75,0.75); box-shadow: 0 0 0 3px rgba(214,180,75,0.14); }
+.pf-input:-webkit-autofill,
+.pf-input:-webkit-autofill:hover,
+.pf-input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #e9efff;
+    -webkit-box-shadow: 0 0 0 1000px #101a2f inset;
+    transition: background-color 5000s ease-in-out 0s;
+}
 .txn-row {
     display: grid;
     grid-template-columns: auto 1fr auto;
@@ -218,9 +226,12 @@ $walletTransactions = $wallet_transactions ?? [];
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
                 <div>
                     <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Add Funds</h2>
-                    <p style="margin:0;font-size:0.76rem;color:var(--muted);">Choose amount &amp; payment method</p>
+                    <p style="margin:0;font-size:0.76rem;color:var(--muted);">Choose amount and payment method.</p>
                 </div>
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
+            </div>
+            <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
+                PayMongo top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. Wallet funds are purchase-only and cannot be withdrawn.
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
@@ -235,13 +246,27 @@ $walletTransactions = $wallet_transactions ?? [];
                             <span class="sub">Ginto Pay</span>
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="ginto_pay_card">
-                            Card
-                            <span class="sub">Ginto Pay</span>
+                            Credit / Debit
+                            <span class="sub">via PayMongo</span>
                         </button>
                         <button type="button" class="topup-method-btn wallet-method-card" data-method="paypal">
                             PayPal
                             <span class="sub">International</span>
                         </button>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:10px 12px;border-radius:12px;background:rgba(255,255,255,0.04);border:1px solid var(--border);font-size:0.76rem;">
+                    <div>
+                        <div style="color:var(--muted);">You pay</div>
+                        <div id="topupGross" style="font-weight:800;color:var(--text);margin-top:3px;">₱0.00</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);">Fee</div>
+                        <div id="topupFee" style="font-weight:800;color:#fca5a5;margin-top:3px;">₱0.00</div>
+                    </div>
+                    <div>
+                        <div style="color:var(--muted);">Wallet credit</div>
+                        <div id="topupCredit" style="font-weight:800;color:#86efac;margin-top:3px;">₱0.00</div>
                     </div>
                 </div>
                 <div id="walletTopupError" style="display:none;padding:12px 14px;border-radius:13px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fecaca;font-size:0.85rem;"></div>
@@ -256,7 +281,7 @@ $walletTransactions = $wallet_transactions ?? [];
     <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
             <div>
-                <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Transaction History</h2>
+                <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Wallet Ledger</h2>
                 <p style="margin:0;font-size:0.77rem;color:var(--muted);">All wallet activity</p>
             </div>
             <span style="font-size:0.73rem;color:var(--muted);background:var(--surface2);padding:5px 11px;border-radius:9px;border:1px solid var(--border);font-weight:600;">Newest first</span>
@@ -296,12 +321,16 @@ $walletTransactions = $wallet_transactions ?? [];
     const errorBox = document.getElementById('walletTopupError');
     const infoBox = document.getElementById('walletTopupInfo');
     const qrWrap = document.getElementById('walletTopupQr');
+    const topupGrossEl = document.getElementById('topupGross');
+    const topupFeeEl = document.getElementById('topupFee');
+    const topupCreditEl = document.getElementById('topupCredit');
     const topupPanel = document.getElementById('topupPanel');
     const toggleTopupBtn = document.getElementById('toggleTopupBtn');
     const closeTopupBtn = document.getElementById('closeTopupBtn');
     const methodButtons = Array.from(document.querySelectorAll('.wallet-method-card'));
     let selectedMethod = 'ginto_pay_qr';
     let currentSessionRef = '';
+    let statusPoll = null;
 
     toggleTopupBtn.addEventListener('click', function () {
         const isOpen = topupPanel.style.display !== 'none';
@@ -323,6 +352,41 @@ $walletTransactions = $wallet_transactions ?? [];
     function setInfo(message) {
         infoBox.style.display = message ? 'block' : 'none';
         infoBox.textContent = message || '';
+    }
+
+    function formatPrice(value) {
+        return '₱' + Number(value || 0).toFixed(2);
+    }
+
+    function isPayMongoMethod(method) {
+        return method === 'ginto_pay_qr' || method === 'ginto_pay_card';
+    }
+
+    function updateTopupBreakdown() {
+        const gross = Math.max(0, Number(amountInput.value || 0));
+        const fee = isPayMongoMethod(selectedMethod) && gross > 0 ? 25 : 0;
+        const credit = Math.max(0, gross - fee);
+        topupGrossEl.textContent = formatPrice(gross);
+        topupFeeEl.textContent = formatPrice(fee);
+        topupCreditEl.textContent = formatPrice(credit);
+    }
+
+    function beginStatusPoll() {
+        if (!currentSessionRef) return;
+        if (statusPoll) window.clearInterval(statusPoll);
+        statusPoll = window.setInterval(async function () {
+            try {
+                const response = await fetch('/api/mall/checkout/status?session_ref=' + encodeURIComponent(currentSessionRef), {
+                    headers: { 'Accept': 'application/json' },
+                });
+                const json = await response.json();
+                if (json.status === 'completed') {
+                    window.clearInterval(statusPoll);
+                    setInfo('Top-up confirmed and posted to your wallet. Refreshing ledger...');
+                    window.location.reload();
+                }
+            } catch (_) {}
+        }, 5000);
     }
 
     async function api(url, body) {
@@ -355,9 +419,11 @@ $walletTransactions = $wallet_transactions ?? [];
                 qrWrap.style.display = 'block';
                 qrWrap.innerHTML = '<h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to top up</h3>'
                     + (qr.qr_image ? '<img src="' + qr.qr_image + '" alt="Wallet top-up QR" style="max-width:320px;width:min(100%,320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;">' : '<div style="color:var(--muted);font-size:0.84rem;">' + (qr.qr_string || 'QR code ready.') + '</div>');
-                setInfo('Scan the QR code and keep this page open until the top-up posts to your wallet.');
+                setInfo('Scan the QR code and keep this page open. You pay ' + formatPrice(create.amount) + ', fee ' + formatPrice(create.fee) + ', wallet credit ' + formatPrice(create.credit_amount) + '.');
+                beginStatusPoll();
             } else if (selectedMethod === 'ginto_pay_card') {
                 const card = await api('/api/mall/checkout/paymongo-card-init', { session_ref: currentSessionRef });
+                setInfo('Redirecting to PayMongo secure card page. You pay ' + formatPrice(create.amount) + ', fee ' + formatPrice(create.fee) + ', wallet credit ' + formatPrice(create.credit_amount) + '.');
                 window.location.href = card.redirect_url;
                 return;
             } else {
@@ -379,8 +445,12 @@ $walletTransactions = $wallet_transactions ?? [];
                 item.classList.toggle('is-selected', active);
                 item.style.borderColor = active ? '#d6b44b' : '';
             });
+            updateTopupBreakdown();
         });
     });
+
+    amountInput.addEventListener('input', updateTopupBreakdown);
+    updateTopupBreakdown();
 
     topupBtn.addEventListener('click', startTopup);
 })();

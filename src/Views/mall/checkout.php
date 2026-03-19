@@ -113,72 +113,191 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     transition:border-color 0.18s, color 0.18s;
 }
 .co-btn-cancel:hover { border-color:rgba(255,255,255,0.22); color:var(--text); }
+/* ── Form inputs ── */
+.pf-input {
+    width:100%; padding:11px 14px;
+    background:#101a2f;
+    border:1.5px solid rgba(255,255,255,0.16);
+    border-radius:12px;
+    color:#e9efff;
+    font-family:inherit; font-size:0.9rem;
+    transition:border-color 0.18s, box-shadow 0.18s, background 0.18s;
+    -webkit-appearance:none;
+}
+.pf-input::placeholder { color:rgba(233,239,255,0.56); opacity:1; }
+.pf-input:focus {
+    outline:none;
+    border-color:rgba(214,180,75,0.75);
+    background:#0e172a;
+    box-shadow:0 0 0 3px rgba(214,180,75,0.14);
+}
+.pf-input:hover:not(:focus) { border-color:rgba(255,255,255,0.16); }
+textarea.pf-input { resize:vertical; line-height:1.6; }
+.pf-input:-webkit-autofill,
+.pf-input:-webkit-autofill:hover,
+.pf-input:-webkit-autofill:focus {
+    -webkit-text-fill-color:#e9efff;
+    -webkit-box-shadow:0 0 0 1000px #101a2f inset;
+    transition:background-color 5000s ease-in-out 0s;
+}
+.pf-input.field-error {
+    border-color:rgba(239,68,68,0.7) !important;
+    box-shadow:0 0 0 3px rgba(239,68,68,0.12) !important;
+    background:rgba(239,68,68,0.04) !important;
+}
+.pf-label {
+    font-size:0.75rem;
+    font-weight:700;
+    color:rgba(232,241,255,0.86);
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    margin-bottom:6px;
+    display:block;
+}
+/* ── Section cards ── */
+.co-section {
+    border:1px solid rgba(255,255,255,0.07);
+    background:rgba(255,255,255,0.025);
+    backdrop-filter:blur(6px);
+    border-radius:24px;
+    padding:28px;
+}
+.co-section-title {
+    font-size:0.7rem;
+    font-weight:800;
+    text-transform:uppercase;
+    letter-spacing:0.14em;
+    color:var(--muted);
+    margin-bottom:16px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+.co-section-title::before {
+    content:'';
+    width:3px; height:14px;
+    border-radius:2px;
+    background:linear-gradient(180deg,#d4af37,#3b82f6);
+    display:inline-block;
+    flex-shrink:0;
+}
+/* ── Aside cards ── */
+.aside-card {
+    border:1px solid rgba(255,255,255,0.07);
+    background:rgba(255,255,255,0.025);
+    border-radius:24px;
+    padding:24px;
+    overflow:hidden;
+}
+/* ── Total amount display ── */
+#checkoutTotal {
+    font-size:2.2rem; font-weight:900; line-height:1;
+    background:linear-gradient(135deg,#f5d67b 0%,#d4af37 45%,#b8860b 100%);
+    -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+}
+/* ── What happens next ── */
+.next-steps { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+.next-steps li {
+    display:flex; align-items:flex-start; gap:12px;
+    font-size:0.85rem; color:var(--muted); line-height:1.55;
+}
+.next-steps li .step-num {
+    width:22px; height:22px; border-radius:50%;
+    background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1);
+    font-size:0.68rem; font-weight:800; color:var(--muted);
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; margin-top:1px;
+}
+
+@media (max-width: 980px) {
+    section[style*="grid-template-columns:minmax(0,1.3fr)"] {
+        grid-template-columns: minmax(0, 1fr) !important;
+        gap: 16px !important;
+    }
+    aside[style*="position:sticky"] {
+        position: static !important;
+        top: auto !important;
+    }
+}
+
+@media (max-width: 640px) {
+    #paymentMethodGrid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+    #checkoutShippingForm {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
 /* ── Shipping field error highlight ── */
-.pf-input.field-error { border-color:var(--danger) !important; box-shadow:0 0 0 2px rgba(239,68,68,0.18); }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 
-<section style="max-width:1360px;margin:28px auto 72px;padding:0 18px;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(340px,0.8fr);gap:20px;align-items:start;">
-    <div style="display:flex;flex-direction:column;gap:18px;">
-        <div style="border:1px solid var(--border);background:linear-gradient(135deg, rgba(255,255,255,0.04), rgba(80,146,255,0.08) 55%, rgba(255,214,102,0.14));border-radius:28px;padding:26px;">
-            <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+<section style="max-width:1320px;margin:32px auto 80px;padding:0 18px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,0.7fr);gap:22px;align-items:start;">
+    <div style="display:flex;flex-direction:column;gap:20px;">
+
+        <!-- Hero bar -->
+        <div style="border:1px solid rgba(255,255,255,0.07);background:linear-gradient(130deg,rgba(15,23,42,0.9) 0%,rgba(26,32,64,0.9) 50%,rgba(30,28,50,0.9) 100%);border-radius:24px;padding:24px 28px;position:relative;overflow:hidden;">
+            <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(214,180,75,0.1) 0%,transparent 60%);pointer-events:none;"></div>
+            <div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
                 <div>
-                    <div style="font-size:0.82rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);font-weight:700;">Mall Checkout</div>
-                    <h1 style="margin:8px 0 10px;font-size:2rem;line-height:1.05;font-weight:800;">Finish your order</h1>
-                    <p style="margin:0;max-width:720px;color:var(--muted);font-size:0.95rem;line-height:1.7;">This checkout uses the same processors already configured for registration. Ginto Pay supports QR and card through PayMongo, PayPal is available as a direct option, and Ginto Wallet can be used when your balance is sufficient.</p>
+                    <div style="font-size:0.68rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(214,180,75,0.7);font-weight:800;margin-bottom:6px;">Mall Checkout</div>
+                    <h1 style="margin:0 0 6px;font-size:1.75rem;line-height:1.1;font-weight:900;letter-spacing:-0.02em;">Finish your order</h1>
+                    <p style="margin:0;color:var(--muted);font-size:0.85rem;line-height:1.65;max-width:580px;">Ginto Pay routes through PayMongo. Card payment means the user pays with a regular credit or debit card.</p>
                 </div>
-                <a href="/marketplace" class="btn btn-secondary">Back to Mall</a>
+                <a href="/marketplace" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--muted);font-size:0.82rem;font-weight:700;transition:all 0.18s;text-decoration:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='var(--text)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='var(--muted)';">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+                    Back to Mall
+                </a>
             </div>
         </div>
 
-        <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
-            <h2 style="margin:0 0 14px;font-size:1.05rem;font-weight:800;">Shipping Details</h2>
+        <!-- Shipping Details -->
+        <div class="co-section">
+            <div class="co-section-title">Shipping Details</div>
             <form id="checkoutShippingForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">Full Name</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">Full Name</span>
                     <input id="shipFullName" type="text" class="pf-input" placeholder="Juan Dela Cruz" autocomplete="name">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">Phone</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">Phone</span>
                     <input id="shipPhone" type="text" class="pf-input" placeholder="09xx xxx xxxx" autocomplete="tel">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1;">
-                    <span style="font-size:0.82rem;font-weight:700;">Address Line 1</span>
+                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                    <span class="pf-label">Address Line 1</span>
                     <input id="shipAddress1" type="text" class="pf-input" placeholder="House number, street, barangay" autocomplete="address-line1">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1;">
-                    <span style="font-size:0.82rem;font-weight:700;">Address Line 2</span>
+                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                    <span class="pf-label">Address Line 2 <span style="font-weight:500;opacity:0.6;">(optional)</span></span>
                     <input id="shipAddress2" type="text" class="pf-input" placeholder="Apartment, building, landmark" autocomplete="address-line2">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">City / Municipality</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">City / Municipality</span>
                     <input id="shipCity" type="text" class="pf-input" placeholder="Quezon City" autocomplete="address-level2">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">Province</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">Province</span>
                     <input id="shipProvince" type="text" class="pf-input" placeholder="Metro Manila" autocomplete="address-level1">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">Postal Code</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">Postal Code</span>
                     <input id="shipPostalCode" type="text" class="pf-input" placeholder="1100" autocomplete="postal-code">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;">
-                    <span style="font-size:0.82rem;font-weight:700;">Country</span>
+                <label style="display:flex;flex-direction:column;">
+                    <span class="pf-label">Country</span>
                     <input id="shipCountry" type="text" class="pf-input" value="PH" autocomplete="country-name">
                 </label>
-                <label style="display:flex;flex-direction:column;gap:6px;grid-column:1 / -1;">
-                    <span style="font-size:0.82rem;font-weight:700;">Buyer Notes</span>
-                    <textarea id="shipBuyerNotes" class="pf-input" rows="3" placeholder="Special instructions for delivery or landmark notes"></textarea>
+                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                    <span class="pf-label">Delivery Notes <span style="font-weight:500;opacity:0.6;">(optional)</span></span>
+                    <textarea id="shipBuyerNotes" class="pf-input" rows="3" placeholder="Special instructions or landmark notes for the delivery crew"></textarea>
                 </label>
             </form>
         </div>
 
-        <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;">
-                <h2 style="margin:0;font-size:1.05rem;font-weight:800;">Payment Method</h2>
-                <div style="font-size:0.82rem;color:var(--muted);">Available: Ginto Pay, PayPal, and Ginto Wallet</div>
-            </div>
+        <!-- Payment Method -->
+        <div class="co-section">
+            <div class="co-section-title">Payment Method</div>
 
             <div id="paymentMethodGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
                 <button type="button" class="pm-card is-selected" data-method="ginto_pay_qr">
@@ -196,7 +315,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
                     </div>
                     <div class="pm-body">
                         <div class="pm-name">Card</div>
-                        <div class="pm-desc">Credit / debit via PayMongo</div>
+                        <div class="pm-desc">Regular credit/debit cards via PayMongo</div>
                     </div>
                     <div class="pm-check">✓</div>
                 </button>
@@ -224,6 +343,10 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
                 </button>
             </div>
 
+            <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.24);font-size:0.79rem;color:#c7f9df;line-height:1.5;">
+                Wallet funds are purchase-only and cannot be withdrawn.
+            </div>
+
             <div id="checkoutError" style="display:none;margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fecaca;"></div>
             <div id="checkoutInfo" style="display:none;margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#bfdbfe;"></div>
 
@@ -240,7 +363,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
                 <button type="button" id="startCheckoutBtn" style="display:none;" aria-hidden="true"></button>
-                <a href="/mall/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Wallet</a>
+                <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Wallet</a>
                 <span style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
             </div>
         </div>
@@ -569,7 +692,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
             confirmLabel: 'Generate QR & Pay',
         },
         ginto_pay_card: {
-            name: 'Ginto Pay — Card',
+            name: 'Credit / Debit Card',
             iconBg: 'linear-gradient(135deg,#1e3a8a,#3b82f6)',
             iconHtml: '<svg width="28" height="22" viewBox="0 0 26 20" fill="none"><rect width="26" height="20" rx="4"/><rect y="3" width="26" height="6" fill="rgba(255,255,255,0.32)"/><rect x="2" y="12" width="10" height="2.5" rx="1.2" fill="white"/></svg>',
             confirmLabel: 'Pay with Card',

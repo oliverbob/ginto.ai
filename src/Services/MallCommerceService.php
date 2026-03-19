@@ -10,6 +10,8 @@ class MallCommerceService
 {
     private $db;
 
+    private const PAYMONGO_TOPUP_FEE_PHP = 25.00;
+
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off' => 12.00,
         'active_discovery' => 25.00,
@@ -397,6 +399,19 @@ class MallCommerceService
             throw new \RuntimeException('Top-up amount must be greater than zero.');
         }
 
+        $normalizedMethod = $this->normalizePaymentMethod($paymentMethod);
+        if (!in_array($normalizedMethod, ['ginto_pay_qr', 'ginto_pay_card', 'paypal'], true)) {
+            throw new \RuntimeException('Unsupported top-up payment method.');
+        }
+
+        $feeAmount = $this->isPayMongoTopupMethod($normalizedMethod) ? self::PAYMONGO_TOPUP_FEE_PHP : 0.00;
+        if ($feeAmount > 0 && $amount <= $feeAmount) {
+            throw new \RuntimeException('Top-up amount must be greater than ₱' . number_format($feeAmount, 2) . ' to cover the PayMongo processing fee.');
+        }
+
+        $grossAmount = round($amount, 2);
+        $creditAmount = round($grossAmount - $feeAmount, 2);
+
         $sessionRef = $this->generateSessionRef('WTU');
         $now = date('Y-m-d H:i:s');
         $expiresAt = date('Y-m-d H:i:s', strtotime('+30 minutes'));
@@ -405,12 +420,17 @@ class MallCommerceService
             'session_ref' => $sessionRef,
             'buyer_id' => $userId,
             'purpose' => 'wallet_topup',
-            'payment_method' => $this->normalizePaymentMethod($paymentMethod),
-            'gateway' => $this->paymentGatewayForMethod($paymentMethod),
+            'payment_method' => $normalizedMethod,
+            'gateway' => $this->paymentGatewayForMethod($normalizedMethod),
             'currency' => 'PHP',
-            'amount_total' => round($amount, 2),
+            'amount_total' => $grossAmount,
             'status' => 'pending',
-            'payload_json' => json_encode(['topup_amount' => round($amount, 2)]),
+            'payload_json' => json_encode([
+                'topup_amount' => $grossAmount,
+                'topup_fee' => round($feeAmount, 2),
+                'topup_credit_amount' => $creditAmount,
+                'fee_policy' => $feeAmount > 0 ? 'fixed_paymongo_fee' : 'no_fee',
+            ]),
             'expires_at' => $expiresAt,
             'created_at' => $now,
             'updated_at' => $now,
@@ -418,7 +438,9 @@ class MallCommerceService
 
         return [
             'session_ref' => $sessionRef,
-            'amount' => round($amount, 2),
+            'amount' => $grossAmount,
+            'fee' => round($feeAmount, 2),
+            'credit_amount' => $creditAmount,
         ];
     }
 
@@ -466,10 +488,38 @@ class MallCommerceService
             $this->db->update('mall_payment_sessions', $sessionUpdate, ['session_ref' => $sessionRef]);
 
             if ($session['purpose'] === 'wallet_topup') {
-                $this->applyWalletCredit($buyerId, (float)$session['amount_total'], 'PHP', $sessionRef, 'Ginto Wallet top-up');
+                $payload = json_decode((string)($session['payload_json'] ?? '{}'), true) ?: [];
+                $grossAmount = round((float)($payload['topup_amount'] ?? $session['amount_total'] ?? 0), 2);
+                $feeAmount = round((float)($payload['topup_fee'] ?? 0), 2);
+                $creditAmount = round((float)($payload['topup_credit_amount'] ?? ($grossAmount - $feeAmount)), 2);
+
+                if ($creditAmount <= 0) {
+                    throw new \RuntimeException('Wallet top-up credit amount is invalid.');
+                }
+
+                $creditDescription = $feeAmount > 0
+                    ? 'Ginto Wallet top-up (net of ₱' . number_format($feeAmount, 2) . ' PayMongo fee)'
+                    : 'Ginto Wallet top-up';
+
+                $this->applyWalletCredit(
+                    $buyerId,
+                    $creditAmount,
+                    'PHP',
+                    $sessionRef,
+                    $creditDescription,
+                    [
+                        'gross_amount' => $grossAmount,
+                        'fee_amount' => $feeAmount,
+                        'net_credited_amount' => $creditAmount,
+                        'payment_method' => (string)($session['payment_method'] ?? ''),
+                    ]
+                );
+
                 $this->createMallNotification($buyerId, null, 'mall_wallet_topup_completed', 'Your Ginto Wallet top-up has been credited.', [
                     'session_ref' => $sessionRef,
-                    'amount' => (float)$session['amount_total'],
+                    'gross_amount' => $grossAmount,
+                    'fee' => $feeAmount,
+                    'credited_amount' => $creditAmount,
                 ]);
             } else {
                 $orderIds = json_decode((string)($session['order_ids_json'] ?? '[]'), true) ?: [];
@@ -940,7 +990,7 @@ class MallCommerceService
         ]);
     }
 
-    private function applyWalletCredit(int $userId, float $amount, string $currency, string $referenceId, string $description): void
+    private function applyWalletCredit(int $userId, float $amount, string $currency, string $referenceId, string $description, array $metadata = []): void
     {
         $wallet = $this->ensureWalletAccount($userId);
         $balance = round((float)($wallet['balance'] ?? 0), 2);
@@ -961,8 +1011,14 @@ class MallCommerceService
             'reference_type' => 'mall_payment_session',
             'reference_id' => $referenceId,
             'description' => $description,
+            'metadata' => !empty($metadata) ? json_encode($metadata) : null,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+    }
+
+    private function isPayMongoTopupMethod(string $paymentMethod): bool
+    {
+        return in_array($paymentMethod, ['ginto_pay_qr', 'ginto_pay_card'], true);
     }
 
     private function addOrderHistory(int $orderId, ?int $actorUserId, string $actorType, ?string $fromStatus, string $toStatus, string $message): void

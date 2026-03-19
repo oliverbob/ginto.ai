@@ -46,7 +46,7 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
         <!-- Actions -->
         <div class="header-actions" style="margin-left:auto">
             <?php if ($isLoggedIn): ?>
-            <a class="action-btn" href="/mall/wallet" aria-label="Open Ginto Wallet" title="Ginto Wallet balance: ₱<?= number_format($mallWalletBalance, 2) ?>" style="text-decoration:none;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;padding:0 10px;min-width:42px;">
+            <a class="action-btn" href="/wallet" aria-label="Open Ginto Wallet" title="Ginto Wallet balance: ₱<?= number_format($mallWalletBalance, 2) ?>" style="text-decoration:none;position:relative;display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;padding:0 10px;min-width:42px;">
                 <span aria-hidden="true">₱</span>
                 <span style="font-size:0.75rem;font-weight:700;"><?= number_format($mallWalletBalance, 2) ?></span>
             </a>

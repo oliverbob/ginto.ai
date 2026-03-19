@@ -1265,6 +1265,7 @@ $router->req('/marketplace', 'MallController@marketplace');
 $router->req('/mall', 'MallController@marketplace');
 $router->req('/mall/checkout', 'MallCheckoutController@checkoutPage');
 $router->req('/mall/wallet', 'MallCheckoutController@walletPage');
+$router->req('/wallet', 'MallCheckoutController@walletPage');
 $router->req('/mall/orders', 'MallCheckoutController@buyerOrdersPage');
 $router->req('/marketplace/sellers/orders', 'MallCheckoutController@sellerOrdersPage');
 $router->req('/marketplace/delivery/orders', 'MallCheckoutController@deliveryOrdersPage');
