@@ -1285,6 +1285,8 @@ body.light .co-qr-spinner {
         const ctEl = document.getElementById('checkoutTotal');
         if (ctEl && session.total) ctEl.textContent = formatPrice(session.total, currency);
     }
+
+    function shippingPayload() {
         return {
             full_name: document.getElementById('shipFullName').value,
             phone: document.getElementById('shipPhone').value,
