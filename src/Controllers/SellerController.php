@@ -3,6 +3,7 @@ namespace Ginto\Controllers;
 
 use Ginto\Models\Product;
 use Ginto\Core\Database;
+use Ginto\Services\MallCommerceService;
 
 class SellerController extends \Core\Controller
 {
@@ -64,6 +65,7 @@ class SellerController extends \Core\Controller
             'digital_content','intellectual_property','food_beverage',
             'fashion_apparel','health_wellness','arts_crafts',
             'business','cooperative','non_profit','government_program',
+            'delivery_service',
             'ginto_sell_for_me','ginto_special_agreement','ginto_partnership_program',
         ];
         $rawAccountType = trim($_POST['account_type'] ?? '');
@@ -79,9 +81,24 @@ class SellerController extends \Core\Controller
             // Supporting / business documents
             'proof_of_address','dti_certificate','sec_certificate',
             'business_permit','bir_cor','cda_certificate','government_program_certificate','other_support',
+            'police_clearance','nbi_clearance',
             'other', // legacy
         ];
         $docTypes = array_values(array_intersect((array)$rawDocTypes, $allowedDocTypes));
+
+        // Delivery-service KYC requirements:
+        // 1) valid ID, 2) barangay OR church clearance, 3) police OR NBI clearance
+        if ($accountType === 'delivery_service') {
+            $hasValidId = in_array('id_front', $docTypes, true) || in_array('other_id', $docTypes, true) || in_array('id_back', $docTypes, true);
+            $hasLocalClearance = in_array('barangay_clearance', $docTypes, true) || in_array('church_clearance', $docTypes, true);
+            $hasPoliceOrNbi = in_array('police_clearance', $docTypes, true) || in_array('nbi_clearance', $docTypes, true);
+
+            if (!$hasValidId || !$hasLocalClearance || !$hasPoliceOrNbi) {
+                http_response_code(400);
+                echo 'Delivery service registration requires valid ID, barangay/church clearance, and police/NBI clearance.';
+                return;
+            }
+        }
 
         // Handle uploaded documents from both upload areas
         $docs = [];
@@ -266,6 +283,21 @@ class SellerController extends \Core\Controller
         $price = floatval($_POST['price'] ?? 0);
         $currency = $_POST['currency'] ?? 'USD';
         $category = intval($_POST['category_id'] ?? 0) ?: null;
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
+        $pricingRate = (float)($_POST['pricing_rate'] ?? 12);
+        $markupRate = (float)($_POST['markup_rate'] ?? 0);
+
+        $allowedPricingModels = ['hands_off', 'active_discovery', 'full_service', 'markup'];
+        if (!in_array($pricingModel, $allowedPricingModels, true)) {
+            $pricingModel = 'hands_off';
+        }
+        if ($pricingModel === 'markup') {
+            $markupRate = max(10, min(50, $markupRate));
+            $pricingRate = 0;
+        } else {
+            $pricingRate = max(10, min(50, $pricingRate));
+            $markupRate = 0;
+        }
 
         // Handle images upload (multiple) — use B2 when configured, else local storage
         $imagesArray = [];
@@ -322,6 +354,9 @@ class SellerController extends \Core\Controller
             'description' => $description ?: null,
             'price' => $price,
             'currency' => $currency,
+            'pricing_model' => $pricingModel,
+            'pricing_rate' => $pricingRate,
+            'markup_rate' => $markupRate,
             'category_id' => $category,
             'images' => $imagesArray,
             'status' => 'draft',
@@ -331,6 +366,14 @@ class SellerController extends \Core\Controller
         $created = $productModel->create($data);
         if (!$created) {
             http_response_code(500); echo 'Failed to create product'; return;
+        }
+
+        // Ensure every seller has a storefront slug once they start listing products.
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $commerce->ensureStorefront($userId);
+        } catch (\Throwable $_) {
+            // Non-blocking: product listing should still succeed.
         }
 
         header('Location: /marketplace/sellers/products'); exit;
@@ -469,6 +512,21 @@ class SellerController extends \Core\Controller
         $currency = $_POST['currency'] ?? 'USD';
         $qty      = intval($_POST['quantity'] ?? 0);
         $category = intval($_POST['category_id'] ?? 0) ?: null;
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
+        $pricingRate = (float)($_POST['pricing_rate'] ?? 12);
+        $markupRate = (float)($_POST['markup_rate'] ?? 0);
+
+        $allowedPricingModels = ['hands_off', 'active_discovery', 'full_service', 'markup'];
+        if (!in_array($pricingModel, $allowedPricingModels, true)) {
+            $pricingModel = 'hands_off';
+        }
+        if ($pricingModel === 'markup') {
+            $markupRate = max(10, min(50, $markupRate));
+            $pricingRate = 0;
+        } else {
+            $pricingRate = max(10, min(50, $pricingRate));
+            $markupRate = 0;
+        }
 
         // Start from the kept images (user may have removed some via delete buttons)
         $allExisting  = json_decode($existing['images'] ?? '[]', true) ?: [];
@@ -531,6 +589,9 @@ class SellerController extends \Core\Controller
             'currency'          => $currency,
             'quantity'          => $qty,
             'category_id'       => $category,
+            'pricing_model'     => $pricingModel,
+            'pricing_rate'      => $pricingRate,
+            'markup_rate'       => $markupRate,
             'images'            => json_encode($imagesArray),
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);

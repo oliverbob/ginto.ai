@@ -469,6 +469,32 @@ select.pf-input    { cursor: pointer; }
                         </select>
                     </div>
                 </div>
+
+                <div class="pf-group">
+                    <label class="pf-label" for="pf-pricing-model">Marketplace Fee Model <span class="req" aria-hidden="true">*</span></label>
+                    <select class="pf-input" id="pf-pricing-model" name="pricing_model">
+                        <option value="hands_off" <?= ($p['pricing_model'] ?? 'hands_off') === 'hands_off' ? 'selected' : '' ?>>Hands-Off (10% to 15% platform fee)</option>
+                        <option value="active_discovery" <?= ($p['pricing_model'] ?? '') === 'active_discovery' ? 'selected' : '' ?>>Active Discovery (20% to 25% platform fee)</option>
+                        <option value="full_service" <?= ($p['pricing_model'] ?? '') === 'full_service' ? 'selected' : '' ?>>Full Service (30% to 50% platform fee)</option>
+                        <option value="markup" <?= ($p['pricing_model'] ?? '') === 'markup' ? 'selected' : '' ?>>Markup Mode (add 10% to 50% buyer markup)</option>
+                    </select>
+                    <span class="pf-hint">This controls how platform fees are computed when buyers checkout your product.</span>
+                </div>
+
+                <div class="pf-grid-2">
+                    <div class="pf-group" id="pf-pricing-rate-group">
+                        <label class="pf-label" for="pf-pricing-rate">Platform Fee Rate (%)</label>
+                        <input class="pf-input" id="pf-pricing-rate" type="number" min="10" max="50" step="0.01" name="pricing_rate"
+                            value="<?= htmlspecialchars((string)($p['pricing_rate'] ?? 12)) ?>">
+                        <span class="pf-hint">Used for Hands-Off, Active Discovery, and Full Service models.</span>
+                    </div>
+                    <div class="pf-group" id="pf-markup-rate-group">
+                        <label class="pf-label" for="pf-markup-rate">Markup Rate (%)</label>
+                        <input class="pf-input" id="pf-markup-rate" type="number" min="10" max="50" step="0.01" name="markup_rate"
+                            value="<?= htmlspecialchars((string)($p['markup_rate'] ?? 10)) ?>">
+                        <span class="pf-hint">Used only when Markup mode is selected.</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -619,6 +645,33 @@ select.pf-input    { cursor: pointer; }
                 .trim().replace(/\s+/g, '-');
         });
         slugInput.addEventListener('input', function () { slugInput.dataset.manual = '1'; });
+    }
+
+    var pricingModelEl = document.getElementById('pf-pricing-model');
+    var pricingRateEl = document.getElementById('pf-pricing-rate');
+    var markupRateEl = document.getElementById('pf-markup-rate');
+
+    function applyPricingModelRules() {
+        if (!pricingModelEl || !pricingRateEl || !markupRateEl) return;
+        var model = pricingModelEl.value;
+        var isMarkup = model === 'markup';
+        pricingRateEl.disabled = isMarkup;
+        markupRateEl.disabled = !isMarkup;
+
+        if (isMarkup) {
+            if (!markupRateEl.value || Number(markupRateEl.value) < 10) markupRateEl.value = '10';
+            pricingRateEl.value = '0';
+        } else {
+            if (!pricingRateEl.value || Number(pricingRateEl.value) < 10) {
+                pricingRateEl.value = model === 'active_discovery' ? '25' : (model === 'full_service' ? '35' : '12');
+            }
+            markupRateEl.value = '0';
+        }
+    }
+
+    if (pricingModelEl) {
+        pricingModelEl.addEventListener('change', applyPricingModelRules);
+        applyPricingModelRules();
     }
 }());
 

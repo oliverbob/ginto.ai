@@ -2,6 +2,7 @@
 namespace Ginto\Controllers;
 
 use Ginto\Core\Database;
+use Ginto\Services\MallCommerceService;
 use Exception;
 
 class WebhookController
@@ -809,6 +810,24 @@ class WebhookController
                 'payment.paid_webhook'
             );
         }
+
+        // Mall QR checkout sessions also use PayMongo payment_intent_id as gateway reference.
+        if (!empty($piId)) {
+            try {
+                $commerce = new MallCommerceService($this->db);
+                $session = $commerce->getPaymentSessionByGatewayReference($piId);
+                if ($session) {
+                    $commerce->completePaymentSession((string)$session['session_ref'], [
+                        'gateway' => 'paymongo',
+                        'gateway_reference' => $piId,
+                        'gateway_payment_id' => $paymentId,
+                        'gateway_payload_json' => json_encode($event),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                error_log('PayMongo payment.paid mall finalization error: ' . $e->getMessage());
+            }
+        }
     }
 
     /**
@@ -834,6 +853,14 @@ class WebhookController
             'payment_method'    => 'paymongo_qrph',
             'status'            => 'pending',
         ]);
+
+        // Mark mall payment sessions as failed for matching PayMongo payment intent IDs.
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $commerce->failPaymentSessionByGatewayReference($piId, 'PayMongo payment.failed webhook');
+        } catch (\Throwable $e) {
+            error_log('PayMongo payment.failed mall finalization error: ' . $e->getMessage());
+        }
     }
 
     // ===================================================================
@@ -877,16 +904,32 @@ class WebhookController
         if (!$pending) {
             // Could be a duplicate delivery or an already-processed session — safe to ignore
             error_log("GintoPay webhook: no pending registration for cs_id={$checkoutSessionId} (already processed or unknown)");
-            return;
+            // Continue checking mall card checkout sessions which also use checkout_session IDs.
+        } else {
+            $this->processPendingRegistration(
+                $pending,
+                $checkoutSessionId,
+                $paymentIntentId,
+                $gatewayPaymentId,
+                'checkout_session.payment.paid'
+            );
         }
 
-        $this->processPendingRegistration(
-            $pending,
-            $checkoutSessionId,
-            $paymentIntentId,
-            $gatewayPaymentId,
-            'checkout_session.payment.paid'
-        );
+        // Mall card checkout sessions store gateway_reference as checkout_session_id.
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($checkoutSessionId);
+            if ($session) {
+                $commerce->completePaymentSession((string)$session['session_ref'], [
+                    'gateway' => 'paymongo',
+                    'gateway_reference' => $checkoutSessionId,
+                    'gateway_payment_id' => $gatewayPaymentId,
+                    'gateway_payload_json' => json_encode($event),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            error_log('PayMongo checkout_session.payment.paid mall finalization error: ' . $e->getMessage());
+        }
     }
 
     /**

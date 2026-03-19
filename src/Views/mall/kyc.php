@@ -587,6 +587,7 @@ details summary::-webkit-details-marker { display: none; }
                             <?php foreach ([
                                 ['products',     '🛍️', 'Products',     'Physical goods — manufactured, imported, or locally-made'],
                                 ['services',     '🔧', 'Services',     'Service-based: repairs, tutoring, freelance, consultancy'],
+                                ['delivery_service','🛵', 'Delivery Service', 'Courier, rider, and delivery partner services for marketplace orders'],
                                 ['real_estate',  '🏠', 'Real Estate',  'Property listings for sale, lease, or pre-selling'],
                                 ['rentals',      '🔑', 'Rentals',      'Equipment, vehicles, property, and event item rentals'],
                                         ['multi_purpose',        '🔀', 'Multi-Purpose / Multi-Type', 'Combines multiple categories — products, services, rentals, and more'],
@@ -983,6 +984,8 @@ details summary::-webkit-details-marker { display: none; }
                             'sec_certificate'   => '🏛️ SEC Certificate of Registration',
                             'business_permit'   => "📋 Business Permit / Mayor's Permit",
                             'bir_cor'           => '🧾 BIR Certificate of Registration (Form 2303)',
+                            'police_clearance'  => '👮 Police Clearance',
+                            'nbi_clearance'     => '🛡️ NBI Clearance',
                             'cda_certificate'             => '🤝 CDA Cooperative Registration',
                             'government_program_certificate' => '🏛️ Government Program Certificate / Authority',
                             'other_support'               => '📎 Other Supporting Document',
@@ -1132,7 +1135,7 @@ window.kycClearErr = function (id) {
 
 var SUPPORT_REQUIRED_TYPES = [
     'retailer','wholesale','general_merchandise','mall',
-    'products','services','real_estate','rentals','multi_purpose',
+    'products','services','delivery_service','real_estate','rentals','multi_purpose',
     'digital_content','intellectual_property','food_beverage',
     'fashion_apparel','health_wellness','arts_crafts',
     'business','cooperative','non_profit','government_program',
@@ -1182,7 +1185,7 @@ window.kycValidateAndSubmit = function (btn) {
     var ID_KEYS  = ['id_front','id_back','selfie_with_id','birth_certificate','barangay_clearance',
                     'church_clearance','ncip_certificate','entity_endorsement','other_id'];
     var SUP_KEYS = ['proof_of_address','dti_certificate','sec_certificate',
-                    'business_permit','bir_cor','cda_certificate','other_support'];
+                    'business_permit','bir_cor','police_clearance','nbi_clearance','cda_certificate','other_support'];
 
     var allChecked = Array.from(document.querySelectorAll('input[name="doc_types[]"]:checked'));
     var checkedId  = allChecked.filter(function (c) { return ID_KEYS.indexOf(c.value)  !== -1; });
@@ -1219,6 +1222,20 @@ window.kycValidateAndSubmit = function (btn) {
             supMsgs.push('⚠ Your account type requires at least one supporting document type to be ticked.');
         if (supCount === 0 && !hasExistingDocs)
             supMsgs.push('⚠ No supporting files attached — click the 📂 upload area to attach your business or legal documents.');
+
+        var acctTypeInput = document.getElementById('accountTypeInput');
+        var acctType = acctTypeInput ? acctTypeInput.value : '';
+        if (acctType === 'delivery_service') {
+            var hasBarangayOrChurch = checkedId.some(function (c) { return c.value === 'barangay_clearance' || c.value === 'church_clearance'; });
+            var hasPoliceOrNbi = checkedSup.some(function (c) { return c.value === 'police_clearance' || c.value === 'nbi_clearance'; });
+            if (!hasBarangayOrChurch) {
+                supMsgs.push('⚠ Delivery service accounts require Barangay Clearance or Church Clearance in Identity Documents.');
+            }
+            if (!hasPoliceOrNbi) {
+                supMsgs.push('⚠ Delivery service accounts require Police Clearance or NBI Clearance in Supporting Documents.');
+            }
+        }
+
         if (supMsgs.length) {
             supErr.style.display = 'block';
             supErr.innerHTML = supMsgs.join('<br>');

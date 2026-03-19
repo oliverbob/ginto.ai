@@ -2137,55 +2137,76 @@ class PaymentController
             ];
 
             $appUrl     = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
-            $successUrl = $appUrl . '/register/awaiting?session_id={CHECKOUT_SESSION_ID}';
+            $successUrl = $appUrl . '/register/awaiting?subscription_id={SUBSCRIPTION_ID}';
             $cancelUrl  = $appUrl . '/register';
 
-            $durationLabel = ($duration === '12m') ? '12-Month' : '1-Month';
-            $description   = 'Ginto ' . $tier . ' ' . $durationLabel . ' Membership';
+            $durationLabel = 'Monthly';
+            $description   = 'Ginto ' . $tier . ' ' . $durationLabel . ' Subscription';
 
             $handler = new \Ginto\Handlers\PayMongoHandler();
-            $result  = $handler->createCheckoutSession(
-                $amountPhp * 100,
+
+            // Create subscription plan
+            $planResult = $handler->createSubscriptionPlan(
+                $tier . ' Monthly Plan',
                 $description,
-                strip_tags($fullname),
-                $email,
-                $successUrl,
-                $cancelUrl,
-                preg_replace('/[^0-9+\-\s]/', '', $_POST['phone'] ?? ''),
-                [
-                    'line1'       => strip_tags(trim($_POST['billing_line1'] ?? '')),
+                $amountPhp * 100,
+                'PHP',
+                'MONTH',
+                1
+            );
+
+            if (!$planResult['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => $planResult['message']]);
+                exit;
+            }
+
+            $planId = $planResult['plan_id'];
+
+            // Create subscription
+            $billing = [
+                'name'    => strip_tags($fullname),
+                'email'   => $email,
+                'phone'   => preg_replace('/[^0-9+\-\s]/', '', $_POST['phone'] ?? ''),
+            ];
+
+            if (!empty($_POST['billing_line1'])) {
+                $billing['address'] = [
+                    'line1'       => strip_tags(trim($_POST['billing_line1'])),
                     'line2'       => strip_tags(trim($_POST['billing_line2'] ?? '')),
                     'city'        => strip_tags(trim($_POST['billing_city'] ?? '')),
                     'state'       => strip_tags(trim($_POST['billing_state'] ?? '')),
                     'postal_code' => preg_replace('/[^a-zA-Z0-9\-\s]/', '', $_POST['billing_postal_code'] ?? ''),
                     'country'     => strtoupper(preg_replace('/[^a-zA-Z]/', '', $_POST['billing_country'] ?? ($_POST['country'] ?? 'PH'))),
-                ]
-            );
+                ];
+            }
 
-            if (!$result['success']) {
+            $subscriptionResult = $handler->createSubscription($planId, null, $billing);
+
+            if (!$subscriptionResult['success']) {
                 http_response_code(502);
-                echo json_encode(['success' => false, 'message' => $result['message']]);
+                echo json_encode(['success' => false, 'message' => $subscriptionResult['message']]);
                 exit;
             }
 
-            $_SESSION['ginto_pay_session_id'] = $result['session_id'];
+            $_SESSION['ginto_pay_subscription_id'] = $subscriptionResult['subscription_id'];
 
             // Persist registration data to DB so webhook handler can create the user
             // without needing access to this PHP session.
             $regDataJson = json_encode($_SESSION['ginto_pay_reg']);
             $expiresAt   = date('Y-m-d H:i:s', strtotime('+2 hours'));
             $this->db->insert('pending_registrations', [
-                'checkout_session_id' => $result['session_id'],
+                'checkout_session_id' => $subscriptionResult['subscription_id'], // Use subscription ID as key
                 'reg_data'            => $regDataJson,
                 'amount'              => $amountPhp,
-                'duration'            => $duration,
+                'duration'            => '1m',
                 'status'              => 'pending',
                 'expires_at'          => $expiresAt,
             ]);
 
             echo json_encode([
                 'success'      => true,
-                'checkout_url' => $result['checkout_url'],
+                'checkout_url' => $subscriptionResult['checkout_url'],
             ]);
             exit;
 

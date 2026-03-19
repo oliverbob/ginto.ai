@@ -2,6 +2,7 @@
 namespace Ginto\Controllers;
 
 use Ginto\Core\Database;
+use Ginto\Services\MallCommerceService;
 
 class MallController extends \Core\Controller
 {
@@ -28,13 +29,19 @@ class MallController extends \Core\Controller
 
         $productModel = new \Ginto\Models\Product();
         $products = $productModel->list(['limit' => 48]);
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        $commerce = new MallCommerceService($this->db);
+        $walletSummary = $userId > 0 ? $commerce->getWalletSummary($userId) : ['account' => []];
 
         // Pass data to the view
         $this->view('mall/marketplace', [
             'categories' => $categories,
             'products' => $products,
             'csrf_token' => generateCsrfToken(),
-            'title' => 'ePower Mall'
+            'title' => 'ePower Mall',
+            'mall_unread_notifications' => $userId > 0 ? $commerce->getMallUnreadNotificationCount($userId) : 0,
+            'mall_notifications' => $userId > 0 ? $commerce->getMallNotifications($userId) : [],
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 

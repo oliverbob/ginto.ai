@@ -231,7 +231,7 @@
     }
     function checkout() {
         if (state.cart.length === 0) { showToast('Your cart is empty'); return; }
-        showToast('Checkout coming soon…');
+        window.location.href = '/mall/checkout';
     }
 
     /* ============================
@@ -485,6 +485,38 @@
         });
         sortDropdown.addEventListener('keydown', function (e) {
             if (e.key === 'Escape') { sortDropdown.classList.remove('open'); sortBtn.setAttribute('aria-expanded', 'false'); sortBtn.focus(); }
+        });
+    }
+
+    /* ============================
+     * MALL NOTIFICATIONS
+     * ============================ */
+    const mallNotifyToggle = document.getElementById('mallNotifyToggle');
+    const mallNotifyPanel = document.getElementById('mallNotifyPanel');
+    if (mallNotifyToggle && mallNotifyPanel) {
+        mallNotifyToggle.addEventListener('click', async function (e) {
+            e.stopPropagation();
+            const isOpen = mallNotifyPanel.style.display === 'block';
+            mallNotifyPanel.style.display = isOpen ? 'none' : 'block';
+            if (!isOpen) {
+                try {
+                    await fetch('/api/mall/notifications/mark-read', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': CSRF_TOKEN,
+                        },
+                        body: JSON.stringify({ csrf_token: CSRF_TOKEN }),
+                    });
+                    const badge = document.getElementById('mallNotifyBadge');
+                    if (badge) badge.style.display = 'none';
+                } catch (_) {}
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (!mallNotifyPanel.contains(e.target) && !mallNotifyToggle.contains(e.target)) {
+                mallNotifyPanel.style.display = 'none';
+            }
         });
     }
 

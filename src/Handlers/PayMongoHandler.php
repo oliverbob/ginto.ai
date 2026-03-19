@@ -613,43 +613,100 @@ class PayMongoHandler
     }
 
     /**
-     * Retrieve a Checkout Session to verify payment completion.
+     * Create a PayMongo Subscription Plan
      *
-     * @param string $sessionId  Checkout Session ID (cs_xxxxxxxx)
-     * @return array ['success' => bool, 'status' => string, 'payment_intent_id' => string, ...]
+     * @param string $name Plan name
+     * @param string $description Plan description
+     * @param int $amount Amount in centavos
+     * @param string $currency Currency code (PHP)
+     * @param string $interval Billing interval (MONTH)
+     * @param int $intervalCount Interval count (1)
+     * @return array ['success' => bool, 'plan_id' => string] | ['success' => false, 'message' => string]
      */
-    public function getCheckoutSession(string $sessionId): array
+    public function createSubscriptionPlan(string $name, string $description, int $amount, string $currency = 'PHP', string $interval = 'MONTH', int $intervalCount = 1): array
     {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
         }
 
-        $response = $this->request('GET', '/checkout_sessions/' . urlencode($sessionId));
+        $body = [
+            'data' => [
+                'attributes' => [
+                    'name' => $name,
+                    'description' => $description,
+                    'amount' => $amount,
+                    'currency' => $currency,
+                    'interval' => $interval,
+                    'interval_count' => $intervalCount,
+                ],
+            ],
+        ];
+
+        $response = $this->request('POST', '/plans', $body);
 
         if (!empty($response['errors']) || $response['http_code'] >= 400) {
-            $msg = $response['errors'][0]['detail'] ?? 'Failed to retrieve checkout session.';
-            error_log('PayMongo getCheckoutSession error: ' . json_encode($response));
+            $msg = $response['errors'][0]['detail'] ?? 'Failed to create subscription plan.';
+            error_log('PayMongo createSubscriptionPlan error: ' . json_encode($response));
             return ['success' => false, 'message' => $msg];
         }
 
-        $attrs    = $response['data']['attributes'] ?? [];
-        $status   = $attrs['status'] ?? 'unknown';
-        $payments = $attrs['payments'] ?? [];
+        $planId = $response['data']['id'] ?? null;
+        if (!$planId) {
+            return ['success' => false, 'message' => 'Invalid subscription plan response.'];
+        }
 
-        // Extract payment intent ID and charge ID from payments array
-        $paymentIntentId = null;
-        $gatewayPaymentId = null;
-        if (!empty($payments[0])) {
-            $gatewayPaymentId = $payments[0]['id'] ?? null;
-            $paymentIntentId  = $payments[0]['attributes']['payment_intent_id'] ?? null;
+        return ['success' => true, 'plan_id' => $planId];
+    }
+
+    /**
+     * Create a PayMongo Subscription
+     *
+     * @param string $planId Plan ID
+     * @param string $customerId Customer ID (optional)
+     * @param array $billing Billing info
+     * @return array ['success' => bool, 'subscription_id' => string, 'checkout_url' => string] | ['success' => false, 'message' => string]
+     */
+    public function createSubscription(string $planId, string $customerId = null, array $billing = []): array
+    {
+        if (empty($this->secretKey)) {
+            return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        $body = [
+            'data' => [
+                'attributes' => [
+                    'plan_id' => $planId,
+                ],
+            ],
+        ];
+
+        if ($customerId) {
+            $body['data']['attributes']['customer_id'] = $customerId;
+        }
+
+        if (!empty($billing)) {
+            $body['data']['attributes']['billing'] = $billing;
+        }
+
+        $response = $this->request('POST', '/subscriptions', $body);
+
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            $msg = $response['errors'][0]['detail'] ?? 'Failed to create subscription.';
+            error_log('PayMongo createSubscription error: ' . json_encode($response));
+            return ['success' => false, 'message' => $msg];
+        }
+
+        $subscriptionId = $response['data']['id'] ?? null;
+        $checkoutUrl = $response['data']['attributes']['latest_invoice']['payment_intent']['attributes']['next_action']['redirect']['url'] ?? null;
+
+        if (!$subscriptionId) {
+            return ['success' => false, 'message' => 'Invalid subscription response.'];
         }
 
         return [
-            'success'          => true,
-            'status'           => $status,
-            'payment_intent_id' => $paymentIntentId,
-            'payment_id'       => $gatewayPaymentId,
-            'payments'         => $payments,
+            'success' => true,
+            'subscription_id' => $subscriptionId,
+            'checkout_url' => $checkoutUrl,
         ];
     }
 }

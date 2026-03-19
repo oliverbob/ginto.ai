@@ -1260,6 +1260,34 @@ $router->req('/marketplace/sellers/products/delete', 'SellerController@productDe
 $router->req('/marketplace/sellers/products/edit/{id}', 'SellerController@productEdit');
 $router->req('/marketplace/sellers/products/update/{id}', 'SellerController@productUpdate', ['POST']);
 
+// Mall storefront, checkout, wallet, and order lifecycle routes
+$router->req('/marketplace', 'MallController@marketplace');
+$router->req('/mall', 'MallController@marketplace');
+$router->req('/mall/checkout', 'MallCheckoutController@checkoutPage');
+$router->req('/mall/wallet', 'MallCheckoutController@walletPage');
+$router->req('/mall/orders', 'MallCheckoutController@buyerOrdersPage');
+$router->req('/marketplace/sellers/orders', 'MallCheckoutController@sellerOrdersPage');
+$router->req('/marketplace/delivery/orders', 'MallCheckoutController@deliveryOrdersPage');
+
+$router->req('/api/mall/notifications', 'MallCheckoutController@notificationsApi', ['GET']);
+$router->req('/api/mall/notifications/mark-read', 'MallCheckoutController@notificationsMarkRead', ['POST']);
+$router->req('/api/mall/checkout/create', 'MallCheckoutController@checkoutCreate', ['POST']);
+$router->req('/api/mall/checkout/paymongo/qr/init', 'MallCheckoutController@checkoutPaymongoQrInit', ['POST']);
+$router->req('/api/mall/checkout/paymongo/card/init', 'MallCheckoutController@checkoutPaymongoCardInit', ['POST']);
+$router->req('/api/mall/checkout/paymongo-qr-init', 'MallCheckoutController@checkoutPaymongoQrInit', ['POST']);
+$router->req('/api/mall/checkout/paymongo-card-init', 'MallCheckoutController@checkoutPaymongoCardInit', ['POST']);
+$router->req('/api/mall/checkout/paypal/order', 'MallCheckoutController@checkoutPayPalOrder', ['POST']);
+$router->req('/api/mall/checkout/paypal/capture', 'MallCheckoutController@checkoutPayPalCapture', ['POST']);
+$router->req('/api/mall/checkout/paypal-order', 'MallCheckoutController@checkoutPayPalOrder', ['POST']);
+$router->req('/api/mall/checkout/paypal-capture', 'MallCheckoutController@checkoutPayPalCapture', ['POST']);
+$router->req('/api/mall/checkout/status', 'MallCheckoutController@checkoutStatus', ['GET']);
+$router->req('/api/mall/wallet/topup/create', 'MallCheckoutController@walletTopupCreate', ['POST']);
+$router->req('/api/mall/delivery/claim', 'MallCheckoutController@deliveryClaim', ['POST']);
+$router->req('/api/mall/orders/status', 'MallCheckoutController@orderStatusUpdate', ['POST']);
+
+// Keep dynamic storefront route after static /mall/* routes.
+$router->req('/mall/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallCheckoutController@storefront');
+
 // Admin KYC review
 $router->req('/admin/kyc', 'AdminKycController@index');
 $router->req('/admin/kyc/review/{id}', 'AdminKycController@review', ['POST']);
