@@ -763,7 +763,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         </div>
                     </div>
 
-                    <hr class="my-6" style="border-color: var(--border-color);">
+                    <hr class="mt-6 mb-10" style="border-color: var(--border-color);">
 
                     <!-- PayPal Section -->
                     <h3 class="text-base font-semibold mb-4 flex items-center gap-2" style="color: var(--text-primary);">
