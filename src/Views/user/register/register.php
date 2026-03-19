@@ -409,11 +409,10 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
     .payment-method-container label {
       min-width: 0;
       width: 100%;
-      flex-wrap: wrap;
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
-      line-height: 1.25;
+      line-height: 1.28;
     }
     .payment-method-container label > span,
     .payment-method-container label > div,
@@ -422,6 +421,65 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       white-space: normal;
       overflow-wrap: anywhere;
       word-break: break-word;
+    }
+    .payment-method-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      min-width: 0;
+    }
+    .payment-method-title {
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      line-height: 1.2;
+      color: var(--text-primary);
+    }
+    .payment-method-meta {
+      display: inline-flex;
+      align-items: center;
+      width: fit-content;
+      max-width: 100%;
+      padding: 0.18rem 0.5rem;
+      border-radius: 0.45rem;
+      font-size: 0.82rem;
+      font-weight: 700;
+      line-height: 1.2;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .meta-orange {
+      background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);
+      color: #fff;
+    }
+    .meta-green {
+      background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+      color: #fff;
+    }
+    .meta-gold {
+      background: linear-gradient(135deg, #b8860b 0%, #d4af37 42%, #f5d67b 100%);
+      color: #2b2110;
+      border: 1px solid rgba(139, 105, 20, 0.6);
+      text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+    .meta-yellow {
+      background: linear-gradient(135deg, #f0b90b 0%, #d4a00a 100%);
+      color: #000;
+    }
+
+    @media (min-width: 1024px) {
+      /* Desktop: remove heavy highlight chips for cleaner, elegant labels */
+      .payment-method-meta {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        padding: 0;
+        border-radius: 0;
+        color: var(--text-secondary) !important;
+        font-weight: 600;
+        font-size: 0.84rem;
+      }
     }
     .payment-modal-tab.ginto-pay-tab.active {
       color: #2b2110;
@@ -1144,7 +1202,100 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
         <div class="wizard-content" data-step="3">
           <h3 class="text-2xl font-bold mb-6" style="color: var(--text-primary);">Payment Information</h3>
           <p class="mb-8" style="color: var(--text-secondary);">Complete your membership purchase.</p>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div class="grid grid-cols-1 gap-8">
+            <div>
+              <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <?php if ($paymongoEnabled): ?>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container ginto-pay-option" data-radio="ginto-pay">
+                  <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" loading="lazy" onerror="this.style.display='none'">
+                    <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
+                    <span class="payment-method-copy">
+                      <span class="payment-method-title">Ginto Pay</span>
+                      <span class="payment-method-meta meta-gold">Fast Card Checkout</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
+                  <input type="radio" name="payment_method" id="paymongo-qrph" value="paymongo_qrph" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
+                    <span class="payment-method-copy">
+                      <span class="payment-method-title">QR Pay - 1 Month</span>
+                      <span class="payment-method-meta meta-orange">InstaPay / PESONet</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
+                  <input type="radio" name="payment_method" id="paymongo-qrph-annual" value="paymongo_qrph_annual" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paymongo-qrph-annual" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
+                    <span class="payment-method-copy">
+                      <span class="payment-method-title">QR Pay - 12 Months</span>
+                      <span class="payment-method-meta meta-green">One-Time</span>
+                    </span>
+                  </label>
+                </div>
+                <?php endif; ?>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
+                  <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
+                    <span class="sr-only">PayPal</span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
+                  <input type="radio" name="payment_method" id="credit-card" value="credit_card" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="credit-card" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-credit-card text-lg" style="color: var(--primary-500);"></i>
+                    <span class="payment-method-title">Credit/Debit Card</span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
+                  <input type="radio" name="payment_method" id="gcash" value="gcash" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="gcash" class="ml-3 block font-medium" style="color: var(--text-primary);">
+                    <span class="inline-flex items-center gap-2">
+                      <img src="https://www.gcash.com/wp-content/uploads/2019/04/gcash-logo.png" alt="GCash" class="h-5" onerror="this.style.display='none'">
+                      <span class="payment-method-title">GCash</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
+                  <input type="radio" name="payment_method" id="bank-transfer" value="bank_transfer" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="bank-transfer" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-university text-lg" style="color: var(--primary-500);"></i>
+                    <span class="payment-method-title">Bank Transfer / Deposit</span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
+                  <input type="radio" name="payment_method" id="crypto-usdt" value="crypto_usdt_bep20" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="crypto-usdt" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fab fa-bitcoin text-lg" style="color: #f0b90b;"></i>
+                    <span class="payment-method-copy">
+                      <span class="payment-method-title">Crypto USDT</span>
+                      <span class="payment-method-meta meta-yellow">BEP20</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- PayPal Button Container (PayPal balance only) -->
+              <div id="paypal-button-container" class="mt-6 hidden"></div>
+
+              <!-- Credit Card Button Container (Card funding only) -->
+              <div id="card-button-container" class="mt-6 hidden"></div>
+
+              <div id="paypal-loading" class="mt-6 hidden text-center py-4">
+                <div class="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
+                <p style="color: var(--text-secondary);">Loading payment options...</p>
+              </div>
+              <div id="paypal-error" class="mt-4 hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
+                <i class="fas fa-exclamation-circle mr-2"></i>
+                <span id="paypal-error-message">Payment failed. Please try again.</span>
+              </div>
+            </div>
             <div>
               <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Order Summary</h4>
               <div class="p-6 rounded-lg" style="background-color: var(--bg-secondary);">
@@ -1163,95 +1314,6 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               </div>
             </div>
             <div>
-              <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <?php if ($paymongoEnabled): ?>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container ginto-pay-option" data-radio="ginto-pay">
-                  <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" loading="lazy" onerror="this.style.display='none'">
-                    <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
-                    <span>
-                      Ginto Pay
-                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1 ginto-pay-badge">Fast Card Checkout</span>
-                    </span>
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
-                  <input type="radio" name="payment_method" id="paymongo-qrph" value="paymongo_qrph" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
-                    <span>
-                      QR Pay — <strong>1 Month</strong>
-                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: #fff;">InstaPay / PESONet</span>
-                    </span>
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
-                  <input type="radio" name="payment_method" id="paymongo-qrph-annual" value="paymongo_qrph_annual" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="paymongo-qrph-annual" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
-                    <span>
-                      QR Pay — <strong>12 Months</strong>
-                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: #fff;">One-Time</span>
-                    </span>
-                  </label>
-                </div>
-                <?php endif; ?>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
-                  <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
-                    <span class="sr-only">PayPal</span>
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
-                  <input type="radio" name="payment_method" id="credit-card" value="credit_card" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="credit-card" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-credit-card text-lg" style="color: var(--primary-500);"></i>
-                    Credit/Debit Card
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
-                  <input type="radio" name="payment_method" id="gcash" value="gcash" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="gcash" class="ml-3 block font-medium" style="color: var(--text-primary);">
-                    <span class="inline-flex items-center gap-2">
-                      <img src="https://www.gcash.com/wp-content/uploads/2019/04/gcash-logo.png" alt="GCash" class="h-5" onerror="this.style.display='none'">
-                      GCash
-                    </span>
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
-                  <input type="radio" name="payment_method" id="bank-transfer" value="bank_transfer" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="bank-transfer" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-university text-lg" style="color: var(--primary-500);"></i>
-                    Bank Transfer / Deposit
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
-                  <input type="radio" name="payment_method" id="crypto-usdt" value="crypto_usdt_bep20" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="crypto-usdt" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fab fa-bitcoin text-lg" style="color: #f0b90b;"></i>
-                    <span>Crypto <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background: linear-gradient(135deg, #f0b90b 0%, #d4a00a 100%); color: #000;">USDT BEP20</span></span>
-                  </label>
-                </div>
-              </div>
-              
-              <!-- PayPal Button Container (PayPal balance only) -->
-              <div id="paypal-button-container" class="mt-6 hidden"></div>
-              
-              <!-- Credit Card Button Container (Card funding only) -->
-              <div id="card-button-container" class="mt-6 hidden"></div>
-              
-              <div id="paypal-loading" class="mt-6 hidden text-center py-4">
-                <div class="animate-spin w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-                <p style="color: var(--text-secondary);">Loading payment options...</p>
-              </div>
-              <div id="paypal-error" class="mt-4 hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
-                <i class="fas fa-exclamation-circle mr-2"></i>
-                <span id="paypal-error-message">Payment failed. Please try again.</span>
-              </div>
-              
               <!-- GCash Payment Details -->
               <div id="gcash-details" class="mt-6 hidden">
                 <div class="p-5 rounded-lg" style="background: linear-gradient(135deg, #007dfe 0%, #0056b3 100%); color: white;">
