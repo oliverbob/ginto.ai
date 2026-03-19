@@ -693,6 +693,12 @@ $walletTransactions = $wallet_transactions ?? [];
                 const dl = document.getElementById('wtDownloadQrBtn');
                 if (dl) dl.addEventListener('click', downloadQr);
             }, 20);
+
+            // Auto-generate QR when modal opens if a valid amount is present
+            if (credit > 0) {
+                // Fire-and-forget; downloadQr will update the modal status and preview
+                downloadQr().catch(function () {});
+            }
         }
     }
 
