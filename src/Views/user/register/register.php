@@ -1445,7 +1445,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                   <div class="bg-red-500/30 rounded p-2 mb-4 border border-red-400">
                     <p class="text-xs text-center">
                       <i class="fas fa-exclamation-triangle text-red-300 mr-1"></i>
-                      <strong>CRITICAL:</strong> Only send <strong>USDT</strong> via <strong>BNB Smart Chain (BEP20)</strong>. Other networks = <strong>permanent loss!</strong>
+                      <strong>CRITICAL:</strong> Only send <strong>USDT</strong> via <strong>BNB Smart Chain (BEP20)</strong>. Other networks = <strong>permanent loss!</strong> By proceeding, you acknowledge this is <strong>at your own risk</strong> and <strong>Ginto is not liable</strong> for funds sent on the wrong network.
                     </p>
                   </div>
                   
