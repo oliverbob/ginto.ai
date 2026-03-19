@@ -844,8 +844,27 @@ $walletTransactions = $wallet_transactions ?? [];
                 const json = await response.json();
                 if (json.status === 'completed') {
                     window.clearInterval(statusPoll);
-                    setInfo('Top-up confirmed and posted to your wallet. Refreshing ledger...');
-                    window.location.reload();
+                    setInfo('Top-up confirmed and posted to your wallet. Updating balance...');
+                    // Try to update top-bar wallet balance immediately using the current session's credited amount
+                    try {
+                        const creditAdded = (currentCreate && Number(currentCreate.credit_amount)) ? Number(currentCreate.credit_amount) : 0;
+                        if (creditAdded > 0) {
+                            const elems = document.querySelectorAll('.wallet-balance-text');
+                            elems.forEach(function (el) {
+                                const cur = parseFloat(String(el.textContent || '').replace(/[^0-9.-]+/g, '')) || 0;
+                                const updated = Math.round((cur + creditAdded) * 100) / 100;
+                                el.textContent = updated.toFixed(2);
+                            });
+                            const walletBtn = document.querySelector('.action-btn.wallet-btn');
+                            if (walletBtn) {
+                                const first = document.querySelector('.wallet-balance-text');
+                                const shown = first ? first.textContent : (creditAdded).toFixed(2);
+                                walletBtn.title = 'Ginto Wallet balance: ₱' + shown;
+                            }
+                        }
+                    } catch (e) {}
+                    // Refresh ledger/transactions shortly to ensure server state is reflected
+                    setTimeout(function(){ window.location.reload(); }, 1200);
                 }
             } catch (_) {}
         }, 5000);

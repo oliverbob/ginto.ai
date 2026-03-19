@@ -176,7 +176,8 @@ require_once __DIR__ . '/../admin/parts/icon_helpers.php';
 function initializeUniversalSidebar() {
     const sidebar = document.getElementById('sidebar');
     // accept either hamburger id used in different views
-    const hamburgerBtn = document.getElementById('hamburgerBtn') || document.getElementById('hamburgerToggle');
+    // Accept different hamburger IDs used across views (menuToggle used in header)
+    const hamburgerBtn = document.getElementById('hamburgerBtn') || document.getElementById('hamburgerToggle') || document.getElementById('menuToggle');
     // accept either overlay/backdrop id
     const overlay = document.getElementById('sidebarOverlay') || document.getElementById('sidebarBackdrop');
     // accept either main content id used across views
