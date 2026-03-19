@@ -212,9 +212,6 @@ class PayMongoHandler
 
         $response = $this->request('POST', '/payment_intents/' . urlencode($piId) . '/attach', $body);
 
-        // DEBUG: log full raw attach response
-        error_log('PayMongo attach raw response: ' . json_encode($response));
-
         if (!empty($response['errors']) || $response['http_code'] >= 400) {
             $msg = $response['errors'][0]['detail'] ?? 'Failed to attach payment method.';
             error_log('PayMongo attachPaymentMethod error: ' . json_encode($response));
@@ -235,13 +232,14 @@ class PayMongoHandler
         }
 
         return [
-            'success'    => true,
-            'status'     => $status,
-            'qr_image'   => $qrImage,
-            'qr_string'  => $qrString,
-            'pi_id'      => $response['data']['id'] ?? $piId,
+            'success'      => true,
+            'status'       => $status,
+            'qr_image'     => $qrImage,
+            'qr_string'    => $qrString,
+            'pi_id'        => $response['data']['id'] ?? $piId,
             '_next_action' => $nextAction,
             '_attrs_keys'  => array_keys($attrs),
+            '_raw_data'    => $response['data'] ?? null,
         ];
     }
 
@@ -364,12 +362,14 @@ class PayMongoHandler
         }
 
         return [
-            'success'   => true,
-            'pi_id'     => $piId,
-            'pm_id'     => $pmId,
-            'qr_image'  => $attachResult['qr_image'],
-            'qr_string' => $attachResult['qr_string'],
-            'status'    => $attachResult['status'],
+            'success'      => true,
+            'pi_id'        => $piId,
+            'pm_id'        => $pmId,
+            'qr_image'     => $attachResult['qr_image'],
+            'qr_string'    => $attachResult['qr_string'],
+            'status'       => $attachResult['status'],
+            '_next_action' => $attachResult['_next_action'] ?? null,
+            '_attrs_keys'  => $attachResult['_attrs_keys'] ?? null,
         ];
     }
 }
