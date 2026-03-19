@@ -64,7 +64,20 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     box-shadow:0 40px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
     animation:coIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
     overflow:hidden;
+    position:relative;
 }
+.co-close-btn {
+    position:absolute; top:14px; right:14px; z-index:2;
+    width:32px; height:32px; border-radius:50%;
+    border:1px solid rgba(255,255,255,0.14);
+    background:rgba(255,255,255,0.07);
+    color:var(--muted); font-size:1.15rem; line-height:1;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    transition:background 0.15s, color 0.15s;
+}
+.co-close-btn:hover { background:rgba(255,255,255,0.15); color:var(--text); }
+body.light .co-close-btn { border-color:#d2def2; background:#f8fbff; color:#64748b; }
+body.light .co-close-btn:hover { background:#eff5ff; color:#0f172a; }
 .co-card.is-scrollable {
     max-height:min(92vh, 860px);
     overflow-y:auto;
@@ -679,7 +692,7 @@ body.light .co-qr-spinner {
         max-width:100%;
         border-radius:22px 22px 0 0;
         max-height:100vh;
-        min-height:auto;
+        min-height:60vh;
         overflow-y:auto;
         padding-bottom:max(10px, env(safe-area-inset-bottom));
     }
@@ -728,7 +741,7 @@ body.light .co-qr-spinner {
         font-size:0.78rem;
         max-width:220px;
     }
-    .co-qr-box img { max-width:124px; padding:5px; margin-bottom:6px; }
+    .co-qr-box img { max-width:min(260px, 100%); padding:5px; margin-bottom:6px; }
     .co-qr-actions {
         gap:8px;
         margin-top:4px;
@@ -971,6 +984,7 @@ body.light .co-qr-spinner {
 <!-- ── Checkout Confirmation Modal ── -->
 <div id="coModal" class="co-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Payment confirmation">
     <div class="co-card">
+        <button id="coClose" class="co-close-btn" aria-label="Close">&times;</button>
         <div class="co-head">
             <div class="co-glow"></div>
             <div id="coIcon" class="co-method-icon"></div>
@@ -1015,6 +1029,10 @@ body.light .co-qr-spinner {
         </div>
         <div id="coCardBox" class="co-card-box" style="display:none;">
             <div class="co-card-grid">
+                <label class="co-card-span-2">
+                    <span class="co-card-label">Name on Card</span>
+                    <input id="coCardName" class="co-card-field" type="text" autocomplete="cc-name" placeholder="Juan Dela Cruz">
+                </label>
                 <label class="co-card-span-2">
                     <span class="co-card-label">Card Number</span>
                     <input id="coCardNumber" class="co-card-field" type="text" inputmode="numeric" autocomplete="cc-number" placeholder="4120 0000 0000 0007">
@@ -1404,6 +1422,8 @@ body.light .co-qr-spinner {
     const coOtpFallback = document.getElementById('coOtpFallback');
     const coOtpOpenNewTab = document.getElementById('coOtpOpenNewTab');
     const coOtpClose = document.getElementById('coOtpClose');
+    const coClose = document.getElementById('coClose');
+    const coCardName = document.getElementById('coCardName');
 
     function validateShipping() {
         const required = [
@@ -1459,6 +1479,7 @@ body.light .co-qr-spinner {
     function billingPayloadFromShipping() {
         const shipping = shippingPayload();
         return {
+            name: (coCardName && coCardName.value.trim()) ? coCardName.value.trim() : shipping.full_name,
             line1: shipping.address_line1,
             line2: shipping.address_line2,
             city: shipping.city,
@@ -1662,15 +1683,10 @@ body.light .co-qr-spinner {
     });
 
     coCancel.addEventListener('click', closeModal);
+    coClose.addEventListener('click', closeModal);
     coOtpClose.addEventListener('click', closeOtpModal);
-    coOtpBackdrop.addEventListener('click', function (e) {
-        if (e.target === coOtpBackdrop) closeOtpModal();
-    });
     coQrRefresh.addEventListener('click', function () {
         startQrFlowInModal(true);
-    });
-    coModal.addEventListener('click', function (e) {
-        if (e.target === coModal && coQrBox.style.display === 'none') closeModal();
     });
 
     document.addEventListener('mall:theme-changed', function () {
