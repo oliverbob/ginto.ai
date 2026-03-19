@@ -312,6 +312,46 @@ body.light #checkoutTotal {
     background-clip:text;
 }
 
+/* ── Light mode: confirmation modal ── */
+body.light .co-card {
+    background:linear-gradient(155deg,#f8fbff 0%,#ffffff 55%,#f0f6ff 100%);
+    border:1px solid #dbe6f7;
+    box-shadow:0 40px 80px rgba(15,23,42,0.18), 0 0 0 1px rgba(15,23,42,0.04);
+}
+body.light .co-glow {
+    background:radial-gradient(ellipse at 50% 0%, rgba(214,180,75,0.12), transparent 70%);
+}
+body.light .co-method-name { color:#0f172a; }
+body.light .co-sector { color:#64748b; }
+body.light .co-divider { background:#e2eaf5; }
+body.light .co-amount-box {
+    background:#f1f6ff;
+    border-color:#dbe6f7;
+}
+body.light .co-amount-label { color:#64748b; }
+body.light .co-amount {
+    background:linear-gradient(135deg,#a16207 0%,#d4af37 40%,#b8860b 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
+}
+body.light .co-ship-box {
+    background:#f8fbff;
+    border-color:#dbe6f7;
+}
+body.light .co-ship-label { color:#64748b; }
+body.light .co-ship-text { color:#1e293b; }
+body.light .co-btn-cancel {
+    border-color:#cbd5e1;
+    color:#475569;
+}
+body.light .co-btn-cancel:hover {
+    border-color:#93c5fd;
+    color:#0f172a;
+}
+body.light #coQrStatus,
+body.light #coQrFallback { color:#64748b; }
+
 @media (max-width: 980px) {
     section[style*="grid-template-columns:minmax(0,1.3fr)"] {
         grid-template-columns: minmax(0, 1fr) !important;
