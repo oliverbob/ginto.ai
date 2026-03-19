@@ -32,7 +32,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 .pm-icon { width:46px; height:46px; border-radius:14px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
 .pm-body { flex:1; min-width:0; }
 .pm-name { font-weight:800; font-size:0.95rem; line-height:1.2; }
-.pm-desc { font-size:0.77rem; color:var(--muted); margin-top:3px; }
+.pm-desc { font-size:0.84rem; color:var(--muted); margin-top:3px; }
 .pm-check {
     width:22px; height:22px; border-radius:50%;
     border:1.5px solid rgba(255,255,255,0.16);
@@ -120,7 +120,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     border:1.5px solid rgba(255,255,255,0.16);
     border-radius:12px;
     color:#e9efff;
-    font-family:inherit; font-size:0.9rem;
+    font-family:inherit; font-size:1rem;
     transition:border-color 0.18s, box-shadow 0.18s, background 0.18s;
     -webkit-appearance:none;
 }
@@ -146,7 +146,7 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     background:rgba(239,68,68,0.04) !important;
 }
 .pf-label {
-    font-size:0.75rem;
+    font-size:0.82rem;
     font-weight:700;
     color:rgba(232,241,255,0.86);
     text-transform:uppercase;
@@ -163,7 +163,7 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     padding:28px;
 }
 .co-section-title {
-    font-size:0.7rem;
+    font-size:0.82rem;
     font-weight:800;
     text-transform:uppercase;
     letter-spacing:0.14em;
@@ -199,7 +199,7 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
 .next-steps { list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
 .next-steps li {
     display:flex; align-items:flex-start; gap:12px;
-    font-size:0.85rem; color:var(--muted); line-height:1.55;
+    font-size:0.95rem; color:var(--muted); line-height:1.6;
 }
 .next-steps li .step-num {
     width:22px; height:22px; border-radius:50%;
@@ -207,6 +207,81 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     font-size:0.68rem; font-weight:800; color:var(--muted);
     display:flex; align-items:center; justify-content:center;
     flex-shrink:0; margin-top:1px;
+}
+
+/* ── Light mode refinements ── */
+body.light {
+    background:
+        radial-gradient(950px 500px at 95% -10%, rgba(59,130,246,0.10), transparent 52%),
+        radial-gradient(900px 460px at -10% 0%, rgba(14,165,233,0.08), transparent 54%),
+        var(--bg);
+}
+body.light .checkout-hero {
+    border:1px solid #dbe6f7;
+    background:linear-gradient(130deg,#eff5ff 0%, #f5f7ff 56%, #ecf8ff 100%);
+    box-shadow:0 14px 34px rgba(15,23,42,0.08);
+}
+body.light .checkout-hero::before {
+    content:'';
+    position:absolute;
+    inset:0;
+    background:radial-gradient(ellipse at 82% 46%, rgba(59,130,246,0.14) 0%, transparent 60%);
+    pointer-events:none;
+}
+body.light .checkout-kicker { color:#8a6a10 !important; }
+body.light .checkout-title { color:#0f172a; }
+body.light .checkout-subtitle { color:#334155 !important; }
+body.light .checkout-back {
+    border-color:#d2def2 !important;
+    background:#ffffff !important;
+    color:#334155 !important;
+}
+body.light .checkout-back:hover {
+    border-color:#93c5fd !important;
+    color:#0f172a !important;
+    box-shadow:0 6px 16px rgba(37,99,235,0.14);
+}
+body.light .co-section,
+body.light .aside-card {
+    border:1px solid #dbe6f7;
+    background:#ffffff;
+    backdrop-filter:none;
+    box-shadow:0 12px 28px rgba(15,23,42,0.08);
+}
+body.light .co-section-title,
+body.light .pf-label {
+    color:#334155;
+}
+body.light .pf-input {
+    background:#ffffff;
+    color:#0f172a;
+    border-color:#cbd5e1;
+}
+body.light .pf-input::placeholder { color:#64748b; }
+body.light .pf-input:focus {
+    border-color:#3b82f6;
+    background:#ffffff;
+    box-shadow:0 0 0 3px rgba(59,130,246,0.18);
+}
+body.light .pm-card {
+    border-color:#dbe6f7;
+    background:#f8fbff;
+}
+body.light .pm-card:hover {
+    border-color:#bfdbfe;
+    box-shadow:0 10px 24px rgba(15,23,42,0.10);
+}
+body.light .pm-check {
+    border-color:#cbd5e1;
+}
+body.light .next-steps li {
+    color:#475569;
+}
+body.light #checkoutTotal {
+    background:linear-gradient(135deg,#a16207 0%,#d4af37 48%,#f59e0b 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    background-clip:text;
 }
 
 @media (max-width: 980px) {
@@ -221,6 +296,16 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
 }
 
 @media (max-width: 640px) {
+    .checkout-hero {
+        padding:22px 18px !important;
+    }
+    .checkout-title {
+        font-size:1.65rem !important;
+    }
+    .checkout-subtitle {
+        font-size:0.95rem !important;
+        line-height:1.62 !important;
+    }
     #paymentMethodGrid {
         grid-template-columns: minmax(0, 1fr) !important;
     }
@@ -237,15 +322,15 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     <div style="display:flex;flex-direction:column;gap:20px;">
 
         <!-- Hero bar -->
-        <div style="border:1px solid rgba(255,255,255,0.07);background:linear-gradient(130deg,rgba(15,23,42,0.9) 0%,rgba(26,32,64,0.9) 50%,rgba(30,28,50,0.9) 100%);border-radius:24px;padding:24px 28px;position:relative;overflow:hidden;">
+        <div class="checkout-hero" style="border:1px solid rgba(255,255,255,0.07);background:linear-gradient(130deg,rgba(15,23,42,0.9) 0%,rgba(26,32,64,0.9) 50%,rgba(30,28,50,0.9) 100%);border-radius:24px;padding:30px 32px;position:relative;overflow:hidden;">
             <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 80% 50%,rgba(214,180,75,0.1) 0%,transparent 60%);pointer-events:none;"></div>
             <div style="position:relative;display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;">
                 <div>
-                    <div style="font-size:0.68rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(214,180,75,0.7);font-weight:800;margin-bottom:6px;">Mall Checkout</div>
-                    <h1 style="margin:0 0 6px;font-size:1.75rem;line-height:1.1;font-weight:900;letter-spacing:-0.02em;">Finish your order</h1>
-                    <p style="margin:0;color:var(--muted);font-size:0.85rem;line-height:1.65;max-width:580px;">Ginto Pay routes through PayMongo. Card payment means the user pays with a regular credit or debit card.</p>
+                    <div class="checkout-kicker" style="font-size:0.82rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(214,180,75,0.7);font-weight:800;margin-bottom:8px;">Mall Checkout</div>
+                    <h1 class="checkout-title" style="margin:0 0 10px;font-size:2.1rem;line-height:1.1;font-weight:900;letter-spacing:-0.02em;">Finish your order</h1>
+                    <p class="checkout-subtitle" style="margin:0;color:var(--muted);font-size:1rem;line-height:1.7;max-width:640px;">Ginto Pay routes through PayMongo. Card payment means the user pays with a regular credit or debit card.</p>
                 </div>
-                <a href="/marketplace" style="display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--muted);font-size:0.82rem;font-weight:700;transition:all 0.18s;text-decoration:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='var(--text)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='var(--muted)';">
+                <a href="/marketplace" class="checkout-back" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--muted);font-size:0.88rem;font-weight:700;transition:all 0.18s;text-decoration:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='var(--text)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='var(--muted)';">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
                     Back to Mall
                 </a>
@@ -370,30 +455,30 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
     </div>
 
     <aside style="display:flex;flex-direction:column;gap:18px;position:sticky;top:92px;">
-        <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
+        <div class="aside-card" style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:24px;">
             <h2 style="margin:0 0 14px;font-size:1.05rem;font-weight:800;">Order Summary</h2>
             <div id="checkoutItems" style="display:flex;flex-direction:column;gap:12px;"></div>
             <div style="height:1px;background:var(--border);margin:16px 0;"></div>
-            <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--muted);margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Items total</span>
                 <span id="checkoutSubtotal">₱0.00</span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.88rem;color:var(--muted);margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Stores in this checkout</span>
                 <span id="checkoutStoreCount">0</span>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:10px;">
                 <div>
-                    <div style="font-size:0.78rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:700;">Total due</div>
+                    <div style="font-size:0.84rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:700;">Total due</div>
                     <div id="checkoutTotal" style="font-size:2rem;font-weight:800;line-height:1;">₱0.00</div>
                 </div>
-                <div style="font-size:0.8rem;color:var(--muted);text-align:right;max-width:180px;">Platform fees and markups are already reflected in the checkout total according to the seller’s chosen plan.</div>
+                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Platform fees and markups are already reflected in the checkout total according to the seller’s chosen plan.</div>
             </div>
         </div>
 
-        <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
-            <h2 style="margin:0 0 12px;font-size:1rem;font-weight:800;">What happens next</h2>
-            <ol style="margin:0;padding-left:18px;color:var(--muted);font-size:0.88rem;line-height:1.8;">
+        <div class="aside-card" style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:24px;">
+            <h2 style="margin:0 0 12px;font-size:1.2rem;font-weight:800;">What happens next</h2>
+            <ol style="margin:0;padding-left:20px;color:var(--muted);font-size:0.98rem;line-height:1.85;">
                 <li>We split your cart into seller-specific orders.</li>
                 <li>Successful payment notifies each seller by email and mall notification.</li>
                 <li>Seller and delivery crew update the order timeline like Lazada or Shopee.</li>
