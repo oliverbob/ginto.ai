@@ -1215,6 +1215,10 @@ $router->req('/api/payments/crypto-info', 'PaymentController@cryptoInfo');
 $router->req('/paymongo-payments', 'PaymentController@paymongoPayments');
 $router->req('/api/payments/paymongo-qrph-init', 'PaymentController@paymongoQrphInit');
 $router->req('/api/payments/paymongo-qrph-status', 'PaymentController@paymongoQrphStatus');
+// TEMP: PayMongo QRPH test page — remove after testing
+$router->get('/paymongo', function() {
+    \Ginto\Core\View::view('paymongo_test', ['csrf_token' => generateCsrfToken(true)]);
+});
 $router->req('/api/user/payment-details', 'PaymentController@paymentDetails');
 $router->req('/api/payment/check-status/{paymentId}', 'PaymentController@checkStatus');
 $router->req('/api/payment/request-review/{paymentId}', 'PaymentController@requestReview');
