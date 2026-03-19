@@ -18,10 +18,12 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
         </button>
 
         <!-- Brand -->
-        <a href="/" class="brand" aria-label="Ginto home">
-            <img src="/assets/images/ginto.png" alt="Ginto">
-            <span class="brand-name">ePower</span>
-        </a>
+        <div class="brand" aria-label="Brand links">
+            <a href="/" aria-label="Ginto home">
+                <img src="/assets/images/ginto.png" alt="Ginto">
+            </a>
+            <a href="/mall" class="brand-name" aria-label="ePower mall">ePower</a>
+        </div>
 
         <!-- Search trigger icon -->
         <button class="search-trigger" id="searchTrigger" aria-label="Search products" aria-expanded="false" aria-controls="searchOverlay">
