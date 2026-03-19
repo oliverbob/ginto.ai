@@ -64,8 +64,7 @@ img { display: block; max-width: 100%; }
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
-    overflow-x: auto;
-    scrollbar-width: thin;
+    overflow: hidden;
 }
 body.light .site-header { background: rgba(255,255,255,0.92); }
 
@@ -78,9 +77,7 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
     display: flex;
     align-items: center;
     gap: 6px;
-    flex-wrap: nowrap;
-    min-width: 100%;
-    width: max-content;
+    overflow: hidden;
 }
 
 /* Hamburger (hidden on desktop, shown via media query) */
@@ -200,10 +197,11 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .header-actions {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     margin-left: auto;
     flex-shrink: 0;
     flex-wrap: nowrap;
+    min-width: 0;
 }
 .wallet-btn {
     text-decoration: none;
@@ -896,18 +894,8 @@ input[type="file"].form-input { padding: 7px 12px; }
 @media (max-width: 767px) {
     :root { --header-h: 56px; }
 
-    .site-header {
-        overflow-x: auto;
-        overflow-y: visible;
-        -webkit-overflow-scrolling: touch;
-    }
-    .site-header::-webkit-scrollbar {
-        height: 4px;
-    }
-    .site-header::-webkit-scrollbar-thumb {
-        background: var(--border);
-        border-radius: 999px;
-    }
+    .site-header { overflow: hidden; }
+    .header-inner { gap: 4px; padding: 0 8px; }
 
     /* Hamburger visible on mobile */
     .hamburger { display: flex; }
@@ -963,11 +951,19 @@ input[type="file"].form-input { padding: 7px 12px; }
     .main-toolbar { gap: 8px; }
 }
 
+/* ========== ULTRA-NARROW MOBILE <= 390px ========== */
+@media (max-width: 390px) {
+    .wallet-balance-text { display: none; }
+    .wallet-btn { padding: 0 6px; min-width: 34px; }
+    .header-actions { gap: 2px; }
+    .action-btn, .hamburger, .search-trigger { width: 34px; height: 34px; }
+}
+
 /* ========== ULTRA-NARROW MOBILE <= 360px ========== */
 @media (max-width: 360px) {
     .header-inner {
-        padding: 0 8px;
-        gap: 4px;
+        padding: 0 6px;
+        gap: 2px;
     }
 
     .brand img {
@@ -978,15 +974,13 @@ input[type="file"].form-input { padding: 7px 12px; }
     .search-trigger,
     .action-btn,
     .hamburger {
-        width: 34px;
-        height: 34px;
+        width: 32px;
+        height: 32px;
     }
 
-    .header-actions { gap: 2px; }
+    .header-actions { gap: 1px; }
 
-    .wallet-balance-text {
-        display: none;
-    }
+    .wallet-balance-text { display: none; }
 
     #sellBtn {
         display: none;
