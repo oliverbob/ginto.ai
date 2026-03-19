@@ -840,6 +840,16 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                                 </button>
                             </div>
                         </div>
+                        <div>
+                            <label class="label-text">PayMongo Webhook Secret</label>
+                            <div class="relative">
+                                <input type="password" id="paymongo_webhook_secret" name="paymongo_webhook_secret" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_WEBHOOK_SECRET'] ?? '') ?>" placeholder="whsec_...">
+                                <button type="button" onclick="togglePassword('paymongo_webhook_secret')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <i id="paymongo_webhook_secret_icon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                            <p class="help-text mt-1">Webhook endpoint: <code class="text-xs">https://ginto.ai/webhooks/paymongo</code></p>
+                        </div>
                     </div>
 
                     <p class="help-text mt-6">Note: Storing secrets in the .env is convenient for local/sandbox environments; consider secure secret storage for production.</p>
@@ -1754,9 +1764,16 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                     const data = JSON.parse(saved);
                     const form = document.getElementById('settings-form');
                     Object.keys(data).forEach(key => {
-                        const field = form.querySelector(`[name="${key}"]`);
-                        if (field && key !== 'csrf_token') {
-                            field.value = data[key];
+                        if (key === 'csrf_token') return;
+                        const value = data[key];
+                        if (Array.isArray(value)) {
+                            // Restore checkbox groups
+                            form.querySelectorAll(`[name="${key}[]"]`).forEach(cb => {
+                                cb.checked = value.includes(cb.value);
+                            });
+                        } else {
+                            const field = form.querySelector(`[name="${key}"]`);
+                            if (field) field.value = value;
                         }
                     });
                 }
@@ -1770,8 +1787,17 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
             try {
                 const form = document.getElementById('settings-form');
                 const formData = new FormData(form);
-                const data = Object.fromEntries(formData.entries());
-                delete data.csrf_token; // Don't store CSRF token
+                const data = {};
+                for (const [key, value] of formData.entries()) {
+                    if (key.endsWith('[]')) {
+                        const k = key.slice(0, -2);
+                        if (!data[k]) data[k] = [];
+                        data[k].push(value);
+                    } else {
+                        data[key] = value;
+                    }
+                }
+                delete data.csrf_token;
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
             } catch (e) {
                 console.warn('Failed to save form data:', e);

@@ -63,17 +63,19 @@ class WebhookController
         $this->paypal_client_id = $_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID');
         $this->paypal_client_secret = $_ENV['PAYPAL_CLIENT_SECRET'] ?? getenv('PAYPAL_CLIENT_SECRET');
         $this->paypal_environment = $_ENV['PAYPAL_ENVIRONMENT'] ?? getenv('PAYPAL_ENVIRONMENT');
+    }
 
-        // --- VALIDATION BLOCK ---
-        // Check if any of the required variables failed to load.
+    /**
+     * Assert PayPal environment variables are present (called only by PayPal methods).
+     */
+    private function requirePaypalConfig(): void
+    {
         if (
             empty($this->paypal_webhook_id) ||
             empty($this->paypal_client_id) ||
             empty($this->paypal_client_secret) ||
             empty($this->paypal_environment)
         ) {
-            // Stop everything and throw a clear, specific error.
-            // This is much better than letting other methods fail mysteriously.
             throw new \Exception(
                 'CRITICAL ERROR: One or more required PayPal environment variables are not set. ' .
                 'Please check that your .env file is being loaded correctly and contains all required keys.'
@@ -86,6 +88,7 @@ class WebhookController
      */
     public function webhook()
     {
+        $this->requirePaypalConfig();
         error_reporting(E_ALL);
         ini_set('display_errors', 1);
 
@@ -683,6 +686,136 @@ class WebhookController
         // available as variables inside webhook.view.php (e.g., $is_active, $message).
         $this->view('webhook', ['webhook' => $statusData]);
     }
+
+    /**
+     * Handle incoming PayMongo webhook events.
+     * Endpoint: POST /webhooks/paymongo
+     *
+     * Verifies the Paymongo-Signature header using HMAC-SHA256 and the
+     * PAYMONGO_WEBHOOK_SECRET env var, then dispatches on event type.
+     */
+    public function paymongoWebhook()
+    {
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            http_response_code(200);
+            echo json_encode(['status' => 'paymongo webhook endpoint active']);
+            exit();
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit();
+        }
+
+        $rawBody = file_get_contents('php://input');
+        if (empty($rawBody)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Empty body']);
+            exit();
+        }
+
+        // Verify webhook signature
+        $sigHeader = $_SERVER['HTTP_PAYMONGO_SIGNATURE'] ?? '';
+        if (!\Ginto\Handlers\PayMongoHandler::verifyWebhookSignature($sigHeader, $rawBody)) {
+            error_log('PayMongo webhook: invalid signature');
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid signature']);
+            exit();
+        }
+
+        $event = json_decode($rawBody, true);
+        if (json_last_error() !== JSON_ERROR_NONE || empty($event['data']['type'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid JSON']);
+            exit();
+        }
+
+        $eventType = $event['data']['type'] ?? '';
+        error_log("PayMongo webhook received: {$eventType}");
+
+        try {
+            switch ($eventType) {
+                case 'payment.paid':
+                    $this->handlePaymongoPaymentPaid($event);
+                    break;
+                case 'payment.failed':
+                    $this->handlePaymongoPaymentFailed($event);
+                    break;
+                default:
+                    // Acknowledge unknown events
+                    error_log("PayMongo webhook: unhandled event type {$eventType}");
+                    break;
+            }
+        } catch (\Throwable $e) {
+            error_log('PayMongo webhook error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['error' => 'Internal error']);
+            exit();
+        }
+
+        http_response_code(200);
+        echo json_encode(['status' => 'ok']);
+        exit();
+    }
+
+    /**
+     * Handle payment.paid event from PayMongo.
+     * Updates any pending subscription_payments record to 'completed'.
+     */
+    private function handlePaymongoPaymentPaid(array $event): void
+    {
+        $attributes = $event['data']['attributes']['data']['attributes'] ?? [];
+        $piId       = $attributes['payment_intent_id'] ?? '';
+        $amount     = (int)($attributes['amount'] ?? 0); // centavos
+
+        if (empty($piId)) {
+            error_log('PayMongo payment.paid: missing payment_intent_id');
+            return;
+        }
+
+        error_log("PayMongo payment.paid: pi_id={$piId}, amount={$amount}");
+
+        // Mark any pending paymongo_qrph payments for this PI as completed
+        $this->db->update('subscription_payments', [
+            'status'   => 'completed',
+            'paid_at'  => date('Y-m-d H:i:s'),
+            'notes'    => 'Confirmed via PayMongo webhook',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], [
+            'payment_reference' => $piId,
+            'payment_method'    => 'paymongo_qrph',
+            'status'            => 'pending',
+        ]);
+    }
+
+    /**
+     * Handle payment.failed event from PayMongo.
+     */
+    private function handlePaymongoPaymentFailed(array $event): void
+    {
+        $attributes = $event['data']['attributes']['data']['attributes'] ?? [];
+        $piId       = $attributes['payment_intent_id'] ?? '';
+
+        if (empty($piId)) {
+            return;
+        }
+
+        error_log("PayMongo payment.failed: pi_id={$piId}");
+
+        $this->db->update('subscription_payments', [
+            'status'     => 'failed',
+            'notes'      => 'Failed via PayMongo webhook',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], [
+            'payment_reference' => $piId,
+            'payment_method'    => 'paymongo_qrph',
+            'status'            => 'pending',
+        ]);
+    }
+
     // ===================================================================
     // LOGIC METHODS - These do the actual work
     // ===================================================================

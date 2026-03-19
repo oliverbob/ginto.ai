@@ -272,6 +272,55 @@ class PayMongoHandler
     }
 
     /**
+     * Verify a PayMongo webhook signature.
+     *
+     * PayMongo signs requests with HMAC-SHA256.
+     * Header: "Paymongo-Signature: t=<timestamp>,te=<hmac>,li=<hmac>"
+     * Signed payload: "<timestamp>.<raw_body>"
+     * Replay attack protection: reject events older than 5 minutes.
+     *
+     * @param string $signatureHeader  Value of the Paymongo-Signature header
+     * @param string $rawBody          Raw request body string
+     * @return bool
+     */
+    public static function verifyWebhookSignature(string $signatureHeader, string $rawBody): bool
+    {
+        $secret = $_ENV['PAYMONGO_WEBHOOK_SECRET'] ?? getenv('PAYMONGO_WEBHOOK_SECRET') ?? '';
+        if (empty($secret) || empty($signatureHeader)) {
+            return false;
+        }
+
+        // Parse t=<ts>,te=<hmac>,li=<hmac>
+        $parts = [];
+        foreach (explode(',', $signatureHeader) as $part) {
+            [$k, $v] = array_pad(explode('=', $part, 2), 2, '');
+            $parts[trim($k)] = trim($v);
+        }
+
+        $timestamp = $parts['t'] ?? '';
+        if (empty($timestamp)) {
+            return false;
+        }
+
+        // Reject events older than 5 minutes (replay attack prevention)
+        if (abs(time() - (int)$timestamp) > 300) {
+            return false;
+        }
+
+        $signedPayload = $timestamp . '.' . $rawBody;
+        $expected = hash_hmac('sha256', $signedPayload, $secret);
+
+        // Check against both te (test) and li (live) signatures
+        foreach (['te', 'li'] as $key) {
+            if (!empty($parts[$key]) && hash_equals($expected, $parts[$key])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Full QRPH initialization flow:
      * 1. Create Payment Intent
      * 2. Create QRPH Payment Method

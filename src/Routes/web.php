@@ -1374,6 +1374,7 @@ $router->req('/user', 'UserController@user');
 
 // Webhooks
 $router->req('/webhook', 'WebhookController@webhook');
+$router->req('/webhooks/paymongo', 'WebhookController@paymongoWebhook', ['POST', 'GET']);
 $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // Editor routes
