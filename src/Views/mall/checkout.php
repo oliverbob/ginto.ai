@@ -540,7 +540,7 @@ body.light .co-qr-spinner {
         font-size:0.78rem;
         max-width:220px;
     }
-    .co-qr-box img { max-width:148px; padding:6px; margin-bottom:8px; }
+    .co-qr-box img { max-width:136px; padding:6px; margin-bottom:8px; }
     .co-qr-actions {
         gap:8px;
         margin-top:6px;
@@ -552,9 +552,9 @@ body.light .co-qr-spinner {
         font-size:0.8rem;
     }
     .co-qr-box #coQrStatus {
-        font-size:0.78rem !important;
-        line-height:1.45;
-        margin-top:8px !important;
+        font-size:0.74rem !important;
+        line-height:1.35;
+        margin-top:6px !important;
     }
     .co-actions {
         position:sticky;
