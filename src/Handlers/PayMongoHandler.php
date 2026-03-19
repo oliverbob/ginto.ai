@@ -232,11 +232,13 @@ class PayMongoHandler
         }
 
         return [
-            'success'   => true,
-            'status'    => $status,
-            'qr_image'  => $qrImage,
-            'qr_string' => $qrString,
-            'pi_id'     => $response['data']['id'] ?? $piId,
+            'success'    => true,
+            'status'     => $status,
+            'qr_image'   => $qrImage,
+            'qr_string'  => $qrString,
+            'pi_id'      => $response['data']['id'] ?? $piId,
+            '_next_action' => $nextAction,
+            '_attrs_keys'  => array_keys($attrs),
         ];
     }
 

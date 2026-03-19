@@ -1516,11 +1516,13 @@ class PaymentController
             $_SESSION['paymongo_pi_email']  = $email;
 
             echo json_encode([
-                'success'   => true,
-                'pi_id'     => $result['pi_id'],
-                'qr_image'  => $result['qr_image'],
-                'qr_string' => $result['qr_string'],
-                'status'    => $result['status'],
+                'success'      => true,
+                'pi_id'        => $result['pi_id'],
+                'qr_image'     => $result['qr_image'],
+                'qr_string'    => $result['qr_string'],
+                'status'       => $result['status'],
+                '_next_action' => $result['_next_action'] ?? null,
+                '_attrs_keys'  => $result['_attrs_keys'] ?? null,
             ]);
             exit;
 
