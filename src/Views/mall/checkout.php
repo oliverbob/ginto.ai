@@ -80,6 +80,36 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 .co-sector { font-size:0.74rem; letter-spacing:0.14em; text-transform:uppercase; color:var(--muted); font-weight:700; margin-bottom:4px; }
 .co-method-name { font-size:1.45rem; font-weight:800; line-height:1.2; }
 .co-divider { height:1px; background:rgba(255,255,255,0.07); margin:0 28px; }
+.co-mobile-summary {
+    display:none;
+    margin:12px 28px 0;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:10px;
+}
+.co-mobile-chip {
+    border:1px solid rgba(255,255,255,0.08);
+    background:rgba(255,255,255,0.03);
+    border-radius:14px;
+    padding:11px 12px;
+    min-width:0;
+}
+.co-mobile-chip-label {
+    font-size:0.68rem;
+    text-transform:uppercase;
+    letter-spacing:0.12em;
+    color:var(--muted);
+    font-weight:800;
+    margin-bottom:5px;
+}
+.co-mobile-chip-value {
+    font-size:0.9rem;
+    font-weight:800;
+    color:var(--text);
+    line-height:1.3;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
 .co-amount-box {
     margin:16px 28px; padding:18px 20px; border-radius:18px;
     background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
@@ -96,6 +126,45 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
 .co-ship-text { font-size:0.87rem; line-height:1.65; color:var(--text); }
 .co-qr-box { margin:0 28px 16px; text-align:center; }
 .co-qr-box img { max-width:200px; width:100%; border-radius:14px; border:1px solid var(--border); background:#fff; padding:10px; margin:0 auto 10px; display:block; }
+.co-qr-loading {
+    display:none;
+    align-items:center;
+    justify-content:center;
+    flex-direction:column;
+    gap:10px;
+    min-height:180px;
+    padding:18px 14px;
+    border-radius:18px;
+    border:1px dashed rgba(255,255,255,0.12);
+    background:rgba(255,255,255,0.03);
+    margin-bottom:10px;
+}
+.co-qr-spinner {
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:3px solid rgba(255,255,255,0.16);
+    border-top-color:#d4af37;
+    animation:coSpin 0.85s linear infinite;
+}
+.co-qr-loading-title {
+    font-size:0.95rem;
+    font-weight:800;
+    color:var(--text);
+}
+.co-qr-loading-copy {
+    font-size:0.82rem;
+    line-height:1.5;
+    color:var(--muted);
+    max-width:260px;
+    margin:0 auto;
+}
+.co-qr-box.is-loading .co-qr-loading {
+    display:flex;
+}
+@keyframes coSpin {
+    to { transform:rotate(360deg); }
+}
 .co-qr-actions {
     display:flex;
     gap:10px;
@@ -352,6 +421,12 @@ body.light .co-glow {
 body.light .co-method-name { color:#0f172a; }
 body.light .co-sector { color:#64748b; }
 body.light .co-divider { background:#e2eaf5; }
+body.light .co-mobile-chip {
+    background:#f8fbff;
+    border-color:#dbe6f7;
+}
+body.light .co-mobile-chip-label { color:#64748b; }
+body.light .co-mobile-chip-value { color:#1e293b; }
 body.light .co-amount-box {
     background:#f1f6ff;
     border-color:#dbe6f7;
@@ -389,6 +464,14 @@ body.light .co-qr-action-btn:hover {
     background:#f8fbff;
     color:#0f172a;
 }
+body.light .co-qr-loading {
+    background:#f8fbff;
+    border-color:#dbe6f7;
+}
+body.light .co-qr-spinner {
+    border-color:#dbe6f7;
+    border-top-color:#d4af37;
+}
 
 @media (max-width: 980px) {
     section[style*="grid-template-columns:minmax(0,1.3fr)"] {
@@ -403,30 +486,89 @@ body.light .co-qr-action-btn:hover {
 
 @media (max-width: 640px) {
     .co-overlay {
-        align-items:flex-start;
-        padding:10px;
+        align-items:flex-end;
+        padding:0;
         overflow:auto;
     }
     .co-card {
         max-width:100%;
-        border-radius:20px;
-        max-height:calc(100vh - 20px);
+        border-radius:22px 22px 0 0;
+        max-height:100vh;
+        min-height:auto;
         overflow-y:auto;
+        padding-bottom:max(10px, env(safe-area-inset-bottom));
     }
-    .co-head { padding:20px 16px 14px; }
+    .co-head { padding:14px 14px 10px; }
+    .co-glow {
+        width:180px;
+        height:86px;
+    }
+    .co-method-icon {
+        width:52px;
+        height:52px;
+        border-radius:16px;
+        margin:0 auto 10px;
+    }
+    .co-sector {
+        font-size:0.66rem;
+        margin-bottom:2px;
+    }
+    .co-method-name {
+        font-size:1.05rem;
+    }
     .co-divider { margin:0 16px; }
+    .co-mobile-summary {
+        display:grid;
+        margin:10px 16px 0;
+    }
     .co-amount-box,
     .co-ship-box,
     .co-qr-box,
     .co-pp-box { margin-left:16px; margin-right:16px; }
-    .co-amount-box { padding:12px 12px; margin-top:12px; margin-bottom:12px; }
-    .co-amount { font-size:2.05rem; }
-    .co-ship-box { padding:12px; margin-bottom:12px; }
-    .co-ship-text { font-size:0.84rem; line-height:1.5; }
-    .co-qr-box img { max-width:170px; padding:8px; margin-bottom:8px; }
-    .co-actions { padding:4px 16px 16px; gap:8px; }
+    .co-amount-box,
+    .co-ship-box { display:none; }
+    .co-qr-box { margin-top:12px; margin-bottom:12px; }
+    .co-qr-loading {
+        min-height:132px;
+        padding:14px 12px;
+        margin-bottom:8px;
+    }
+    .co-qr-loading-title {
+        font-size:0.88rem;
+    }
+    .co-qr-loading-copy {
+        font-size:0.78rem;
+        max-width:220px;
+    }
+    .co-qr-box img { max-width:148px; padding:6px; margin-bottom:8px; }
+    .co-qr-actions {
+        gap:8px;
+        margin-top:6px;
+    }
+    .co-qr-action-btn {
+        min-width:0;
+        flex:1 1 0;
+        padding:10px 10px;
+        font-size:0.8rem;
+    }
+    .co-qr-box #coQrStatus {
+        font-size:0.78rem !important;
+        line-height:1.45;
+        margin-top:8px !important;
+    }
+    .co-actions {
+        position:sticky;
+        bottom:0;
+        padding:8px 16px 12px;
+        gap:8px;
+        background:linear-gradient(180deg,rgba(15,23,42,0), rgba(15,23,42,0.9) 28%, rgba(15,23,42,0.98) 100%);
+        backdrop-filter:blur(10px);
+    }
     .co-btn-confirm { padding:12px 16px; }
     .co-btn-cancel { padding:11px 16px; }
+    body.light .co-actions {
+        background:linear-gradient(180deg,rgba(255,255,255,0), rgba(255,255,255,0.92) 28%, rgba(255,255,255,0.98) 100%);
+    }
     .checkout-hero {
         padding:22px 18px !important;
     }
@@ -629,6 +771,16 @@ body.light .co-qr-action-btn:hover {
             <div id="coName" class="co-method-name"></div>
         </div>
         <div class="co-divider"></div>
+        <div class="co-mobile-summary">
+            <div class="co-mobile-chip">
+                <div class="co-mobile-chip-label">Total</div>
+                <div id="coAmountMobile" class="co-mobile-chip-value">₱0.00</div>
+            </div>
+            <div class="co-mobile-chip">
+                <div class="co-mobile-chip-label">Ship To</div>
+                <div id="coShipMobile" class="co-mobile-chip-value">—</div>
+            </div>
+        </div>
         <div class="co-amount-box">
             <div class="co-amount-label">Total Due</div>
             <div id="coAmount" class="co-amount">₱0.00</div>
@@ -638,6 +790,11 @@ body.light .co-qr-action-btn:hover {
             <div id="coShip" class="co-ship-text">—</div>
         </div>
         <div id="coQrBox" class="co-qr-box" style="display:none;">
+            <div id="coQrLoading" class="co-qr-loading">
+                <div class="co-qr-spinner" aria-hidden="true"></div>
+                <div class="co-qr-loading-title">Generating QR for easy-scan payment</div>
+                <div class="co-qr-loading-copy">We are preparing your Ginto Pay QR so you can scan it quickly with your banking app.</div>
+            </div>
             <img id="coQrImg" src="" alt="Ginto Pay QR" style="display:none;">
             <div id="coQrFallback" style="font-size:0.8rem;color:var(--muted);display:none;"></div>
             <div class="co-qr-actions">
@@ -968,13 +1125,16 @@ body.light .co-qr-action-btn:hover {
     const coIcon       = document.getElementById('coIcon');
     const coName       = document.getElementById('coName');
     const coAmount     = document.getElementById('coAmount');
+    const coAmountMobile = document.getElementById('coAmountMobile');
     const coShip       = document.getElementById('coShip');
+    const coShipMobile = document.getElementById('coShipMobile');
     const coConfirm    = document.getElementById('coConfirm');
     const coCancel     = document.getElementById('coCancel');
     const coQrBox      = document.getElementById('coQrBox');
     const coQrImg      = document.getElementById('coQrImg');
     const coQrFallback = document.getElementById('coQrFallback');
     const coQrStatus   = document.getElementById('coQrStatus');
+    const coQrLoading  = document.getElementById('coQrLoading');
     const coQrDownload = document.getElementById('coQrDownload');
     const coQrRefresh  = document.getElementById('coQrRefresh');
     const coPpBox      = document.getElementById('coPpBox');
@@ -1009,10 +1169,12 @@ body.light .co-qr-action-btn:hover {
         coIcon.innerHTML        = meta.iconHtml || '';
         coName.textContent      = meta.name || selectedMethod;
         coAmount.textContent    = formatPrice(summary.total, summary.currency);
+        coAmountMobile.textContent = formatPrice(summary.total, summary.currency);
         coShip.innerHTML = '<strong>' + esc(s.full_name) + '</strong>'
             + (s.phone ? ' &middot; ' + esc(s.phone) : '') + '<br>'
             + esc(s.address_line1) + (s.address_line2 ? ', ' + esc(s.address_line2) : '') + '<br>'
             + [s.city, s.province, s.postal_code].filter(Boolean).map(esc).join(', ');
+        coShipMobile.textContent = s.city || s.address_line1 || s.full_name || '—';
         coConfirm.textContent    = meta.confirmLabel || 'Confirm & Pay';
         coConfirm.disabled       = false;
         coConfirm.style.display  = '';
@@ -1030,6 +1192,8 @@ body.light .co-qr-action-btn:hover {
     }
 
     function renderQrInModal(qr) {
+        coQrBox.classList.remove('is-loading');
+        coQrLoading.style.display = 'none';
         if (qr.qr_image) {
             coQrImg.src = qr.qr_image;
             coQrImg.style.display = 'block';
@@ -1049,8 +1213,13 @@ body.light .co-qr-action-btn:hover {
         coConfirm.style.display = 'none';
         coPpBox.style.display   = 'none';
         coQrBox.style.display   = 'block';
+        coQrBox.classList.add('is-loading');
         coCancel.textContent    = 'Close';
-        coQrStatus.textContent  = forceNewSession ? 'Refreshing QR...' : 'Preparing QR...';
+        coQrImg.style.display = 'none';
+        coQrFallback.style.display = 'none';
+        coQrDownload.style.display = 'none';
+        coQrLoading.style.display = 'flex';
+        coQrStatus.textContent  = forceNewSession ? 'Refreshing QR for easy-scan payment...' : 'Generating QR for easy-scan payment...';
         coQrRefresh.disabled    = true;
 
         try {
@@ -1063,6 +1232,8 @@ body.light .co-qr-action-btn:hover {
             coQrStatus.textContent = 'Scan with your banking app — this will update automatically when payment is confirmed.';
             beginStatusPoll();
         } catch (err) {
+            coQrBox.classList.remove('is-loading');
+            coQrLoading.style.display = 'none';
             setError(err.message);
             coQrStatus.textContent = 'Unable to generate QR. Tap Refresh QR to try again.';
         } finally {
