@@ -1807,6 +1807,8 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                 updateGintoPayDisplay();
               }
             }
+            // Always open the payment modal when reaching step 3 with a method pre-selected
+            if (typeof window.openPaymentModal === 'function') window.openPaymentModal(paymentMethod.value);
           }
         }
       }
@@ -2264,7 +2266,102 @@ if (empty($paypalClientId)) {
     if (paymongoDetails) paymongoDetails.classList.add('hidden');
     if (gintoPayDetails) gintoPayDetails.classList.add('hidden');
   };
-  
+
+  // -------------------------------------------------------
+  // Payment Modal — only X button closes it
+  // -------------------------------------------------------
+  var PAYMENT_METHOD_INFO = {
+    'paypal':               { icon: 'fab fa-paypal',      color: '#0070e0', label: 'PayPal'        },
+    'credit_card':          { icon: 'fas fa-credit-card', color: '#0070e0', label: 'Card'          },
+    'gcash':                { icon: 'fas fa-mobile-alt',  color: '#007dfe', label: 'GCash'         },
+    'bank_transfer':        { icon: 'fas fa-university',  color: '#2c5282', label: 'Bank'          },
+    'crypto_usdt_bep20':    { icon: 'fab fa-bitcoin',     color: '#f0b90b', label: 'Crypto'        },
+    'paymongo_qrph':        { icon: 'fas fa-qrcode',      color: '#f97316', label: 'QR 1 Month'   },
+    'paymongo_qrph_annual': { icon: 'fas fa-qrcode',      color: '#16a34a', label: 'QR 12 Months' },
+    'ginto_pay':            { icon: 'fas fa-credit-card', color: '#6366f1', label: 'Card Pay'      }
+  };
+
+  function buildPaymentModal() {
+    if (document.getElementById('payment-modal')) return;
+    var modal = document.createElement('div');
+    modal.id = 'payment-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:500;display:none;background:rgba(0,0,0,0.82);overflow-y:auto;';
+    modal.innerHTML =
+      '<div style="display:flex;align-items:flex-start;justify-content:center;min-height:100%;padding:1.5rem 1rem 3rem;">' +
+        '<div style="background:var(--bg-primary);border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.5);width:100%;max-width:30rem;display:flex;flex-direction:column;">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);">' +
+            '<div style="display:flex;align-items:center;gap:0.6rem;">' +
+              '<span id="pmodal-icon" style="font-size:1.5rem;line-height:1;"></span>' +
+              '<div>' +
+                '<h3 id="pmodal-title" style="font-weight:700;font-size:0.95rem;color:var(--text-primary);margin:0;line-height:1.2;"></h3>' +
+                '<p style="font-size:0.65rem;color:var(--text-secondary);margin:0.15rem 0 0;">Tap a method below to switch</p>' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" id="pmodal-close" title="Close" style="width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border-radius:50%;border:none;cursor:pointer;font-size:0.9rem;background:var(--bg-secondary);color:var(--text-secondary);flex-shrink:0;">' +
+              '<i class="fas fa-times"></i>' +
+            '</button>' +
+          '</div>' +
+          '<div id="pmodal-tabs" style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.65rem 1rem;border-bottom:1px solid var(--border-color);"></div>' +
+          '<div id="pmodal-body" style="overflow-y:auto;padding:1rem;"></div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(modal);
+    // Move all payment panels into modal body (no HTML clone — live DOM move)
+    var body = document.getElementById('pmodal-body');
+    ['paypal-button-container','card-button-container','paypal-loading','paypal-error',
+      'gcash-details','bank-transfer-details','crypto-usdt-details',
+      'paymongo-qrph-details','confirm-paymongo-payment','ginto-pay-details'
+    ].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) body.appendChild(el);
+    });
+    // Only X closes the modal
+    document.getElementById('pmodal-close').addEventListener('click', window.closePaymentModal);
+  }
+
+  window.openPaymentModal = function(value) {
+    buildPaymentModal();
+    var info = PAYMENT_METHOD_INFO[value] || { icon: 'fas fa-credit-card', color: 'var(--primary-500)', label: 'Payment' };
+    var iconEl = document.getElementById('pmodal-icon');
+    var titleEl = document.getElementById('pmodal-title');
+    if (iconEl) iconEl.innerHTML = '<i class="' + info.icon + '" style="color:' + info.color + '"></i>';
+    if (titleEl) titleEl.textContent = info.label;
+    // Rebuild method thumbnail tabs
+    var tabs = document.getElementById('pmodal-tabs');
+    if (tabs) {
+      tabs.innerHTML = '';
+      document.querySelectorAll('input[name="payment_method"]').forEach(function(radio) {
+        var mi = PAYMENT_METHOD_INFO[radio.value];
+        if (!mi) return;
+        var active = radio.value === value;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.style.cssText = 'display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:0.4rem;font-size:0.68rem;font-weight:600;cursor:pointer;transition:all 0.15s;border:2px solid ' +
+          (active ? mi.color : 'var(--border-color)') + ';background:' +
+          (active ? mi.color : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text-secondary)') + ';';
+        btn.innerHTML = '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
+        btn.addEventListener('click', function() {
+          radio.checked = true;
+          radio.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+        tabs.appendChild(btn);
+      });
+    }
+    var modal = document.getElementById('payment-modal');
+    modal.style.display = 'block';
+    var body = document.getElementById('pmodal-body');
+    if (body) body.scrollTop = 0;
+  };
+
+  window.closePaymentModal = function() {
+    var modal = document.getElementById('payment-modal');
+    if (modal) modal.style.display = 'none';
+    window.hideAllPaymentSections();
+    document.querySelectorAll('input[name="payment_method"]').forEach(function(r) { r.checked = false; });
+    var sp = document.getElementById('selectedPayMethod');
+    if (sp) sp.value = '';
+  };
+
   // Toggle bank SWIFT/codes visibility
   window.toggleBankCodes = function() {
     var extraCodes = document.getElementById('bank-codes-content');
@@ -2787,9 +2884,11 @@ if (empty($paypalClientId)) {
         }
         // Don't show complete-purchase - Ginto Pay redirects externally
       }
+      // Show payment modal (only X button closes it)
+      if (typeof window.openPaymentModal === 'function') window.openPaymentModal(this.value);
     });
   });
-  
+
   function showPayPalButton(fundingType) {
     var container, loading, errorDiv;
     
