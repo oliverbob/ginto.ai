@@ -1085,10 +1085,10 @@ body.light .co-qr-spinner {
             <!-- Billing Address -->
             <div class="co-bill-section-title">Billing Address</div>
             <label class="co-bill-toggle">
-                <input type="checkbox" id="coCardSameAsShip" checked>
+                <input type="checkbox" id="coCardSameAsShip">
                 <span>Same as shipping address</span>
             </label>
-            <div id="coBillFields" class="co-bill-fields" style="display:none;">
+            <div id="coBillFields" class="co-bill-fields" style="display:grid;">
                 <label class="co-card-span-2">
                     <span class="co-card-label">Address Line 1</span>
                     <input id="coBillAddr1" class="co-card-field" type="text" autocomplete="billing address-line1" placeholder="Street, Barangay">
@@ -1817,9 +1817,11 @@ body.light .co-qr-spinner {
     const coCardSameAsShip = document.getElementById('coCardSameAsShip');
     const coBillFields = document.getElementById('coBillFields');
     if (coCardSameAsShip && coBillFields) {
-        coCardSameAsShip.addEventListener('change', function() {
-            coBillFields.style.display = this.checked ? 'none' : 'grid';
-        });
+        const syncBillingFields = function() {
+            coBillFields.style.display = coCardSameAsShip.checked ? 'none' : 'grid';
+        };
+        coCardSameAsShip.addEventListener('change', syncBillingFields);
+        syncBillingFields();
     }
     const coUseHomeAddr = document.getElementById('coUseHomeAddr');
     if (coUseHomeAddr && profileHome && profileHome.address_line1) {
