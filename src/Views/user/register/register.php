@@ -3014,6 +3014,7 @@ if (empty($paypalClientId)) {
     }
   }
 })();
+</script>
 
 <?php if ($paymongoEnabled): ?>
 <script>
