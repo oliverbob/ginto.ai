@@ -304,7 +304,7 @@ $walletTransactions = $wallet_transactions ?? [];
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
             </div>
             <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
-                PayMongo top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. Wallet funds are purchase-only and cannot be withdrawn.
+                Ginto Cash In top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. Wallet funds are purchase-only and cannot be withdrawn.
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
