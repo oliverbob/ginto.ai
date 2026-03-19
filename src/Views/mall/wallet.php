@@ -237,7 +237,15 @@ $walletTransactions = $wallet_transactions ?? [];
                 <div class="gw-balance">₱<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></div>
                 <div class="gw-balance-sub">Available balance</div>
                 <div class="gw-divider"></div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;" id="wallet-buttons">
+                    <style>
+                        @media (max-width: 767px) {
+                            #wallet-buttons {
+                                flex-direction: column;
+                                align-items: stretch;
+                            }
+                        }
+                    </style>
                     <a href="/mall/checkout" class="gw-btn gw-btn-ghost">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                         Checkout
