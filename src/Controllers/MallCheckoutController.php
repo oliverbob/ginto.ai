@@ -33,6 +33,9 @@ class MallCheckoutController extends Controller
             return;
         }
 
+        $viewerId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        $this->commerce->recordStorefrontImpression((int)($data['storefront']['user_id'] ?? 0), $viewerId, 'viewed');
+
         $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
         $walletSummary = $userId > 0 ? $this->commerce->getWalletSummary($userId) : ['account' => []];
 
@@ -90,6 +93,7 @@ class MallCheckoutController extends Controller
     public function buyerOrdersPage()
     {
         $userId = $this->requireUser();
+        $this->commerce->purgeUnpaidOrdersForUser($userId, 'buyer');
         $this->view('mall/orders', [
             'title' => 'My Mall Orders',
             'csrf_token' => generateCsrfToken(),
@@ -103,6 +107,7 @@ class MallCheckoutController extends Controller
     public function sellerOrdersPage()
     {
         $userId = $this->requireUser();
+        $this->commerce->purgeUnpaidOrdersForUser($userId, 'seller');
         $this->view('mall/orders', [
             'title' => 'Seller Orders',
             'csrf_token' => generateCsrfToken(),

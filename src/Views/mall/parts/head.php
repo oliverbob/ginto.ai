@@ -925,6 +925,45 @@ input[type="file"].form-input { padding: 7px 12px; }
     .main-toolbar { gap: 8px; }
 }
 
+/* ========== ULTRA-NARROW MOBILE <= 360px ========== */
+@media (max-width: 360px) {
+    .header-inner {
+        padding: 0 6px;
+        gap: 4px;
+    }
+
+    .brand img {
+        width: 26px;
+        height: 26px;
+    }
+
+    .search-trigger,
+    .action-btn,
+    .hamburger {
+        width: 34px;
+        height: 34px;
+    }
+
+    .header-actions {
+        gap: 2px;
+    }
+
+    .wallet-balance-text {
+        display: none;
+    }
+
+    #sellBtn {
+        display: none;
+    }
+}
+
+/* ========== EXTREME NARROW <= 320px ========== */
+@media (max-width: 320px) {
+    #themeToggle {
+        display: none;
+    }
+}
+
 /* ========== DESKTOP >= 768px ========== */
 @media (min-width: 768px) {
     /* Hamburger invisible on desktop */

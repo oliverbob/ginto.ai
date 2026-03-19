@@ -196,6 +196,19 @@ class MallCommerceService
             throw new \RuntimeException('Failed to create checkout session.');
         }
 
+        if ($paymentMethod !== 'wallet') {
+            $sellerIds = [];
+            foreach ($bundle['orders'] as $orderSummary) {
+                $sellerId = (int)($orderSummary['seller_id'] ?? 0);
+                if ($sellerId > 0) {
+                    $sellerIds[$sellerId] = true;
+                }
+            }
+            foreach (array_keys($sellerIds) as $sellerId) {
+                $this->recordStorefrontImpression($sellerId, $buyerId, 'added_to_cart');
+            }
+        }
+
         if ($paymentMethod === 'wallet') {
             $wallet = $this->ensureWalletAccount($buyerId);
             $balance = (float)($wallet['balance'] ?? 0);
@@ -619,6 +632,7 @@ class MallCommerceService
     {
         return $this->hydrateOrders($this->db->select('mall_orders', '*', [
             'buyer_id' => $buyerId,
+            'payment_status' => ['paid', 'refunded'],
             'ORDER' => ['created_at' => 'DESC'],
             'LIMIT' => [0, 100],
         ]) ?: []);
@@ -628,9 +642,76 @@ class MallCommerceService
     {
         return $this->hydrateOrders($this->db->select('mall_orders', '*', [
             'seller_id' => $sellerId,
+            'payment_status' => ['paid', 'refunded'],
             'ORDER' => ['created_at' => 'DESC'],
             'LIMIT' => [0, 100],
         ]) ?: []);
+    }
+
+    public function purgeUnpaidOrdersForUser(int $userId, string $scope = 'buyer'): int
+    {
+        if ($userId <= 0) {
+            return 0;
+        }
+
+        $scopeColumn = $scope === 'seller' ? 'seller_id' : 'buyer_id';
+        $orders = $this->db->select('mall_orders', ['id'], [
+            $scopeColumn => $userId,
+            'payment_status[!]' => ['paid', 'refunded'],
+        ]) ?: [];
+
+        $orderIds = [];
+        foreach ($orders as $order) {
+            $id = (int)($order['id'] ?? 0);
+            if ($id > 0) {
+                $orderIds[] = $id;
+            }
+        }
+
+        if (empty($orderIds)) {
+            return 0;
+        }
+
+        $this->db->pdo->beginTransaction();
+        try {
+            $this->db->delete('mall_order_items', ['order_id' => $orderIds]);
+            $this->db->delete('mall_order_history', ['order_id' => $orderIds]);
+            $this->db->delete('mall_orders', ['id' => $orderIds]);
+            $this->db->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->db->pdo->inTransaction()) {
+                $this->db->pdo->rollBack();
+            }
+            throw $e;
+        }
+
+        return count($orderIds);
+    }
+
+    public function recordStorefrontImpression(int $sellerId, ?int $viewerUserId, string $activity = 'viewed'): void
+    {
+        if ($sellerId <= 0) {
+            return;
+        }
+        if (!empty($viewerUserId) && $viewerUserId === $sellerId) {
+            return;
+        }
+
+        $message = match ($activity) {
+            'added_to_cart' => 'User added items to cart but has not paid yet.',
+            default => 'User viewed your storefront but never paid yet.',
+        };
+
+        $this->createMallNotification(
+            $sellerId,
+            !empty($viewerUserId) ? $viewerUserId : null,
+            'mall_seller_impression',
+            $message,
+            [
+                'activity' => $activity,
+                'privacy_mode' => 'no_pii',
+            ]
+        );
     }
 
     public function listDeliveryOrders(int $deliveryUserId): array
