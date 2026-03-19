@@ -826,29 +826,56 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         <span class="text-xs font-normal px-2 py-0.5 rounded" style="background: linear-gradient(90deg,#f97316,#fb923c); color: #fff;">QRPH</span>
                     </h3>
                     <p class="help-text mb-4">PayMongo enables QRPH (InstaPay/PESONet QR) payments. Get keys from <a href="https://dashboard.paymongo.com" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">dashboard.paymongo.com</a>.</p>
-                    <div class="grid md:grid-cols-2 gap-6">
+                    <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--text-secondary);">Live Credentials</p>
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
                         <div>
                             <label class="label-text">PayMongo Public Key</label>
-                            <input type="text" name="paymongo_public_key" class="input-field" value="<?= htmlspecialchars($envValues['PAYMONGO_PUBLIC_KEY'] ?? '') ?>" placeholder="pk_live_... or pk_test_...">
+                            <input type="text" name="paymongo_public_key" class="input-field" value="<?= htmlspecialchars($envValues['PAYMONGO_PUBLIC_KEY'] ?? '') ?>" placeholder="pk_live_...">
                         </div>
                         <div>
                             <label class="label-text">PayMongo Secret Key</label>
                             <div class="relative">
-                                <input type="password" id="paymongo_secret_key" name="paymongo_secret_key" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_SECRET_KEY'] ?? '') ?>" placeholder="sk_live_... or sk_test_...">
+                                <input type="password" id="paymongo_secret_key" name="paymongo_secret_key" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_SECRET_KEY'] ?? '') ?>" placeholder="sk_live_...">
                                 <button type="button" onclick="togglePassword('paymongo_secret_key')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                     <i id="paymongo_secret_key_icon" class="fas fa-eye"></i>
                                 </button>
                             </div>
                         </div>
                         <div>
-                            <label class="label-text">PayMongo Webhook Secret</label>
+                            <label class="label-text">Webhook Secret</label>
                             <div class="relative">
                                 <input type="password" id="paymongo_webhook_secret" name="paymongo_webhook_secret" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_WEBHOOK_SECRET'] ?? '') ?>" placeholder="whsec_...">
                                 <button type="button" onclick="togglePassword('paymongo_webhook_secret')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
                                     <i id="paymongo_webhook_secret_icon" class="fas fa-eye"></i>
                                 </button>
                             </div>
-                            <p class="help-text mt-1">Webhook endpoint: <code class="text-xs">https://ginto.ai/webhooks/paymongo</code></p>
+                            <p class="help-text mt-1">Webhook URL: <code class="text-xs">https://ginto.ai/webhooks/paymongo</code></p>
+                        </div>
+                    </div>
+
+                    <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--text-secondary);">Test / Sandbox Credentials</p>
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div>
+                            <label class="label-text">Test Public Key</label>
+                            <input type="text" name="paymongo_public_key_test" class="input-field" value="<?= htmlspecialchars($envValues['PAYMONGO_PUBLIC_KEY_TEST'] ?? '') ?>" placeholder="pk_test_...">
+                        </div>
+                        <div>
+                            <label class="label-text">Test Secret Key</label>
+                            <div class="relative">
+                                <input type="password" id="paymongo_secret_key_test" name="paymongo_secret_key_test" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_SECRET_KEY_TEST'] ?? '') ?>" placeholder="sk_test_...">
+                                <button type="button" onclick="togglePassword('paymongo_secret_key_test')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <i id="paymongo_secret_key_test_icon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="label-text">Test Webhook Secret</label>
+                            <div class="relative">
+                                <input type="password" id="paymongo_webhook_secret_test" name="paymongo_webhook_secret_test" class="input-field pr-10" value="<?= htmlspecialchars($envValues['PAYMONGO_WEBHOOK_SECRET_TEST'] ?? '') ?>" placeholder="whsec_test_...">
+                                <button type="button" onclick="togglePassword('paymongo_webhook_secret_test')" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <i id="paymongo_webhook_secret_test_icon" class="fas fa-eye"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
 
