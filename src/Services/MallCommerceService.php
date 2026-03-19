@@ -12,8 +12,7 @@ class MallCommerceService
     private $db;
 
     private const MIN_TOPUP_FEE_PHP = 25.00;
-    private const PAYPAL_TOPUP_FEE_PERCENT_DEFAULT = 0.044;
-    private const PAYPAL_TOPUP_FEE_FIXED_PHP_DEFAULT = 15.00;
+    private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.05;
 
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off' => 12.00,
@@ -1191,11 +1190,7 @@ class MallCommerceService
         }
 
         if ($paymentMethod === 'paypal') {
-            $processorFee = round(
-                ($creditAmount * $this->paypalTopupFeePercent()) + $this->paypalTopupFeeFixedPhp(),
-                2
-            );
-            return round(max(self::MIN_TOPUP_FEE_PHP, $processorFee), 2);
+            return round(self::MIN_TOPUP_FEE_PHP + ($creditAmount * self::PAYPAL_TOPUP_SERVICE_FEE_PERCENT), 2);
         }
 
         return 0.00;
@@ -1212,25 +1207,10 @@ class MallCommerceService
         }
 
         if ($paymentMethod === 'paypal') {
-            return 'paypal_or_minimum_fee';
+            return 'fixed_plus_percent_fee';
         }
 
         return 'fixed_minimum_fee';
-    }
-
-    private function paypalTopupFeePercent(): float
-    {
-        $raw = (float)($_ENV['PAYPAL_TOPUP_FEE_PERCENT'] ?? getenv('PAYPAL_TOPUP_FEE_PERCENT') ?? self::PAYPAL_TOPUP_FEE_PERCENT_DEFAULT);
-        if ($raw > 1) {
-            $raw = $raw / 100;
-        }
-        return max(0.0, min($raw, 1.0));
-    }
-
-    private function paypalTopupFeeFixedPhp(): float
-    {
-        $raw = (float)($_ENV['PAYPAL_TOPUP_FEE_FIXED_PHP'] ?? getenv('PAYPAL_TOPUP_FEE_FIXED_PHP') ?? self::PAYPAL_TOPUP_FEE_FIXED_PHP_DEFAULT);
-        return round(max(0, $raw), 2);
     }
 
     private function addOrderHistory(int $orderId, ?int $actorUserId, string $actorType, ?string $fromStatus, string $toStatus, string $message): void

@@ -304,7 +304,7 @@ $walletTransactions = $wallet_transactions ?? [];
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
             </div>
             <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
-                Ginto Platform Cash In/top-ups (QR or card) or Paypal include a fixed fee of ₱25.00 per transaction. Wallet funds are purchase-only and cannot be withdrawn. This may change depending on bank or payment processor, bank or international card type.
+                Ginto Pay top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. PayPal top-ups include ₱25.00 plus a 5% service fee. Wallet funds are purchase-only and cannot be withdrawn. This may change depending on bank or payment processor, bank or international card type.
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
@@ -449,9 +449,20 @@ $walletTransactions = $wallet_transactions ?? [];
         return method === 'ginto_pay_qr' || method === 'ginto_pay_card';
     }
 
+    function isPayPalMethod(method) {
+        return method === 'paypal';
+    }
+
     function updateTopupBreakdown() {
         const credit = Math.max(0, Number(amountInput.value || 0));
-        const fee = isPayMongoMethod(selectedMethod) && credit > 0 ? 25 : 0;
+        let fee = 0;
+        if (credit > 0) {
+            if (isPayMongoMethod(selectedMethod)) {
+                fee = 25;
+            } else if (isPayPalMethod(selectedMethod)) {
+                fee = 25 + (credit * 0.05);
+            }
+        }
         const gross = credit + fee;
         topupGrossEl.textContent = formatPrice(gross);
         topupFeeEl.textContent = formatPrice(fee);
