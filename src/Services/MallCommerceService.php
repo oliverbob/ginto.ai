@@ -5,6 +5,7 @@ use Ginto\Core\Database;
 use Ginto\Handlers\PayMongoHandler;
 use Ginto\Handlers\PayPalHandler;
 use Ginto\Helpers\MailHelper;
+use Ginto\Services\ShippingCalculator;
 
 class MallCommerceService
 {
@@ -858,6 +859,11 @@ class MallCommerceService
                 'product_id' => (int)$product['id'],
                 'title' => (string)($product['title'] ?? ''),
                 'image_url' => $this->firstProductImage($product),
+                // Shipping dimension snapshot — carried into order items
+                'weight_kg' => max(0.0, (float)($product['weight_kg'] ?? 0)),
+                'length_cm' => max(0.0, (float)($product['length_cm'] ?? 0)),
+                'width_cm'  => max(0.0, (float)($product['width_cm']  ?? 0)),
+                'height_cm' => max(0.0, (float)($product['height_cm'] ?? 0)),
             ]);
             $grouped[$sellerId]['subtotal'] += $pricing['line_subtotal'];
             $grouped[$sellerId]['platform_fee'] += $pricing['platform_fee_amount'];
@@ -868,6 +874,32 @@ class MallCommerceService
         $sanitizedShipping = $this->sanitizeShipping($shipping);
         if (empty($sanitizedShipping['full_name']) || empty($sanitizedShipping['phone']) || empty($sanitizedShipping['address_line1']) || empty($sanitizedShipping['city'])) {
             throw new \RuntimeException('Shipping full name, phone, address, and city are required.');
+        }
+
+        // -- Shipping fee estimation ----------------------------------------
+        // Infer delivery zone from buyer address; no logistics partner yet so
+        // we use the conservative safe divisor (3,500) to protect sellers from
+        // shortfall surprises when a courier takes an actual measurement.
+        $shippingCalc = new ShippingCalculator();
+        $buyerZone    = ShippingCalculator::inferZone(
+            (string)($sanitizedShipping['province'] ?? ''),
+            (string)($sanitizedShipping['city']     ?? '')
+        );
+
+        // Compute per-seller shipping estimate (each seller = 1 parcel group)
+        foreach ($grouped as $sellerId => $group) {
+            $shippingResult = $shippingCalc->estimate(
+                $group['items'],
+                $buyerZone,
+                ShippingCalculator::DIVISOR_SAFE, // conservative — safe default
+                false                              // no logistics partner yet
+            );
+            $grouped[$sellerId]['shipping_fee']       = $shippingResult['estimated_fee'];
+            $grouped[$sellerId]['shipping_zone']      = $shippingResult['zone'];
+            $grouped[$sellerId]['chargeable_weight']  = $shippingResult['chargeable_weight_kg'];
+            $grouped[$sellerId]['shipping_dimensions_json'] = json_encode($shippingResult);
+            // Buyer pays product subtotal + shipping fee
+            $grouped[$sellerId]['buyer_total'] += $shippingResult['estimated_fee'];
         }
 
         $now = date('Y-m-d H:i:s');
@@ -890,6 +922,10 @@ class MallCommerceService
                     'platform_fee_amount' => round($group['platform_fee'], 2),
                     'seller_net_amount' => round($group['seller_net'], 2),
                     'buyer_total_amount' => round($group['buyer_total'], 2),
+                    'shipping_fee_estimated' => round($group['shipping_fee'] ?? 0.00, 2),
+                    'shipping_zone' => $group['shipping_zone'] ?? null,
+                    'chargeable_weight_kg' => $group['chargeable_weight'] ?? null,
+                    'shipping_dimensions_json' => $group['shipping_dimensions_json'] ?? null,
                     'payment_status' => 'pending',
                     'status' => 'pending_payment',
                     'payment_method' => $this->normalizePaymentMethod($paymentMethod),
@@ -918,6 +954,10 @@ class MallCommerceService
                         'pricing_rate' => round($item['pricing_rate'], 2),
                         'markup_rate' => round($item['markup_rate'], 2),
                         'image_url' => $item['image_url'],
+                        'weight_kg_snapshot' => $item['weight_kg'] > 0 ? $item['weight_kg'] : null,
+                        'length_cm_snapshot' => $item['length_cm'] > 0 ? $item['length_cm'] : null,
+                        'width_cm_snapshot'  => $item['width_cm']  > 0 ? $item['width_cm']  : null,
+                        'height_cm_snapshot' => $item['height_cm'] > 0 ? $item['height_cm'] : null,
                         'metadata' => json_encode(['storefront_slug' => $group['storefront_slug']]),
                     ]);
                 }
@@ -929,6 +969,9 @@ class MallCommerceService
                     'seller_id' => $sellerId,
                     'storefront_slug' => $group['storefront_slug'],
                     'buyer_total' => round($group['buyer_total'], 2),
+                    'shipping_fee' => round($group['shipping_fee'] ?? 0.00, 2),
+                    'shipping_zone' => $group['shipping_zone'] ?? null,
+                    'chargeable_weight_kg' => $group['chargeable_weight'] ?? null,
                     'items' => $group['items'],
                 ];
             }

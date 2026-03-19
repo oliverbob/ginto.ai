@@ -475,6 +475,8 @@ class UserController extends \Core\Controller
             $this->settings('Addresses saved successfully.');
             return;
         }
+
+        if ($form === 'password') {
             $current = $_POST['current_password'] ?? '';
             $new     = $_POST['new_password']     ?? '';
             $confirm = $_POST['confirm_password'] ?? '';

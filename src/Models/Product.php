@@ -53,6 +53,11 @@ class Product
             'attributes' => !empty($data['attributes']) ? (is_array($data['attributes']) ? json_encode($data['attributes']) : $data['attributes']) : null,
             'status' => $data['status'] ?? 'draft',
             'is_visible' => isset($data['is_visible']) ? (int)$data['is_visible'] : 0,
+            // Shipping dimensions — packed weight + outer box size (including packaging)
+            'weight_kg' => isset($data['weight_kg']) && $data['weight_kg'] !== '' ? round((float)$data['weight_kg'], 3) : null,
+            'length_cm' => isset($data['length_cm']) && $data['length_cm'] !== '' ? round((float)$data['length_cm'], 2) : null,
+            'width_cm'  => isset($data['width_cm'])  && $data['width_cm']  !== '' ? round((float)$data['width_cm'],  2) : null,
+            'height_cm' => isset($data['height_cm']) && $data['height_cm'] !== '' ? round((float)$data['height_cm'], 2) : null,
             'created_at' => $now,
             'updated_at' => $now
         ];

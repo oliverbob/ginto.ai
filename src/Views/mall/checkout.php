@@ -981,6 +981,13 @@ body.light .co-qr-spinner {
                 <span id="checkoutSubtotal">₱0.00</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Estimated shipping</span>
+                <span id="checkoutShippingFee" title="Calculated after you proceed to checkout">calculated at checkout</span>
+            </div>
+            <div id="checkoutShippingNote" style="display:none;font-size:0.75rem;color:var(--muted);margin-bottom:8px;padding:8px 10px;background:rgba(214,180,75,0.07);border:1px solid rgba(214,180,75,0.18);border-radius:8px;line-height:1.5;">
+                ⚠ Shipping is estimated from seller-declared packed dimensions. If the courier measures a higher weight, the difference is deducted from the seller — not charged to you again.
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Stores in this checkout</span>
                 <span id="checkoutStoreCount">0</span>
             </div>
@@ -1257,9 +1264,27 @@ body.light .co-qr-spinner {
         checkoutSubtotal.textContent = formatPrice(summary.total, summary.currency);
         checkoutTotal.textContent = formatPrice(summary.total, summary.currency);
         checkoutStoreCount.textContent = String(summary.stores || 1);
+        // Shipping fee is server-computed; reset to pending until session is created
+        const sfEl   = document.getElementById('checkoutShippingFee');
+        const sfNote = document.getElementById('checkoutShippingNote');
+        if (sfEl)  { sfEl.textContent   = 'calculated at checkout'; sfEl.style.color = ''; }
+        if (sfNote) sfNote.style.display = 'none';
     }
 
-    function shippingPayload() {
+    function updateShippingFromSession(session) {
+        const sfEl   = document.getElementById('checkoutShippingFee');
+        const sfNote = document.getElementById('checkoutShippingNote');
+        if (!sfEl || !session || !session.orders) return;
+        let totalShipping = 0;
+        const currency = session.currency || 'PHP';
+        session.orders.forEach(function (o) { totalShipping += Number(o.shipping_fee || 0); });
+        sfEl.textContent = formatPrice(totalShipping, currency);
+        sfEl.style.color = totalShipping > 0 ? 'var(--text)' : 'var(--muted)';
+        if (sfNote) sfNote.style.display = totalShipping > 0 ? 'block' : 'none';
+        // Grand total from server already includes shipping
+        const ctEl = document.getElementById('checkoutTotal');
+        if (ctEl && session.total) ctEl.textContent = formatPrice(session.total, currency);
+    }
         return {
             full_name: document.getElementById('shipFullName').value,
             phone: document.getElementById('shipPhone').value,

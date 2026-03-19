@@ -299,6 +299,12 @@ class SellerController extends \Core\Controller
             $markupRate = 0;
         }
 
+        // Shipping dimensions — must include item + all packaging (box, wrap, etc.)
+        $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
+        $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
+        $widthCm  = isset($_POST['width_cm'])  && $_POST['width_cm']  !== '' ? max(0.0, (float)$_POST['width_cm'])  : null;
+        $heightCm = isset($_POST['height_cm']) && $_POST['height_cm'] !== '' ? max(0.0, (float)$_POST['height_cm']) : null;
+
         // Handle images upload (multiple) — use B2 when configured, else local storage
         $imagesArray = [];
         $imgLogFile  = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/logs/marketplace_errors.log';
@@ -360,7 +366,11 @@ class SellerController extends \Core\Controller
             'category_id' => $category,
             'images' => $imagesArray,
             'status' => 'draft',
-            'is_visible' => 0
+            'is_visible' => 0,
+            'weight_kg' => $weightKg,
+            'length_cm' => $lengthCm,
+            'width_cm'  => $widthCm,
+            'height_cm' => $heightCm,
         ];
 
         $created = $productModel->create($data);
@@ -528,6 +538,12 @@ class SellerController extends \Core\Controller
             $markupRate = 0;
         }
 
+        // Shipping dimensions — must include item + all packaging
+        $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
+        $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
+        $widthCm  = isset($_POST['width_cm'])  && $_POST['width_cm']  !== '' ? max(0.0, (float)$_POST['width_cm'])  : null;
+        $heightCm = isset($_POST['height_cm']) && $_POST['height_cm'] !== '' ? max(0.0, (float)$_POST['height_cm']) : null;
+
         // Start from the kept images (user may have removed some via delete buttons)
         $allExisting  = json_decode($existing['images'] ?? '[]', true) ?: [];
         $keepImages   = $_POST['keep_images'] ?? null;
@@ -593,6 +609,10 @@ class SellerController extends \Core\Controller
             'pricing_rate'      => $pricingRate,
             'markup_rate'       => $markupRate,
             'images'            => json_encode($imagesArray),
+            'weight_kg'         => $weightKg,
+            'length_cm'         => $lengthCm,
+            'width_cm'          => $widthCm,
+            'height_cm'         => $heightCm,
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
 

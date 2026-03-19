@@ -498,6 +498,61 @@ select.pf-input    { cursor: pointer; }
             </div>
         </div>
 
+        <!-- Shipping & Weight -->
+        <div class="pf-section">
+            <div class="pf-section-header">
+                <div class="pf-section-icon">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+                </div>
+                <h2 class="pf-section-title">Shipping &amp; Weight</h2>
+            </div>
+            <div class="pf-section-body">
+                <div class="pf-hint" style="margin-bottom:14px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.2);border-radius:10px;padding:10px 14px;color:var(--text);line-height:1.6;">
+                    <strong>⚠ Include packaging:</strong> Enter the <em>total packed weight and outer box dimensions</em> — this must include the box, bubble wrap, and any other packaging. The shipping fee shown to buyers is calculated from these values. If they are lower than the actual courier measurement, the <strong>difference will be deducted from your payout</strong>.
+                </div>
+                <div class="pf-grid-2">
+                    <div class="pf-group">
+                        <label class="pf-label" for="pf-weight">Packed Weight (kg)</label>
+                        <input class="pf-input" id="pf-weight" type="number" step="0.001" min="0" name="weight_kg"
+                            placeholder="e.g. 0.500"
+                            value="<?= htmlspecialchars((string)($p['weight_kg'] ?? '')) ?>">
+                        <span class="pf-hint">Total weight of item + all packaging in kilograms.</span>
+                    </div>
+                    <div class="pf-group">
+                        <label class="pf-label">Packed Box Dimensions (cm)</label>
+                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+                            <div>
+                                <input class="pf-input" id="pf-length" type="number" step="0.1" min="0" name="length_cm"
+                                    placeholder="L"
+                                    value="<?= htmlspecialchars((string)($p['length_cm'] ?? '')) ?>">
+                                <span class="pf-hint" style="text-align:center;display:block">Length</span>
+                            </div>
+                            <div>
+                                <input class="pf-input" type="number" step="0.1" min="0" name="width_cm"
+                                    placeholder="W"
+                                    value="<?= htmlspecialchars((string)($p['width_cm'] ?? '')) ?>">
+                                <span class="pf-hint" style="text-align:center;display:block">Width</span>
+                            </div>
+                            <div>
+                                <input class="pf-input" type="number" step="0.1" min="0" name="height_cm"
+                                    placeholder="H"
+                                    value="<?= htmlspecialchars((string)($p['height_cm'] ?? '')) ?>">
+                                <span class="pf-hint" style="text-align:center;display:block">Height</span>
+                            </div>
+                        </div>
+                        <span class="pf-hint">Outer box size in centimeters. Used to compute volumetric weight (L×W×H÷3500).</span>
+                    </div>
+                </div>
+                <!-- Live estimate preview -->
+                <div id="pf-shipping-preview" style="display:none;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);font-size:0.84rem;line-height:1.8;color:var(--text);margin-top:4px;">
+                    <strong style="color:var(--accent)">📦 Estimated shipping (Metro Luzon):</strong>
+                    <span id="pf-shipping-fee">—</span>
+                    &nbsp;·&nbsp;Chargeable weight: <span id="pf-shipping-cw">—</span> kg
+                    <span id="pf-shipping-note" style="color:var(--muted);font-size:0.78rem;display:block"></span>
+                </div>
+            </div>
+        </div>
+
         <!-- Images -->
         <div class="pf-section">
             <div class="pf-section-header">
@@ -727,6 +782,65 @@ select.pf-input    { cursor: pointer; }
             if (tosOverlay) tosOverlay.classList.add('hidden');
         }
     } catch (_) {}
+}());
+
+// ── Live shipping estimate preview ──────────────────────────────────────────
+(function () {
+    var DIVISOR = 3500; // conservative safe divisor
+    var ZONE_RATES = {
+        metro_luzon: { base: 80, per_kg: 15, free_kg: 1 }
+    };
+
+    function volWeight(l, w, h) {
+        return (l > 0 && w > 0 && h > 0) ? (l * w * h) / DIVISOR : 0;
+    }
+
+    function estimate(weightKg, l, w, h) {
+        var actual = Math.max(0, weightKg);
+        var vol    = volWeight(l, w, h);
+        var cw     = Math.max(actual, vol, 0.5);
+        var r      = ZONE_RATES.metro_luzon;
+        var fee    = r.base + Math.max(0, cw - r.free_kg) * r.per_kg;
+        return { cw: cw, fee: fee };
+    }
+
+    var wInput = document.getElementById('pf-weight');
+    var lInput = document.getElementById('pf-length');
+    var preview = document.getElementById('pf-shipping-preview');
+    var feeEl   = document.getElementById('pf-shipping-fee');
+    var cwEl    = document.getElementById('pf-shipping-cw');
+    var noteEl  = document.getElementById('pf-shipping-note');
+
+    function update() {
+        if (!wInput || !preview) return;
+        var wv = parseFloat(wInput.value) || 0;
+        var lv = parseFloat(lInput ? lInput.value : 0) || 0;
+        var wv2 = parseFloat((document.querySelector('[name="width_cm"]') || {}).value) || 0;
+        var hv  = parseFloat((document.querySelector('[name="height_cm"]') || {}).value) || 0;
+
+        if (wv <= 0 && lv <= 0) { preview.style.display = 'none'; return; }
+
+        var r = estimate(wv, lv, wv2, hv);
+        feeEl.textContent = '₱' + r.fee.toFixed(2);
+        cwEl.textContent  = r.cw.toFixed(3);
+
+        var incomplete = lv <= 0 || wv2 <= 0 || hv <= 0;
+        noteEl.textContent = incomplete
+            ? '⚠ Dimensions incomplete — volumetric weight not applied. Complete L×W×H for an accurate estimate.'
+            : 'Volumetric weight: ' + volWeight(lv, wv2, hv).toFixed(3) + ' kg · Estimate for Metro Luzon zone.';
+        preview.style.display = 'block';
+    }
+
+    ['pf-weight', 'pf-length'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('input', update);
+    });
+    ['[name="width_cm"]', '[name="height_cm"]'].forEach(function (sel) {
+        var el = document.querySelector(sel);
+        if (el) el.addEventListener('input', update);
+    });
+
+    update(); // populate on edit page
 }());
 </script>
 
