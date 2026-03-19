@@ -62,6 +62,7 @@ $csrfToken = $csrf_token ?? '';
     <div id="qr-no-data" style="display:none; padding:20px; color:#f87171; font-size:0.85rem;">&#x26A0; No QR data returned from PayMongo.<br>Check the Raw API response below.</div>
     <div id="qr-amount"></div>
     <div id="poll-banner">&#x23F3; Waiting for payment... (polling every 3s)</div>
+    <a id="download-btn" href="#" download="paymongo-qr.png" style="display:none; margin-top:14px; padding:9px 24px; background:transparent; border:1px solid #f97316; color:#f97316; border-radius:6px; font-size:0.85rem; text-decoration:none; cursor:pointer;">&#x2B07; Download QR</a>
   </div>
 
   <div id="confirmed-section">
@@ -130,6 +131,10 @@ $csrfToken = $csrf_token ?? '';
       if (data.qr_image) {
         qrImg.src = data.qr_image;
         qrImg.style.display = '';
+        // Enable download
+        var dlBtn = document.getElementById('download-btn');
+        dlBtn.href = data.qr_image;
+        dlBtn.style.display = 'inline-block';
       } else if (data.qr_string) {
         // Render QR from string client-side
         QRCode.toCanvas(qrCanvas, data.qr_string, { width: 200, margin: 1 }, function(err) {
