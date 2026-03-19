@@ -121,6 +121,9 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     border:1.5px solid rgba(255,255,255,0.16);
     border-radius:12px;
     color:#e9efff;
+    --pf-autofill-bg:#101a2f;
+    --pf-autofill-text:#e9efff;
+    --pf-autofill-caret:#e9efff;
     font-family:inherit; font-size:1rem;
     transition:border-color 0.18s, box-shadow 0.18s, background 0.18s;
     -webkit-appearance:none;
@@ -137,17 +140,11 @@ textarea.pf-input { resize:vertical; line-height:1.6; }
 .pf-input:-webkit-autofill,
 .pf-input:-webkit-autofill:hover,
 .pf-input:-webkit-autofill:focus {
-    -webkit-text-fill-color:#e9efff;
-    -webkit-box-shadow:0 0 0 1000px #101a2f inset;
-    transition:background-color 5000s ease-in-out 0s;
-}
-body.light .pf-input:-webkit-autofill,
-body.light .pf-input:-webkit-autofill:hover,
-body.light .pf-input:-webkit-autofill:focus {
-    -webkit-text-fill-color:#0f172a;
-    -webkit-box-shadow:0 0 0 1000px #ffffff inset;
-    transition:background-color 5000s ease-in-out 0s;
-    caret-color:#0f172a;
+    -webkit-text-fill-color:var(--pf-autofill-text) !important;
+    -webkit-box-shadow:0 0 0 1000px var(--pf-autofill-bg) inset !important;
+    box-shadow:0 0 0 1000px var(--pf-autofill-bg) inset !important;
+    caret-color:var(--pf-autofill-caret);
+    transition:background-color 0s, color 0s;
 }
 .pf-input.field-error {
     border-color:rgba(239,68,68,0.7) !important;
@@ -265,6 +262,9 @@ body.light .pf-input {
     background:#ffffff;
     color:#0f172a;
     border-color:#cbd5e1;
+    --pf-autofill-bg:#ffffff;
+    --pf-autofill-text:#0f172a;
+    --pf-autofill-caret:#0f172a;
 }
 body.light .pf-input::placeholder { color:#64748b; }
 body.light .pf-input:focus {
