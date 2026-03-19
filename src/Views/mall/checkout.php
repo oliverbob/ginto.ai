@@ -16,6 +16,7 @@ $paypalClientId = trim((string)($paypal_client_id ?? ''));
     border:1.5px solid rgba(255,255,255,0.09);
     background:rgba(255,255,255,0.03);
     cursor:pointer; width:100%;
+    color:inherit;
     transition:transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
     overflow:hidden;
 }
@@ -266,14 +267,33 @@ body.light .pf-input:focus {
 body.light .pm-card {
     border-color:#dbe6f7;
     background:#f8fbff;
+    color:#0f172a;
 }
 body.light .pm-card:hover {
     border-color:#bfdbfe;
     box-shadow:0 10px 24px rgba(15,23,42,0.10);
 }
+body.light .pm-name { color:#0f172a; }
+body.light .pm-desc  { color:#475569; }
 body.light .pm-check {
     border-color:#cbd5e1;
 }
+body.light #walletNotice {
+    background:rgba(16,185,129,0.08) !important;
+    border-color:rgba(16,185,129,0.35) !important;
+    color:#065f46 !important;
+}
+body.light #checkoutError {
+    background:rgba(239,68,68,0.07) !important;
+    border-color:rgba(239,68,68,0.3) !important;
+    color:#991b1b !important;
+}
+body.light #checkoutInfo {
+    background:rgba(59,130,246,0.07) !important;
+    border-color:rgba(59,130,246,0.3) !important;
+    color:#1e40af !important;
+}
+body.light .checkout-hint { color:#475569; }
 body.light .next-steps li {
     color:#475569;
 }
@@ -428,7 +448,7 @@ body.light #checkoutTotal {
                 </button>
             </div>
 
-            <div style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.24);font-size:0.79rem;color:#c7f9df;line-height:1.5;">
+            <div id="walletNotice" style="margin-top:12px;padding:10px 12px;border-radius:12px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.24);font-size:0.79rem;color:#c7f9df;line-height:1.5;">
                 Wallet funds are purchase-only and cannot be withdrawn.
             </div>
 
@@ -449,7 +469,7 @@ body.light #checkoutTotal {
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
                 <button type="button" id="startCheckoutBtn" style="display:none;" aria-hidden="true"></button>
                 <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Wallet</a>
-                <span style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
+                <span class="checkout-hint" style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
             </div>
         </div>
     </div>
