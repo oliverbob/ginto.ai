@@ -28,6 +28,14 @@ $csrfToken = $csrf_token ?? '';
     .box { margin-top: 12px; border: 1px solid #30363d; border-radius: 8px; padding: 10px; }
     .box a { color: #58a6ff; text-decoration: underline; }
     pre { margin-top: 10px; background: #010409; border: 1px solid #30363d; border-radius: 8px; padding: 10px; max-height: 220px; overflow: auto; font-size: 0.75rem; }
+    .otp-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.75); display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .otp-modal { width: min(960px, 96vw); height: min(760px, 92vh); background: #0b1220; border: 1px solid #30363d; border-radius: 12px; display: flex; flex-direction: column; overflow: hidden; }
+    .otp-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #30363d; }
+    .otp-modal-head h3 { font-size: 0.95rem; font-weight: 700; }
+    .otp-actions { display: flex; gap: 8px; }
+    .otp-actions button, .otp-actions a { width: auto; padding: 8px 10px; border-radius: 6px; border: 1px solid #30363d; background: #161b22; color: #e6edf3; font-size: 0.8rem; text-decoration: none; cursor: pointer; }
+    #otp-iframe { width: 100%; height: 100%; border: 0; background: #fff; }
+    .otp-fallback { padding: 10px 12px; font-size: 0.8rem; color: #d29922; border-top: 1px solid #30363d; display: none; }
   </style>
 </head>
 <body>
@@ -151,6 +159,22 @@ $csrfToken = $csrf_token ?? '';
   </div>
 </div>
 
+<div id="otp-modal-backdrop" class="otp-modal-backdrop">
+  <div class="otp-modal" role="dialog" aria-modal="true" aria-label="Card OTP verification">
+    <div class="otp-modal-head">
+      <h3>Complete Card Verification (OTP)</h3>
+      <div class="otp-actions">
+        <a id="otp-open-new-tab" href="#" target="_blank" rel="noopener">Open in new tab</a>
+        <button id="otp-close-btn" type="button">Close</button>
+      </div>
+    </div>
+    <iframe id="otp-iframe" title="PayMongo OTP Verification"></iframe>
+    <div id="otp-fallback" class="otp-fallback">
+      Embedded verification may be blocked by browser security headers. Use "Open in new tab".
+    </div>
+  </div>
+</div>
+
 <script>
 (function() {
   'use strict';
@@ -172,6 +196,31 @@ $csrfToken = $csrf_token ?? '';
       clearInterval(pollTimer);
       pollTimer = null;
     }
+  }
+
+  function openOtpModal(url) {
+    const backdrop = byId('otp-modal-backdrop');
+    const iframe = byId('otp-iframe');
+    const fallback = byId('otp-fallback');
+    const openNewTab = byId('otp-open-new-tab');
+
+    openNewTab.href = url;
+    fallback.style.display = 'none';
+    backdrop.style.display = 'flex';
+    iframe.src = url;
+
+    // If the provider blocks iframe embedding, show fallback guidance.
+    setTimeout(function() {
+      fallback.style.display = 'block';
+    }, 4500);
+
+  }
+
+  function closeOtpModal() {
+    const backdrop = byId('otp-modal-backdrop');
+    const iframe = byId('otp-iframe');
+    backdrop.style.display = 'none';
+    iframe.src = 'about:blank';
   }
   function startPoll(piId) {
     stopPoll();
@@ -229,6 +278,7 @@ $csrfToken = $csrf_token ?? '';
       if (data.requires_action && data.next_action_url) {
         byId('action-box').style.display = 'block';
         byId('action-box').innerHTML = 'Card requires additional action: <a href="' + data.next_action_url + '" target="_blank" rel="noopener">Open verification link</a>';
+        openOtpModal(data.next_action_url);
       }
 
       setStatus('Payment initialized. Waiting for webhook...', 'warn');
@@ -238,6 +288,16 @@ $csrfToken = $csrf_token ?? '';
       btn.disabled = false;
       setStatus('Network error: ' + err.message, 'bad');
     });
+  });
+
+  byId('otp-close-btn').addEventListener('click', function() {
+    closeOtpModal();
+  });
+
+  byId('otp-modal-backdrop').addEventListener('click', function(e) {
+    if (e.target && e.target.id === 'otp-modal-backdrop') {
+      closeOtpModal();
+    }
   });
 })();
 </script>
