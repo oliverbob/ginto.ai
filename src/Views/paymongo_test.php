@@ -21,6 +21,7 @@ $csrfToken = $csrf_token ?? '';
     #status { margin-top: 20px; text-align: center; font-size: 0.9rem; color: #aaa; min-height: 24px; }
     #qr-section { display: none; text-align: center; margin-top: 20px; }
     #qr-section img { width: 200px; height: 200px; background: #fff; padding: 8px; border-radius: 8px; }
+    #qr-section canvas { background: #fff; padding: 8px; border-radius: 8px; display: block; margin: 0 auto; }
     #qr-amount { font-size: 1.4rem; font-weight: 700; color: #f97316; margin-top: 10px; }
     #poll-banner { margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; background: rgba(249,115,22,0.15); display: inline-block; }
     #confirmed-section { display: none; text-align: center; margin-top: 20px; padding: 20px; background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); border-radius: 8px; color: #4ade80; font-weight: 600; }
@@ -29,6 +30,7 @@ $csrfToken = $csrf_token ?? '';
   </style>
 </head>
 <body>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
 <div class="card">
   <h1>&#x1F4F1; PayMongo QRPH Test</h1>
 
@@ -55,7 +57,9 @@ $csrfToken = $csrf_token ?? '';
   </div>
 
   <div id="qr-section">
-    <img id="qr-image" src="" alt="QRPH QR Code">
+    <img id="qr-image" src="" alt="QRPH QR Code" style="display:none;">
+    <canvas id="qr-canvas" style="display:none;"></canvas>
+    <div id="qr-no-data" style="display:none; padding:20px; color:#f87171; font-size:0.85rem;">&#x26A0; No QR data returned from PayMongo.<br>Check the Raw API response below.</div>
     <div id="qr-amount"></div>
     <div id="poll-banner">&#x23F3; Waiting for payment... (polling every 3s)</div>
   </div>
@@ -65,10 +69,10 @@ $csrfToken = $csrf_token ?? '';
     <small style="color:#86efac; font-weight:400;">The QR was paid successfully.</small>
   </div>
 
-  <details style="margin-top:20px;">
-    <summary style="cursor:pointer; font-size:0.8rem; color:#666;">Raw API response</summary>
-    <pre id="debug-output" style="margin-top:8px; background:#0a0a0a; border:1px solid #333; border-radius:6px; padding:12px; font-size:0.72rem; color:#aaa; overflow-x:auto; white-space:pre-wrap; word-break:break-all;">(none yet)</pre>
-  </details>
+  <div style="margin-top:20px;">
+    <div style="font-size:0.75rem; color:#666; margin-bottom:4px;">Raw API response (auto-updated)</div>
+    <pre id="debug-output" style="background:#0a0a0a; border:1px solid #333; border-radius:6px; padding:12px; font-size:0.72rem; color:#aaa; overflow-x:auto; white-space:pre-wrap; word-break:break-all; max-height:400px; overflow-y:auto;">(waiting...)</pre>
+  </div>
 </div>
 
 <script>
@@ -119,12 +123,26 @@ $csrfToken = $csrf_token ?? '';
 
       currentPiId = data.pi_id;
 
-      var qrImg = document.getElementById('qr-image');
+      var qrImg    = document.getElementById('qr-image');
+      var qrCanvas = document.getElementById('qr-canvas');
+      var qrNoData = document.getElementById('qr-no-data');
+
       if (data.qr_image) {
         qrImg.src = data.qr_image;
+        qrImg.style.display = '';
+      } else if (data.qr_string) {
+        // Render QR from string client-side
+        QRCode.toCanvas(qrCanvas, data.qr_string, { width: 200, margin: 1 }, function(err) {
+          if (err) {
+            qrNoData.style.display = '';
+            console.error('QR render error:', err);
+          } else {
+            qrCanvas.style.display = '';
+          }
+        });
       } else {
-        qrImg.alt = 'QR string: ' + (data.qr_string || '(none)');
-        console.warn('No qr_image returned:', data);
+        qrNoData.style.display = '';
+        console.warn('No qr_image or qr_string in response:', data);
       }
 
       document.getElementById('qr-amount').textContent = '₱' + amount.toLocaleString();
