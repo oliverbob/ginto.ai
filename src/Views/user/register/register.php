@@ -401,6 +401,10 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
     }
     .payment-method-container {
       align-items: center;
+      cursor: pointer;
+    }
+    .payment-method-container * {
+      cursor: pointer;
     }
     .payment-method-container label {
       min-width: 0;
