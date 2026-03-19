@@ -1204,6 +1204,23 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
           <p class="mb-8" style="color: var(--text-secondary);">Complete your membership purchase.</p>
           <div class="grid grid-cols-1 gap-8">
             <div>
+              <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Order Summary</h4>
+              <div class="p-6 rounded-lg" style="background-color: var(--bg-secondary);">
+                <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
+                  <span class="font-medium" style="color: var(--text-secondary);">Membership Tier:</span>
+                  <span class="font-bold" id="selected-tier" style="color: var(--text-primary);">Professional</span>
+                </div>
+                <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
+                  <span class="font-medium" style="color: var(--text-secondary);">Price:</span>
+                  <span class="font-bold" id="payment-step-price" style="color: var(--text-primary);">₱1,000</span>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-lg font-bold" style="color: var(--text-primary);">Total:</span>
+                  <span class="text-xl font-extrabold" id="payment-total" style="color: var(--primary-500);">₱1,000</span>
+                </div>
+              </div>
+            </div>
+            <div>
               <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <?php if ($paymongoEnabled): ?>
@@ -1294,23 +1311,6 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               <div id="paypal-error" class="mt-4 hidden bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
                 <i class="fas fa-exclamation-circle mr-2"></i>
                 <span id="paypal-error-message">Payment failed. Please try again.</span>
-              </div>
-            </div>
-            <div>
-              <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Order Summary</h4>
-              <div class="p-6 rounded-lg" style="background-color: var(--bg-secondary);">
-                <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
-                  <span class="font-medium" style="color: var(--text-secondary);">Membership Tier:</span>
-                  <span class="font-bold" id="selected-tier" style="color: var(--text-primary);">Professional</span>
-                </div>
-                <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
-                  <span class="font-medium" style="color: var(--text-secondary);">Price:</span>
-                  <span class="font-bold" id="payment-step-price" style="color: var(--text-primary);">₱1,000</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-lg font-bold" style="color: var(--text-primary);">Total:</span>
-                  <span class="text-xl font-extrabold" id="payment-total" style="color: var(--primary-500);">₱1,000</span>
-                </div>
               </div>
             </div>
             <div>
