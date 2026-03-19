@@ -217,8 +217,8 @@ body.light {
         var(--bg);
 }
 body.light .checkout-hero {
-    border:1px solid #dbe6f7;
-    background:linear-gradient(130deg,#eff5ff 0%, #f5f7ff 56%, #ecf8ff 100%);
+    border:1px solid #dbe6f7 !important;
+    background:linear-gradient(130deg,#eff5ff 0%, #f5f7ff 56%, #ecf8ff 100%) !important;
     box-shadow:0 14px 34px rgba(15,23,42,0.08);
 }
 body.light .checkout-hero::before {
