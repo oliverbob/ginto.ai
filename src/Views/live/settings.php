@@ -826,6 +826,15 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                         <span class="text-xs font-normal px-2 py-0.5 rounded" style="background: linear-gradient(90deg,#f97316,#fb923c); color: #fff;">QRPH</span>
                     </h3>
                     <p class="help-text mb-4">PayMongo enables QRPH (InstaPay/PESONet QR) payments. Get keys from <a href="https://dashboard.paymongo.com" target="_blank" rel="noopener noreferrer" class="text-blue-500 underline">dashboard.paymongo.com</a>.</p>
+                    <div class="grid md:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <label class="label-text">PayMongo Environment</label>
+                            <select name="paymongo_environment" class="input-field">
+                                <option value="live" <?= (!isset($envValues['PAYMONGO_ENVIRONMENT']) || $envValues['PAYMONGO_ENVIRONMENT'] === 'live') ? 'selected' : '' ?>>Live</option>
+                                <option value="test" <?= (isset($envValues['PAYMONGO_ENVIRONMENT']) && $envValues['PAYMONGO_ENVIRONMENT'] === 'test') ? 'selected' : '' ?>>Test / Sandbox</option>
+                            </select>
+                        </div>
+                    </div>
                     <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--text-secondary);">Live Credentials</p>
                     <div class="grid md:grid-cols-2 gap-6 mb-6">
                         <div>

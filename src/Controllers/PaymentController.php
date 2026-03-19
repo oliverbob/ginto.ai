@@ -1492,6 +1492,9 @@ class PaymentController
 
         $amountPhp = (int)$amountRaw;
 
+        // Billing duration: '1m' (1 month) or '12m' (12 months / annual one-time)
+        $duration = in_array($_POST['duration'] ?? '', ['1m', '12m']) ? $_POST['duration'] : '1m';
+
         if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
             http_response_code(503);
             echo json_encode(['success' => false, 'message' => 'PayMongo is not configured. Please contact support.']);
@@ -1510,10 +1513,11 @@ class PaymentController
             }
 
             // Store PI ID in session for later verification (prevents forgery)
-            $_SESSION['paymongo_pi_id']     = $result['pi_id'];
-            $_SESSION['paymongo_pi_amount'] = $amountPhp;
-            $_SESSION['paymongo_pi_tier']   = $tier;
-            $_SESSION['paymongo_pi_email']  = $email;
+            $_SESSION['paymongo_pi_id']       = $result['pi_id'];
+            $_SESSION['paymongo_pi_amount']   = $amountPhp;
+            $_SESSION['paymongo_pi_tier']     = $tier;
+            $_SESSION['paymongo_pi_email']    = $email;
+            $_SESSION['paymongo_pi_duration'] = $duration;
 
             echo json_encode([
                 'success'   => true,
@@ -1649,6 +1653,9 @@ class PaymentController
                 exit;
             }
 
+            // The finalized charge ID (pay_xxxxxxxx) — distinct from the Payment Intent ID
+            $gatewayPaymentId = $statusResult['payment_id'] ?? null;
+
             // Check for duplicate PI (prevent double registration)
             $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $piId]);
             if ($existing) {
@@ -1689,15 +1696,16 @@ class PaymentController
             }
 
             $paymentNotes = json_encode([
-                'email'             => $_POST['email'],
-                'username'          => $_POST['username'],
-                'fullname'          => $fullname,
-                'phone'             => $_POST['phone'],
-                'country'           => $_POST['country'],
-                'referrer_id'       => $referrerId,
-                'paymongo_pi_id'    => $piId,
-                'payment_gateway'   => 'paymongo',
-                'payment_type'      => 'qrph',
+                'email'               => $_POST['email'],
+                'username'            => $_POST['username'],
+                'fullname'            => $fullname,
+                'phone'               => $_POST['phone'],
+                'country'             => $_POST['country'],
+                'referrer_id'         => $referrerId,
+                'paymongo_pi_id'      => $piId,
+                'paymongo_payment_id' => $gatewayPaymentId,
+                'payment_gateway'     => 'paymongo',
+                'payment_type'        => 'qrph',
             ]);
 
             $transactionId = \Ginto\Helpers\TransactionHelper::generateTransactionId($this->db);
@@ -1705,19 +1713,20 @@ class PaymentController
             $paymentAmount = (float)($_POST['package_amount'] ?? $expectedAmount);
 
             $this->db->insert('subscription_payments', array_merge([
-                'user_id'           => $userId,
-                'subscription_id'   => null,
-                'plan_id'           => $planId,
-                'type'              => 'registration',
-                'amount'            => $paymentAmount,
-                'currency'          => 'PHP',
-                'payment_method'    => 'paymongo_qrph',
-                'payment_reference' => $piId,
-                'status'            => 'paid',
-                'notes'             => $paymentNotes,
-                'receipt_filename'  => null,
-                'receipt_path'      => null,
-                'transaction_id'    => $transactionId,
+                'user_id'             => $userId,
+                'subscription_id'     => null,
+                'plan_id'             => $planId,
+                'type'                => 'registration',
+                'amount'              => $paymentAmount,
+                'currency'            => 'PHP',
+                'payment_method'      => 'paymongo_qrph',
+                'payment_reference'   => $piId,
+                'gateway_payment_id'  => $gatewayPaymentId,
+                'status'              => 'paid',
+                'notes'               => $paymentNotes,
+                'receipt_filename'    => null,
+                'receipt_path'        => null,
+                'transaction_id'      => $transactionId,
             ], $auditData));
 
             $paymentId = $this->db->id();
@@ -1730,8 +1739,42 @@ class PaymentController
                 exit;
             }
 
+            // Create subscription record (QRPH = one-time payment, no auto-renew)
+            $packageName = strtolower($_POST['package'] ?? 'go');
+            $now         = date('Y-m-d H:i:s');
+            $duration    = $_SESSION['paymongo_pi_duration'] ?? '12m';
+            $expiresAt   = ($duration === '1m')
+                ? date('Y-m-d H:i:s', strtotime('+1 month'))
+                : date('Y-m-d H:i:s', strtotime('+1 year'));
+
+            $this->db->insert('user_subscriptions', [
+                'user_id'            => $userId,
+                'plan_id'            => $planId,
+                'status'             => 'active',
+                'started_at'         => $now,
+                'expires_at'         => $expiresAt,
+                'payment_method'     => 'paymongo_qrph',
+                'payment_reference'  => $piId,
+                'gateway_payment_id' => $gatewayPaymentId,
+                'amount_paid'        => $paymentAmount,
+                'currency'           => 'PHP',
+                'auto_renew'         => 0,
+                'created_at'         => $now,
+                'updated_at'         => $now,
+            ]);
+
+            $subscriptionId = $this->db->id();
+
+            // Link the payment record to the subscription
+            if ($subscriptionId) {
+                $this->db->update('subscription_payments', ['subscription_id' => $subscriptionId], ['id' => $paymentId]);
+            }
+
+            // Update user's subscription plan
+            $this->db->update('users', ['subscription_plan' => $packageName], ['id' => $userId]);
+
             // Clear PayMongo session data
-            unset($_SESSION['paymongo_pi_id'], $_SESSION['paymongo_pi_amount'], $_SESSION['paymongo_pi_tier'], $_SESSION['paymongo_pi_email']);
+            unset($_SESSION['paymongo_pi_id'], $_SESSION['paymongo_pi_amount'], $_SESSION['paymongo_pi_tier'], $_SESSION['paymongo_pi_email'], $_SESSION['paymongo_pi_duration']);
 
             // Log in the user
             $_SESSION['user_id']        = $userId;
@@ -1739,7 +1782,7 @@ class PaymentController
             $_SESSION['email']          = $_POST['email'];
             $_SESSION['payment_status'] = 'paid';
 
-            error_log("PayMongo QRPH registration complete: user_id={$userId}, payment_id={$paymentId}, pi_id={$piId}");
+            error_log("PayMongo QRPH registration complete: user_id={$userId}, payment_id={$paymentId}, subscription_id=" . ($subscriptionId ?? 'null') . ", pi_id={$piId}, pay_id=" . ($gatewayPaymentId ?? 'null'));
 
             echo json_encode([
                 'success'    => true,
@@ -1755,6 +1798,294 @@ class PaymentController
             http_response_code(500);
             echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
             exit;
+        }
+    }
+
+    /**
+     * Ginto Pay (Card) Initialization
+     * Validates registration form data, stores it in session, creates a PayMongo
+     * Checkout Session for card payment, and returns the checkout URL.
+     */
+    public function gintoPayInit(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+            exit;
+        }
+
+        if (!isset($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] !== 'XMLHttpRequest') {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid request']);
+            exit;
+        }
+
+        if (!isset($_POST['csrf_token']) || !validateCsrfToken($_POST['csrf_token'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'message' => 'Invalid CSRF token. Please refresh the page.']);
+            exit;
+        }
+
+        // Validate required registration fields
+        $required = ['username', 'email', 'password', 'country', 'phone'];
+        foreach ($required as $field) {
+            if (empty(trim($_POST[$field] ?? ''))) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'message' => 'Please complete all registration steps before payment.']);
+                exit;
+            }
+        }
+
+        $amountRaw = $_POST['amount'] ?? '';
+        if (!is_numeric($amountRaw) || (int)$amountRaw <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid payment amount.']);
+            exit;
+        }
+        $amountPhp = (int)$amountRaw;
+
+        $email    = filter_var(trim($_POST['email']), FILTER_SANITIZE_EMAIL);
+        $fullname = trim(($_POST['firstname'] ?? '') . ' ' . ($_POST['lastname'] ?? ''));
+        if (empty($fullname)) $fullname = $_POST['username'];
+        $tier     = strip_tags(trim($_POST['tier'] ?? 'Membership'));
+        $duration = in_array($_POST['duration'] ?? '', ['1m', '12m']) ? $_POST['duration'] : '1m';
+
+        if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'message' => 'Ginto Pay is not configured. Please contact support.']);
+            exit;
+        }
+
+        try {
+            // Store all registration form fields in session before redirect
+            $_SESSION['ginto_pay_reg'] = [
+                'username'         => preg_replace('/[^a-zA-Z0-9_\-]/', '', $_POST['username']),
+                'email'            => $email,
+                'password_hash'    => password_hash($_POST['password'], PASSWORD_DEFAULT),
+                'firstname'        => strip_tags(trim($_POST['firstname'] ?? '')),
+                'lastname'         => strip_tags(trim($_POST['lastname'] ?? '')),
+                'fullname'         => strip_tags($fullname),
+                'phone'            => preg_replace('/[^0-9+\-\s]/', '', $_POST['phone'] ?? ''),
+                'country'          => preg_replace('/[^a-zA-Z]/', '', $_POST['country'] ?? ''),
+                'package'          => strip_tags(trim($_POST['package'] ?? 'go')),
+                'amount'           => $amountPhp,
+                'currency'         => 'PHP',
+                'duration'         => $duration,
+                'tier'             => $tier,
+                'referrer_id'      => $this->resolveReferrerId(),
+                'promo_code'       => preg_replace('/[^a-zA-Z0-9\-_]/', '', $_POST['promo_code'] ?? ''),
+            ];
+
+            $appUrl     = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
+            $successUrl = $appUrl . '/register/complete?session_id={CHECKOUT_SESSION_ID}';
+            $cancelUrl  = $appUrl . '/register';
+
+            $durationLabel = ($duration === '12m') ? '12-Month' : '1-Month';
+            $description   = 'Ginto ' . $tier . ' ' . $durationLabel . ' Membership';
+
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $result  = $handler->createCheckoutSession(
+                $amountPhp * 100,
+                $description,
+                strip_tags($fullname),
+                $email,
+                $successUrl,
+                $cancelUrl
+            );
+
+            if (!$result['success']) {
+                http_response_code(502);
+                echo json_encode(['success' => false, 'message' => $result['message']]);
+                exit;
+            }
+
+            $_SESSION['ginto_pay_session_id'] = $result['session_id'];
+
+            echo json_encode([
+                'success'      => true,
+                'checkout_url' => $result['checkout_url'],
+            ]);
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('Ginto Pay init error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'An error occurred. Please try again.']);
+            exit;
+        }
+    }
+
+    /**
+     * Ginto Pay (Card) Completion
+     * Called via GET after PayMongo redirects back from the hosted checkout page.
+     * Verifies the session, creates the user account and subscription.
+     */
+    public function gintoPayComplete(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        $sessionId = preg_replace('/[^a-zA-Z0-9_\-]/', '', $_GET['session_id'] ?? '');
+
+        $fail = function(string $msg) {
+            $appUrl = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
+            header('Location: ' . $appUrl . '/register?error=' . urlencode($msg));
+            exit;
+        };
+
+        if (empty($sessionId)) {
+            $fail('Missing checkout session ID.');
+        }
+
+        // Verify session matches what we stored
+        if (empty($_SESSION['ginto_pay_session_id']) || $_SESSION['ginto_pay_session_id'] !== $sessionId) {
+            $fail('Session mismatch. Please try registering again.');
+        }
+
+        $regData = $_SESSION['ginto_pay_reg'] ?? null;
+        if (empty($regData)) {
+            $fail('Registration data expired. Please fill in the form again.');
+        }
+
+        if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) {
+            $fail('Payment gateway not configured.');
+        }
+
+        try {
+            $handler       = new \Ginto\Handlers\PayMongoHandler();
+            $sessionResult = $handler->getCheckoutSession($sessionId);
+
+            if (!$sessionResult['success']) {
+                $fail('Could not verify payment: ' . $sessionResult['message']);
+            }
+
+            if ($sessionResult['status'] !== 'completed') {
+                $fail('Payment was not completed. Please try again.');
+            }
+
+            // Check duplicate session
+            $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $sessionId]);
+            if ($existing) {
+                // Already registered — just redirect to chat
+                $_SESSION['user_id']        = $existing['user_id'] ?? null;
+                header('Location: /chat');
+                exit;
+            }
+
+            $planIdMap    = ['free' => 1, 'go' => 2, 'plus' => 3, 'pro' => 4, 'starter' => 1, 'professional' => 2, 'executive' => 3, 'gold' => 4, 'platinum' => 5];
+            $packageName  = strtolower($regData['package'] ?? 'go');
+            $planId       = $planIdMap[$packageName] ?? 2;
+            $duration     = $regData['duration'] ?? '12m';
+            $paymentAmount = (float)($regData['amount'] ?? 0);
+            $now          = date('Y-m-d H:i:s');
+            $expiresAt    = ($duration === '1m')
+                ? date('Y-m-d H:i:s', strtotime('+1 month'))
+                : date('Y-m-d H:i:s', strtotime('+1 year'));
+
+            $publicId = substr(md5(uniqid(mt_rand(), true)), 0, 12);
+
+            $this->db->insert('users', [
+                'email'          => $regData['email'],
+                'username'       => $regData['username'],
+                'password_hash'  => $regData['password_hash'],
+                'fullname'       => $regData['fullname'],
+                'phone'          => $regData['phone'],
+                'country'        => $regData['country'],
+                'referrer_id'    => $regData['referrer_id'],
+                'public_id'      => $publicId,
+                'payment_status' => 'paid',
+                'subscription_plan' => $packageName,
+                'created_at'     => $now,
+            ]);
+
+            $userId = $this->db->id();
+            if (!$userId) {
+                $fail('Failed to create account. Please contact support.');
+            }
+
+            $transactionId    = \Ginto\Helpers\TransactionHelper::generateTransactionId($this->db);
+            $auditData        = \Ginto\Helpers\TransactionHelper::captureAuditData();
+            $gatewayPaymentId = $sessionResult['payment_id'] ?? null;
+            $paymentIntentId  = $sessionResult['payment_intent_id'] ?? null;
+
+            $paymentNotes = json_encode([
+                'email'               => $regData['email'],
+                'username'            => $regData['username'],
+                'fullname'            => $regData['fullname'],
+                'phone'               => $regData['phone'],
+                'country'             => $regData['country'],
+                'paymongo_session_id' => $sessionId,
+                'paymongo_pi_id'      => $paymentIntentId,
+                'paymongo_payment_id' => $gatewayPaymentId,
+                'payment_gateway'     => 'paymongo',
+                'payment_type'        => 'card',
+                'duration'            => $duration,
+            ]);
+
+            $this->db->insert('subscription_payments', array_merge([
+                'user_id'            => $userId,
+                'subscription_id'    => null,
+                'plan_id'            => $planId,
+                'type'               => 'registration',
+                'amount'             => $paymentAmount,
+                'currency'           => 'PHP',
+                'payment_method'     => 'ginto_pay_card',
+                'payment_reference'  => $sessionId,
+                'gateway_payment_id' => $gatewayPaymentId,
+                'status'             => 'paid',
+                'notes'              => $paymentNotes,
+                'transaction_id'     => $transactionId,
+            ], $auditData));
+
+            $paymentId = $this->db->id();
+            if (!$paymentId) {
+                $this->db->delete('users', ['id' => $userId]);
+                $fail('Failed to save payment record. Please contact support.');
+            }
+
+            // Create subscription record
+            $this->db->insert('user_subscriptions', [
+                'user_id'            => $userId,
+                'plan_id'            => $planId,
+                'status'             => 'active',
+                'started_at'         => $now,
+                'expires_at'         => $expiresAt,
+                'payment_method'     => 'ginto_pay_card',
+                'payment_reference'  => $sessionId,
+                'gateway_payment_id' => $gatewayPaymentId,
+                'amount_paid'        => $paymentAmount,
+                'currency'           => 'PHP',
+                'auto_renew'         => 0,
+                'created_at'         => $now,
+                'updated_at'         => $now,
+            ]);
+
+            $subscriptionId = $this->db->id();
+            if ($subscriptionId) {
+                $this->db->update('subscription_payments', ['subscription_id' => $subscriptionId], ['id' => $paymentId]);
+            }
+
+            // Clear Ginto Pay session data
+            unset($_SESSION['ginto_pay_reg'], $_SESSION['ginto_pay_session_id']);
+
+            // Log in the user
+            $_SESSION['user_id']        = $userId;
+            $_SESSION['username']       = $regData['username'];
+            $_SESSION['email']          = $regData['email'];
+            $_SESSION['payment_status'] = 'paid';
+
+            error_log("Ginto Pay card registration complete: user_id={$userId}, payment_id={$paymentId}, session_id={$sessionId}");
+
+            $appUrl = rtrim($_ENV['APP_URL'] ?? getenv('APP_URL') ?? '', '/');
+            header('Location: ' . $appUrl . '/chat');
+            exit;
+
+        } catch (\Exception $e) {
+            error_log('Ginto Pay complete error: ' . $e->getMessage());
+            $fail('An error occurred. Please contact support.');
         }
     }
 }

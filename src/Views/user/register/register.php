@@ -1095,8 +1095,28 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                   <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
                     <span>
-                      QRPH
+                      QR Pay — <strong>1 Month</strong>
                       <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); color: #fff;">InstaPay / PESONet</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
+                  <input type="radio" name="payment_method" id="paymongo-qrph-annual" value="paymongo_qrph_annual" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paymongo-qrph-annual" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
+                    <span>
+                      QR Pay — <strong>12 Months</strong>
+                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%); color: #fff;">One-Time</span>
+                    </span>
+                  </label>
+                </div>
+                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
+                  <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
+                    <span>
+                      Ginto Pay
+                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">Credit / Debit Card</span>
                     </span>
                   </label>
                 </div>
@@ -1478,6 +1498,37 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                 </button>
               </div>
               <?php endif; ?>
+
+              <?php if ($paymongoEnabled): ?>
+              <!-- Ginto Pay (Card) Panel -->
+              <div id="ginto-pay-details" class="mt-4 hidden">
+                <div class="p-4 rounded-lg" style="background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%); color: white; border: 2px solid #6366f1;">
+                  <h5 class="font-semibold text-base mb-3 flex items-center justify-center gap-2">
+                    <i class="fas fa-credit-card" style="color: #a5b4fc;"></i>
+                    <span>Ginto Pay</span>
+                    <span class="text-xs px-2 py-0.5 rounded font-bold" style="background: #6366f1; color: #fff;">Credit / Debit Card</span>
+                  </h5>
+                  <p class="text-xs text-center opacity-80 mb-4">Pay securely with your Visa, Mastercard, or any major card. You will be redirected to our secure payment page.</p>
+
+                  <div class="bg-white/10 backdrop-blur rounded p-3 mb-4 text-center">
+                    <p class="text-xs opacity-70 mb-0.5">Amount to Pay</p>
+                    <p class="font-bold text-xl text-indigo-300" id="ginto-pay-amount">₱0</p>
+                    <p class="text-xs opacity-60 mt-1" id="ginto-pay-duration-label">1-Month Subscription</p>
+                  </div>
+
+                  <button type="button" id="ginto-pay-btn" class="w-full font-semibold py-3 px-6 rounded-lg flex items-center justify-center gap-2" style="background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">
+                    <i class="fas fa-lock mr-1"></i> Pay with Ginto Pay
+                  </button>
+                  <p class="text-xs text-center opacity-50 mt-2">
+                    <i class="fas fa-shield-alt mr-1"></i> Secured by PayMongo. We never see your card details.
+                  </p>
+                  <div id="ginto-pay-error" class="hidden mt-3 bg-red-500/30 border border-red-400 rounded p-3 text-center text-sm">
+                    <i class="fas fa-exclamation-circle text-red-300 mb-1 block text-lg"></i>
+                    <span id="ginto-pay-error-msg">An error occurred. Please try again.</span>
+                  </div>
+                </div>
+              </div>
+              <?php endif; ?>
             </div>
           </div>
           <div class="mt-8 flex justify-between">
@@ -1738,12 +1789,19 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             } else if (paymentMethod.value === 'gcash') {
               document.getElementById('gcash-details').classList.remove('hidden');
               document.getElementById('complete-purchase').classList.remove('hidden');
-            } else if (paymentMethod.value === 'paymongo_qrph') {
+            } else if (paymentMethod.value === 'paymongo_qrph' || paymentMethod.value === 'paymongo_qrph_annual') {
               var qrph = document.getElementById('paymongo-qrph-details');
               if (qrph) {
                 qrph.classList.remove('hidden');
                 document.getElementById('complete-purchase').classList.add('hidden');
-                if (typeof initPaymongoQrph === 'function') { initPaymongoQrph(); }
+                if (typeof window.initPaymongoQrph === 'function') { window.initPaymongoQrph(); }
+              }
+            } else if (paymentMethod.value === 'ginto_pay') {
+              var gintoPayPanel = document.getElementById('ginto-pay-details');
+              if (gintoPayPanel) {
+                gintoPayPanel.classList.remove('hidden');
+                document.getElementById('complete-purchase').classList.add('hidden');
+                updateGintoPayDisplay();
               }
             }
           }
@@ -3054,7 +3112,12 @@ if (empty($paypalClientId)) {
     }
 
     var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : null;
-    var amountPhp = tier ? parseInt(tier.firstPhp || tier.pricePhp || 0, 10) : 0;
+    // Determine duration and amount based on which QRPH option is selected
+    var selectedMethod = document.querySelector('input[name="payment_method"]:checked');
+    var isAnnual = selectedMethod && selectedMethod.value === 'paymongo_qrph_annual';
+    var duration = isAnnual ? '12m' : '1m';
+    var recurringPhp = tier ? parseInt(tier.recurringPhp || tier.pricePhp || 0, 10) : 0;
+    var amountPhp = isAnnual ? recurringPhp * 12 : recurringPhp;
     var tierName  = tier ? (tier.name || 'Membership') : 'Membership';
 
     if (amountPhp <= 0) {
@@ -3075,6 +3138,7 @@ if (empty($paypalClientId)) {
     formData.append('name', fullname);
     formData.append('phone', phone);
     formData.append('tier', tierName);
+    formData.append('duration', duration);
 
     fetch('/api/payments/paymongo-qrph-init', {
       method: 'POST',
@@ -3150,7 +3214,12 @@ if (empty($paypalClientId)) {
       var formData = new FormData(form);
 
       var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : null;
-      var amountPhp = tier ? parseInt(tier.firstPhp || tier.pricePhp || 0, 10) : 0;
+      // Use the same duration/amount logic as initPaymongoQrph
+      var selectedMethod = document.querySelector('input[name="payment_method"]:checked');
+      var isAnnual = selectedMethod && selectedMethod.value === 'paymongo_qrph_annual';
+      var duration = isAnnual ? '12m' : '1m';
+      var recurringPhp = tier ? parseInt(tier.recurringPhp || tier.pricePhp || 0, 10) : 0;
+      var amountPhp = isAnnual ? recurringPhp * 12 : recurringPhp;
 
       formData.set('package', tier ? tier.name : 'Membership');
       formData.set('package_amount', amountPhp);
@@ -3195,6 +3264,92 @@ if (empty($paypalClientId)) {
 
   // Stop polling when leaving the page
   window.addEventListener('beforeunload', stopPolling);
+
+  // -------------------------------------------------------
+  // Ginto Pay (Card) — update display and handle click
+  // -------------------------------------------------------
+  function updateGintoPayDisplay() {
+    var tier = window.selectedTier;
+    var selectedMethod = document.querySelector('input[name="payment_method"]:checked');
+    var isAnnual = false; // Ginto Pay panel doesn't distinguish — use 12m by default for card
+    var amountPhp = tier ? parseInt(tier.recurringPhp || tier.pricePhp || 0, 10) : 0;
+    var amountEl = document.getElementById('ginto-pay-amount');
+    if (amountEl) amountEl.textContent = '₱' + amountPhp.toLocaleString();
+    var labelEl = document.getElementById('ginto-pay-duration-label');
+    if (labelEl) labelEl.textContent = 'Monthly Subscription — renew anytime';
+  }
+
+  var gintoPayBtn = document.getElementById('ginto-pay-btn');
+  if (gintoPayBtn) {
+    gintoPayBtn.addEventListener('click', function() {
+      var form = document.getElementById('wizardRegisterForm');
+      if (!form) return;
+
+      var email    = (form.querySelector('input[name="email"]') || {}).value || '';
+      var username = (form.querySelector('input[name="username"]') || {}).value || '';
+      var password = (form.querySelector('input[name="password"]') || {}).value || '';
+
+      if (!email || !username || !password) {
+        var errEl = document.getElementById('ginto-pay-error');
+        var errMsg = document.getElementById('ginto-pay-error-msg');
+        if (errEl) errEl.classList.remove('hidden');
+        if (errMsg) errMsg.textContent = 'Please complete Steps 1 & 2 before proceeding with payment.';
+        return;
+      }
+
+      var tier = (typeof getSelectedTier === 'function') ? getSelectedTier() : window.selectedTier;
+      var amountPhp = tier ? parseInt(tier.recurringPhp || tier.pricePhp || 0, 10) : 0;
+      var tierName  = tier ? (tier.name || 'Membership') : 'Membership';
+
+      if (amountPhp <= 0) {
+        var errEl = document.getElementById('ginto-pay-error');
+        var errMsg = document.getElementById('ginto-pay-error-msg');
+        if (errEl) errEl.classList.remove('hidden');
+        if (errMsg) errMsg.textContent = 'Please select a membership tier first.';
+        return;
+      }
+
+      gintoPayBtn.disabled = true;
+      gintoPayBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i> Preparing secure checkout...';
+
+      var formData = new FormData(form);
+      formData.set('amount', amountPhp);
+      formData.set('tier', tierName);
+      formData.set('duration', '1m');
+
+      fetch('/api/payments/ginto-pay-init', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        body: formData
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (!data.success) {
+          gintoPayBtn.disabled = false;
+          gintoPayBtn.innerHTML = '<i class="fas fa-lock mr-1"></i> Pay with Ginto Pay';
+          var errEl = document.getElementById('ginto-pay-error');
+          var errMsg = document.getElementById('ginto-pay-error-msg');
+          if (errEl) errEl.classList.remove('hidden');
+          if (errMsg) errMsg.textContent = data.message || 'Could not initialize checkout. Please try again.';
+          return;
+        }
+        // Redirect to PayMongo hosted checkout
+        window.location.href = data.checkout_url;
+      })
+      .catch(function(err) {
+        console.error('Ginto Pay init error:', err);
+        gintoPayBtn.disabled = false;
+        gintoPayBtn.innerHTML = '<i class="fas fa-lock mr-1"></i> Pay with Ginto Pay';
+        var errEl = document.getElementById('ginto-pay-error');
+        var errMsg = document.getElementById('ginto-pay-error-msg');
+        if (errEl) errEl.classList.remove('hidden');
+        if (errMsg) errMsg.textContent = 'Network error. Please check your connection and try again.';
+      });
+    });
+  }
+
+  // Expose updateGintoPayDisplay globally so step-switch can call it
+  window.updateGintoPayDisplay = updateGintoPayDisplay;
 })();
 </script>
 <?php endif; ?>

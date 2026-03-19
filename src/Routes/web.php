@@ -1215,8 +1215,11 @@ $router->req('/api/payments/crypto-info', 'PaymentController@cryptoInfo');
 $router->req('/paymongo-payments', 'PaymentController@paymongoPayments');
 $router->req('/api/payments/paymongo-qrph-init', 'PaymentController@paymongoQrphInit');
 $router->req('/api/payments/paymongo-qrph-status', 'PaymentController@paymongoQrphStatus');
+$router->req('/api/payments/ginto-pay-init', 'PaymentController@gintoPayInit');
+$router->get('/register/complete', 'PaymentController@gintoPayComplete');
 // TEMP: PayMongo QRPH test page — remove after testing
 $router->get('/paymongo', function() {
+    if (!defined('IS_ADMIN') || !IS_ADMIN) { http_response_code(403); exit; }
     \Ginto\Core\View::view('paymongo_test', ['csrf_token' => generateCsrfToken(true)]);
 });
 $router->req('/api/user/payment-details', 'PaymentController@paymentDetails');

@@ -1,6 +1,6 @@
 <?php
-// Temporary PayMongo QRPH test page — accessible at /paymongo
-// Remove this file and its route once testing is complete.
+// PayMongo QRPH test page — admin-only, accessible at /paymongo
+if (!defined('IS_ADMIN') || !IS_ADMIN) { http_response_code(403); exit; }
 $csrfToken = $csrf_token ?? '';
 ?>
 <!DOCTYPE html>

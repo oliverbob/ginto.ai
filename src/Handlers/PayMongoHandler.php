@@ -19,8 +19,14 @@ class PayMongoHandler
 
     public function __construct()
     {
-        $this->secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?? '';
-        $this->publicKey = $_ENV['PAYMONGO_PUBLIC_KEY'] ?? getenv('PAYMONGO_PUBLIC_KEY') ?? '';
+        $env = strtolower(trim($_ENV['PAYMONGO_ENVIRONMENT'] ?? getenv('PAYMONGO_ENVIRONMENT') ?? 'live'));
+        if ($env === 'test') {
+            $this->secretKey = $_ENV['PAYMONGO_SECRET_KEY_TEST'] ?? getenv('PAYMONGO_SECRET_KEY_TEST') ?? '';
+            $this->publicKey = $_ENV['PAYMONGO_PUBLIC_KEY_TEST'] ?? getenv('PAYMONGO_PUBLIC_KEY_TEST') ?? '';
+        } else {
+            $this->secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?? '';
+            $this->publicKey = $_ENV['PAYMONGO_PUBLIC_KEY'] ?? getenv('PAYMONGO_PUBLIC_KEY') ?? '';
+        }
     }
 
     /**
@@ -28,7 +34,12 @@ class PayMongoHandler
      */
     public static function isConfigured(): bool
     {
-        $secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?? '';
+        $env = strtolower(trim($_ENV['PAYMONGO_ENVIRONMENT'] ?? getenv('PAYMONGO_ENVIRONMENT') ?? 'live'));
+        if ($env === 'test') {
+            $secretKey = $_ENV['PAYMONGO_SECRET_KEY_TEST'] ?? getenv('PAYMONGO_SECRET_KEY_TEST') ?? '';
+        } else {
+            $secretKey = $_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?? '';
+        }
         return !empty($secretKey);
     }
 
@@ -272,10 +283,17 @@ class PayMongoHandler
         $status   = $attrs['status'] ?? 'unknown';
         $payments = $attrs['payments'] ?? [];
 
+        // Extract the finalized charge ID (pay_xxxxxxxx) from the first payment object
+        $paymentId = null;
+        if (!empty($payments[0]['id'])) {
+            $paymentId = $payments[0]['id'];
+        }
+
         return [
-            'success'  => true,
-            'status'   => $status,
-            'payments' => $payments,
+            'success'    => true,
+            'status'     => $status,
+            'payment_id' => $paymentId,   // pay_xxxxxxxx — the actual charge object
+            'payments'   => $payments,
         ];
     }
 
@@ -373,6 +391,122 @@ class PayMongoHandler
             'qr_image'  => $attachResult['qr_image'],
             'qr_string' => $attachResult['qr_string'],
             'status'    => $attachResult['status'],
+        ];
+    }
+
+    /**
+     * Create a PayMongo Checkout Session (hosted card payment page).
+     *
+     * The user is redirected to checkout_url, completes card payment,
+     * then PayMongo redirects them to success_url with the session ID.
+     *
+     * @param int    $amountCentavos  Amount in centavos
+     * @param string $description     Line-item description
+     * @param string $name            Billing name
+     * @param string $email           Billing email
+     * @param string $successUrl      Redirect on payment success (may include {CHECKOUT_SESSION_ID})
+     * @param string $cancelUrl       Redirect on cancellation
+     * @return array ['success' => bool, 'checkout_url' => string, 'session_id' => string] | ['success' => false, ...]
+     */
+    public function createCheckoutSession(
+        int    $amountCentavos,
+        string $description,
+        string $name,
+        string $email,
+        string $successUrl,
+        string $cancelUrl
+    ): array {
+        if (empty($this->secretKey)) {
+            return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        $body = [
+            'data' => [
+                'attributes' => [
+                    'billing'              => [
+                        'name'    => $name,
+                        'email'   => $email,
+                        'phone'   => '',
+                    ],
+                    'line_items'           => [
+                        [
+                            'currency'    => 'PHP',
+                            'amount'      => $amountCentavos,
+                            'description' => $description,
+                            'name'        => $description,
+                            'quantity'    => 1,
+                        ],
+                    ],
+                    'payment_method_types' => ['card'],
+                    'success_url'          => $successUrl,
+                    'cancel_url'           => $cancelUrl,
+                    'send_email_receipt'   => false,
+                    'show_description'     => true,
+                    'show_line_items'      => true,
+                ],
+            ],
+        ];
+
+        $response = $this->request('POST', '/checkout_sessions', $body);
+
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            $msg = $response['errors'][0]['detail'] ?? 'Failed to create checkout session.';
+            error_log('PayMongo createCheckoutSession error: ' . json_encode($response));
+            return ['success' => false, 'message' => $msg];
+        }
+
+        $sessionId   = $response['data']['id'] ?? null;
+        $checkoutUrl = $response['data']['attributes']['checkout_url'] ?? null;
+
+        if (!$sessionId || !$checkoutUrl) {
+            return ['success' => false, 'message' => 'Invalid checkout session response.'];
+        }
+
+        return [
+            'success'      => true,
+            'session_id'   => $sessionId,
+            'checkout_url' => $checkoutUrl,
+        ];
+    }
+
+    /**
+     * Retrieve a Checkout Session to verify payment completion.
+     *
+     * @param string $sessionId  Checkout Session ID (cs_xxxxxxxx)
+     * @return array ['success' => bool, 'status' => string, 'payment_intent_id' => string, ...]
+     */
+    public function getCheckoutSession(string $sessionId): array
+    {
+        if (empty($this->secretKey)) {
+            return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        $response = $this->request('GET', '/checkout_sessions/' . urlencode($sessionId));
+
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            $msg = $response['errors'][0]['detail'] ?? 'Failed to retrieve checkout session.';
+            error_log('PayMongo getCheckoutSession error: ' . json_encode($response));
+            return ['success' => false, 'message' => $msg];
+        }
+
+        $attrs    = $response['data']['attributes'] ?? [];
+        $status   = $attrs['status'] ?? 'unknown';
+        $payments = $attrs['payments'] ?? [];
+
+        // Extract payment intent ID and charge ID from payments array
+        $paymentIntentId = null;
+        $gatewayPaymentId = null;
+        if (!empty($payments[0])) {
+            $gatewayPaymentId = $payments[0]['id'] ?? null;
+            $paymentIntentId  = $payments[0]['attributes']['payment_intent_id'] ?? null;
+        }
+
+        return [
+            'success'          => true,
+            'status'           => $status,
+            'payment_intent_id' => $paymentIntentId,
+            'payment_id'       => $gatewayPaymentId,
+            'payments'         => $payments,
         ];
     }
 }
