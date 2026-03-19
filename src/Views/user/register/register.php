@@ -330,6 +330,81 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       box-shadow: 0 2px 8px rgba(31, 162, 255, 0.10);
     }
 
+    .payment-method-container {
+      min-height: 74px;
+      border-width: 2px;
+      padding: 1rem;
+    }
+    .payment-method-container label {
+      font-size: 0.96rem;
+      line-height: 1.35;
+      width: 100%;
+    }
+    .payment-method-container input[type="radio"] {
+      width: 1.2rem;
+      height: 1.2rem;
+      flex-shrink: 0;
+    }
+
+    .payment-modal-shell {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100%;
+      padding: 1rem 0.85rem 2.5rem;
+    }
+    .payment-modal-card {
+      background: var(--bg-primary);
+      border-radius: 1rem;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.5);
+      width: 100%;
+      max-width: 32rem;
+      display: flex;
+      flex-direction: column;
+    }
+    .payment-modal-tabs {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.55rem;
+      padding: 0.85rem 0.9rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .payment-modal-tab {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      width: 100%;
+      min-height: 3rem;
+      padding: 0.72rem 0.95rem;
+      border-radius: 0.7rem;
+      border: 2px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .payment-modal-tab:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+    }
+    .payment-modal-tab.active {
+      color: #ffffff;
+      box-shadow: 0 10px 22px rgba(0, 0, 0, 0.28);
+      border-color: transparent;
+    }
+
+    @media (min-width: 640px) {
+      .payment-modal-shell {
+        padding: 1.5rem 1rem 3rem;
+      }
+      .payment-modal-tabs {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     /* Gold accent buttons */
 
     .btn-gold {
@@ -1052,45 +1127,18 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div>
               <h4 class="text-lg font-semibold mb-4" style="color: var(--text-primary);">Payment Method</h4>
               <div class="space-y-4">
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
-                  <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);" checked>
-                  <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
-                    PayPal
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
-                  <input type="radio" name="payment_method" id="credit-card" value="credit_card" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="credit-card" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-credit-card text-lg" style="color: var(--primary-500);"></i>
-                    Credit/Debit Card
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
-                  <input type="radio" name="payment_method" id="gcash" value="gcash" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="gcash" class="ml-3 block font-medium" style="color: var(--text-primary);">
-                    <span class="inline-flex items-center gap-2">
-                      <img src="https://www.gcash.com/wp-content/uploads/2019/04/gcash-logo.png" alt="GCash" class="h-5" onerror="this.style.display='none'">
-                      GCash
+                <?php if ($paymongoEnabled): ?>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
+                  <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
+                    <span>
+                      Ginto Pay
+                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">Fast Card Checkout</span>
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
-                  <input type="radio" name="payment_method" id="bank-transfer" value="bank_transfer" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="bank-transfer" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-university text-lg" style="color: var(--primary-500);"></i>
-                    Bank Transfer / Deposit
-                  </label>
-                </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
-                  <input type="radio" name="payment_method" id="crypto-usdt" value="crypto_usdt_bep20" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="crypto-usdt" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fab fa-bitcoin text-lg" style="color: #f0b90b;"></i>
-                    <span>Crypto <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background: linear-gradient(135deg, #f0b90b 0%, #d4a00a 100%); color: #000;">USDT BEP20</span></span>
-                  </label>
-                </div>
-                <?php if ($paymongoEnabled): ?>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph">
                   <input type="radio" name="payment_method" id="paymongo-qrph" value="paymongo_qrph" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paymongo-qrph" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
@@ -1100,7 +1148,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paymongo-qrph-annual">
                   <input type="radio" name="payment_method" id="paymongo-qrph-annual" value="paymongo_qrph_annual" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="paymongo-qrph-annual" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
                     <i class="fas fa-qrcode text-lg" style="color: #f97316;"></i>
@@ -1110,17 +1158,44 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                     </span>
                   </label>
                 </div>
-                <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container" data-radio="ginto-pay">
-                  <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
-                  <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
-                    <span>
-                      Ginto Pay
-                      <span class="text-xs px-1.5 py-0.5 rounded font-bold ml-1" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: #fff;">Credit / Debit Card</span>
+                <?php endif; ?>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="paypal">
+                  <input type="radio" name="payment_method" id="paypal" value="paypal" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="paypal" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <img src="https://www.paypalobjects.com/webstatic/mktg/Logo/pp-logo-100px.png" alt="PayPal" class="h-5">
+                    PayPal
+                  </label>
+                </div>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="credit-card">
+                  <input type="radio" name="payment_method" id="credit-card" value="credit_card" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="credit-card" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-credit-card text-lg" style="color: var(--primary-500);"></i>
+                    Credit/Debit Card
+                  </label>
+                </div>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="gcash">
+                  <input type="radio" name="payment_method" id="gcash" value="gcash" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="gcash" class="ml-3 block font-medium" style="color: var(--text-primary);">
+                    <span class="inline-flex items-center gap-2">
+                      <img src="https://www.gcash.com/wp-content/uploads/2019/04/gcash-logo.png" alt="GCash" class="h-5" onerror="this.style.display='none'">
+                      GCash
                     </span>
                   </label>
                 </div>
-                <?php endif; ?>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="bank-transfer">
+                  <input type="radio" name="payment_method" id="bank-transfer" value="bank_transfer" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="bank-transfer" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fas fa-university text-lg" style="color: var(--primary-500);"></i>
+                    Bank Transfer / Deposit
+                  </label>
+                </div>
+                <div class="flex items-center rounded-lg cursor-pointer tier-card payment-method-container" data-radio="crypto-usdt">
+                  <input type="radio" name="payment_method" id="crypto-usdt" value="crypto_usdt_bep20" class="h-5 w-5" style="accent-color: var(--primary-500);">
+                  <label for="crypto-usdt" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
+                    <i class="fab fa-bitcoin text-lg" style="color: #f0b90b;"></i>
+                    <span>Crypto <span class="text-xs px-1.5 py-0.5 rounded font-bold" style="background: linear-gradient(135deg, #f0b90b 0%, #d4a00a 100%); color: #000;">USDT BEP20</span></span>
+                  </label>
+                </div>
               </div>
               
               <!-- PayPal Button Container (PayPal balance only) -->
@@ -2278,7 +2353,7 @@ if (empty($paypalClientId)) {
     'crypto_usdt_bep20':    { icon: 'fab fa-bitcoin',     color: '#f0b90b', label: 'Crypto'        },
     'paymongo_qrph':        { icon: 'fas fa-qrcode',      color: '#f97316', label: 'QR 1 Month'   },
     'paymongo_qrph_annual': { icon: 'fas fa-qrcode',      color: '#16a34a', label: 'QR 12 Months' },
-    'ginto_pay':            { icon: 'fas fa-credit-card', color: '#6366f1', label: 'Card Pay'      }
+    'ginto_pay':            { icon: 'fas fa-credit-card', color: '#6366f1', label: 'Ginto Pay'     }
   };
 
   function buildPaymentModal() {
@@ -2287,21 +2362,21 @@ if (empty($paypalClientId)) {
     modal.id = 'payment-modal';
     modal.style.cssText = 'position:fixed;inset:0;z-index:500;display:none;background:rgba(0,0,0,0.82);overflow-y:auto;';
     modal.innerHTML =
-      '<div style="display:flex;align-items:flex-start;justify-content:center;min-height:100%;padding:1.5rem 1rem 3rem;">' +
-        '<div style="background:var(--bg-primary);border-radius:1rem;box-shadow:0 25px 60px rgba(0,0,0,0.5);width:100%;max-width:30rem;display:flex;flex-direction:column;">' +
+      '<div class="payment-modal-shell">' +
+        '<div class="payment-modal-card">' +
           '<div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border-color);">' +
             '<div style="display:flex;align-items:center;gap:0.6rem;">' +
               '<span id="pmodal-icon" style="font-size:1.5rem;line-height:1;"></span>' +
               '<div>' +
                 '<h3 id="pmodal-title" style="font-weight:700;font-size:0.95rem;color:var(--text-primary);margin:0;line-height:1.2;"></h3>' +
-                '<p style="font-size:0.65rem;color:var(--text-secondary);margin:0.15rem 0 0;">Tap a method below to switch</p>' +
+                '<p style="font-size:0.7rem;color:var(--text-secondary);margin:0.15rem 0 0;">Choose a secure checkout method</p>' +
               '</div>' +
             '</div>' +
             '<button type="button" id="pmodal-close" title="Close" style="width:2rem;height:2rem;display:flex;align-items:center;justify-content:center;border-radius:50%;border:none;cursor:pointer;font-size:0.9rem;background:var(--bg-secondary);color:var(--text-secondary);flex-shrink:0;">' +
               '<i class="fas fa-times"></i>' +
             '</button>' +
           '</div>' +
-          '<div id="pmodal-tabs" style="display:flex;flex-wrap:wrap;gap:0.4rem;padding:0.65rem 1rem;border-bottom:1px solid var(--border-color);"></div>' +
+          '<div id="pmodal-tabs" class="payment-modal-tabs"></div>' +
           '<div id="pmodal-body" style="overflow-y:auto;padding:1rem;"></div>' +
         '</div>' +
       '</div>';
@@ -2336,9 +2411,11 @@ if (empty($paypalClientId)) {
         var active = radio.value === value;
         var btn = document.createElement('button');
         btn.type = 'button';
-        btn.style.cssText = 'display:inline-flex;align-items:center;gap:0.3rem;padding:0.28rem 0.65rem;border-radius:0.4rem;font-size:0.68rem;font-weight:600;cursor:pointer;transition:all 0.15s;border:2px solid ' +
-          (active ? mi.color : 'var(--border-color)') + ';background:' +
-          (active ? mi.color : 'transparent') + ';color:' + (active ? '#fff' : 'var(--text-secondary)') + ';';
+        btn.className = 'payment-modal-tab' + (active ? ' active' : '');
+        btn.style.borderColor = active ? mi.color : 'var(--border-color)';
+        if (active) {
+          btn.style.background = 'linear-gradient(135deg, ' + mi.color + ', #111827)';
+        }
         btn.innerHTML = '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
         btn.addEventListener('click', function() {
           radio.checked = true;
