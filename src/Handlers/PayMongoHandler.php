@@ -212,6 +212,9 @@ class PayMongoHandler
 
         $response = $this->request('POST', '/payment_intents/' . urlencode($piId) . '/attach', $body);
 
+        // DEBUG: log full raw attach response
+        error_log('PayMongo attach raw response: ' . json_encode($response));
+
         if (!empty($response['errors']) || $response['http_code'] >= 400) {
             $msg = $response['errors'][0]['detail'] ?? 'Failed to attach payment method.';
             error_log('PayMongo attachPaymentMethod error: ' . json_encode($response));
