@@ -206,23 +206,63 @@ $walletTransactions = $wallet_transactions ?? [];
 }
 .txn-credit .txn-icon { background: rgba(34,197,94,0.12); color: #4ade80; }
 .txn-debit .txn-icon { background: rgba(239,68,68,0.12); color: #f87171; }
+.wallet-layout {
+    max-width: 1200px;
+    margin: 20px auto 40px;
+    padding: 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    align-items: stretch;
+}
+.wallet-left {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    min-width: 0;
+}
+.wallet-right {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 22px;
+    min-width: 0;
+}
+.wallet-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 1;
+}
+@media (min-width: 480px) {
+    .wallet-layout {
+        margin: 30px auto 72px;
+        padding: 0 18px;
+    }
+}
+@media (max-width: 767px) {
+    .wallet-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
+@media (min-width: 1024px) {
+    .wallet-layout {
+        flex-direction: row;
+        align-items: flex-start;
+    }
+    .wallet-left {
+        flex: 0 0 420px;
+    }
+    .wallet-right {
+        flex: 1 1 auto;
+    }
+}
 </style>
 
-<section style="max-width:1200px;margin:20px auto 40px;padding:0 12px;display:grid;grid-template-columns:1fr;gap:20px;align-items:start;" id="wallet-section">
-    <style>
-        @media (min-width: 480px) {
-            #wallet-section {
-                margin: 30px auto 72px;
-                padding: 0 18px;
-            }
-        }
-        @media (min-width: 768px) {
-            #wallet-section {
-                grid-template-columns: minmax(320px,0.9fr) minmax(0,1.1fr);
-            }
-        }
-    </style>
-    <div style="display:flex;flex-direction:column;gap:16px;">
+<section class="wallet-layout">
+    <div class="wallet-left">
 
         <!-- Premium Wallet Card -->
         <div class="gw-card">
@@ -237,15 +277,7 @@ $walletTransactions = $wallet_transactions ?? [];
                 <div class="gw-balance">₱<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></div>
                 <div class="gw-balance-sub">Available balance</div>
                 <div class="gw-divider"></div>
-                <div style="display:flex;gap:8px;flex-wrap:wrap;position:relative;z-index:1;" id="wallet-buttons">
-                    <style>
-                        @media (max-width: 767px) {
-                            #wallet-buttons {
-                                flex-direction: column;
-                                align-items: stretch;
-                            }
-                        }
-                    </style>
+                <div class="wallet-actions">
                     <a href="/mall/checkout" class="gw-btn gw-btn-ghost">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                         Checkout
@@ -333,7 +365,7 @@ $walletTransactions = $wallet_transactions ?? [];
     </div>
 
     <!-- Transaction History -->
-    <div style="border:1px solid var(--border);background:var(--surface);border-radius:24px;padding:22px;">
+    <div class="wallet-right">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px;">
             <div>
                 <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Wallet Ledger</h2>
