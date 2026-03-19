@@ -25,6 +25,7 @@ class CsrfMiddleware
         '/gcash-payments', // GCash registration - validates CSRF internally in handler
         '/crypto-payments', // Crypto USDT registration - validates CSRF internally in handler
         '/api/payments/crypto-info', // Crypto info API - AJAX only, no mutation
+        '/api/mall/wallet/topup/create', // Wallet top-up session create - validated by MallCheckoutController
         '/debug/session-set', // Debug helper: allow localhost POST to set session for testing
         '/login-m',           // Mobile app JSON login — authenticates via credentials, no CSRF session
         '/logout-m',          // Mobile app JSON logout — kills session, CSRF not applicable
