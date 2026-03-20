@@ -291,9 +291,9 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     display: none;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px 12px;
+    height: var(--header-h);
+    padding: 0 12px;
     border-bottom: 1px solid var(--border);
-    margin-bottom: 4px;
     flex-shrink: 0;
 }
 .sidebar-close-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 1.05rem; color: var(--accent); }
