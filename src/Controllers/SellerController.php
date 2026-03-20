@@ -195,6 +195,8 @@ class SellerController extends \Core\Controller
             }
 
             $csrf = generateCsrfToken();
+            $commerce = new MallCommerceService();
+            $walletSummary = $commerce->getWalletSummary($userId);
             return $this->view('mall/seller_products', [
                 'products'            => $products,
                 'drafts'              => $drafts,
@@ -203,6 +205,7 @@ class SellerController extends \Core\Controller
                 'subscription_status' => $subscription_status,
                 'next_billing_at'     => $subRow['next_billing_at'] ?? null,
                 'is_admin'            => $isAdmin,
+                'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
             ]);
         } catch (\Throwable $e) {
             // Log full stack trace and user context for debugging
@@ -237,12 +240,15 @@ class SellerController extends \Core\Controller
         }
 
         $categories = $this->db->select('categories', '*') ?: [];
+        $commerce = new MallCommerceService();
+        $walletSummary = $commerce->getWalletSummary($userId);
         return $this->view('mall/product_form', [
-            'csrf_token'  => $csrf,
-            'categories'  => $categories,
-            'kyc_status'  => $kycStatus,
-            'tos_agreed'  => $tosAgreed,
-            'is_admin'    => $isAdmin,
+            'csrf_token'          => $csrf,
+            'categories'          => $categories,
+            'kyc_status'          => $kycStatus,
+            'tos_agreed'          => $tosAgreed,
+            'is_admin'            => $isAdmin,
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 
@@ -498,14 +504,17 @@ class SellerController extends \Core\Controller
             $tosAgreed = !empty($userRow['seller_tos_agreed_at']);
         }
 
+        $commerce = new MallCommerceService();
+        $walletSummary = $commerce->getWalletSummary($userId);
         return $this->view('mall/product_form', [
-            'csrf_token'  => $csrf,
-            'categories'  => $categories,
-            'product'     => $product,
-            'editing'     => true,
-            'kyc_status'  => $kycStatus,
-            'tos_agreed'  => $tosAgreed,
-            'is_admin'    => $isAdmin,
+            'csrf_token'          => $csrf,
+            'categories'          => $categories,
+            'product'             => $product,
+            'editing'             => true,
+            'kyc_status'          => $kycStatus,
+            'tos_agreed'          => $tosAgreed,
+            'is_admin'            => $isAdmin,
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 
