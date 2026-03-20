@@ -289,6 +289,15 @@ $payoutAccount = $payout_account ?? null;
     display: flex;
     flex-direction: column;
     gap: 4px;
+    text-decoration: none;
+    color: inherit;
+    transition: border-color var(--trans), transform var(--trans), box-shadow var(--trans);
+    cursor: pointer;
+}
+.wstat:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 18px rgba(99,102,241,0.15);
 }
 .wstat-icon {
     width: 34px; height: 34px;
@@ -486,41 +495,41 @@ $payoutAccount = $payout_account ?? null;
 
 <section class="wallet-stats-row">
     <!-- Sales -->
-    <div class="wstat">
+    <a class="wstat" href="/wallet/sales">
         <div class="wstat-icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
         </div>
         <div class="wstat-label">Sales</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['gross_sales'], 2) ?></div>
         <div class="wstat-sub"><?= (int)$sellerStats['order_count'] ?> paid order<?= (int)$sellerStats['order_count'] !== 1 ? 's' : '' ?></div>
-    </div>
+    </a>
     <!-- Commissions -->
-    <div class="wstat">
+    <a class="wstat" href="/wallet/commissions">
         <div class="wstat-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
         <div class="wstat-label">Commissions</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['total_commissions'], 2) ?></div>
         <div class="wstat-sub">From referral chain (10%)</div>
-    </div>
+    </a>
     <!-- Earnings -->
-    <div class="wstat">
+    <a class="wstat" href="/wallet/earnings">
         <div class="wstat-icon" style="background:rgba(99,102,241,0.12);color:#a5b4fc;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         </div>
         <div class="wstat-label">Earnings</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['net_earnings'], 2) ?></div>
         <div class="wstat-sub">Net after fees &amp; charges</div>
-    </div>
+    </a>
     <!-- Pending Payouts -->
-    <div class="wstat">
+    <a class="wstat" href="/wallet/payouts">
         <div class="wstat-icon" style="background:rgba(239,68,68,0.10);color:#f87171;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div class="wstat-label">Pending Payouts</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['pending_payout'], 2) ?></div>
         <div class="wstat-sub">Auto-sent on schedule</div>
-    </div>
+    </a>
 </section>
 
 <section class="wallet-layout">

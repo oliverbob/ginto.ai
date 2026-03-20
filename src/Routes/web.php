@@ -1266,6 +1266,11 @@ $router->req('/mall', 'MallController@marketplace');
 $router->req('/mall/checkout', 'MallCheckoutController@checkoutPage');
 $router->req('/mall/wallet', 'MallCheckoutController@walletPage');
 $router->req('/wallet', 'MallCheckoutController@walletPage');
+$router->req('/wallet/sales', 'MallCheckoutController@walletSalesPage');
+$router->req('/wallet/commissions', 'MallCheckoutController@walletCommissionsPage');
+$router->req('/wallet/earnings', 'MallCheckoutController@walletEarningsPage');
+$router->req('/wallet/payouts', 'MallCheckoutController@walletPayoutsPage');
+$router->req('/wallet/payout-accounts', 'MallCheckoutController@walletPayoutAccountsPage');
 $router->req('/mall/orders', 'MallCheckoutController@buyerOrdersPage');
 $router->req('/marketplace/sellers/orders', 'MallCheckoutController@sellerOrdersPage');
 $router->req('/marketplace/delivery/orders', 'MallCheckoutController@deliveryOrdersPage');
@@ -1284,6 +1289,8 @@ $router->req('/api/mall/checkout/paypal-capture', 'MallCheckoutController@checko
 $router->req('/api/mall/checkout/status', 'MallCheckoutController@checkoutStatus', ['GET']);
 $router->req('/api/mall/wallet/topup/create', 'MallCheckoutController@walletTopupCreate', ['POST']);
 $router->req('/api/mall/wallet/payout-account', 'MallCheckoutController@savePayoutAccount', ['POST']);
+$router->req('/api/mall/wallet/payout-account/set-default', 'MallCheckoutController@setDefaultPayoutAccount', ['POST']);
+$router->req('/api/mall/wallet/payout-account/delete', 'MallCheckoutController@deletePayoutAccount', ['POST']);
 $router->req('/api/mall/delivery/claim', 'MallCheckoutController@deliveryClaim', ['POST']);
 $router->req('/api/mall/orders/status', 'MallCheckoutController@orderStatusUpdate', ['POST']);
 

@@ -143,6 +143,104 @@ class MallCheckoutController extends Controller
         }
     }
 
+    public function walletSalesPage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+        $this->view('mall/wallet_sales', [
+            'title' => 'My Sales',
+            'csrf_token' => generateCsrfToken(),
+            'sales' => $this->commerce->getSalesList($userId),
+            'seller_stats' => $this->commerce->getSellerStats($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+        ]);
+    }
+
+    public function walletCommissionsPage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+        $this->view('mall/wallet_commissions', [
+            'title' => 'My Commissions',
+            'csrf_token' => generateCsrfToken(),
+            'commissions' => $this->commerce->getCommissionsList($userId),
+            'seller_stats' => $this->commerce->getSellerStats($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+        ]);
+    }
+
+    public function walletEarningsPage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+        $this->view('mall/wallet_earnings', [
+            'title' => 'My Earnings',
+            'csrf_token' => generateCsrfToken(),
+            'seller_stats' => $this->commerce->getSellerStats($userId),
+            'wallet' => $walletSummary['account'],
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+        ]);
+    }
+
+    public function walletPayoutsPage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+        $this->view('mall/wallet_payouts', [
+            'title' => 'Pending Payouts',
+            'csrf_token' => generateCsrfToken(),
+            'payouts' => $this->commerce->getPendingPayoutsList($userId),
+            'seller_stats' => $this->commerce->getSellerStats($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+        ]);
+    }
+
+    public function walletPayoutAccountsPage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+        $this->view('mall/wallet_payout_accounts', [
+            'title' => 'Payout Accounts',
+            'csrf_token' => generateCsrfToken(),
+            'payout_accounts' => $this->commerce->getAllPayoutAccounts($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+        ]);
+    }
+
+    public function setDefaultPayoutAccount()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+        $this->validateCsrfFromPayload($input);
+        $accountId = (int)($input['account_id'] ?? 0);
+        if ($accountId <= 0) { $this->json(['success' => false, 'message' => 'Invalid account.']); return; }
+        $this->commerce->setPrimaryPayoutAccount($userId, $accountId);
+        $this->json(['success' => true]);
+    }
+
+    public function deletePayoutAccount()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+        $this->validateCsrfFromPayload($input);
+        $accountId = (int)($input['account_id'] ?? 0);
+        if ($accountId <= 0) { $this->json(['success' => false, 'message' => 'Invalid account.']); return; }
+        $this->commerce->deletePayoutAccount($userId, $accountId);
+        $this->json(['success' => true]);
+    }
+
     public function buyerOrdersPage()
     {
         $userId = $this->requireUser();

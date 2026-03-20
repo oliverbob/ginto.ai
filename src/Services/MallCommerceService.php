@@ -1425,6 +1425,88 @@ class MallCommerceService
         }
     }
 
+    public function getSalesList(int $userId): array
+    {
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT o.id, o.buyer_total_amount, o.seller_net_amount, o.payment_status,
+                        o.created_at, o.updated_at,
+                        p.title AS product_title, p.image_path AS product_image,
+                        u.name AS buyer_name
+                   FROM mall_orders o
+                   LEFT JOIN mall_products p ON p.id = o.product_id
+                   LEFT JOIN users u ON u.id = o.buyer_id
+                  WHERE o.seller_id = :uid
+                  ORDER BY o.created_at DESC
+                  LIMIT 200"
+            );
+            $stmt->execute([':uid' => $userId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    public function getCommissionsList(int $userId): array
+    {
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT c.id, c.amount, c.status, c.created_at, c.source_id,
+                        u.name AS from_user_name
+                   FROM commissions c
+                   LEFT JOIN users u ON u.id = c.from_user_id
+                  WHERE c.user_id = :uid
+                  ORDER BY c.created_at DESC
+                  LIMIT 200"
+            );
+            $stmt->execute([':uid' => $userId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    public function getPendingPayoutsList(int $userId): array
+    {
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT sp.id, sp.amount, sp.source_type, sp.status, sp.scheduled_at,
+                        sp.sent_at, sp.reference, sp.note, sp.created_at,
+                        pa.institution_name, pa.account_holder_name, pa.account_number, pa.account_type
+                   FROM mall_seller_payouts sp
+                   LEFT JOIN mall_payout_accounts pa ON pa.id = sp.payout_account_id
+                  WHERE sp.user_id = :uid
+                  ORDER BY sp.created_at DESC
+                  LIMIT 200"
+            );
+            $stmt->execute([':uid' => $userId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    public function getAllPayoutAccounts(int $userId): array
+    {
+        try {
+            return $this->db->select('mall_payout_accounts', '*', [
+                'user_id' => $userId,
+                'ORDER'   => ['is_primary' => 'DESC', 'updated_at' => 'DESC'],
+            ]) ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    public function setPrimaryPayoutAccount(int $userId, int $accountId): void
+    {
+        try {
+            $this->db->pdo->prepare("UPDATE mall_payout_accounts SET is_primary = 0 WHERE user_id = :uid")
+                ->execute([':uid' => $userId]);
+            $this->db->pdo->prepare("UPDATE mall_payout_accounts SET is_primary = 1 WHERE id = :id AND user_id = :uid")
+                ->execute([':id' => $accountId, ':uid' => $userId]);
+        } catch (\Throwable $e) {}
+    }
+
+    public function deletePayoutAccount(int $userId, int $accountId): void
+    {
+        try {
+            $this->db->delete('mall_payout_accounts', ['id' => $accountId, 'user_id' => $userId]);
+        } catch (\Throwable $e) {}
+    }
+
     public function savePayoutAccount(int $userId, string $accountType, string $institutionName, string $holderName, string $accountNumber): array
     {
         $existing = null;
