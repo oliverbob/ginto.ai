@@ -147,31 +147,100 @@
     const sortLabel   = document.getElementById('sortLabel');
     const sortDropdown= document.getElementById('sortDropdown');
     const sellBtn     = document.getElementById('sellBtn');
+    const isFallbackSidebar = !!(sidebar && sidebar.classList.contains('fallback-sidebar'));
+    const sidebarStateKey = 'mall_fallback_sidebar_open';
+    if (isFallbackSidebar) {
+        document.body.classList.add('has-fallback-sidebar');
+    }
+
+    function isDesktopViewport() {
+        return window.matchMedia('(min-width: 768px)').matches;
+    }
+
+    function setSidebarState(isOpen, options) {
+        if (!sidebar) return;
+        const opts = Object.assign({ persist: true, focusToggle: false }, options || {});
+        const isDesktop = isDesktopViewport();
+
+        sidebar.classList.toggle('open', !!isOpen);
+        if (menuToggle) menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+
+        if (isFallbackSidebar && isDesktop) {
+            document.body.classList.toggle('fallback-sidebar-open', !!isOpen);
+            if (sidebarBd) {
+                sidebarBd.classList.remove('active');
+                sidebarBd.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            if (opts.persist) {
+                try { localStorage.setItem(sidebarStateKey, isOpen ? '1' : '0'); } catch (_) {}
+            }
+            return;
+        }
+
+        if (isOpen) {
+            if (sidebarBd) {
+                sidebarBd.classList.add('active');
+                sidebarBd.removeAttribute('aria-hidden');
+            }
+            document.body.style.overflow = 'hidden';
+            const closeBtn = document.getElementById('sidebarClose');
+            if (closeBtn) setTimeout(() => closeBtn.focus({ preventScroll: true }), 50);
+        } else {
+            if (sidebarBd) {
+                sidebarBd.classList.remove('active');
+                sidebarBd.setAttribute('aria-hidden', 'true');
+            }
+            document.body.style.overflow = '';
+            if (opts.focusToggle && menuToggle) menuToggle.focus({ preventScroll: true });
+        }
+    }
 
     /* ============================
      * SIDEBAR
      * ============================ */
     function openSidebar() {
-        if (!sidebar) return;
-        sidebar.classList.add('open');
-        if (sidebarBd) { sidebarBd.classList.add('active'); sidebarBd.removeAttribute('aria-hidden'); }
-        document.body.style.overflow = 'hidden';
-        if (menuToggle) menuToggle.setAttribute('aria-expanded', 'true');
-        // Focus close btn
-        const closeBtn = document.getElementById('sidebarClose');
-        if (closeBtn) setTimeout(() => closeBtn.focus({ preventScroll: true }), 50);
+        setSidebarState(true);
     }
     function closeSidebar() {
-        if (!sidebar) return;
-        sidebar.classList.remove('open');
-        if (sidebarBd) { sidebarBd.classList.remove('active'); sidebarBd.setAttribute('aria-hidden', 'true'); }
-        document.body.style.overflow = '';
-        if (menuToggle) { menuToggle.setAttribute('aria-expanded', 'false'); menuToggle.focus({ preventScroll: true }); }
+        setSidebarState(false, { focusToggle: true });
     }
-    if (menuToggle) menuToggle.addEventListener('click', openSidebar);
+    function toggleSidebar() {
+        if (!sidebar) return;
+        const isOpen = sidebar.classList.contains('open');
+        setSidebarState(!isOpen);
+    }
+    if (menuToggle) menuToggle.addEventListener('click', toggleSidebar);
     const sidebarClose = document.getElementById('sidebarClose');
     if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
     if (sidebarBd) sidebarBd.addEventListener('click', closeSidebar);
+
+    if (isFallbackSidebar) {
+        const savedDesktopState = (() => {
+            try { return localStorage.getItem(sidebarStateKey); } catch (_) { return null; }
+        })();
+        if (isDesktopViewport()) {
+            setSidebarState(savedDesktopState === null ? true : savedDesktopState === '1', { persist: false });
+        } else {
+            setSidebarState(false, { persist: false });
+        }
+
+        let wasDesktop = isDesktopViewport();
+        window.addEventListener('resize', function () {
+            const isDesktop = isDesktopViewport();
+            if (isDesktop === wasDesktop) return;
+            wasDesktop = isDesktop;
+            if (isDesktop) {
+                const pref = (() => {
+                    try { return localStorage.getItem(sidebarStateKey); } catch (_) { return null; }
+                })();
+                setSidebarState(pref === null ? true : pref === '1', { persist: false });
+            } else {
+                document.body.classList.remove('fallback-sidebar-open');
+                setSidebarState(false, { persist: false });
+            }
+        });
+    }
 
     /* ============================
      * CART DRAWER

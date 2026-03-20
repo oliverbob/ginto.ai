@@ -1020,13 +1020,23 @@ input[type="file"].form-input { padding: 7px 12px; }
 @media (min-width: 768px) {
     /* Hamburger invisible on desktop */
     .hamburger { display: none; }
+    body.has-fallback-sidebar .hamburger { display: flex !important; }
     /* Close row inside sidebar never needed on desktop */
     .sidebar-close-row { display: none !important; }
     /* Backdrop never needed on desktop */
     .sidebar-backdrop { display: none !important; }
 
-    /* Fallback sidebar should never be permanently visible on desktop pages */
-    .sidebar.fallback-sidebar { display: none !important; }
+    /* Fallback sidebar: desktop-visible and toggleable */
+    .sidebar.fallback-sidebar {
+        display: block !important;
+        top: var(--header-h);
+        height: calc(100vh - var(--header-h));
+        transform: translateX(-100%);
+        z-index: 1000;
+    }
+    body.has-fallback-sidebar.fallback-sidebar-open .sidebar.fallback-sidebar {
+        transform: translateX(0);
+    }
 }
     </style>
 </head>
