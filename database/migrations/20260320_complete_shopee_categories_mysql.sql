@@ -55,6 +55,9 @@ INSERT IGNORE INTO `categories` (`name`, `slug`, `description`, `sort_order`, `c
     -- Automotive
     ('Automotive',                 'automotive',               'Car accessories, motorcycle parts, oil & automotive tools',        20, NOW(), NOW()),
 
+    -- Hardware / Tools
+    ('Tools & Home Improvement',   'tools-home-improvement',   'Hand tools, power tools, hardware, building & repair supplies',    26, NOW(), NOW()),
+
     -- Other
     ('Office & School Supplies',   'office-school-supplies',   'Pens, notebooks, printers, office chairs, desks & supplies',       22, NOW(), NOW()),
     ('Music & Media',              'music-media',              'Instruments, microphones, speakers, CDs, DVDs & media',            23, NOW(), NOW()),
