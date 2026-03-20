@@ -444,9 +444,9 @@
     if (sellBtn) {
         sellBtn.addEventListener('click', function (e) {
             const uploadOverlayEl = document.getElementById('uploadOverlay');
-            if (!uploadOverlayEl) {
+            if (uploadOverlayEl) {
                 e.preventDefault();
-                window.location.href = '/marketplace/sellers/upload';
+                openUploadModal();
             }
         });
     }
