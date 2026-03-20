@@ -306,6 +306,24 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 }
 .sidebar-close-btn:hover { background: var(--surface2); }
 
+/* Fallback drawer injected by shared footer on pages without native sidebar markup */
+.sidebar.fallback-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 300px;
+    height: 100%;
+    padding: 0;
+    z-index: 1002;
+    border-right: 1px solid var(--border);
+    transform: translateX(-100%);
+    transition: transform var(--trans);
+    box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+    overflow-y: auto;
+}
+.sidebar.fallback-sidebar.open { transform: translateX(0); }
+
 /* Mobile overlay backdrop */
 .sidebar-backdrop {
     display: none;
@@ -922,6 +940,10 @@ input[type="file"].form-input { padding: 7px 12px; }
     }
     .sidebar.open { transform: translateX(0); }
 
+    .sidebar.fallback-sidebar {
+        display: block;
+    }
+
     /* Show backdrop */
     .sidebar-backdrop { display: block; }
 
@@ -1002,6 +1024,9 @@ input[type="file"].form-input { padding: 7px 12px; }
     .sidebar-close-row { display: none !important; }
     /* Backdrop never needed on desktop */
     .sidebar-backdrop { display: none !important; }
+
+    /* Fallback sidebar should never be permanently visible on desktop pages */
+    .sidebar.fallback-sidebar { display: none !important; }
 }
     </style>
 </head>

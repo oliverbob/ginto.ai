@@ -49,7 +49,7 @@
         if (!document.getElementById('sidebar')) {
             const sidebar = document.createElement('aside');
             sidebar.id = 'sidebar';
-            sidebar.className = 'sidebar';
+            sidebar.className = 'sidebar fallback-sidebar';
             sidebar.setAttribute('role', 'navigation');
             sidebar.setAttribute('aria-label', 'Mall navigation');
             sidebar.innerHTML = ''
