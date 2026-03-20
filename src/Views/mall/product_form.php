@@ -9,9 +9,11 @@
 $editing    = $editing ?? false;
 $product    = $product ?? [];
 $pageTitle  = $editing ? 'Edit Product' : 'New Product';
+$_pBase     = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/wallet/') ? '/wallet/products' : '/marketplace/sellers/products';
+$_kycPath   = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/wallet/') ? '/wallet/kyc' : '/marketplace/sellers/kyc';
 $action     = $editing
-    ? '/marketplace/sellers/products/update/' . (int)($product['id'] ?? 0)
-    : '/marketplace/sellers/products/create';
+    ? $_pBase . '/update/' . (int)($product['id'] ?? 0)
+    : $_pBase . '/create';
 $kycStatus  = $kyc_status ?? 'none';
 $tosAgreed  = $tos_agreed ?? false;
 $isAdmin    = $is_admin ?? false;
@@ -234,9 +236,9 @@ select.pf-input    { cursor: pointer; }
     </div>
     <div class="sidebar-inner" style="padding:16px 0">
         <ul class="sc-nav" role="list" style="list-style:none;margin:0;padding:0">
-            <li class="sc-nav-item"><a href="/marketplace/sellers/products" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">📦 My Products</a></li>
-            <li class="sc-nav-item"><a href="/marketplace/sellers/products/new" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--accent);text-decoration:none;font-weight:600">➕ New Product</a></li>
-            <li class="sc-nav-item"><a href="/marketplace/sellers/kyc" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🪪 KYC Verification</a></li>
+            <li class="sc-nav-item"><a href="<?= $_pBase ?>" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">📦 My Products</a></li>
+            <li class="sc-nav-item"><a href="<?= $_pBase ?>/new" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--accent);text-decoration:none;font-weight:600">➕ New Product</a></li>
+            <li class="sc-nav-item"><a href="<?= $_kycPath ?>" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🪹 KYC Verification</a></li>
             <li class="sc-nav-item"><a href="/marketplace" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🏠 View Marketplace</a></li>
         </ul>
     </div>
@@ -263,10 +265,10 @@ select.pf-input    { cursor: pointer; }
             <?php endif; ?>
         </div>
         <div class="gate-actions">
-            <a href="/marketplace/sellers/kyc" class="btn btn-primary" style="padding:11px 28px">
-                <?= $kycStatus === 'pending' ? '⏳ View KYC Status' : '🪪 Start KYC Verification' ?>
+            <a href="<?= $_kycPath ?>" class="btn btn-primary" style="padding:11px 28px">
+                <?= $kycStatus === 'pending' ? '⏳ View KYC Status' : '🪹 Start KYC Verification' ?>
             </a>
-            <a href="/marketplace/sellers/products" class="btn btn-secondary">Back to Products</a>
+            <a href="<?= $_pBase ?>" class="btn btn-secondary">Back to Products</a>
         </div>
     </div>
 </div>
@@ -357,7 +359,7 @@ select.pf-input    { cursor: pointer; }
         </div>
         <div class="gate-actions">
             <button type="button" id="tosBtnAgree" class="btn btn-primary" style="padding:11px 28px" disabled>✅ I Agree and Continue</button>
-            <a href="/marketplace/sellers/products" class="btn btn-secondary">Decline — Back to Products</a>
+            <a href="<?= $_pBase ?>" class="btn btn-secondary">Decline — Back to Products</a>
         </div>
     </div>
 </div>
@@ -365,7 +367,7 @@ select.pf-input    { cursor: pointer; }
 
 <div class="pf-shell">
 
-    <a href="/marketplace/sellers/products" class="pf-back">
+    <a href="<?= $_pBase ?>" class="pf-back">
         <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Products
     </a>
@@ -591,7 +593,7 @@ select.pf-input    { cursor: pointer; }
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                 <?= $editing ? 'Save Changes' : 'Create Product' ?>
             </button>
-            <a href="/marketplace/sellers/products" class="btn btn-secondary">Cancel</a>
+            <a href="<?= $_pBase ?>" class="btn btn-secondary">Cancel</a>
         </div>
 
     </form>

@@ -1271,6 +1271,15 @@ $router->req('/wallet/commissions', 'MallCheckoutController@walletCommissionsPag
 $router->req('/wallet/earnings', 'MallCheckoutController@walletEarningsPage');
 $router->req('/wallet/payouts', 'MallCheckoutController@walletPayoutsPage');
 $router->req('/wallet/payout-accounts', 'MallCheckoutController@walletPayoutAccountsPage');
+$router->req('/wallet/products', 'SellerController@products');
+$router->req('/wallet/products/new', 'SellerController@productNew');
+$router->req('/wallet/products/create', 'SellerController@productCreate', ['POST']);
+$router->req('/wallet/products/toggle', 'SellerController@productToggle', ['POST']);
+$router->req('/wallet/products/delete', 'SellerController@productDelete', ['POST']);
+$router->req('/wallet/products/edit/{id}', 'SellerController@productEdit');
+$router->req('/wallet/products/update/{id}', 'SellerController@productUpdate', ['POST']);
+$router->req('/wallet/kyc', 'SellerController@kycForm');
+$router->req('/wallet/kyc/submit', 'SellerController@submitKyc', ['POST']);
 $router->req('/mall/orders', 'MallCheckoutController@buyerOrdersPage');
 $router->req('/marketplace/sellers/orders', 'MallCheckoutController@sellerOrdersPage');
 $router->req('/marketplace/delivery/orders', 'MallCheckoutController@deliveryOrdersPage');

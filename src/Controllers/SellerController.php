@@ -15,6 +15,17 @@ class SellerController extends \Core\Controller
         $this->db = $db ?? Database::getInstance();
     }
 
+    /** Redirect to /wallet/products if the request came from that namespace, else the legacy path. */
+    private function productsUrl(): string
+    {
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        $ref = $_SERVER['HTTP_REFERER'] ?? '';
+        if (str_starts_with($uri, '/wallet/') || str_contains($ref, '/wallet/')) {
+            return '/wallet/products';
+        }
+        return '/marketplace/sellers/products';
+    }
+
     public function kycForm()
     {
         if (empty($_SESSION['user_id'])) {
@@ -25,7 +36,7 @@ class SellerController extends \Core\Controller
         $user   = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
         // Admins don't need KYC — redirect them straight to products
         if (in_array($user['role_id'] ?? 0, [1, 2])) {
-            header('Location: /marketplace/sellers/products'); exit;
+            header('Location: ' . $this->productsUrl()); exit;
         }
         $kyc = $this->db->get('kyc_profiles', '*', ['user_id' => $userId]);
         return $this->view('mall/kyc', ['csrf_token' => $csrf, 'kyc' => $kyc]);
@@ -166,9 +177,9 @@ class SellerController extends \Core\Controller
 
         try {
             $productModel = new Product();
-            // Admins see all products; sellers see only their own
-            $filterPublished = $isAdmin ? ['status' => 'published'] : ['seller_id' => $userId, 'status' => 'published'];
-            $filterDraft     = $isAdmin ? ['status' => 'draft']     : ['seller_id' => $userId, 'status' => 'draft'];
+            // Always filter by the logged-in user — even admins only see their own products here
+            $filterPublished = ['seller_id' => $userId, 'status' => 'published'];
+            $filterDraft     = ['seller_id' => $userId, 'status' => 'draft'];
             $products = $productModel->list($filterPublished);
             $drafts   = $productModel->list($filterDraft);
 
@@ -386,7 +397,7 @@ class SellerController extends \Core\Controller
             // Non-blocking: product listing should still succeed.
         }
 
-        header('Location: /marketplace/sellers/products'); exit;
+        header('Location: ' . $this->productsUrl()); exit;
     }
 
     public function productToggle()
@@ -415,7 +426,7 @@ class SellerController extends \Core\Controller
                 'updated_at' => date('Y-m-d H:i:s'),
             ], ['id' => $productId]);
 
-            header('Location: /marketplace/sellers/products'); exit;
+            header('Location: ' . $this->productsUrl()); exit;
         } catch (\Throwable $e) {
             $logDir  = (defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage') . '/logs';
             @mkdir($logDir, 0755, true);
@@ -429,7 +440,7 @@ class SellerController extends \Core\Controller
             echo '<div style="max-width:600px;margin:40px auto;padding:20px;font-family:sans-serif">'
                . '<h2>Failed to update product</h2>'
                . '<p style="color:#ef4444">' . htmlspecialchars($e->getMessage()) . '</p>'
-               . '<p><a href="/marketplace/sellers/products">← Back to products</a></p>'
+               . '<p><a href="' . $this->productsUrl() . '">← Back to products</a></p>'
                . '</div>';
         }
     }
@@ -457,7 +468,7 @@ class SellerController extends \Core\Controller
             'updated_at' => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
 
-        header('Location: /marketplace/sellers/products'); exit;
+        header('Location: ' . $this->productsUrl()); exit;
     }
 
     public function productEdit($id = null)
@@ -616,6 +627,6 @@ class SellerController extends \Core\Controller
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
 
-        header('Location: /marketplace/sellers/products'); exit;
+        header('Location: ' . $this->productsUrl()); exit;
     }
 }

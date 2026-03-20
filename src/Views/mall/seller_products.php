@@ -10,6 +10,9 @@
 $title      = $title ?? 'My Products — Seller Center';
 $isLoggedIn = true;
 $is_admin   = $is_admin ?? false;
+// Use /wallet/ namespace when requested from there, else legacy path
+$_reqUri    = $_SERVER['REQUEST_URI'] ?? '';
+$basePath   = str_starts_with($_reqUri, '/wallet/') ? '/wallet/products' : '/marketplace/sellers/products';
 
 $allProductsList = array_merge($products ?? [], $drafts ?? []);
 usort($allProductsList, fn($a, $b) => strtotime($b['created_at'] ?? 0) - strtotime($a['created_at'] ?? 0));
@@ -305,13 +308,13 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
         </div>
         <ul class="sc-nav" role="list">
             <li class="sc-nav-item">
-                <a href="/marketplace/sellers/products" class="active" aria-current="page">
+                <a href="<?= $basePath ?>" class="active" aria-current="page">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     My Products
                 </a>
             </li>
             <li class="sc-nav-item">
-                <a href="/marketplace/sellers/products/new">
+                <a href="<?= $basePath ?>/new">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                     New Product
                 </a>
@@ -352,7 +355,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 <h1 class="sc-page-title">Product Management</h1>
                 <p class="sc-page-subtitle">Manage your listings, drafts, and publish status</p>
             </div>
-            <a href="/marketplace/sellers/products/new" class="btn btn-primary">
+            <a href="<?= $basePath ?>/new" class="btn btn-primary">
                 <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
                 Add Product
             </a>
@@ -492,13 +495,13 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                     View
                                 </a>
                                 <?php endif; ?>
-                                <a href="/marketplace/sellers/products/edit/<?= htmlspecialchars($p['id']) ?>"
+                                <a href="<?= $basePath ?>/edit/<?= htmlspecialchars($p['id']) ?>"
                                    class="sc-action-btn edit"
                                    aria-label="Edit <?= htmlspecialchars($p['title'] ?? '') ?>">
                                     <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     Edit
                                 </a>
-                                <form method="POST" action="/marketplace/sellers/products/toggle" style="display:contents">
+                                <form method="POST" action="<?= $basePath ?>/toggle" style="display:contents">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
                                     <input type="hidden" name="current_status" value="<?= htmlspecialchars($status) ?>">
@@ -514,7 +517,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                         <?php endif; ?>
                                     </button>
                                 </form>
-                                <form method="POST" action="/marketplace/sellers/products/delete" style="display:contents"
+                                <form method="POST" action="<?= $basePath ?>/delete" style="display:contents"
                                       onsubmit="return confirm('Delete this product? This action cannot be undone.')">
                                     <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf_token) ?>">
                                     <input type="hidden" name="id" value="<?= htmlspecialchars($p['id']) ?>">
@@ -534,7 +537,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     <div class="sc-empty-icon">📦</div>
                     <h3>No products yet</h3>
                     <p>Start building your store by adding your first product listing.</p>
-                    <a href="/marketplace/sellers/products/new" class="btn btn-primary">
+                    <a href="<?= $basePath ?>/new" class="btn btn-primary">
                         <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12l7-7 7 7"/></svg>
                         Add Your First Product
                     </a>
