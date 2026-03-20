@@ -1,6 +1,8 @@
 <?php
 $wallet = $wallet ?? [];
 $walletTransactions = $wallet_transactions ?? [];
+$sellerStats  = $seller_stats  ?? ['gross_sales'=>0,'net_earnings'=>0,'order_count'=>0,'total_commissions'=>0,'pending_payout'=>0];
+$payoutAccount = $payout_account ?? null;
 ?>
 <!doctype html>
 <html lang="en">
@@ -259,6 +261,93 @@ $walletTransactions = $wallet_transactions ?? [];
         flex: 1 1 auto;
     }
 }
+/* ── Earnings / Stats Row ── */
+.wallet-stats-row {
+    max-width: 1200px;
+    margin: 16px auto 0;
+    padding: 0 12px;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+@media (min-width: 480px) {
+    .wallet-stats-row {
+        padding: 0 18px;
+        gap: 12px;
+    }
+}
+@media (min-width: 768px) {
+    .wallet-stats-row {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+.wstat {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 14px 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.wstat-icon {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    margin-bottom: 6px;
+    flex-shrink: 0;
+}
+.wstat-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    color: var(--muted);
+    line-height: 1.2;
+}
+.wstat-value {
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: var(--text);
+    line-height: 1.1;
+}
+.wstat-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 2px;
+}
+/* ── Payout Account Panel ── */
+.payout-panel {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 24px;
+    padding: 16px 18px;
+}
+@media (min-width: 480px) {
+    .payout-panel { padding: 22px 24px; }
+}
+.payout-type-btn {
+    flex: 1;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--surface2);
+    border: 2px solid var(--border);
+    color: var(--text);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.payout-type-btn.active {
+    background: rgba(59,130,246,0.12);
+    border-color: rgba(59,130,246,0.55);
+    color: #93c5fd;
+}
+.payout-type-btn:hover:not(.active) {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.18);
+}
 /* ── Wallet Top-up Confirmation Modal ── */
 @keyframes wtIn {
     from { opacity:0; transform:scale(0.9) translateY(22px); }
@@ -395,6 +484,45 @@ $walletTransactions = $wallet_transactions ?? [];
 }
 </style>
 
+<section class="wallet-stats-row">
+    <!-- Sales -->
+    <div class="wstat">
+        <div class="wstat-icon" style="background:rgba(34,197,94,0.12);color:#4ade80;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="wstat-label">Sales</div>
+        <div class="wstat-value">₱<?= number_format((float)$sellerStats['gross_sales'], 2) ?></div>
+        <div class="wstat-sub"><?= (int)$sellerStats['order_count'] ?> paid order<?= (int)$sellerStats['order_count'] !== 1 ? 's' : '' ?></div>
+    </div>
+    <!-- Commissions -->
+    <div class="wstat">
+        <div class="wstat-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div class="wstat-label">Commissions</div>
+        <div class="wstat-value">₱<?= number_format((float)$sellerStats['total_commissions'], 2) ?></div>
+        <div class="wstat-sub">From referral chain (10%)</div>
+    </div>
+    <!-- Earnings -->
+    <div class="wstat">
+        <div class="wstat-icon" style="background:rgba(99,102,241,0.12);color:#a5b4fc;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </div>
+        <div class="wstat-label">Earnings</div>
+        <div class="wstat-value">₱<?= number_format((float)$sellerStats['net_earnings'], 2) ?></div>
+        <div class="wstat-sub">Net after fees &amp; charges</div>
+    </div>
+    <!-- Pending Payouts -->
+    <div class="wstat">
+        <div class="wstat-icon" style="background:rgba(239,68,68,0.10);color:#f87171;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div class="wstat-label">Pending Payouts</div>
+        <div class="wstat-value">₱<?= number_format((float)$sellerStats['pending_payout'], 2) ?></div>
+        <div class="wstat-sub">Auto-sent on schedule</div>
+    </div>
+</section>
+
 <section class="wallet-layout">
     <div class="wallet-left">
 
@@ -494,6 +622,147 @@ $walletTransactions = $wallet_transactions ?? [];
                 <div id="walletTopupInfo" style="display:none;padding:12px 14px;border-radius:13px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#c7d2fe;font-size:0.85rem;"></div>
                 <div id="walletTopupQr" style="display:none;text-align:center;padding:20px;border-radius:18px;border:1px dashed var(--border);background:var(--surface2);"></div>
                 <button type="button" id="walletTopupBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.9rem;font-weight:800;padding:12px 18px;">Confirm Top Up</button>
+            </div>
+        </div>
+
+        <!-- Payout Account Panel -->
+        <div class="payout-panel">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+                <div>
+                    <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Payout Account</h2>
+                    <p style="margin:0;font-size:0.76rem;color:var(--muted);">Where we send your earnings automatically.</p>
+                </div>
+                <?php if ($payoutAccount): ?>
+                <span style="font-size:0.65rem;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);color:#4ade80;font-weight:700;border:1px solid rgba(34,197,94,0.2);">SAVED</span>
+                <?php endif; ?>
+            </div>
+            <div style="margin:12px 0;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.18);font-size:0.76rem;color:#93c5fd;line-height:1.55;">
+                Earnings are automatically sent to your registered account on schedule. This complies with Bangko Sentral ng Pilipinas regulations — no manual withdrawal required.
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:16px;" id="payoutTypeRow">
+                <button type="button" class="payout-type-btn active" data-type="bank" id="ptypeBank">🏦 Bank Account</button>
+                <button type="button" class="payout-type-btn" data-type="ewallet" id="ptypeEwallet">📱 E-Wallet</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+                <label style="display:flex;flex-direction:column;gap:6px;">
+                    <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Institution</span>
+                    <select id="payoutInstitution" class="pf-input">
+                        <option value="">— Select institution —</option>
+                        <optgroup label="Universal / Commercial Banks" id="og-bank">
+                            <option>Asia United Bank Corporation</option>
+                            <option>Bank of China (HK) Limited – Manila Branch</option>
+                            <option>Bank of Commerce</option>
+                            <option>Bank of the Philippine Islands (BPI)</option>
+                            <option>BDO Unibank, Inc.</option>
+                            <option>China Banking Corporation (China Bank)</option>
+                            <option>CIMB Bank Philippines, Inc.</option>
+                            <option>CTBC Bank (Philippines) Corporation</option>
+                            <option>Development Bank of the Philippines (DBP)</option>
+                            <option>East West Banking Corporation</option>
+                            <option>Land Bank of the Philippines</option>
+                            <option>Maybank Philippines, Inc.</option>
+                            <option>Metropolitan Bank and Trust Company (Metrobank)</option>
+                            <option>Philippine Bank of Communications (PBCom)</option>
+                            <option>Philippine National Bank (PNB)</option>
+                            <option>Philippine Trust Company (Philtrust)</option>
+                            <option>Philippine Veterans Bank</option>
+                            <option>Rizal Commercial Banking Corporation (RCBC)</option>
+                            <option>Security Bank Corporation</option>
+                            <option>Standard Chartered Bank</option>
+                            <option>The Hongkong and Shanghai Banking Corporation (HSBC)</option>
+                            <option>Union Bank of the Philippines</option>
+                        </optgroup>
+                        <optgroup label="Thrift Banks" id="og-thrift">
+                            <option>AllBank (A Thrift Bank), Inc.</option>
+                            <option>BDO Network Bank, Inc.</option>
+                            <option>BPI Direct BanKo, Inc., A Savings Bank</option>
+                            <option>Card SME Bank Inc., A Thrift Bank</option>
+                            <option>China Bank Savings, Inc.</option>
+                            <option>City Savings Bank, Inc.</option>
+                            <option>Equicom Savings Bank, Inc.</option>
+                            <option>ISLA Bank (A Thrift Bank), Inc.</option>
+                            <option>Legazpi Savings Bank, Inc.</option>
+                            <option>Luzon Development Bank</option>
+                            <option>Malayan Savings Bank, Inc.</option>
+                            <option>Pacific Ace Savings Bank, Inc.</option>
+                            <option>Philippine Business Bank, Inc., A Savings Bank</option>
+                            <option>Philippine Savings Bank (PSBank)</option>
+                            <option>Producers Savings Bank Corporation</option>
+                            <option>Queen City Development Bank (Queenbank), A Thrift Bank</option>
+                            <option>Sterling Bank of Asia, Inc. (A Savings Bank)</option>
+                            <option>Sun Savings Bank, Inc.</option>
+                            <option>UCPB Savings Bank</option>
+                            <option>Wealth Development Bank Corporation</option>
+                        </optgroup>
+                        <optgroup label="Rural / Cooperative Banks" id="og-rural">
+                            <option>Bangko Mabuhay (A Rural Bank), Inc.</option>
+                            <option>Camalig Bank, Inc. (A Rural Bank)</option>
+                            <option>Cantilan Bank, Inc. (A Rural Bank)</option>
+                            <option>Card Bank, Inc. (A Microfinance-Oriented Rural Bank)</option>
+                            <option>CARD MRI Rizal Bank, Inc.</option>
+                            <option>Cebuana Lhuillier Rural Bank, Inc.</option>
+                            <option>Dungganon Bank (A Microfinance Rural Bank), Inc.</option>
+                            <option>East West Rural Bank, Inc.</option>
+                            <option>Entrepreneur Rural Bank, Inc.</option>
+                            <option>MariBank Philippines Inc. (A Rural Bank)</option>
+                            <option>Mindanao Consolidated Cooperative Bank</option>
+                            <option>Netbank (A Rural Bank), Inc.</option>
+                            <option>Own Bank, The Rural Bank of Cavite City, Inc.</option>
+                            <option>Partner Rural Bank (Cotabato), Inc.</option>
+                            <option>Quezon Capital Rural Bank, Inc.</option>
+                            <option>Rang-Ay Bank, Inc. (A Rural Bank)</option>
+                            <option>Rural Bank of Guinobatan, Inc.</option>
+                            <option>Vigan Banco Rural, Incorporada (VBRI)</option>
+                        </optgroup>
+                        <optgroup label="Digital Banks" id="og-digital">
+                            <option>GoTyme Bank Corporation</option>
+                            <option>Maya Bank, Inc.</option>
+                            <option>Tonik Digital Bank, Inc.</option>
+                            <option>Union Digital Bank</option>
+                            <option>UNObank, Inc.</option>
+                        </optgroup>
+                        <optgroup label="E-Wallets / EMI-NBFIs" id="og-ewallet">
+                            <option>Alipay Philippines, Inc.</option>
+                            <option>CIS Bayad Center, Inc.</option>
+                            <option>DCPAY Philippines, Inc.</option>
+                            <option>Easypay Global EMI Corporation</option>
+                            <option>Ecashpay Asia, Inc.</option>
+                            <option>G-Xchange, Inc. (GCash)</option>
+                            <option>Gpay Network PH, Inc. (GrabPay)</option>
+                            <option>I-Remit, Inc.</option>
+                            <option>Infoserve, Inc.</option>
+                            <option>MarcoPay, Inc.</option>
+                            <option>Maya Philippines, Inc.</option>
+                            <option>OmniPay, Inc.</option>
+                            <option>PayMongo Payments, Inc.</option>
+                            <option>Paynamics Technologies, Inc.</option>
+                            <option>Peppermint Bizmoto Inc.</option>
+                            <option>Philippine Digital Asset Exchange, Inc.</option>
+                            <option>PPS-PEPP Financial Services Corp. (PalawanPay)</option>
+                            <option>ShopeePay Philippines, Inc.</option>
+                            <option>SpeedyPay, Inc.</option>
+                            <option>StarPay Corporation</option>
+                            <option>TayoCash, Inc.</option>
+                            <option>Toktokwallet, Inc.</option>
+                            <option>TopJuan Tech Corporation</option>
+                            <option>Toyota Financial Services Philippines Corporation</option>
+                            <option>Traxion Pay, Inc.</option>
+                            <option>USSC Money Services, Inc.</option>
+                            <option>Wise Pilipinas, Inc.</option>
+                            <option>Zybi Tech, Inc.</option>
+                        </optgroup>
+                    </select>
+                </label>
+                <label style="display:flex;flex-direction:column;gap:6px;">
+                    <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Account Holder Name</span>
+                    <input id="payoutHolderName" type="text" class="pf-input" placeholder="Full name on account" value="<?= htmlspecialchars($payoutAccount['account_holder_name'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                </label>
+                <label style="display:flex;flex-direction:column;gap:6px;">
+                    <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Account Number / Mobile Number</span>
+                    <input id="payoutAccountNumber" type="text" class="pf-input" placeholder="e.g. 09XX XXX XXXX or account number" value="<?= htmlspecialchars($payoutAccount['account_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
+                </label>
+                <div id="payoutSaveMsg" style="display:none;padding:10px 12px;border-radius:10px;font-size:0.82rem;"></div>
+                <button type="button" id="payoutSaveBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.88rem;font-weight:800;padding:11px 18px;">Save Payout Account</button>
             </div>
         </div>
     </div>
@@ -951,6 +1220,103 @@ $walletTransactions = $wallet_transactions ?? [];
     wtCloseBtn.addEventListener('click', closeModal);
 
     topupBtn.addEventListener('click', startTopup);
+})();
+</script>
+
+<script>
+// ── Payout Account ──────────────────────────────────────────────────────────
+(function () {
+    const csrfToken   = <?= json_encode($csrf_token ?? '') ?>;
+    const savedType   = <?= json_encode($payoutAccount['account_type'] ?? 'bank') ?>;
+    const savedInst   = <?= json_encode($payoutAccount['institution_name'] ?? '') ?>;
+
+    let currentType = savedType || 'bank';
+
+    const ptypeBank    = document.getElementById('ptypeBank');
+    const ptypeEwallet = document.getElementById('ptypeEwallet');
+    const selInst      = document.getElementById('payoutInstitution');
+    const ogBank       = document.getElementById('og-bank');
+    const ogThrift     = document.getElementById('og-thrift');
+    const ogRural      = document.getElementById('og-rural');
+    const ogDigital    = document.getElementById('og-digital');
+    const ogEwallet    = document.getElementById('og-ewallet');
+    const saveBtn      = document.getElementById('payoutSaveBtn');
+    const saveMsg      = document.getElementById('payoutSaveMsg');
+
+    function filterInstitutions(type) {
+        const isBankMode = (type === 'bank');
+        [ogBank, ogThrift, ogRural, ogDigital].forEach(function (og) {
+            og.style.display = isBankMode ? '' : 'none';
+            Array.from(og.options).forEach(function (o) { o.disabled = !isBankMode; });
+        });
+        ogEwallet.style.display = isBankMode ? 'none' : '';
+        Array.from(ogEwallet.options).forEach(function (o) { o.disabled = isBankMode; });
+        selInst.value = '';
+    }
+
+    function applyType(type) {
+        currentType = type;
+        ptypeBank.classList.toggle('active', type === 'bank');
+        ptypeEwallet.classList.toggle('active', type === 'ewallet');
+        filterInstitutions(type);
+    }
+
+    ptypeBank.addEventListener('click', function () { applyType('bank'); });
+    ptypeEwallet.addEventListener('click', function () { applyType('ewallet'); });
+
+    // Restore saved state
+    applyType(savedType || 'bank');
+    if (savedInst) selInst.value = savedInst;
+
+    saveBtn.addEventListener('click', async function () {
+        const institution  = selInst.value.trim();
+        const holderName   = document.getElementById('payoutHolderName').value.trim();
+        const accountNum   = document.getElementById('payoutAccountNumber').value.trim();
+
+        if (!institution || !holderName || !accountNum) {
+            saveMsg.style.display = 'block';
+            saveMsg.style.background = 'rgba(239,68,68,0.1)';
+            saveMsg.style.border = '1px solid rgba(239,68,68,0.25)';
+            saveMsg.style.color = '#fecaca';
+            saveMsg.textContent = 'Please fill in all fields.';
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveMsg.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/mall/wallet/payout-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({
+                    csrf_token:           csrfToken,
+                    account_type:         currentType,
+                    institution_name:     institution,
+                    account_holder_name:  holderName,
+                    account_number:       accountNum,
+                }),
+            });
+            const json = await res.json();
+            if (json.success) {
+                saveMsg.style.display = 'block';
+                saveMsg.style.background = 'rgba(34,197,94,0.1)';
+                saveMsg.style.border = '1px solid rgba(34,197,94,0.2)';
+                saveMsg.style.color = '#86efac';
+                saveMsg.textContent = 'Payout account saved successfully.';
+            } else {
+                throw new Error(json.message || 'Save failed.');
+            }
+        } catch (err) {
+            saveMsg.style.display = 'block';
+            saveMsg.style.background = 'rgba(239,68,68,0.1)';
+            saveMsg.style.border = '1px solid rgba(239,68,68,0.25)';
+            saveMsg.style.color = '#fecaca';
+            saveMsg.textContent = err.message;
+        } finally {
+            saveBtn.disabled = false;
+        }
+    });
 })();
 </script>
 

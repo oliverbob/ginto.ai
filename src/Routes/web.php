@@ -1283,6 +1283,7 @@ $router->req('/api/mall/checkout/paypal-order', 'MallCheckoutController@checkout
 $router->req('/api/mall/checkout/paypal-capture', 'MallCheckoutController@checkoutPayPalCapture', ['POST']);
 $router->req('/api/mall/checkout/status', 'MallCheckoutController@checkoutStatus', ['GET']);
 $router->req('/api/mall/wallet/topup/create', 'MallCheckoutController@walletTopupCreate', ['POST']);
+$router->req('/api/mall/wallet/payout-account', 'MallCheckoutController@savePayoutAccount', ['POST']);
 $router->req('/api/mall/delivery/claim', 'MallCheckoutController@deliveryClaim', ['POST']);
 $router->req('/api/mall/orders/status', 'MallCheckoutController@orderStatusUpdate', ['POST']);
 

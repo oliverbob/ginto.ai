@@ -109,18 +109,45 @@ class MallCheckoutController extends Controller
             'title' => 'Ginto Wallet',
             'csrf_token' => generateCsrfToken(),
             'wallet' => $walletSummary['account'],
-            // Keep header wallet balance in sync across mall views
             'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
             'wallet_transactions' => $walletSummary['transactions'],
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
+            'seller_stats' => $this->commerce->getSellerStats($userId),
+            'payout_account' => $this->commerce->getPayoutAccount($userId),
         ]);
+    }
+
+    public function savePayoutAccount()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+        $this->validateCsrfFromPayload($input);
+
+        $accountType     = trim((string)($input['account_type'] ?? 'bank'));
+        $institutionName = trim((string)($input['institution_name'] ?? ''));
+        $holderName      = trim((string)($input['account_holder_name'] ?? ''));
+        $accountNumber   = trim((string)($input['account_number'] ?? ''));
+
+        if ($institutionName === '' || $holderName === '' || $accountNumber === '') {
+            $this->json(['success' => false, 'message' => 'All fields are required.']);
+            return;
+        }
+
+        try {
+            $result = $this->commerce->savePayoutAccount($userId, $accountType, $institutionName, $holderName, $accountNumber);
+            $this->json(['success' => true, 'id' => $result['id']]);
+        } catch (\Throwable $e) {
+            $this->json(['success' => false, 'message' => $e->getMessage()]);
+        }
     }
 
     public function buyerOrdersPage()
     {
         $userId = $this->requireUser();
         $this->commerce->purgeUnpaidOrdersForUser($userId, 'buyer');
+        $walletSummary = $this->commerce->getWalletSummary($userId);
         $this->view('mall/orders', [
             'title' => 'My Mall Orders',
             'csrf_token' => generateCsrfToken(),
@@ -128,6 +155,7 @@ class MallCheckoutController extends Controller
             'page_kind' => 'buyer',
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 
@@ -135,6 +163,7 @@ class MallCheckoutController extends Controller
     {
         $userId = $this->requireUser();
         $this->commerce->purgeUnpaidOrdersForUser($userId, 'seller');
+        $walletSummary = $this->commerce->getWalletSummary($userId);
         $this->view('mall/orders', [
             'title' => 'Seller Orders',
             'csrf_token' => generateCsrfToken(),
@@ -142,6 +171,7 @@ class MallCheckoutController extends Controller
             'page_kind' => 'seller',
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 
@@ -153,7 +183,7 @@ class MallCheckoutController extends Controller
             echo 'Delivery account required.';
             return;
         }
-
+        $walletSummary = $this->commerce->getWalletSummary($userId);
         $this->view('mall/orders', [
             'title' => 'Delivery Dashboard',
             'csrf_token' => generateCsrfToken(),
@@ -161,6 +191,7 @@ class MallCheckoutController extends Controller
             'page_kind' => 'delivery',
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
         ]);
     }
 

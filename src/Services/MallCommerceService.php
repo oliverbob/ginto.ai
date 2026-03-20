@@ -1353,4 +1353,106 @@ class MallCommerceService
     {
         return str_replace('_', ' ', ucfirst($status));
     }
+
+    // ── Seller stats: sales, commissions, earnings, pending payouts ──────────
+
+    public function getSellerStats(int $userId): array
+    {
+        $stats = [
+            'gross_sales'       => 0.0,
+            'net_earnings'      => 0.0,
+            'order_count'       => 0,
+            'total_commissions' => 0.0,
+            'pending_payout'    => 0.0,
+        ];
+
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT COALESCE(SUM(buyer_total_amount),0) AS gross_sales,
+                        COALESCE(SUM(seller_net_amount),0)  AS net_earnings,
+                        COUNT(*) AS order_count
+                   FROM mall_orders
+                  WHERE seller_id = :uid AND payment_status = 'paid'"
+            );
+            $stmt->execute([':uid' => $userId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row) {
+                $stats['gross_sales']  = (float)$row['gross_sales'];
+                $stats['net_earnings'] = (float)$row['net_earnings'];
+                $stats['order_count']  = (int)$row['order_count'];
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT COALESCE(SUM(amount),0) AS total
+                   FROM commissions
+                  WHERE user_id = :uid AND status != 'cancelled'"
+            );
+            $stmt->execute([':uid' => $userId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row) {
+                $stats['total_commissions'] = (float)$row['total'];
+            }
+        } catch (\Throwable $e) {}
+
+        try {
+            $stmt = $this->db->pdo->prepare(
+                "SELECT COALESCE(SUM(amount),0) AS pending
+                   FROM mall_seller_payouts
+                  WHERE user_id = :uid AND status IN ('pending','processing')"
+            );
+            $stmt->execute([':uid' => $userId]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if ($row) {
+                $stats['pending_payout'] = (float)$row['pending'];
+            }
+        } catch (\Throwable $e) {}
+
+        return $stats;
+    }
+
+    public function getPayoutAccount(int $userId): ?array
+    {
+        try {
+            return $this->db->get('mall_payout_accounts', '*', [
+                'user_id'    => $userId,
+                'is_primary' => 1,
+                'ORDER'      => ['updated_at' => 'DESC'],
+            ]) ?: null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function savePayoutAccount(int $userId, string $accountType, string $institutionName, string $holderName, string $accountNumber): array
+    {
+        $existing = null;
+        try {
+            $existing = $this->db->get('mall_payout_accounts', ['id'], [
+                'user_id'    => $userId,
+                'is_primary' => 1,
+            ]);
+        } catch (\Throwable $e) {}
+
+        $now  = date('Y-m-d H:i:s');
+        $data = [
+            'account_type'        => in_array($accountType, ['bank', 'ewallet'], true) ? $accountType : 'bank',
+            'institution_name'    => substr(strip_tags($institutionName), 0, 255),
+            'account_holder_name' => substr(strip_tags($holderName), 0, 255),
+            'account_number'      => substr(preg_replace('/[^a-zA-Z0-9\-\s]/', '', $accountNumber), 0, 100),
+            'updated_at'          => $now,
+        ];
+
+        if ($existing) {
+            $this->db->update('mall_payout_accounts', $data, ['id' => (int)$existing['id']]);
+            return ['id' => (int)$existing['id']];
+        }
+
+        $data['user_id']    = $userId;
+        $data['is_primary'] = 1;
+        $data['created_at'] = $now;
+        $this->db->insert('mall_payout_accounts', $data);
+        return ['id' => (int)$this->db->id()];
+    }
 }
