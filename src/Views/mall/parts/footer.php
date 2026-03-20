@@ -447,6 +447,9 @@
             if (uploadOverlayEl) {
                 e.preventDefault();
                 openUploadModal();
+            } else {
+                e.preventDefault();
+                window.location.href = '/marketplace?sell=1';
             }
         });
     }
@@ -734,6 +737,15 @@
         renderProducts();
         updateCartUI();
         applyTheme(localStorage.getItem('epower_theme') || 'dark');
+
+        const hasSellQuery = new URLSearchParams(window.location.search).get('sell') === '1';
+        const uploadOverlayEl = document.getElementById('uploadOverlay');
+        if (hasSellQuery && uploadOverlayEl) {
+            openUploadModal();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('sell');
+            window.history.replaceState({}, '', url.pathname + (url.search ? url.search : '') + url.hash);
+        }
     }
 
     init();
