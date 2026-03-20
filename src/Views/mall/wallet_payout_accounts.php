@@ -40,6 +40,26 @@ $csrfToken = $csrf_token ?? '';
 .feedback-msg { display:none; padding:11px 14px; border-radius:12px; font-size:0.82rem; margin-top:10px; }
 .feedback-ok { background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); color:#86efac; }
 .feedback-err { background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.25); color:#fecaca; }
+/* Institution autocomplete */
+.inst-autocomplete { position: relative; }
+.inst-dropdown {
+    position: absolute; top: calc(100% + 3px); left: 0; right: 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; z-index: 1000; max-height: 230px;
+    overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+    display: none;
+}
+.inst-option {
+    padding: 9px 14px; cursor: pointer; font-size: 0.84rem; color: var(--text);
+}
+.inst-option:hover, .inst-option.ac-focused { background: rgba(99,102,241,0.14); }
+.inst-group-label {
+    padding: 7px 14px 3px; font-size: 0.67rem; font-weight: 800;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.09em;
+    pointer-events: none; border-top: 1px solid var(--border); margin-top: 4px;
+}
+.inst-group-label:first-child { margin-top: 0; border-top: none; }
+.inst-no-results { padding: 12px 14px; font-size: 0.82rem; color: var(--muted); text-align: center; }
 </style>
 
 <div class="wpage-wrap">
@@ -121,112 +141,11 @@ $csrfToken = $csrf_token ?? '';
         <div style="display:flex;flex-direction:column;gap:12px;">
             <label>
                 <span class="form-label-text">Institution</span>
-                <select id="newPayoutInstitution" class="pf-input">
-                    <option value="">— Select institution —</option>
-                    <optgroup label="Universal / Commercial Banks" id="og-bank">
-                        <option>Asia United Bank Corporation</option>
-                        <option>Bank of China (HK) Limited – Manila Branch</option>
-                        <option>Bank of Commerce</option>
-                        <option>Bank of the Philippine Islands (BPI)</option>
-                        <option>BDO Unibank, Inc.</option>
-                        <option>China Banking Corporation (China Bank)</option>
-                        <option>CIMB Bank Philippines, Inc.</option>
-                        <option>CTBC Bank (Philippines) Corporation</option>
-                        <option>Development Bank of the Philippines (DBP)</option>
-                        <option>East West Banking Corporation</option>
-                        <option>Land Bank of the Philippines</option>
-                        <option>Maybank Philippines, Inc.</option>
-                        <option>Metropolitan Bank and Trust Company (Metrobank)</option>
-                        <option>Philippine Bank of Communications (PBCom)</option>
-                        <option>Philippine National Bank (PNB)</option>
-                        <option>Philippine Trust Company (Philtrust)</option>
-                        <option>Philippine Veterans Bank</option>
-                        <option>Rizal Commercial Banking Corporation (RCBC)</option>
-                        <option>Security Bank Corporation</option>
-                        <option>Standard Chartered Bank</option>
-                        <option>The Hongkong and Shanghai Banking Corporation (HSBC)</option>
-                        <option>Union Bank of the Philippines</option>
-                    </optgroup>
-                    <optgroup label="Thrift Banks" id="og-thrift">
-                        <option>AllBank (A Thrift Bank), Inc.</option>
-                        <option>BDO Network Bank, Inc.</option>
-                        <option>BPI Direct BanKo, Inc., A Savings Bank</option>
-                        <option>Card SME Bank Inc., A Thrift Bank</option>
-                        <option>China Bank Savings, Inc.</option>
-                        <option>City Savings Bank, Inc.</option>
-                        <option>Equicom Savings Bank, Inc.</option>
-                        <option>ISLA Bank (A Thrift Bank), Inc.</option>
-                        <option>Legazpi Savings Bank, Inc.</option>
-                        <option>Luzon Development Bank</option>
-                        <option>Malayan Savings Bank, Inc.</option>
-                        <option>Pacific Ace Savings Bank, Inc.</option>
-                        <option>Philippine Business Bank, Inc., A Savings Bank</option>
-                        <option>Philippine Savings Bank (PSBank)</option>
-                        <option>Producers Savings Bank Corporation</option>
-                        <option>Queen City Development Bank (Queenbank), A Thrift Bank</option>
-                        <option>Sterling Bank of Asia, Inc. (A Savings Bank)</option>
-                        <option>Sun Savings Bank, Inc.</option>
-                        <option>UCPB Savings Bank</option>
-                        <option>Wealth Development Bank Corporation</option>
-                    </optgroup>
-                    <optgroup label="Rural / Cooperative Banks" id="og-rural">
-                        <option>Bangko Mabuhay (A Rural Bank), Inc.</option>
-                        <option>Camalig Bank, Inc. (A Rural Bank)</option>
-                        <option>Cantilan Bank, Inc. (A Rural Bank)</option>
-                        <option>Card Bank, Inc. (A Microfinance-Oriented Rural Bank)</option>
-                        <option>CARD MRI Rizal Bank, Inc.</option>
-                        <option>Cebuana Lhuillier Rural Bank, Inc.</option>
-                        <option>Dungganon Bank (A Microfinance Rural Bank), Inc.</option>
-                        <option>East West Rural Bank, Inc.</option>
-                        <option>Entrepreneur Rural Bank, Inc.</option>
-                        <option>MariBank Philippines Inc. (A Rural Bank)</option>
-                        <option>Mindanao Consolidated Cooperative Bank</option>
-                        <option>Netbank (A Rural Bank), Inc.</option>
-                        <option>Own Bank, The Rural Bank of Cavite City, Inc.</option>
-                        <option>Partner Rural Bank (Cotabato), Inc.</option>
-                        <option>Quezon Capital Rural Bank, Inc.</option>
-                        <option>Rang-Ay Bank, Inc. (A Rural Bank)</option>
-                        <option>Rural Bank of Guinobatan, Inc.</option>
-                        <option>Vigan Banco Rural, Incorporada (VBRI)</option>
-                    </optgroup>
-                    <optgroup label="Digital Banks" id="og-digital">
-                        <option>GoTyme Bank Corporation</option>
-                        <option>Maya Bank, Inc.</option>
-                        <option>Tonik Digital Bank, Inc.</option>
-                        <option>Union Digital Bank</option>
-                        <option>UNObank, Inc.</option>
-                    </optgroup>
-                    <optgroup label="E-Wallets / EMI-NBFIs" id="og-ewallet">
-                        <option>Alipay Philippines, Inc.</option>
-                        <option>CIS Bayad Center, Inc.</option>
-                        <option>DCPAY Philippines, Inc.</option>
-                        <option>Easypay Global EMI Corporation</option>
-                        <option>Ecashpay Asia, Inc.</option>
-                        <option>G-Xchange, Inc. (GCash)</option>
-                        <option>Gpay Network PH, Inc. (GrabPay)</option>
-                        <option>I-Remit, Inc.</option>
-                        <option>Infoserve, Inc.</option>
-                        <option>MarcoPay, Inc.</option>
-                        <option>Maya Philippines, Inc.</option>
-                        <option>OmniPay, Inc.</option>
-                        <option>PayMongo Payments, Inc.</option>
-                        <option>Paynamics Technologies, Inc.</option>
-                        <option>Peppermint Bizmoto Inc.</option>
-                        <option>Philippine Digital Asset Exchange, Inc.</option>
-                        <option>PPS-PEPP Financial Services Corp. (PalawanPay)</option>
-                        <option>ShopeePay Philippines, Inc.</option>
-                        <option>SpeedyPay, Inc.</option>
-                        <option>StarPay Corporation</option>
-                        <option>TayoCash, Inc.</option>
-                        <option>Toktokwallet, Inc.</option>
-                        <option>TopJuan Tech Corporation</option>
-                        <option>Toyota Financial Services Philippines Corporation</option>
-                        <option>Traxion Pay, Inc.</option>
-                        <option>USSC Money Services, Inc.</option>
-                        <option>Wise Pilipinas, Inc.</option>
-                        <option>Zybi Tech, Inc.</option>
-                    </optgroup>
-                </select>
+                <div class="inst-autocomplete">
+                    <input type="text" id="newPayoutInstitution_search" class="pf-input" placeholder="Search institution…" autocomplete="off" spellcheck="false">
+                    <input type="hidden" id="newPayoutInstitution">
+                    <div class="inst-dropdown" id="newPayoutInstitution_list"></div>
+                </div>
             </label>
             <label>
                 <span class="form-label-text">Account Holder Name</span>
@@ -250,23 +169,166 @@ $csrfToken = $csrf_token ?? '';
 (function () {
     const csrf = <?= json_encode($csrfToken) ?>;
 
-    // Bank / E-wallet type filter
-    const ogBank    = document.getElementById('og-bank');
-    const ogThrift  = document.getElementById('og-thrift');
-    const ogRural   = document.getElementById('og-rural');
-    const ogDigital = document.getElementById('og-digital');
-    const ogEwallet = document.getElementById('og-ewallet');
-    function filterInstitutions(type) {
-        const bankGroups  = [ogBank, ogThrift, ogRural, ogDigital];
-        const allGroups   = [...bankGroups, ogEwallet];
-        if (type === 'bank') {
-            bankGroups.forEach(og => { og.disabled = false; });
-            ogEwallet.disabled = true;
-        } else {
-            bankGroups.forEach(og => { og.disabled = true; });
-            ogEwallet.disabled = false;
+    // ── Institution autocomplete data ────────────────────────────────────────
+    const INST = {
+        bank: {
+            'Universal / Commercial Banks': [
+                'Asia United Bank Corporation','Bank of China (HK) Limited \u2013 Manila Branch',
+                'Bank of Commerce','Bank of the Philippine Islands (BPI)','BDO Unibank, Inc.',
+                'China Banking Corporation (China Bank)','CIMB Bank Philippines, Inc.',
+                'CTBC Bank (Philippines) Corporation','Development Bank of the Philippines (DBP)',
+                'East West Banking Corporation','Land Bank of the Philippines',
+                'Maybank Philippines, Inc.','Metropolitan Bank and Trust Company (Metrobank)',
+                'Philippine Bank of Communications (PBCom)','Philippine National Bank (PNB)',
+                'Philippine Trust Company (Philtrust)','Philippine Veterans Bank',
+                'Rizal Commercial Banking Corporation (RCBC)','Security Bank Corporation',
+                'Standard Chartered Bank','The Hongkong and Shanghai Banking Corporation (HSBC)',
+                'Union Bank of the Philippines'
+            ],
+            'Thrift Banks': [
+                'AllBank (A Thrift Bank), Inc.','BDO Network Bank, Inc.',
+                'BPI Direct BanKo, Inc., A Savings Bank','Card SME Bank Inc., A Thrift Bank',
+                'China Bank Savings, Inc.','City Savings Bank, Inc.',
+                'Equicom Savings Bank, Inc.','ISLA Bank (A Thrift Bank), Inc.',
+                'Legazpi Savings Bank, Inc.','Luzon Development Bank',
+                'Malayan Savings Bank, Inc.','Pacific Ace Savings Bank, Inc.',
+                'Philippine Business Bank, Inc., A Savings Bank','Philippine Savings Bank (PSBank)',
+                'Producers Savings Bank Corporation',
+                'Queen City Development Bank (Queenbank), A Thrift Bank',
+                'Sterling Bank of Asia, Inc. (A Savings Bank)','Sun Savings Bank, Inc.',
+                'UCPB Savings Bank','Wealth Development Bank Corporation'
+            ],
+            'Rural / Cooperative Banks': [
+                'Bangko Mabuhay (A Rural Bank), Inc.','Camalig Bank, Inc. (A Rural Bank)',
+                'Cantilan Bank, Inc. (A Rural Bank)',
+                'Card Bank, Inc. (A Microfinance-Oriented Rural Bank)',
+                'CARD MRI Rizal Bank, Inc.','Cebuana Lhuillier Rural Bank, Inc.',
+                'Dungganon Bank (A Microfinance Rural Bank), Inc.',
+                'East West Rural Bank, Inc.','Entrepreneur Rural Bank, Inc.',
+                'MariBank Philippines Inc. (A Rural Bank)',
+                'Mindanao Consolidated Cooperative Bank','Netbank (A Rural Bank), Inc.',
+                'Own Bank, The Rural Bank of Cavite City, Inc.',
+                'Partner Rural Bank (Cotabato), Inc.','Quezon Capital Rural Bank, Inc.',
+                'Rang-Ay Bank, Inc. (A Rural Bank)','Rural Bank of Guinobatan, Inc.',
+                'Vigan Banco Rural, Incorporada (VBRI)'
+            ],
+            'Digital Banks': [
+                'GoTyme Bank Corporation','Maya Bank, Inc.','Tonik Digital Bank, Inc.',
+                'Union Digital Bank','UNObank, Inc.'
+            ]
+        },
+        ewallet: {
+            'E-Wallets / EMI-NBFIs': [
+                'Alipay Philippines, Inc.','CIS Bayad Center, Inc.',
+                'DCPAY Philippines, Inc.','Easypay Global EMI Corporation',
+                'Ecashpay Asia, Inc.','G-Xchange, Inc. (GCash)',
+                'Gpay Network PH, Inc. (GrabPay)','I-Remit, Inc.','Infoserve, Inc.',
+                'MarcoPay, Inc.','Maya Philippines, Inc.','OmniPay, Inc.',
+                'PayMongo Payments, Inc.','Paynamics Technologies, Inc.',
+                'Peppermint Bizmoto Inc.','Philippine Digital Asset Exchange, Inc.',
+                'PPS-PEPP Financial Services Corp. (PalawanPay)',
+                'ShopeePay Philippines, Inc.','SpeedyPay, Inc.','StarPay Corporation',
+                'TayoCash, Inc.','Toktokwallet, Inc.','TopJuan Tech Corporation',
+                'Toyota Financial Services Philippines Corporation',
+                'Traxion Pay, Inc.','USSC Money Services, Inc.',
+                'Wise Pilipinas, Inc.','Zybi Tech, Inc.'
+            ]
         }
-        document.getElementById('newPayoutInstitution').value = '';
+    };
+
+    // ── Autocomplete ─────────────────────────────────────────────────────────
+    const acInput  = document.getElementById('newPayoutInstitution_search');
+    const acHidden = document.getElementById('newPayoutInstitution');
+    const acList   = document.getElementById('newPayoutInstitution_list');
+    let acType = 'bank';
+    let acFocusIdx = -1;
+
+    function acGetOptions(query) {
+        const q = (query || '').toLowerCase().trim();
+        const groups = acType === 'bank'
+            ? Object.entries(INST.bank)
+            : Object.entries(INST.ewallet);
+        const out = [];
+        for (const [grp, items] of groups) {
+            const filtered = q ? items.filter(i => i.toLowerCase().includes(q)) : items;
+            if (filtered.length) {
+                out.push({ t: 'g', label: grp });
+                filtered.forEach(v => out.push({ t: 'i', value: v }));
+            }
+        }
+        return out;
+    }
+
+    function acRender(query) {
+        const opts = acGetOptions(query);
+        acList.innerHTML = '';
+        acFocusIdx = -1;
+        if (!opts.length) {
+            const el = document.createElement('div');
+            el.className = 'inst-no-results';
+            el.textContent = query ? 'No matches found.' : 'No institutions available.';
+            acList.appendChild(el);
+        } else {
+            opts.forEach(function (opt) {
+                const el = document.createElement('div');
+                if (opt.t === 'g') {
+                    el.className = 'inst-group-label';
+                    el.textContent = opt.label;
+                } else {
+                    el.className = 'inst-option';
+                    el.textContent = opt.value;
+                    el.dataset.value = opt.value;
+                    el.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        acSelect(opt.value);
+                    });
+                }
+                acList.appendChild(el);
+            });
+        }
+        acList.style.display = 'block';
+    }
+
+    function acSelect(value) {
+        acInput.value = value;
+        acHidden.value = value;
+        acList.style.display = 'none';
+        acFocusIdx = -1;
+    }
+
+    acInput.addEventListener('input', function () {
+        acHidden.value = '';
+        acRender(this.value);
+    });
+    acInput.addEventListener('focus', function () { acRender(this.value); });
+    acInput.addEventListener('blur', function () {
+        setTimeout(function () { acList.style.display = 'none'; }, 200);
+    });
+    acInput.addEventListener('keydown', function (e) {
+        const focusable = [...acList.querySelectorAll('.inst-option')];
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            acFocusIdx = Math.min(acFocusIdx + 1, focusable.length - 1);
+            focusable.forEach((o, i) => o.classList.toggle('ac-focused', i === acFocusIdx));
+            if (focusable[acFocusIdx]) focusable[acFocusIdx].scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            acFocusIdx = Math.max(acFocusIdx - 1, 0);
+            focusable.forEach((o, i) => o.classList.toggle('ac-focused', i === acFocusIdx));
+        } else if (e.key === 'Enter' && acFocusIdx >= 0 && focusable[acFocusIdx]) {
+            e.preventDefault();
+            acSelect(focusable[acFocusIdx].dataset.value);
+        } else if (e.key === 'Escape') {
+            acList.style.display = 'none';
+        }
+    });
+
+    // Bank / E-wallet type filter
+    function filterInstitutions(type) {
+        acType = type;
+        acInput.value = '';
+        acHidden.value = '';
+        acList.style.display = 'none';
     }
     document.getElementById('ptypeBank').addEventListener('click', function () {
         document.querySelectorAll('.payout-type-btn').forEach(b => b.classList.remove('active'));
@@ -281,7 +343,7 @@ $csrfToken = $csrf_token ?? '';
 
     // Add account
     document.getElementById('addAcctBtn').addEventListener('click', async function () {
-        const institution = document.getElementById('newPayoutInstitution').value.trim();
+        const institution = acHidden.value.trim();
         const holder      = document.getElementById('newPayoutHolderName').value.trim();
         const number      = document.getElementById('newPayoutAccountNumber').value.trim();
         const isDefault   = document.getElementById('newPayoutIsDefault').checked;
