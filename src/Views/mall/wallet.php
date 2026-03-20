@@ -1247,10 +1247,10 @@ $payoutAccount = $payout_account ?? null;
         const isBankMode = (type === 'bank');
         [ogBank, ogThrift, ogRural, ogDigital].forEach(function (og) {
             og.style.display = isBankMode ? '' : 'none';
-            Array.from(og.options).forEach(function (o) { o.disabled = !isBankMode; });
+            og.disabled = !isBankMode;
         });
         ogEwallet.style.display = isBankMode ? 'none' : '';
-        Array.from(ogEwallet.options).forEach(function (o) { o.disabled = isBankMode; });
+        ogEwallet.disabled = isBankMode;
         selInst.value = '';
     }
 
