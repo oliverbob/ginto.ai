@@ -8,12 +8,18 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
 <header class="site-header" role="banner">
     <div class="header-inner">
 
-        <!-- Hamburger (mobile only — hidden on desktop via CSS) -->
-        <button class="hamburger" id="menuToggle" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">
-            <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <!-- Sidebar toggle button (hamburger on mobile, panel icon on desktop) -->
+        <button class="hamburger" id="menuToggle" aria-label="Toggle sidebar" aria-expanded="false" aria-controls="sidebar">
+            <!-- Hamburger icon (mobile) -->
+            <svg class="icon-hamburger" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
                 <line x1="4" y1="6" x2="20" y2="6"/>
                 <line x1="4" y1="12" x2="20" y2="12"/>
                 <line x1="4" y1="18" x2="20" y2="18"/>
+            </svg>
+            <!-- Sidebar panel icon (desktop) -->
+            <svg class="icon-sidebar-toggle" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" aria-hidden="true">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
             </svg>
         </button>
 

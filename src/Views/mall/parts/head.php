@@ -96,6 +96,10 @@ body.light .site-header { background: rgba(255,255,255,0.92); }
 }
 .hamburger:hover { background: var(--surface); }
 
+/* Sidebar toggle icon: hamburger lines by default (mobile), panel icon on desktop */
+.icon-hamburger { display: block; }
+.icon-sidebar-toggle { display: none; }
+
 .brand {
     display: flex;
     align-items: center;
@@ -1020,27 +1024,42 @@ input[type="file"].form-input { padding: 7px 12px; }
 
 /* ========== DESKTOP >= 768px ========== */
 @media (min-width: 768px) {
-    /* Hamburger invisible on desktop */
+    /* Panel icon on desktop, hamburger lines hidden */
+    .icon-hamburger { display: none; }
+    .icon-sidebar-toggle { display: block; }
+
+    /* Hamburger button invisible on desktop unless page has fallback sidebar */
     .hamburger { display: none; }
     body.has-fallback-sidebar .hamburger { display: flex !important; }
-    /* Close row inside sidebar never needed on desktop */
+
+    /* Close row hidden by default on desktop; show for fallback sidebar (provides logo branding) */
     .sidebar-close-row { display: none !important; }
+    body.has-fallback-sidebar .sidebar-close-row { display: flex !important; }
+
     /* Backdrop never needed on desktop */
     .sidebar-backdrop { display: none !important; }
 
-    /* Fallback sidebar: desktop-visible and toggleable */
+    /* Fallback sidebar: full-height Claude-style column, desktop-visible and toggleable */
     .sidebar.fallback-sidebar {
         display: block !important;
-        top: var(--header-h);
-        height: calc(100vh - var(--header-h));
+        top: 0;
+        height: 100vh;
         transform: translateX(-100%);
-        z-index: 1000;
+        z-index: 999;
     }
     body.has-fallback-sidebar.fallback-sidebar-open .sidebar.fallback-sidebar {
         transform: translateX(0);
     }
 
-    /* Move content right when fallback sidebar is open */
+    /* Header moves right when sidebar opens (Claude-style) */
+    body.has-fallback-sidebar .site-header {
+        transition: margin-left var(--trans);
+    }
+    body.has-fallback-sidebar.fallback-sidebar-open .site-header {
+        margin-left: 300px;
+    }
+
+    /* Content also moves right */
     body.has-fallback-sidebar .wallet-layout,
     body.has-fallback-sidebar .page-layout,
     body.has-fallback-sidebar section[style*="max-width"] {
