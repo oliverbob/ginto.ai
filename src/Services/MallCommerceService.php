@@ -96,6 +96,75 @@ class MallCommerceService
         return $this->db->get('seller_storefronts', '*', ['user_id' => $userId]) ?: [];
     }
 
+    /**
+     * Update a seller's storefront record. Handles image uploads via B2 or local storage.
+     * @param array $files  Subset of $_FILES — keys 'banner_image' and/or 'logo_image'
+     */
+    public function saveStorefront(int $userId, array $data, array $files = []): array
+    {
+        $storefront = $this->ensureStorefront($userId);
+        $storeId    = (int)$storefront['id'];
+
+        $displayName = substr(trim((string)($data['display_name'] ?? '')), 0, 100);
+        if ($displayName === '') {
+            throw new \RuntimeException('Store name is required.');
+        }
+
+        $slug = $this->sanitizeSlug((string)($data['slug'] ?? ''));
+        if ($slug === '') {
+            $slug = $storefront['slug'];
+        }
+
+        // Ensure slug not taken by another storefront
+        $taken = $this->db->get('seller_storefronts', ['id'], ['slug' => $slug]);
+        if ($taken && (int)$taken['id'] !== $storeId) {
+            throw new \RuntimeException('That store URL is already taken. Please choose a different one.');
+        }
+
+        $description = substr(trim((string)($data['description'] ?? '')), 0, 1000);
+        $isActive    = isset($data['is_active']) ? 1 : 0;
+
+        $update = [
+            'display_name' => $displayName,
+            'slug'         => $slug,
+            'description'  => $description,
+            'is_active'    => $isActive,
+            'updated_at'   => date('Y-m-d H:i:s'),
+        ];
+
+        // Banner image upload
+        if (!empty($files['banner_image']['tmp_name']) && $files['banner_image']['error'] === UPLOAD_ERR_OK) {
+            $update['banner_image'] = $this->uploadStorefrontAsset($files['banner_image'], 'banners');
+        }
+        // Logo image upload
+        if (!empty($files['logo_image']['tmp_name']) && $files['logo_image']['error'] === UPLOAD_ERR_OK) {
+            $update['logo_image'] = $this->uploadStorefrontAsset($files['logo_image'], 'logos');
+        }
+
+        $this->db->update('seller_storefronts', $update, ['id' => $storeId]);
+        return $this->db->get('seller_storefronts', '*', ['id' => $storeId]) ?: [];
+    }
+
+    private function uploadStorefrontAsset(array $file, string $folder): string
+    {
+        $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($file['name']));
+        if (\Ginto\Helpers\B2Helper::isEnabled()) {
+            $bytes    = file_get_contents($file['tmp_name']);
+            $path     = 'mall/storefronts/' . $folder . '/' . uniqid() . '_' . $name;
+            $mimeType = $file['type'] ?: 'image/jpeg';
+            return \Ginto\Helpers\B2Helper::upload($bytes, $path, $mimeType);
+        }
+        $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+        $dir = $storagePath . '/mall/storefronts/' . $folder . '/';
+        if (!is_dir($dir)) {
+            mkdir($dir, 0750, true);
+        }
+        $target = $dir . uniqid() . '_' . $name;
+        move_uploaded_file($file['tmp_name'], $target);
+        chmod($target, 0640);
+        return str_replace($storagePath, '/storage', $target);
+    }
+
     public function getStorefrontBySlug(string $slug): ?array
     {
         $slug = $this->sanitizeSlug($slug);

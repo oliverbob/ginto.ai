@@ -252,6 +252,53 @@ class SellerController extends \Core\Controller
         ]);
     }
 
+    /** Render the storefront editor (GET). Creates the storefront row if it doesn't exist yet. */
+    public function storefrontEdit()
+    {
+        if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
+        $userId  = (int)$_SESSION['user_id'];
+        $user    = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
+        $isAdmin = in_array($user['role_id'] ?? 0, [1, 2]);
+
+        $commerce      = new MallCommerceService();
+        $storefront    = $commerce->ensureStorefront($userId);
+        $walletSummary = $commerce->getWalletSummary($userId);
+
+        $saved    = isset($_GET['saved']);
+        $errMsg   = $_GET['error'] ?? null;
+
+        return $this->view('mall/seller_storefront_edit', [
+            'csrf_token'          => generateCsrfToken(),
+            'storefront'          => $storefront,
+            'is_admin'            => $isAdmin,
+            'saved'               => $saved,
+            'error_msg'           => $errMsg ? htmlspecialchars((string)$errMsg, ENT_QUOTES, 'UTF-8') : null,
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+        ]);
+    }
+
+    /** Handle storefront save (POST). */
+    public function storefrontSave()
+    {
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); return; }
+        if (empty($_SESSION['user_id'])) { http_response_code(401); return; }
+        if (!validateCsrfToken($_POST['csrf_token'] ?? '')) { http_response_code(400); echo 'Invalid CSRF token'; return; }
+
+        $userId   = (int)$_SESSION['user_id'];
+        $commerce = new MallCommerceService();
+
+        // Detect which namespace the request came from
+        $referer  = $_SERVER['HTTP_REFERER'] ?? '';
+        $base     = str_contains($referer, '/wallet/') ? '/wallet/storefront' : '/marketplace/sellers/storefront';
+
+        try {
+            $commerce->saveStorefront($userId, $_POST, $_FILES);
+            header('Location: ' . $base . '?saved=1'); exit;
+        } catch (\RuntimeException $e) {
+            header('Location: ' . $base . '?error=' . urlencode($e->getMessage())); exit;
+        }
+    }
+
     /**
      * AJAX endpoint: seller agrees to Terms of Service.
      * Stores timestamp server-side so the TOS modal won't be shown again on any device.

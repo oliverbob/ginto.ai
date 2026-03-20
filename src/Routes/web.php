@@ -1259,6 +1259,8 @@ $router->req('/marketplace/sellers/products/toggle', 'SellerController@productTo
 $router->req('/marketplace/sellers/products/delete', 'SellerController@productDelete', ['POST']);
 $router->req('/marketplace/sellers/products/edit/{id}', 'SellerController@productEdit');
 $router->req('/marketplace/sellers/products/update/{id}', 'SellerController@productUpdate', ['POST']);
+$router->req('/marketplace/sellers/storefront', 'SellerController@storefrontEdit');
+$router->req('/marketplace/sellers/storefront/save', 'SellerController@storefrontSave', ['POST']);
 
 // Mall storefront, checkout, wallet, and order lifecycle routes
 $router->req('/marketplace', 'MallController@marketplace');
@@ -1278,6 +1280,8 @@ $router->req('/wallet/products/toggle', 'SellerController@productToggle', ['POST
 $router->req('/wallet/products/delete', 'SellerController@productDelete', ['POST']);
 $router->req('/wallet/products/edit/{id}', 'SellerController@productEdit');
 $router->req('/wallet/products/update/{id}', 'SellerController@productUpdate', ['POST']);
+$router->req('/wallet/storefront', 'SellerController@storefrontEdit');
+$router->req('/wallet/storefront/save', 'SellerController@storefrontSave', ['POST']);
 $router->req('/wallet/kyc', 'SellerController@kycForm');
 $router->req('/wallet/kyc/submit', 'SellerController@submitKyc', ['POST']);
 $router->req('/mall/orders', 'MallCheckoutController@buyerOrdersPage');

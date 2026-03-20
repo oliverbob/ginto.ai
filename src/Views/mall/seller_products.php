@@ -319,6 +319,13 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     New Product
                 </a>
             </li>
+            <li class="sc-nav-item">
+                <?php $sfBase = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/wallet/') ? '/wallet' : '/marketplace/sellers'; ?>
+                <a href="<?= $sfBase ?>/storefront">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    My Storefront
+                </a>
+            </li>
             <li class="sc-nav-divider" role="separator"></li>
             <?php if ($is_admin): ?>
             <li class="sc-nav-item">
