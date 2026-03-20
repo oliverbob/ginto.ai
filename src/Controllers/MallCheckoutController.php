@@ -93,6 +93,7 @@ class MallCheckoutController extends Controller
             'title' => 'Checkout - Ginto Mall',
             'csrf_token' => generateCsrfToken(),
             'wallet' => $walletSummary['account'],
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
             'paypal_client_id' => $paypalClientId,
