@@ -903,7 +903,7 @@ body.light .co-qr-spinner {
 
             <div id="paymentMethodGrid" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
                 <button type="button" class="pm-card is-selected" data-method="ginto_pay_qr">
-                    <div class="pm-icon" style="background:linear-gradient(135deg,#92650a,#d4af37);"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"><img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
+                    <div class="pm-icon" style="background:linear-gradient(135deg,#92650a,#d4af37);"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"><img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
                     <div class="pm-body">
                         <div class="pm-name">Ginto Pay</div>
                         <div class="pm-desc">QR · InstaPay / PESONet</div>
@@ -1459,7 +1459,7 @@ body.light .co-qr-spinner {
         ginto_pay_qr: {
             name: 'Ginto Pay',
             iconBg: 'transparent',
-            iconHtml: '<img src="/assets/images/ginto.png" alt="" style="width:100%;height:100%;object-fit:contain;">',
+            iconHtml: '<img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:contain;">',
             confirmLabel: 'Generate QR & Pay',
         },
         ginto_pay_card: {

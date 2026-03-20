@@ -19,8 +19,8 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
 
         <!-- Brand -->
         <div class="brand" aria-label="Brand links">
-            <a href="/" aria-label="Ginto home">
-                <img src="/assets/images/ginto.png" alt="Ginto">
+            <a href="/mall" aria-label="Open mall home">
+                <img src="/assets/images/mall.png" alt="Mall">
             </a>
             <a href="/mall" class="brand-name" aria-label="ePower mall">ePower</a>
         </div>

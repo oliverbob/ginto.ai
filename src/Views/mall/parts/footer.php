@@ -54,10 +54,10 @@
             sidebar.setAttribute('aria-label', 'Mall navigation');
             sidebar.innerHTML = ''
                 + '<div class="sidebar-close-row" id="sidebarCloseRow">'
-                + '  <div class="sidebar-close-logo">'
-                + '    <img src="/assets/images/ginto.png" alt="Ginto">'
+                + '  <a class="sidebar-close-logo" href="/mall" aria-label="Open mall home">'
+                + '    <img src="/assets/images/mall.png" alt="Mall">'
                 + '    <span>ePower</span>'
-                + '  </div>'
+                + '  </a>'
                 + '  <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close menu">'
                 + '    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">'
                 + '      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'
