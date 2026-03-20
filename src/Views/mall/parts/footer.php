@@ -37,6 +37,84 @@
     const CSRF_TOKEN = <?= json_encode($csrf_token ?? '') ?>;
     const PLACEHOLDER = '/assets/images/placeholder_ceramic.svg';
 
+    function ensureMallShellElements() {
+        if (!document.getElementById('sidebarBackdrop')) {
+            const sidebarBackdrop = document.createElement('div');
+            sidebarBackdrop.id = 'sidebarBackdrop';
+            sidebarBackdrop.className = 'sidebar-backdrop';
+            sidebarBackdrop.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(sidebarBackdrop);
+        }
+
+        if (!document.getElementById('sidebar')) {
+            const sidebar = document.createElement('aside');
+            sidebar.id = 'sidebar';
+            sidebar.className = 'sidebar';
+            sidebar.setAttribute('role', 'navigation');
+            sidebar.setAttribute('aria-label', 'Mall navigation');
+            sidebar.innerHTML = ''
+                + '<div class="sidebar-close-row" id="sidebarCloseRow">'
+                + '  <div class="sidebar-close-logo">'
+                + '    <img src="/assets/images/ginto.png" alt="Ginto">'
+                + '    <span>ePower</span>'
+                + '  </div>'
+                + '  <button class="sidebar-close-btn" id="sidebarClose" aria-label="Close menu">'
+                + '    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">'
+                + '      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'
+                + '    </svg>'
+                + '  </button>'
+                + '</div>'
+                + '<div class="sidebar-inner">'
+                + '  <div class="sidebar-section">'
+                + '    <div class="sidebar-section-title">Quick Links</div>'
+                + '    <a class="cat-item" href="/marketplace" style="display:block;text-decoration:none;color:inherit;">Mall Home</a>'
+                + '    <a class="cat-item" href="/wallet" style="display:block;text-decoration:none;color:inherit;">Wallet</a>'
+                + '    <a class="cat-item" href="/mall/orders" style="display:block;text-decoration:none;color:inherit;">My Orders</a>'
+                + '    <a class="cat-item" href="/marketplace/sellers/products" style="display:block;text-decoration:none;color:inherit;">My Products</a>'
+                + '    <a class="cat-item" href="/marketplace/sellers/kyc" style="display:block;text-decoration:none;color:inherit;">Seller KYC</a>'
+                + '  </div>'
+                + '</div>';
+            document.body.appendChild(sidebar);
+        }
+
+        if (!document.getElementById('drawerOverlay')) {
+            const drawerOverlay = document.createElement('div');
+            drawerOverlay.id = 'drawerOverlay';
+            drawerOverlay.className = 'drawer-overlay';
+            drawerOverlay.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(drawerOverlay);
+        }
+
+        if (!document.getElementById('cartDrawer')) {
+            const cartDrawer = document.createElement('aside');
+            cartDrawer.id = 'cartDrawer';
+            cartDrawer.className = 'cart-drawer';
+            cartDrawer.setAttribute('role', 'dialog');
+            cartDrawer.setAttribute('aria-modal', 'true');
+            cartDrawer.setAttribute('aria-label', 'Shopping cart');
+            cartDrawer.setAttribute('aria-hidden', 'true');
+            cartDrawer.innerHTML = ''
+                + '<div class="drawer-header">'
+                + '  <h2>Your Cart</h2>'
+                + '  <button class="action-btn" onclick="toggleCart()" aria-label="Close cart">'
+                + '    <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">'
+                + '      <line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>'
+                + '    </svg>'
+                + '  </button>'
+                + '</div>'
+                + '<div class="drawer-body" id="cartItems">'
+                + '  <p class="cart-empty-msg">Your cart is empty.</p>'
+                + '</div>'
+                + '<div class="drawer-footer">'
+                + '  <div class="cart-total-row"><span>Total</span><span id="cartTotal">$0.00</span></div>'
+                + '  <button class="btn btn-primary" style="width:100%" onclick="checkout()">Checkout</button>'
+                + '</div>';
+            document.body.appendChild(cartDrawer);
+        }
+    }
+
+    ensureMallShellElements();
+
     /* ============================
      * STATE
      * ============================ */
@@ -68,6 +146,7 @@
     const sortBtn     = document.getElementById('sortBtn');
     const sortLabel   = document.getElementById('sortLabel');
     const sortDropdown= document.getElementById('sortDropdown');
+    const sellBtn     = document.getElementById('sellBtn');
 
     /* ============================
      * SIDEBAR
@@ -361,6 +440,15 @@
         if (prev) prev.innerHTML = '';
         const err = document.getElementById('uploadError');
         if (err) { err.style.display = 'none'; err.textContent = ''; }
+    }
+    if (sellBtn) {
+        sellBtn.addEventListener('click', function (e) {
+            const uploadOverlayEl = document.getElementById('uploadOverlay');
+            if (!uploadOverlayEl) {
+                e.preventDefault();
+                window.location.href = '/marketplace/sellers/upload';
+            }
+        });
     }
     const uploadOverlay = document.getElementById('uploadOverlay');
     if (uploadOverlay) uploadOverlay.addEventListener('click', function (e) { if (e.target === uploadOverlay) closeUploadModal(); });
