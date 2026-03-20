@@ -15,10 +15,14 @@ class MallCommerceService
     private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.05;
 
     private const PRODUCT_PRICING_DEFAULTS = [
-        'hands_off' => 12.00,
-        'active_discovery' => 25.00,
-        'full_service' => 35.00,
-        'markup' => 0.00,
+        // New clear model names
+        'standard'         => 10.00,   // no referral program
+        'referral'         => 15.00,   // participates in referral program
+        // Legacy values — kept for backward compat with existing products
+        'hands_off'        => 10.00,
+        'active_discovery' => 10.00,
+        'full_service'     => 10.00,
+        'markup'           => 0.00,
     ];
 
     public function __construct($db = null)
@@ -998,25 +1002,35 @@ class MallCommerceService
     private function calculatePricing(array $product, int $quantity): array
     {
         $baseUnitPrice = round((float)($product['price'] ?? 0), 2);
-        $pricingModel = (string)($product['pricing_model'] ?? 'hands_off');
+        $pricingModel = (string)($product['pricing_model'] ?? 'standard');
+        // Normalise legacy values
+        if (in_array($pricingModel, ['hands_off', 'active_discovery', 'full_service'], true)) {
+            $pricingModel = 'standard';
+        }
         if (!array_key_exists($pricingModel, self::PRODUCT_PRICING_DEFAULTS)) {
-            $pricingModel = 'hands_off';
+            $pricingModel = 'standard';
         }
 
         $pricingRate = isset($product['pricing_rate']) ? (float)$product['pricing_rate'] : self::PRODUCT_PRICING_DEFAULTS[$pricingModel];
-        $markupRate = isset($product['markup_rate']) ? (float)$product['markup_rate'] : 0.00;
+        $markupRate  = isset($product['markup_rate'])  ? (float)$product['markup_rate']  : 0.00;
 
         if ($pricingModel === 'markup') {
-            $markupRate = min(50.00, max(10.00, $markupRate ?: 10.00));
-            $chargedUnitPrice = round($baseUnitPrice * (1 + ($markupRate / 100)), 2);
+            // Legacy markup mode: buyer price = base * (1 + markup%)
+            $markupRate = min(200.00, max(0.00, $markupRate ?: 10.00));
+            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($markupRate / 100)), 2);
             $platformFeePerUnit = round($chargedUnitPrice - $baseUnitPrice, 2);
-            $sellerNetPerUnit = $baseUnitPrice;
+            $sellerNetPerUnit   = $baseUnitPrice;
             $pricingRate = 0.00;
         } else {
-            $pricingRate = max(10.00, min(50.00, $pricingRate ?: self::PRODUCT_PRICING_DEFAULTS[$pricingModel]));
-            $chargedUnitPrice = $baseUnitPrice;
-            $platformFeePerUnit = round($baseUnitPrice * ($pricingRate / 100), 2);
-            $sellerNetPerUnit = round($baseUnitPrice - $platformFeePerUnit, 2);
+            // standard / referral: fee is taken from the buyer's (marked-up) price
+            $pricingRate = max(0.00, min(100.00, $pricingRate ?: self::PRODUCT_PRICING_DEFAULTS[$pricingModel]));
+            // Apply markup if set, then deduct platform fee
+            $markupRate = min(200.00, max(0.00, $markupRate));
+            $chargedUnitPrice   = $markupRate > 0
+                ? round($baseUnitPrice * (1 + ($markupRate / 100)), 2)
+                : $baseUnitPrice;
+            $platformFeePerUnit = round($chargedUnitPrice * ($pricingRate / 100), 2);
+            $sellerNetPerUnit   = round($chargedUnitPrice - $platformFeePerUnit, 2);
         }
 
         return [

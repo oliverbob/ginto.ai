@@ -203,6 +203,53 @@ select.pf-input    { cursor: pointer; }
 }
 .possession-banner-icon { font-size: 1.4rem; flex-shrink: 0; }
 
+/* Product type toggle */
+.ptype-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.ptype-btn {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:5px; padding:12px 8px;
+    border:1.5px solid var(--border); border-radius:10px;
+    background:var(--surface2); color:var(--muted);
+    font-size:0.75rem; font-weight:700; cursor:pointer;
+    transition:all var(--trans); text-align:center;
+    line-height:1.3;
+}
+.ptype-btn .ptype-icon { font-size:1.5rem; }
+.ptype-btn.active {
+    border-color:var(--accent);
+    background:rgba(59,130,246,0.09);
+    color:var(--text);
+}
+.ptype-btn:hover:not(.active) { border-color:var(--muted); }
+@media(max-width:480px) { .ptype-grid { grid-template-columns:repeat(2,1fr); } }
+
+/* Referral plan cards */
+.fee-plan-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.fee-plan-card {
+    position:relative; padding:16px 16px 14px;
+    border:2px solid var(--border); border-radius:12px;
+    background:var(--surface2); cursor:pointer;
+    transition:all var(--trans);
+}
+.fee-plan-card:hover { border-color:var(--muted); }
+.fee-plan-card.active { border-color:var(--accent); background:rgba(59,130,246,0.06); }
+.fee-plan-card input[type=radio] { position:absolute; opacity:0; width:0; height:0; }
+.fee-plan-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:7px; }
+.fee-plan-title { font-size:0.85rem; font-weight:800; }
+.fee-plan-badge {
+    font-size:0.68rem; font-weight:800; padding:3px 8px; border-radius:6px;
+    background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.25);
+}
+.fee-plan-pct { font-size:1.35rem; font-weight:900; color:var(--accent); margin-bottom:4px; }
+.fee-plan-desc { font-size:0.75rem; color:var(--muted); line-height:1.55; }
+.fee-plan-upside {
+    margin-top:8px; padding:7px 10px;
+    border-radius:8px; background:rgba(34,197,94,0.07);
+    border:1px solid rgba(34,197,94,0.18);
+    font-size:0.73rem; color:#86efac; line-height:1.5;
+}
+@media(max-width:480px) { .fee-plan-grid { grid-template-columns:1fr; } }
+
 /* Hamburger nav drawer — always fixed and off-screen, slides in on .open */
 #sidebar {
     position: fixed;
@@ -435,6 +482,33 @@ select.pf-input    { cursor: pointer; }
                 <h2 class="pf-section-title">Pricing &amp; Details</h2>
             </div>
             <div class="pf-section-body">
+
+                <!-- Product Type -->
+                <div class="pf-group">
+                    <label class="pf-label">Product Type <span class="req" aria-hidden="true">*</span></label>
+                    <div class="ptype-grid" role="group" aria-label="Product type">
+                        <?php
+                        $curType = $p['product_type'] ?? 'physical';
+                        $ptypes = [
+                            'physical'     => ['📦', 'Physical', 'Shipped to buyer'],
+                            'digital'      => ['📄', 'Digital', 'Downloadable file'],
+                            'virtual'      => ['🎭', 'Virtual', 'Service / voucher'],
+                            'subscription' => ['🔄', 'Subscription', 'Recurring access'],
+                        ];
+                        foreach ($ptypes as $val => [$icon, $label, $sub]):
+                        ?>
+                        <button type="button"
+                            class="ptype-btn<?= $curType === $val ? ' active' : '' ?>"
+                            data-ptype="<?= $val ?>">
+                            <span class="ptype-icon"><?= $icon ?></span>
+                            <span><?= $label ?></span>
+                            <span style="font-size:0.68rem;font-weight:400;color:var(--muted)"><?= $sub ?></span>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <input type="hidden" id="pf-product-type" name="product_type" value="<?= htmlspecialchars($curType) ?>">
+                </div>
+
                 <div class="pf-grid-2">
                     <div class="pf-group">
                         <label class="pf-label" for="pf-price">Price <span class="req" aria-hidden="true">*</span></label>
@@ -457,6 +531,7 @@ select.pf-input    { cursor: pointer; }
                         <input class="pf-input" id="pf-qty" type="number" min="0" name="quantity"
                             placeholder="0"
                             value="<?= htmlspecialchars((string)($p['quantity'] ?? $p['stock'] ?? 0)) ?>">
+                        <span class="pf-hint" id="pf-qty-hint">Leave 0 for unlimited (digital/virtual/subscription).</span>
                     </div>
                     <div class="pf-group">
                         <label class="pf-label" for="pf-cat">Category</label>
@@ -472,36 +547,59 @@ select.pf-input    { cursor: pointer; }
                     </div>
                 </div>
 
+                <!-- Platform Fee Plan -->
+                <?php
+                $savedModel = $p['pricing_model'] ?? 'standard';
+                // Normalise legacy values
+                if (in_array($savedModel, ['hands_off','active_discovery','full_service'], true)) $savedModel = 'standard';
+                ?>
+                <input type="hidden" id="pf-pricing-model" name="pricing_model" value="<?= htmlspecialchars($savedModel) ?>">
+                <!-- pricing_rate is set automatically from the plan choice; hidden field keeps backward compat -->
+                <input type="hidden" id="pf-pricing-rate" name="pricing_rate" value="<?= $savedModel === 'referral' ? '15' : '10' ?>">
+
                 <div class="pf-group">
-                    <label class="pf-label" for="pf-pricing-model">Marketplace Fee Model <span class="req" aria-hidden="true">*</span></label>
-                    <select class="pf-input" id="pf-pricing-model" name="pricing_model">
-                        <option value="hands_off" <?= ($p['pricing_model'] ?? 'hands_off') === 'hands_off' ? 'selected' : '' ?>>Hands-Off (10% to 15% platform fee)</option>
-                        <option value="active_discovery" <?= ($p['pricing_model'] ?? '') === 'active_discovery' ? 'selected' : '' ?>>Active Discovery (20% to 25% platform fee)</option>
-                        <option value="full_service" <?= ($p['pricing_model'] ?? '') === 'full_service' ? 'selected' : '' ?>>Full Service (30% to 50% platform fee)</option>
-                        <option value="markup" <?= ($p['pricing_model'] ?? '') === 'markup' ? 'selected' : '' ?>>Markup Mode (add 10% to 50% buyer markup)</option>
-                    </select>
-                    <span class="pf-hint">This controls how platform fees are computed when buyers checkout your product.</span>
+                    <label class="pf-label">Platform Fee Plan <span class="req" aria-hidden="true">*</span></label>
+                    <div class="fee-plan-grid" role="group" aria-label="Platform fee plan">
+
+                        <!-- Standard plan -->
+                        <label class="fee-plan-card<?= $savedModel !== 'referral' ? ' active' : '' ?>" id="fpc-standard">
+                            <input type="radio" name="_fee_plan_radio" value="standard" <?= $savedModel !== 'referral' ? 'checked' : '' ?>>
+                            <div class="fee-plan-card-top">
+                                <span class="fee-plan-title">🔕 No Referral Program</span>
+                            </div>
+                            <div class="fee-plan-pct">10%</div>
+                            <div class="fee-plan-desc">Standard listing. You keep more per sale. Platform promotes your product through standard search and discovery only.</div>
+                        </label>
+
+                        <!-- Referral plan -->
+                        <label class="fee-plan-card<?= $savedModel === 'referral' ? ' active' : '' ?>" id="fpc-referral">
+                            <input type="radio" name="_fee_plan_radio" value="referral" <?= $savedModel === 'referral' ? 'checked' : '' ?>>
+                            <div class="fee-plan-card-top">
+                                <span class="fee-plan-title">✅ Referral Program</span>
+                                <span class="fee-plan-badge">Recommended</span>
+                            </div>
+                            <div class="fee-plan-pct">15%</div>
+                            <div class="fee-plan-desc">Your product is promoted through our referral network. Members share your listing and earn a commission when their friends buy — putting your product in front of warm, trusted audiences.</div>
+                            <div class="fee-plan-upside">💬 Higher chance of word-of-mouth sales from friends and connections.</div>
+                        </label>
+
+                    </div>
+                    <span class="pf-hint" style="margin-top:4px;">Platform fee is deducted from your earnings at checkout. Buyers are not shown this fee separately — it is already factored in.</span>
                 </div>
 
-                <div class="pf-grid-2">
-                    <div class="pf-group" id="pf-pricing-rate-group">
-                        <label class="pf-label" for="pf-pricing-rate">Platform Fee Rate (%)</label>
-                        <input class="pf-input" id="pf-pricing-rate" type="number" min="10" max="50" step="0.01" name="pricing_rate"
-                            value="<?= htmlspecialchars((string)($p['pricing_rate'] ?? 12)) ?>">
-                        <span class="pf-hint">Used for Hands-Off, Active Discovery, and Full Service models.</span>
-                    </div>
-                    <div class="pf-group" id="pf-markup-rate-group">
-                        <label class="pf-label" for="pf-markup-rate">Markup Rate (%)</label>
-                        <input class="pf-input" id="pf-markup-rate" type="number" min="10" max="50" step="0.01" name="markup_rate"
-                            value="<?= htmlspecialchars((string)($p['markup_rate'] ?? 10)) ?>">
-                        <span class="pf-hint">Used only when Markup mode is selected.</span>
-                    </div>
+                <!-- Markup Rate -->
+                <div class="pf-group">
+                    <label class="pf-label" for="pf-markup-rate">Markup Rate (%) <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+                    <input class="pf-input" id="pf-markup-rate" type="number" min="0" max="200" step="0.01" name="markup_rate"
+                        value="<?= htmlspecialchars((string)($p['markup_rate'] ?? 0)) ?>">
+                    <span class="pf-hint">Add a percentage on top of your base price to pass the platform fee on to the buyer, so your net payout stays closer to your listed price. Set to 0 to absorb the fee yourself. Example: base price ₱1,000 + 15% markup = buyer pays ₱1,150; platform fee is deducted from ₱1,150.</span>
                 </div>
+
             </div>
         </div>
 
-        <!-- Shipping & Weight -->
-        <div class="pf-section">
+        <!-- Shipping & Weight — hidden for non-physical product types -->
+        <div class="pf-section" id="pf-shipping-section">
             <div class="pf-section-header">
                 <div class="pf-section-icon">
                     <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="15" height="13"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -704,32 +802,44 @@ select.pf-input    { cursor: pointer; }
         slugInput.addEventListener('input', function () { slugInput.dataset.manual = '1'; });
     }
 
-    var pricingModelEl = document.getElementById('pf-pricing-model');
-    var pricingRateEl = document.getElementById('pf-pricing-rate');
-    var markupRateEl = document.getElementById('pf-markup-rate');
+    // ── Product type toggle ───────────────────────────────────────────────
+    var ptypeHidden      = document.getElementById('pf-product-type');
+    var shippingSection  = document.getElementById('pf-shipping-section');
+    var qtyHint          = document.getElementById('pf-qty-hint');
 
-    function applyPricingModelRules() {
-        if (!pricingModelEl || !pricingRateEl || !markupRateEl) return;
-        var model = pricingModelEl.value;
-        var isMarkup = model === 'markup';
-        pricingRateEl.disabled = isMarkup;
-        markupRateEl.disabled = !isMarkup;
-
-        if (isMarkup) {
-            if (!markupRateEl.value || Number(markupRateEl.value) < 10) markupRateEl.value = '10';
-            pricingRateEl.value = '0';
-        } else {
-            if (!pricingRateEl.value || Number(pricingRateEl.value) < 10) {
-                pricingRateEl.value = model === 'active_discovery' ? '25' : (model === 'full_service' ? '35' : '12');
-            }
-            markupRateEl.value = '0';
+    function applyProductType(type) {
+        document.querySelectorAll('.ptype-btn').forEach(function (btn) {
+            btn.classList.toggle('active', btn.dataset.ptype === type);
+        });
+        if (ptypeHidden) ptypeHidden.value = type;
+        if (shippingSection) {
+            shippingSection.style.display = (type === 'physical') ? '' : 'none';
+        }
+        if (qtyHint) {
+            qtyHint.style.display = (type === 'physical') ? 'none' : '';
         }
     }
 
-    if (pricingModelEl) {
-        pricingModelEl.addEventListener('change', applyPricingModelRules);
-        applyPricingModelRules();
-    }
+    document.querySelectorAll('.ptype-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { applyProductType(btn.dataset.ptype); });
+    });
+
+    // init
+    applyProductType(ptypeHidden ? ptypeHidden.value : 'physical');
+
+    // ── Fee plan radio cards ──────────────────────────────────────────────
+    var pricingModelHidden = document.getElementById('pf-pricing-model');
+    var pricingRateHidden  = document.getElementById('pf-pricing-rate');
+
+    document.querySelectorAll('input[name="_fee_plan_radio"]').forEach(function (radio) {
+        radio.addEventListener('change', function () {
+            var plan = radio.value; // 'standard' or 'referral'
+            if (pricingModelHidden) pricingModelHidden.value = plan;
+            if (pricingRateHidden)  pricingRateHidden.value  = (plan === 'referral') ? '15' : '10';
+            document.getElementById('fpc-standard').classList.toggle('active', plan === 'standard');
+            document.getElementById('fpc-referral').classList.toggle('active', plan === 'referral');
+        });
+    });
 }());
 
 // ===== KYC GATE =====

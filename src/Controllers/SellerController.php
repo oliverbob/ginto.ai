@@ -287,6 +287,10 @@ class SellerController extends \Core\Controller
             }
         }
 
+        $productType = trim((string)($_POST['product_type'] ?? 'physical'));
+        if (!in_array($productType, ['physical','digital','virtual','subscription'], true)) {
+            $productType = 'physical';
+        }
         $title = trim($_POST['title'] ?? '');
         $slug = trim($_POST['slug'] ?? '');
         $short = trim($_POST['short_description'] ?? '');
@@ -294,21 +298,17 @@ class SellerController extends \Core\Controller
         $price = floatval($_POST['price'] ?? 0);
         $currency = $_POST['currency'] ?? 'USD';
         $category = intval($_POST['category_id'] ?? 0) ?: null;
-        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
-        $pricingRate = (float)($_POST['pricing_rate'] ?? 12);
-        $markupRate = (float)($_POST['markup_rate'] ?? 0);
-
-        $allowedPricingModels = ['hands_off', 'active_discovery', 'full_service', 'markup'];
-        if (!in_array($pricingModel, $allowedPricingModels, true)) {
-            $pricingModel = 'hands_off';
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'standard'));
+        // Normalise legacy values
+        if (in_array($pricingModel, ['hands_off','active_discovery','full_service'], true)) {
+            $pricingModel = 'standard';
         }
-        if ($pricingModel === 'markup') {
-            $markupRate = max(10, min(50, $markupRate));
-            $pricingRate = 0;
-        } else {
-            $pricingRate = max(10, min(50, $pricingRate));
-            $markupRate = 0;
+        if (!in_array($pricingModel, ['standard', 'referral', 'markup'], true)) {
+            $pricingModel = 'standard';
         }
+        // pricing_rate is determined by the plan choice; markup_rate is seller-set
+        $pricingRate = $pricingModel === 'referral' ? 15.00 : 10.00;
+        $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
         // Shipping dimensions — must include item + all packaging (box, wrap, etc.)
         $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
@@ -364,24 +364,25 @@ class SellerController extends \Core\Controller
 
         $productModel = new Product();
         $data = [
-            'seller_id' => $userId,
-            'title' => $title,
-            'slug' => $slug ?: null,
+            'seller_id'    => $userId,
+            'product_type' => $productType,
+            'title'        => $title,
+            'slug'         => $slug ?: null,
             'short_description' => $short ?: null,
-            'description' => $description ?: null,
-            'price' => $price,
-            'currency' => $currency,
+            'description'  => $description ?: null,
+            'price'        => $price,
+            'currency'     => $currency,
             'pricing_model' => $pricingModel,
             'pricing_rate' => $pricingRate,
-            'markup_rate' => $markupRate,
-            'category_id' => $category,
-            'images' => $imagesArray,
-            'status' => 'draft',
-            'is_visible' => 0,
-            'weight_kg' => $weightKg,
-            'length_cm' => $lengthCm,
-            'width_cm'  => $widthCm,
-            'height_cm' => $heightCm,
+            'markup_rate'  => $markupRate,
+            'category_id'  => $category,
+            'images'       => $imagesArray,
+            'status'       => 'draft',
+            'is_visible'   => 0,
+            'weight_kg'    => $productType === 'physical' ? $weightKg : null,
+            'length_cm'    => $productType === 'physical' ? $lengthCm : null,
+            'width_cm'     => $productType === 'physical' ? $widthCm  : null,
+            'height_cm'    => $productType === 'physical' ? $heightCm : null,
         ];
 
         $created = $productModel->create($data);
@@ -525,6 +526,10 @@ class SellerController extends \Core\Controller
             http_response_code(403); echo 'Not authorized'; return;
         }
 
+        $productType = trim((string)($_POST['product_type'] ?? 'physical'));
+        if (!in_array($productType, ['physical','digital','virtual','subscription'], true)) {
+            $productType = 'physical';
+        }
         $title    = trim($_POST['title'] ?? '');
         $slug     = trim($_POST['slug'] ?? '') ?: null;
         $short    = trim($_POST['short_description'] ?? '') ?: null;
@@ -533,21 +538,15 @@ class SellerController extends \Core\Controller
         $currency = $_POST['currency'] ?? 'USD';
         $qty      = intval($_POST['quantity'] ?? 0);
         $category = intval($_POST['category_id'] ?? 0) ?: null;
-        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
-        $pricingRate = (float)($_POST['pricing_rate'] ?? 12);
-        $markupRate = (float)($_POST['markup_rate'] ?? 0);
-
-        $allowedPricingModels = ['hands_off', 'active_discovery', 'full_service', 'markup'];
-        if (!in_array($pricingModel, $allowedPricingModels, true)) {
-            $pricingModel = 'hands_off';
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'standard'));
+        if (in_array($pricingModel, ['hands_off','active_discovery','full_service'], true)) {
+            $pricingModel = 'standard';
         }
-        if ($pricingModel === 'markup') {
-            $markupRate = max(10, min(50, $markupRate));
-            $pricingRate = 0;
-        } else {
-            $pricingRate = max(10, min(50, $pricingRate));
-            $markupRate = 0;
+        if (!in_array($pricingModel, ['standard', 'referral', 'markup'], true)) {
+            $pricingModel = 'standard';
         }
+        $pricingRate = $pricingModel === 'referral' ? 15.00 : 10.00;
+        $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
         // Shipping dimensions — must include item + all packaging
         $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
@@ -608,6 +607,7 @@ class SellerController extends \Core\Controller
         }
 
         $this->db->update('products', [
+            'product_type'      => $productType,
             'title'             => $title,
             'slug'              => $slug,
             'short_description' => $short,
@@ -620,10 +620,10 @@ class SellerController extends \Core\Controller
             'pricing_rate'      => $pricingRate,
             'markup_rate'       => $markupRate,
             'images'            => json_encode($imagesArray),
-            'weight_kg'         => $weightKg,
-            'length_cm'         => $lengthCm,
-            'width_cm'          => $widthCm,
-            'height_cm'         => $heightCm,
+            'weight_kg'         => $productType === 'physical' ? $weightKg : null,
+            'length_cm'         => $productType === 'physical' ? $lengthCm : null,
+            'width_cm'          => $productType === 'physical' ? $widthCm  : null,
+            'height_cm'         => $productType === 'physical' ? $heightCm : null,
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
 
