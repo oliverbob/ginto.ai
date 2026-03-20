@@ -15,6 +15,32 @@ $title = $title ?? 'ePower Mall';
 /* ========== RESET & CSS VARIABLES ========== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* ========== GLOBAL SCROLLBAR ========== */
+/* Firefox */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+/* WebKit (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 10px;
+    transition: background var(--trans);
+}
+::-webkit-scrollbar-thumb:hover {
+    background: var(--muted);
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
 :root {
     --bg:           #0f172a;
     --surface:      #1e293b;
@@ -277,12 +303,8 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     top: var(--header-h);
     height: calc(100vh - var(--header-h));
     overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border) transparent;
     background: var(--bg);
 }
-.sidebar::-webkit-scrollbar { width: 4px; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
 .sidebar-inner { padding: 20px 16px 32px; }
 
