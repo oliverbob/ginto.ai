@@ -225,6 +225,7 @@ select.pf-input    { cursor: pointer; }
 
 /* Referral plan cards */
 .fee-plan-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+@media(min-width:700px) { .fee-plan-grid { grid-template-columns:1fr 1fr; } }
 .fee-plan-card {
     position:relative; padding:16px 16px 14px;
     border:2px solid var(--border); border-radius:12px;
@@ -248,7 +249,7 @@ select.pf-input    { cursor: pointer; }
     border:1px solid rgba(34,197,94,0.18);
     font-size:0.73rem; color:#86efac; line-height:1.5;
 }
-@media(max-width:480px) { .fee-plan-grid { grid-template-columns:1fr; } }
+@media(max-width:540px) { .fee-plan-grid { grid-template-columns:1fr; } }
 
 /* Hamburger nav drawer — always fixed and off-screen, slides in on .open */
 #sidebar {
@@ -549,29 +550,53 @@ select.pf-input    { cursor: pointer; }
 
                 <!-- Platform Fee Plan -->
                 <?php
-                $savedModel = $p['pricing_model'] ?? 'standard';
-                // Normalise legacy values
-                if (in_array($savedModel, ['hands_off','active_discovery','full_service'], true)) $savedModel = 'standard';
+                $validPlanModels = ['hands_off','active_discovery','full_service','referral','markup','standard'];
+                $savedModel = in_array($p['pricing_model'] ?? '', $validPlanModels, true)
+                    ? $p['pricing_model']
+                    : 'hands_off';
+                $planRateMap = ['hands_off'=>12,'active_discovery'=>25,'full_service'=>35,'referral'=>15,'markup'=>0,'standard'=>10];
+                $savedRate = $planRateMap[$savedModel] ?? 12;
                 ?>
                 <input type="hidden" id="pf-pricing-model" name="pricing_model" value="<?= htmlspecialchars($savedModel) ?>">
-                <!-- pricing_rate is set automatically from the plan choice; hidden field keeps backward compat -->
-                <input type="hidden" id="pf-pricing-rate" name="pricing_rate" value="<?= $savedModel === 'referral' ? '15' : '10' ?>">
+                <input type="hidden" id="pf-pricing-rate" name="pricing_rate" value="<?= $savedRate ?>">
 
                 <div class="pf-group">
                     <label class="pf-label">Platform Fee Plan <span class="req" aria-hidden="true">*</span></label>
                     <div class="fee-plan-grid" role="group" aria-label="Platform fee plan">
 
-                        <!-- Standard plan -->
-                        <label class="fee-plan-card<?= $savedModel !== 'referral' ? ' active' : '' ?>" id="fpc-standard">
-                            <input type="radio" name="_fee_plan_radio" value="standard" <?= $savedModel !== 'referral' ? 'checked' : '' ?>>
+                        <!-- Hands-Off -->
+                        <label class="fee-plan-card<?= $savedModel === 'hands_off' ? ' active' : '' ?>" id="fpc-hands_off">
+                            <input type="radio" name="_fee_plan_radio" value="hands_off" <?= $savedModel === 'hands_off' ? 'checked' : '' ?>>
                             <div class="fee-plan-card-top">
-                                <span class="fee-plan-title">🔕 No Referral Program</span>
+                                <span class="fee-plan-title">🛒 Hands-Off</span>
                             </div>
-                            <div class="fee-plan-pct">10%</div>
-                            <div class="fee-plan-desc">Standard listing. You keep more per sale. Platform promotes your product through standard search and discovery only.</div>
+                            <div class="fee-plan-pct">10–15%</div>
+                            <div class="fee-plan-desc">Standard listing. Minimal platform involvement. Product appears in search and browse. You keep the most per sale.</div>
                         </label>
 
-                        <!-- Referral plan -->
+                        <!-- Active Discovery -->
+                        <label class="fee-plan-card<?= $savedModel === 'active_discovery' ? ' active' : '' ?>" id="fpc-active_discovery">
+                            <input type="radio" name="_fee_plan_radio" value="active_discovery" <?= $savedModel === 'active_discovery' ? 'checked' : '' ?>>
+                            <div class="fee-plan-card-top">
+                                <span class="fee-plan-title">🔍 Active Discovery</span>
+                                <span class="fee-plan-badge">Popular</span>
+                            </div>
+                            <div class="fee-plan-pct">20–25%</div>
+                            <div class="fee-plan-desc">Platform actively promotes your product through featured placements, categories, and recommendation engines to reach more buyers.</div>
+                        </label>
+
+                        <!-- Full Service -->
+                        <label class="fee-plan-card<?= $savedModel === 'full_service' ? ' active' : '' ?>" id="fpc-full_service">
+                            <input type="radio" name="_fee_plan_radio" value="full_service" <?= $savedModel === 'full_service' ? 'checked' : '' ?>>
+                            <div class="fee-plan-card-top">
+                                <span class="fee-plan-title">🚀 Full Service</span>
+                            </div>
+                            <div class="fee-plan-pct">30–50%</div>
+                            <div class="fee-plan-desc">Maximum platform promotion — ads, referral network, featured categories, and priority placement. Best for high-volume sellers.</div>
+                            <div class="fee-plan-upside">💬 Higher chance of word-of-mouth sales from friends and connections.</div>
+                        </label>
+
+                        <!-- Referral -->
                         <label class="fee-plan-card<?= $savedModel === 'referral' ? ' active' : '' ?>" id="fpc-referral">
                             <input type="radio" name="_fee_plan_radio" value="referral" <?= $savedModel === 'referral' ? 'checked' : '' ?>>
                             <div class="fee-plan-card-top">
@@ -579,8 +604,7 @@ select.pf-input    { cursor: pointer; }
                                 <span class="fee-plan-badge">Recommended</span>
                             </div>
                             <div class="fee-plan-pct">15%</div>
-                            <div class="fee-plan-desc">Your product is promoted through our referral network. Members share your listing and earn a commission when their friends buy — putting your product in front of warm, trusted audiences.</div>
-                            <div class="fee-plan-upside">💬 Higher chance of word-of-mouth sales from friends and connections.</div>
+                            <div class="fee-plan-desc">Members share your listing and earn a commission when their friends buy — putting your product in front of warm, trusted audiences.</div>
                         </label>
 
                     </div>
@@ -592,7 +616,7 @@ select.pf-input    { cursor: pointer; }
                     <label class="pf-label" for="pf-markup-rate">Markup Rate (%) <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
                     <input class="pf-input" id="pf-markup-rate" type="number" min="0" max="200" step="0.01" name="markup_rate"
                         value="<?= htmlspecialchars((string)($p['markup_rate'] ?? 0)) ?>">
-                    <span class="pf-hint">Add a percentage on top of your base price to pass the platform fee on to the buyer, so your net payout stays closer to your listed price. Set to 0 to absorb the fee yourself. Example: base price ₱1,000 + 15% markup = buyer pays ₱1,150; platform fee is deducted from ₱1,150.</span>
+                    <span class="pf-hint">Add a percentage on top of your base price to pass the platform fee on to the buyer, so your net payout stays closer to your listed price. Set to 0 to absorb the fee yourself.</span>
                 </div>
 
             </div>
@@ -831,13 +855,18 @@ select.pf-input    { cursor: pointer; }
     var pricingModelHidden = document.getElementById('pf-pricing-model');
     var pricingRateHidden  = document.getElementById('pf-pricing-rate');
 
+    var planRates = { hands_off: '12', active_discovery: '25', full_service: '35', referral: '15', markup: '0', standard: '10' };
+    var planCardIds = ['fpc-hands_off', 'fpc-active_discovery', 'fpc-full_service', 'fpc-referral'];
+
     document.querySelectorAll('input[name="_fee_plan_radio"]').forEach(function (radio) {
         radio.addEventListener('change', function () {
-            var plan = radio.value; // 'standard' or 'referral'
+            var plan = radio.value;
             if (pricingModelHidden) pricingModelHidden.value = plan;
-            if (pricingRateHidden)  pricingRateHidden.value  = (plan === 'referral') ? '15' : '10';
-            document.getElementById('fpc-standard').classList.toggle('active', plan === 'standard');
-            document.getElementById('fpc-referral').classList.toggle('active', plan === 'referral');
+            if (pricingRateHidden)  pricingRateHidden.value  = planRates[plan] || '12';
+            planCardIds.forEach(function (id) {
+                var el = document.getElementById(id);
+                if (el) el.classList.toggle('active', id === 'fpc-' + plan);
+            });
         });
     });
 }());

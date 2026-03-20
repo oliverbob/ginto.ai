@@ -15,14 +15,12 @@ class MallCommerceService
     private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.05;
 
     private const PRODUCT_PRICING_DEFAULTS = [
-        // New clear model names
-        'standard'         => 10.00,   // no referral program
-        'referral'         => 15.00,   // participates in referral program
-        // Legacy values — kept for backward compat with existing products
-        'hands_off'        => 10.00,
-        'active_discovery' => 10.00,
-        'full_service'     => 10.00,
-        'markup'           => 0.00,
+        'hands_off'        => 12.00,   // standard listing, minimal promotion
+        'active_discovery' => 25.00,   // active platform promotion
+        'full_service'     => 35.00,   // maximum promotion
+        'referral'         => 15.00,   // referral network program
+        'markup'           =>  0.00,   // seller-driven markup, no separate platform fee
+        'standard'         => 10.00,   // legacy alias
     ];
 
     public function __construct($db = null)

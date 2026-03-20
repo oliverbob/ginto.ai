@@ -304,16 +304,14 @@ class SellerController extends \Core\Controller
         $price = floatval($_POST['price'] ?? 0);
         $currency = $_POST['currency'] ?? 'USD';
         $category = intval($_POST['category_id'] ?? 0) ?: null;
-        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'standard'));
-        // Normalise legacy values
-        if (in_array($pricingModel, ['hands_off','active_discovery','full_service'], true)) {
-            $pricingModel = 'standard';
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
+        $validPricingModels = ['hands_off','active_discovery','full_service','referral','markup','standard'];
+        if (!in_array($pricingModel, $validPricingModels, true)) {
+            $pricingModel = 'hands_off';
         }
-        if (!in_array($pricingModel, ['standard', 'referral', 'markup'], true)) {
-            $pricingModel = 'standard';
-        }
-        // pricing_rate is determined by the plan choice; markup_rate is seller-set
-        $pricingRate = $pricingModel === 'referral' ? 15.00 : 10.00;
+        // pricing_rate is determined by the plan choice
+        $planRateMap = ['hands_off'=>12.00,'active_discovery'=>25.00,'full_service'=>35.00,'referral'=>15.00,'markup'=>0.00,'standard'=>10.00];
+        $pricingRate = $planRateMap[$pricingModel] ?? 12.00;
         $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
         // Shipping dimensions — must include item + all packaging (box, wrap, etc.)
@@ -547,14 +545,13 @@ class SellerController extends \Core\Controller
         $currency = $_POST['currency'] ?? 'USD';
         $qty      = intval($_POST['quantity'] ?? 0);
         $category = intval($_POST['category_id'] ?? 0) ?: null;
-        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'standard'));
-        if (in_array($pricingModel, ['hands_off','active_discovery','full_service'], true)) {
-            $pricingModel = 'standard';
+        $pricingModel = trim((string)($_POST['pricing_model'] ?? 'hands_off'));
+        $validPricingModels = ['hands_off','active_discovery','full_service','referral','markup','standard'];
+        if (!in_array($pricingModel, $validPricingModels, true)) {
+            $pricingModel = 'hands_off';
         }
-        if (!in_array($pricingModel, ['standard', 'referral', 'markup'], true)) {
-            $pricingModel = 'standard';
-        }
-        $pricingRate = $pricingModel === 'referral' ? 15.00 : 10.00;
+        $planRateMap = ['hands_off'=>12.00,'active_discovery'=>25.00,'full_service'=>35.00,'referral'=>15.00,'markup'=>0.00,'standard'=>10.00];
+        $pricingRate = $planRateMap[$pricingModel] ?? 12.00;
         $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
         // Shipping dimensions — must include item + all packaging
