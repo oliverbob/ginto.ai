@@ -648,7 +648,6 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     padding: 0;
-    overflow: hidden;
 }
 .cart-fab-logo {
     width: 100%;
@@ -657,6 +656,7 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     border-radius: 50%;
     display: block;
     pointer-events: none;
+    overflow: hidden;
 }
 .cart-fab:hover {
     transform: scale(1.08);
@@ -665,7 +665,7 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .cart-fab:active { transform: scale(0.93); }
 .cart-fab-badge {
     position: absolute;
-    top: 2px; right: 2px;
+    top: -2px; right: -2px;
     min-width: 20px; height: 20px;
     background: var(--danger);
     color: #fff;
