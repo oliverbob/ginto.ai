@@ -146,7 +146,6 @@ class ProviderRegistry
     private const VISION_PATTERNS = [
         'vision', 'vl', 'visual', 'image', 'multimodal', 'mm',
         'gpt-4o', 'gpt-4-turbo', 'claude-3', 'gemini', 'llava',
-        'llama-3.2-11b-vision', 'llama-3.2-90b-vision',
         'llama-4-scout', 'llama-4-maverick', // Llama 4 multimodal models
         'smolvlm', 'qwen-vl', 'qwen2-vl', 'pixtral',
     ];

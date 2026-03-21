@@ -890,7 +890,7 @@ class ChatStreamHandler
             
             // Check if user's selected model is vision-capable
             $visionCapableModels = [
-                'groq' => ['llama-3.2-11b-vision-preview', 'llama-3.2-90b-vision-preview', 'meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'],
+                'groq' => ['meta-llama/llama-4-scout-17b-16e-instruct', 'meta-llama/llama-4-maverick-17b-128e-instruct'],
                 'openai' => ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-4-vision-preview'],
                 'together' => ['meta-llama/Llama-Vision-Free', 'meta-llama/Llama-3.2-11B-Vision-Instruct-Turbo', 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo'],
                 'cerebras' => [], // Cerebras doesn't have vision models

@@ -332,8 +332,8 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
                                 <optgroup label="GROQ">
                                     <option value="llama-3.3-70b-versatile" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.3-70b-versatile' ? 'selected' : '' ?>>llama-3.3-70b-versatile</option>
                                     <option value="llama-3.3-70b-specdec" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.3-70b-specdec' ? 'selected' : '' ?>>llama-3.3-70b-specdec</option>
-                                    <option value="llama-3.2-90b-vision-preview" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.2-90b-vision-preview' ? 'selected' : '' ?>>llama-3.2-90b-vision-preview</option>
-                                    <option value="llama-3.2-11b-vision-preview" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.2-11b-vision-preview' ? 'selected' : '' ?>>llama-3.2-11b-vision-preview</option>
+                                    <option value="meta-llama/llama-4-scout-17b-16e-instruct" <?= ($envValues['LLM_MODEL'] ?? '') === 'meta-llama/llama-4-scout-17b-16e-instruct' ? 'selected' : '' ?>>llama-4-scout-17b (vision)</option>
+                                    <option value="meta-llama/llama-4-maverick-17b-128e-instruct" <?= ($envValues['LLM_MODEL'] ?? '') === 'meta-llama/llama-4-maverick-17b-128e-instruct' ? 'selected' : '' ?>>llama-4-maverick-17b (vision)</option>
                                     <option value="llama-3.1-70b-versatile" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.1-70b-versatile' ? 'selected' : '' ?>>llama-3.1-70b-versatile</option>
                                     <option value="llama-3.1-8b-instant" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama-3.1-8b-instant' ? 'selected' : '' ?>>llama-3.1-8b-instant</option>
                                     <option value="llama3-70b-8192" <?= ($envValues['LLM_MODEL'] ?? '') === 'llama3-70b-8192' ? 'selected' : '' ?>>llama3-70b-8192</option>
