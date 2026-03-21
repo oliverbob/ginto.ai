@@ -91,7 +91,7 @@ $deductions = $gross - $net;
 
     <div class="earnings-card" style="text-align:center;padding:32px;">
         <div class="big-num">₱<?= number_format($net, 2) ?></div>
-        <div class="big-sub">For reporting purposes only. Actual funds are settled externally by your payment provider.</div>
+        <div class="big-sub">For reporting purposes only. Actual funds are settled directly by PayMongo or PayPal.</div>
         <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
             <a href="/wallet/sales" class="btn btn-secondary" style="text-decoration:none;font-size:0.82rem;">View Sales</a>
             <a href="/wallet/payout-accounts" class="btn btn-primary" style="text-decoration:none;font-size:0.82rem;">Manage Settlement Account</a>
