@@ -1265,6 +1265,8 @@ $router->req('/marketplace/sellers/storefront/save', 'SellerController@storefron
 // Mall storefront, checkout, wallet, and order lifecycle routes
 $router->req('/marketplace', 'MallController@marketplace');
 $router->req('/mall', 'MallController@marketplace');
+$router->get('/mall/buyer-register', 'MallCheckoutController@buyerRegisterPage');
+$router->post('/mall/buyer-register', 'MallCheckoutController@buyerRegisterAction');
 $router->req('/mall/checkout', 'MallCheckoutController@checkoutPage');
 $router->req('/mall/wallet', 'MallCheckoutController@walletPage');
 $router->req('/wallet', 'MallCheckoutController@walletPage');

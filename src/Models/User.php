@@ -93,7 +93,7 @@ class User
             'ginto_level', 'wallet_address', 'current_level_id', 'total_balance', 'is_admin', 'role_id',
             'status', 'avatar', 'bio', 'last_login', 'email_verified_at', 'two_factor_enabled',
             'preferences', 'package', 'package_amount', 'package_currency', 'pay_method',
-            'created_at', 'updated_at', 'playground_use_sandbox', 'payment_status', 'editor_show_hidden',
+            'is_buyer', 'created_at', 'updated_at', 'playground_use_sandbox', 'payment_status', 'editor_show_hidden',
             'paypal_subscription_id', 'subscription_status', 'subscription_start_date', 'subscription_next_billing'
         ];
         

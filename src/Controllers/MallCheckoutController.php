@@ -36,6 +36,13 @@ class MallCheckoutController extends Controller
         $viewerId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
         $this->commerce->recordStorefrontImpression((int)($data['storefront']['user_id'] ?? 0), $viewerId, 'viewed');
 
+        // Remember the store owner so buyer registration can assign them as upline
+        $sellerId = (int)($data['storefront']['user_id'] ?? 0);
+        if ($sellerId > 0) {
+            if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+            $_SESSION['mall_checkout_seller_id'] = $sellerId;
+        }
+
         $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
         $walletSummary = $userId > 0 ? $this->commerce->getWalletSummary($userId) : ['account' => []];
 
@@ -478,10 +485,147 @@ class MallCheckoutController extends Controller
         if (empty($_SESSION['user_id'])) {
             if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'] ?? '/mall/checkout';
-            header('Location: /register?intent=buy');
+            header('Location: /mall/buyer-register');
             exit;
         }
         return (int)$_SESSION['user_id'];
+    }
+
+    public function buyerRegisterPage(): void
+    {
+        if (!empty($_SESSION['user_id'])) {
+            header('Location: /mall/checkout');
+            exit;
+        }
+        $this->view('mall/buyer_register', [
+            'title'       => 'Create Buyer Account - Ginto Mall',
+            'csrf_token'  => generateCsrfToken(),
+            'error'       => $_SESSION['buyer_reg_error'] ?? null,
+            'old'         => $_SESSION['buyer_reg_old'] ?? [],
+        ]);
+        unset($_SESSION['buyer_reg_error'], $_SESSION['buyer_reg_old']);
+    }
+
+    public function buyerRegisterAction(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        $post = $_POST;
+
+        // CSRF
+        if (empty($post['csrf_token']) || !validateCsrfToken($post['csrf_token'])) {
+            $_SESSION['buyer_reg_error'] = 'Invalid request. Please try again.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        // Required fields
+        $fullname = strip_tags(trim($post['fullname'] ?? ''));
+        $email    = filter_var(trim($post['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+        $phone    = preg_replace('/[^0-9+\-\s]/', '', $post['phone'] ?? '');
+        $password = $post['password'] ?? '';
+
+        if (!$fullname || !$email || !$phone || !$password) {
+            $_SESSION['buyer_reg_error'] = 'All fields are required.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $_SESSION['buyer_reg_error'] = 'Please enter a valid email address.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        if (strlen($password) < 6) {
+            $_SESSION['buyer_reg_error'] = 'Password must be at least 6 characters.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        // Duplicate check
+        $existingEmail = $this->db->get('users', 'id', ['email' => $email]);
+        if ($existingEmail) {
+            $_SESSION['buyer_reg_error'] = 'An account with this email already exists. <a href="/login" style="color:var(--accent)">Login instead?</a>';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        // Generate a username from email prefix + random suffix
+        $baseUsername = preg_replace('/[^a-zA-Z0-9]/', '', strtolower(explode('@', $email)[0]));
+        if (empty($baseUsername)) { $baseUsername = 'buyer'; }
+        $username = $baseUsername;
+        $attempts = 0;
+        while ($this->db->get('users', 'id', ['username' => $username]) && $attempts < 10) {
+            $username = $baseUsername . rand(100, 9999);
+            $attempts++;
+        }
+
+        // Upline = store owner they visited, fallback to user id 2
+        $referrerId = (int)($_SESSION['mall_checkout_seller_id'] ?? 2);
+        if (!$this->db->get('users', 'id', ['id' => $referrerId])) {
+            $referrerId = 2;
+        }
+
+        $nameParts = explode(' ', $fullname, 2);
+        $firstName = $nameParts[0];
+        $lastName  = $nameParts[1] ?? '';
+
+        $userModel = new \Ginto\Models\User($this->db);
+        $newUserId = $userModel->register([
+            'fullname'    => $fullname,
+            'firstname'   => $firstName,
+            'lastname'    => $lastName,
+            'username'    => $username,
+            'email'       => $email,
+            'phone'       => $phone,
+            'password'    => $password,
+            'referrer_id' => $referrerId,
+            'country'     => '',
+            'is_buyer'    => 1,
+            'role_id'     => 5,
+            'package'     => 'Starter',
+        ]);
+
+        if (!$newUserId) {
+            $_SESSION['buyer_reg_error'] = 'Registration failed. Please try again.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        $newUser = $userModel->find($newUserId);
+
+        // Auto-login
+        $_SESSION['user_id']              = $newUser['id'];
+        $_SESSION['username']             = $newUser['username'];
+        $_SESSION['fullname']             = $newUser['fullname'] ?? '';
+        $_SESSION['user']                 = $newUser['email'] ?? $newUser['username'] ?? '';
+        $_SESSION['user_email']           = $newUser['email'] ?? null;
+        $_SESSION['user_full_name']       = $newUser['fullname'] ?? 'Buyer';
+        $_SESSION['user_username']        = $newUser['username'] ?? '';
+        $_SESSION['user_profile_picture'] = null;
+        $_SESSION['role_id']              = $newUser['role_id'] ?? 5;
+        $_SESSION['role']                 = 'user';
+        try { $this->db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $newUser['id']]); } catch (\Throwable $__e) {}
+
+        $redirect = '/mall/checkout';
+        if (!empty($_SESSION['login_redirect'])) {
+            $redirect = $_SESSION['login_redirect'];
+            unset($_SESSION['login_redirect']);
+        }
+        header('Location: ' . $redirect);
+        exit;
     }
 
     private function requireUserJson(): int
