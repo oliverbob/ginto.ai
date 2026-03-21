@@ -485,6 +485,11 @@ class MallCheckoutController extends Controller
         if (empty($_SESSION['user_id'])) {
             if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'] ?? '/mall/checkout';
+            // Capture the seller id passed via URL so buyer registration uses the correct upline
+            $refSeller = (int)($_GET['ref_seller'] ?? 0);
+            if ($refSeller > 0) {
+                $_SESSION['mall_checkout_seller_id'] = $refSeller;
+            }
             header('Location: /mall/buyer-register');
             exit;
         }

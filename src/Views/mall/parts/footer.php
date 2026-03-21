@@ -33,6 +33,7 @@
             'badge'        => $p['badge'] ?? null,
             'seller_slug'  => $p['seller_slug'] ?? null,
             'seller_name'  => $p['seller_name'] ?? null,
+            'seller_id'    => (int)($p['seller_id'] ?? 0),
         ];
     }, $products ?? [])) ?>;
 
@@ -446,7 +447,10 @@
     }
     function checkout() {
         if (state.cart.length === 0) { showToast('Your cart is empty'); return; }
-        window.location.href = '/mall/checkout';
+        // Pass the primary seller from the cart so the server can assign the correct upline
+        const primarySellerId = (state.cart[0] && state.cart[0].seller_id) ? state.cart[0].seller_id : 0;
+        const url = primarySellerId > 0 ? '/mall/checkout?ref_seller=' + primarySellerId : '/mall/checkout';
+        window.location.href = url;
     }
 
     /* ============================
