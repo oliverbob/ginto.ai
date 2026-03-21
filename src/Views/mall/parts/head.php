@@ -630,6 +630,71 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .empty-state-icon { font-size: 2.5rem; margin-bottom: 12px; }
 .empty-state p { font-size: 0.95rem; }
 
+/* ========== CART FAB ========== */
+.cart-fab {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    z-index: 1100;
+    width: 58px;
+    height: 58px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 20px rgba(99,102,241,0.45), 0 2px 8px rgba(0,0,0,0.3);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.cart-fab:hover {
+    background: var(--accent-h);
+    transform: scale(1.08);
+    box-shadow: 0 6px 28px rgba(99,102,241,0.55), 0 2px 12px rgba(0,0,0,0.35);
+}
+.cart-fab:active { transform: scale(0.93); }
+.cart-fab-badge {
+    position: absolute;
+    top: 2px; right: 2px;
+    min-width: 20px; height: 20px;
+    background: var(--danger);
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    border-radius: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg);
+    line-height: 1;
+    pointer-events: none;
+}
+@keyframes cart-fab-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.2); }
+    70%  { transform: scale(0.93); }
+    100% { transform: scale(1); }
+}
+.cart-fab.pop { animation: cart-fab-pop 0.35s ease; }
+
+/* ========== PRODUCT STORE LINK ========== */
+.product-store-link {
+    display: block;
+    margin-top: 6px;
+    font-size: 0.78rem;
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: color var(--trans);
+}
+.product-store-link:hover { color: var(--accent-h); text-decoration: underline; }
+
 /* ========== CART DRAWER ========== */
 .drawer-overlay {
     position: fixed;

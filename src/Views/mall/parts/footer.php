@@ -129,6 +129,21 @@
             document.body.appendChild(drawerOverlay);
         }
 
+        if (!document.getElementById('cartFab')) {
+            const cartFab = document.createElement('button');
+            cartFab.id = 'cartFab';
+            cartFab.className = 'cart-fab';
+            cartFab.setAttribute('aria-label', 'Open shopping cart');
+            cartFab.onclick = function() { toggleCart(); };
+            cartFab.innerHTML = '<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">'
+                + '<path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>'
+                + '<line x1="3" y1="6" x2="21" y2="6"/>'
+                + '<path d="M16 10a4 4 0 01-8 0"/>'
+                + '</svg>'
+                + '<span class="cart-fab-badge" id="cartFabBadge" aria-live="polite"></span>';
+            document.body.appendChild(cartFab);
+        }
+
         if (!document.getElementById('cartDrawer')) {
             const cartDrawer = document.createElement('aside');
             cartDrawer.id = 'cartDrawer';
@@ -398,6 +413,17 @@
         if (cartBadge) {
             cartBadge.textContent = total > 0 ? (total > 99 ? '99+' : total) : '';
             cartBadge.style.display = total > 0 ? 'flex' : 'none';
+        }
+        const fabBadge = document.getElementById('cartFabBadge');
+        const fab = document.getElementById('cartFab');
+        if (fabBadge) {
+            fabBadge.textContent = total > 0 ? (total > 99 ? '99+' : total) : '';
+            fabBadge.style.display = total > 0 ? 'flex' : 'none';
+        }
+        if (fab && total > 0) {
+            fab.classList.remove('pop');
+            void fab.offsetWidth;
+            fab.classList.add('pop');
         }
         const totalPrice = state.cart.reduce((s, i) => s + i.price * i.qty, 0);
         const currency   = state.cart[0]?.currency || 'USD';
