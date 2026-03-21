@@ -1543,12 +1543,26 @@ class UserController extends \Core\Controller
                 exit;
             }
 
-            // Otherwise show success page for regular registration
-            $_SESSION['registered_fullname'] = $userData['fullname'];
-            $this->view('user/success', [
-                'title' => 'Success',
-                'message' => 'Registration successful! You can now log in.'
-            ]);
+            // Auto-login the new user and redirect to intended destination (e.g. checkout)
+            if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+            $_SESSION['user_id']              = $newUser['id'];
+            $_SESSION['username']             = $newUser['username'];
+            $_SESSION['fullname']             = $newUser['fullname'] ?? '';
+            $_SESSION['user']                 = $newUser['email'] ?? $newUser['username'] ?? '';
+            $_SESSION['user_email']           = $newUser['email'] ?? null;
+            $_SESSION['user_full_name']       = $newUser['fullname'] ?? 'User';
+            $_SESSION['user_username']        = $newUser['username'] ?? '';
+            $_SESSION['user_profile_picture'] = $newUser['avatar'] ?? $newUser['profile_picture'] ?? null;
+            $_SESSION['role_id']              = $newUser['role_id'] ?? 5;
+            $_SESSION['role']                 = 'user';
+            try { $this->db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $newUser['id']]); } catch (\Throwable $__e) {}
+            $redirect = '/chat';
+            if (!empty($_SESSION['login_redirect'])) {
+                $redirect = $_SESSION['login_redirect'];
+                unset($_SESSION['login_redirect']);
+            }
+            header('Location: ' . $redirect);
+            exit;
         } else {
             // Regular form error handling
             $this->view('user/register/register', [

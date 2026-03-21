@@ -478,7 +478,7 @@ class MallCheckoutController extends Controller
         if (empty($_SESSION['user_id'])) {
             if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
             $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'] ?? '/mall/checkout';
-            header('Location: /login');
+            header('Location: /register?intent=buy');
             exit;
         }
         return (int)$_SESSION['user_id'];
