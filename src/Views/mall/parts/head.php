@@ -636,23 +636,31 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     bottom: 28px;
     right: 28px;
     z-index: 1100;
-    width: 58px;
-    height: 58px;
+    width: 62px;
+    height: 62px;
     border-radius: 50%;
-    background: var(--accent);
-    color: #fff;
+    background: transparent;
     border: none;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 20px rgba(99,102,241,0.45), 0 2px 8px rgba(0,0,0,0.3);
-    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    padding: 0;
+    overflow: hidden;
+}
+.cart-fab-logo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+    pointer-events: none;
 }
 .cart-fab:hover {
-    background: var(--accent-h);
     transform: scale(1.08);
-    box-shadow: 0 6px 28px rgba(99,102,241,0.55), 0 2px 12px rgba(0,0,0,0.35);
+    box-shadow: 0 6px 28px rgba(0,0,0,0.45), 0 2px 12px rgba(0,0,0,0.3);
 }
 .cart-fab:active { transform: scale(0.93); }
 .cart-fab-badge {

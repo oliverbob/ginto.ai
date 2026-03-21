@@ -135,11 +135,7 @@
             cartFab.className = 'cart-fab';
             cartFab.setAttribute('aria-label', 'Open shopping cart');
             cartFab.onclick = function() { toggleCart(); };
-            cartFab.innerHTML = '<svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">'
-                + '<path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>'
-                + '<line x1="3" y1="6" x2="21" y2="6"/>'
-                + '<path d="M16 10a4 4 0 01-8 0"/>'
-                + '</svg>'
+            cartFab.innerHTML = '<img src="/assets/images/ginto.png" alt="Ginto AI" class="cart-fab-logo" aria-hidden="true">'
                 + '<span class="cart-fab-badge" id="cartFabBadge" aria-live="polite"></span>';
             document.body.appendChild(cartFab);
         }
