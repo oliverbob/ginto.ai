@@ -167,6 +167,28 @@ $payoutAccount = $payout_account ?? null;
     background: rgba(255,255,255,0.05);
     border-color: rgba(255,255,255,0.18);
 }
+.amount-chip {
+    padding: 8px 4px;
+    border-radius: 10px;
+    border: 1.5px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    font-size: 0.82rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, color 0.15s;
+    font-family: inherit;
+    text-align: center;
+}
+.amount-chip:hover {
+    background: rgba(255,255,255,0.07);
+    border-color: rgba(255,255,255,0.28);
+}
+.amount-chip.is-selected {
+    background: rgba(99,102,241,0.14);
+    border-color: rgba(99,102,241,0.65);
+    color: #a5b4fc;
+}
 .pf-input {
     width: 100%;
     padding: 11px 14px;
@@ -606,6 +628,12 @@ $payoutAccount = $payout_account ?? null;
                     <span style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;">Amount (₱)</span>
                     <input id="walletTopupAmount" type="number" min="1" step="0.01" class="pf-input" placeholder="500.00">
                 </label>
+                <!-- Preset amount chips -->
+                <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="amountChips">
+                    <?php foreach ([100,200,300,500,1000,2000] as $amt): ?>
+                    <button type="button" class="amount-chip" data-amount="<?= $amt ?>">₱<?= number_format($amt) ?></button>
+                    <?php endforeach; ?>
+                </div>
                 <div>
                     <div style="font-size:0.78rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:9px;">Payment Method</div>
                     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(80px,1fr));gap:8px;" id="payment-methods-grid">
@@ -1142,7 +1170,22 @@ $payoutAccount = $payout_account ?? null;
         });
     });
 
-    amountInput.addEventListener('input', updateTopupBreakdown);
+    amountInput.addEventListener('input', function() {
+        // Deselect chips if user types manually
+        document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('is-selected'));
+        updateTopupBreakdown();
+    });
+
+    // Preset amount chips
+    document.querySelectorAll('.amount-chip').forEach(function(chip) {
+        chip.addEventListener('click', function() {
+            document.querySelectorAll('.amount-chip').forEach(c => c.classList.remove('is-selected'));
+            chip.classList.add('is-selected');
+            amountInput.value = chip.dataset.amount;
+            updateTopupBreakdown();
+        });
+    });
+
     applySelectedMethodUI();
 
     wtCloseBtn.addEventListener('click', closeModal);
