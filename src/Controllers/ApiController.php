@@ -619,6 +619,21 @@ class ApiController extends Controller
         return preg_replace('/[^a-z0-9_\-]/', '', $provider) ?: '';
     }
 
+    /**
+     * Normalize a model name for a given provider.
+     * Groq requires the "openai/" prefix for gpt-oss-120b; Cerebras does not.
+     */
+    private function normalizeModelForProvider(string $provider, string $model): string
+    {
+        if ($provider === 'groq' && $model === 'gpt-oss-120b') {
+            return 'openai/gpt-oss-120b';
+        }
+        if ($provider === 'cerebras' && $model === 'openai/gpt-oss-120b') {
+            return 'gpt-oss-120b';
+        }
+        return $model;
+    }
+
     private function sanitizeOpenAiCompatibleBaseUrl(?string $baseUrl): ?string
     {
         $raw = trim(strip_tags((string)$baseUrl));
@@ -1296,12 +1311,24 @@ class ApiController extends Controller
             }
         }
 
-        $effectiveCurrentProvider = $_SESSION['current_provider'] ?? null;
-        $effectiveCurrentModel = $_SESSION['current_model'] ?? null;
+        // Non-admin users without their own API keys must always use the admin global selection.
+        // This prevents stale session/cookie values from overriding the admin's chosen default.
+        if (!$isAdmin && !$userHasAnyKey) {
+            $effectiveCurrentProvider = !empty($globalSelection['provider']) ? $globalSelection['provider'] : null;
+            $effectiveCurrentModel = !empty($globalSelection['model']) ? $globalSelection['model'] : null;
+        } else {
+            $effectiveCurrentProvider = $_SESSION['current_provider'] ?? null;
+            $effectiveCurrentModel = $_SESSION['current_model'] ?? null;
 
-        if ((empty($effectiveCurrentProvider) || empty($effectiveCurrentModel)) && !empty($globalSelection['provider'])) {
-            $effectiveCurrentProvider = $globalSelection['provider'];
-            $effectiveCurrentModel = $globalSelection['model'] ?? null;
+            if ((empty($effectiveCurrentProvider) || empty($effectiveCurrentModel)) && !empty($globalSelection['provider'])) {
+                $effectiveCurrentProvider = $globalSelection['provider'];
+                $effectiveCurrentModel = $globalSelection['model'] ?? null;
+            }
+        }
+
+        // Normalize model name to ensure correct provider prefix (e.g. groq needs openai/gpt-oss-120b)
+        if ($effectiveCurrentProvider && $effectiveCurrentModel) {
+            $effectiveCurrentModel = $this->normalizeModelForProvider($effectiveCurrentProvider, $effectiveCurrentModel);
         }
 
         $currentCapabilities = null;
@@ -1472,6 +1499,9 @@ class ApiController extends Controller
         $model = trim(strip_tags((string)($input['model'] ?? '')));
         $setGlobalDefault = !empty($input['set_global_default']) || !empty($input['set_default']);
 
+        // Normalize model name based on provider to avoid prefix mismatches
+        $model = $this->normalizeModelForProvider((string)$provider, $model);
+
         // Validate that the requesting user may select this provider.
         // Rules:
         // - Admins can select any provider/model.
@@ -1559,7 +1589,13 @@ class ApiController extends Controller
 
         $globalDefaultUpdated = false;
 
-        // Persist global default only for explicit admin requests.
+        // Admin model changes always persist as the global default for all users.
+        // Non-admin users with their own keys only update their own session.
+        if ($isAdmin && $provider && $model) {
+            $setGlobalDefault = true;
+        }
+
+        // Persist global default for admin selections.
         try {
                 if ($setGlobalDefault && $isAdmin) {
                 $val = json_encode(['provider' => $provider, 'model' => $model]);

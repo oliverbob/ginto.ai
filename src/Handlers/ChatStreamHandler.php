@@ -162,6 +162,15 @@ class ChatStreamHandler
             $sessionModel = $globalSelection['model'] ?? null;
         }
 
+        // Normalize model name based on provider
+        if ($sessionProvider && $sessionModel) {
+            if ($sessionProvider === 'groq' && $sessionModel === 'gpt-oss-120b') {
+                $sessionModel = 'openai/gpt-oss-120b';
+            } elseif ($sessionProvider === 'cerebras' && $sessionModel === 'openai/gpt-oss-120b') {
+                $sessionModel = 'gpt-oss-120b';
+            }
+        }
+
         if ($sessionProvider === 'ollama' && $sessionModel) {
             if ($this->handleOllamaRequest($prompt, $sessionModel, $isAdminUser)) {
                 exit;
@@ -770,6 +779,15 @@ class ChatStreamHandler
             $sessionModel = $globalSelection['model'] ?? null;
         }
 
+        // Normalize model name based on provider (e.g. groq needs openai/gpt-oss-120b prefix)
+        if ($sessionProvider && $sessionModel) {
+            if ($sessionProvider === 'groq' && $sessionModel === 'gpt-oss-120b') {
+                $sessionModel = 'openai/gpt-oss-120b';
+            } elseif ($sessionProvider === 'cerebras' && $sessionModel === 'openai/gpt-oss-120b') {
+                $sessionModel = 'gpt-oss-120b';
+            }
+        }
+
         // Check for local LLM preference
         $forceLocalLlm = false;
         if ($sessionProvider && $sessionModel && ($sessionProvider === 'local' || $sessionProvider === 'ginto')) {
@@ -847,6 +865,23 @@ class ChatStreamHandler
                     $selectedProvider = $userProvidedKey['provider'];
                     error_log(sprintf('[ChatStream] Using user-owned API key id=%d provider=%s for user=%s', $currentKeyId, $selectedProvider, $userIdSession));
                 }
+            }
+
+            // Non-admin users without a personal API key must always use the admin's global selection.
+            // This prevents stale session values from overriding the admin-chosen default.
+            if (!$isAdminUser && $userProvidedKey === null && !empty($globalSelection['provider'])) {
+                $sessionCloudProvider = $globalSelection['provider'];
+                $rawGlobalModel = $globalSelection['model'] ?? null;
+                // Normalize model name for provider
+                if ($rawGlobalModel) {
+                    if ($sessionCloudProvider === 'groq' && $rawGlobalModel === 'gpt-oss-120b') {
+                        $rawGlobalModel = 'openai/gpt-oss-120b';
+                    } elseif ($sessionCloudProvider === 'cerebras' && $rawGlobalModel === 'openai/gpt-oss-120b') {
+                        $rawGlobalModel = 'gpt-oss-120b';
+                    }
+                }
+                $sessionCloudModel = $rawGlobalModel;
+                error_log(sprintf('[ChatStream] Non-key user forced to global selection: provider=%s model=%s', $sessionCloudProvider, $sessionCloudModel ?? 'null'));
             }
 
             // Detect web search needs
