@@ -63,10 +63,16 @@ $csrfToken = $csrf_token ?? '';
 </style>
 
 <div class="wpage-wrap">
-    <a class="wpage-back" href="/wallet">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+    <a class="wpage-back" style="margin-bottom:0;" href="/wallet">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Wallet
     </a>
+    <a class="wpage-back" style="margin-bottom:0;" href="/wallet/storefront">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        My Storefront
+    </a>
+    </div>
     <div class="wpage-head">
         <div class="wpage-icon" style="background:rgba(59,130,246,0.10);color:#60a5fa;">
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>

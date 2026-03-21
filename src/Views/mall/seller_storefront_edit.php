@@ -97,6 +97,12 @@ $storeUrl   = 'https://ginto.ai/mall/' . $slug;
         </div>
         <ul class="sc-nav" role="list">
             <li class="sc-nav-item">
+                <a href="<?= $basePath ?>/storefront" class="active" aria-current="page">
+                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    My Storefront
+                </a>
+            </li>
+            <li class="sc-nav-item">
                 <a href="<?= $basePath ?>/products">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
                     My Products
@@ -106,12 +112,6 @@ $storeUrl   = 'https://ginto.ai/mall/' . $slug;
                 <a href="<?= $basePath ?>/products/new">
                     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
                     New Product
-                </a>
-            </li>
-            <li class="sc-nav-item">
-                <a href="<?= $basePath ?>/storefront" class="active" aria-current="page">
-                    <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                    My Storefront
                 </a>
             </li>
             <li class="sc-nav-divider" role="separator"></li>

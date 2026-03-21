@@ -569,6 +569,10 @@ $payoutAccount = $payout_account ?? null;
                 <div class="gw-balance-sub">Available balance</div>
                 <div class="gw-divider"></div>
                 <div class="wallet-actions">
+                    <a href="/wallet/storefront" class="gw-btn gw-btn-ghost">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                        My Storefront
+                    </a>
                     <a href="/mall/checkout" class="gw-btn gw-btn-ghost">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
                         Checkout

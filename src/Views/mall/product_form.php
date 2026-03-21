@@ -284,6 +284,8 @@ select.pf-input    { cursor: pointer; }
     </div>
     <div class="sidebar-inner" style="padding:16px 0">
         <ul class="sc-nav" role="list" style="list-style:none;margin:0;padding:0">
+            <?php $_sfBase = str_starts_with($_SERVER['REQUEST_URI'] ?? '', '/wallet/') ? '/wallet' : '/marketplace/sellers'; ?>
+            <li class="sc-nav-item"><a href="<?= $_sfBase ?>/storefront" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🏪 My Storefront</a></li>
             <li class="sc-nav-item"><a href="<?= $_pBase ?>" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">📦 My Products</a></li>
             <li class="sc-nav-item"><a href="<?= $_pBase ?>/new" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--accent);text-decoration:none;font-weight:600">➕ New Product</a></li>
             <li class="sc-nav-item"><a href="<?= $_kycPath ?>" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🪹 KYC Verification</a></li>

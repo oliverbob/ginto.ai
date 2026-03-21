@@ -337,6 +337,7 @@ details summary::-webkit-details-marker { display: none; }
     </div>
     <div class="sidebar-inner" style="padding:16px 0">
         <ul class="sc-nav" role="list" style="list-style:none;margin:0;padding:0">
+            <li class="sc-nav-item"><a href="/marketplace/sellers/storefront" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">🏪 My Storefront</a></li>
             <li class="sc-nav-item"><a href="/marketplace/sellers/products" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">📦 My Products</a></li>
             <li class="sc-nav-item"><a href="/marketplace/sellers/products/new" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--text);text-decoration:none">➕ New Product</a></li>
             <li class="sc-nav-item"><a href="/marketplace/sellers/kyc" style="display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:0.875rem;color:var(--accent);text-decoration:none;font-weight:600">🪪 KYC Verification</a></li>
