@@ -845,7 +845,7 @@ body.light .co-qr-spinner {
                 <div>
                     <div class="checkout-kicker" style="font-size:0.82rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(214,180,75,0.7);font-weight:800;margin-bottom:8px;">Mall Checkout</div>
                     <h1 class="checkout-title" style="margin:0 0 10px;font-size:2.1rem;line-height:1.1;font-weight:900;letter-spacing:-0.02em;">Finish your order</h1>
-                    <p class="checkout-subtitle" style="margin:0;color:var(--muted);font-size:1rem;line-height:1.7;max-width:640px;">Ginto Pay routes through PayMongo. Card payment means the user pays with a regular credit or debit card.</p>
+                    <p class="checkout-subtitle" style="margin:0;color:var(--muted);font-size:1rem;line-height:1.7;max-width:640px;">QR &amp; card payments are processed by PayMongo. Card payment means you pay with a regular credit or debit card via PayMongo's secure checkout.</p>
                 </div>
                 <a href="/marketplace" class="checkout-back" style="display:inline-flex;align-items:center;gap:7px;padding:10px 18px;border-radius:12px;border:1px solid rgba(255,255,255,0.1);background:rgba(255,255,255,0.05);color:var(--muted);font-size:0.88rem;font-weight:700;transition:all 0.18s;text-decoration:none;" onmouseover="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='var(--text)';" onmouseout="this.style.borderColor='rgba(255,255,255,0.1)';this.style.color='var(--muted)';">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
@@ -905,7 +905,7 @@ body.light .co-qr-spinner {
                 <button type="button" class="pm-card is-selected" data-method="ginto_pay_qr">
                     <div class="pm-icon" style="background:linear-gradient(135deg,#92650a,#d4af37);"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"><img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
                     <div class="pm-body">
-                        <div class="pm-name">Ginto Pay</div>
+                        <div class="pm-name">via PayMongo</div>
                         <div class="pm-desc">QR · InstaPay / PESONet</div>
                     </div>
                     <div class="pm-check">✓</div>
@@ -957,15 +957,15 @@ body.light .co-qr-spinner {
             </div>
 
             <div id="qrWrap" style="display:none;margin-top:18px;border:1px dashed var(--border);border-radius:22px;padding:20px;background:var(--surface2);text-align:center;">
-                <h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to complete Ginto Pay</h3>
-                <img id="qrImage" src="" alt="Ginto Pay QR" style="max-width:320px;width:min(100%, 320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;display:none;margin:0 auto 12px;">
+                <h3 style="margin:0 0 10px;font-size:1rem;font-weight:800;">Scan to complete your payment</h3>
+                <img id="qrImage" src="" alt="Payment QR Code" style="max-width:320px;width:min(100%, 320px);border-radius:16px;border:1px solid var(--border);background:#fff;padding:12px;display:none;margin:0 auto 12px;">
                 <div id="qrFallback" style="font-size:0.8rem;color:var(--muted);display:none;"></div>
                 <div id="qrStatus" style="font-size:0.86rem;color:var(--muted);">Waiting for payment confirmation…</div>
             </div>
 
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
                 <button type="button" id="startCheckoutBtn" style="display:none;" aria-hidden="true"></button>
-                <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Wallet</a>
+                <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Add Mall Credits</a>
                 <span class="checkout-hint" style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
             </div>
         </div>
@@ -1045,7 +1045,7 @@ body.light .co-qr-spinner {
             <div id="coQrLoading" class="co-qr-loading">
                 <div class="co-qr-spinner" aria-hidden="true"></div>
                 <div class="co-qr-loading-title">Generating QR for easy-scan payment</div>
-                <div class="co-qr-loading-copy">We are preparing your Ginto Pay QR so you can scan it quickly with your banking app.</div>
+                <div class="co-qr-loading-copy">We are preparing your payment QR code so you can scan it quickly with your banking app.</div>
             </div>
             <img id="coQrImg" src="" alt="Ginto Pay QR" style="display:none;">
             <div id="coQrFallback" style="font-size:0.8rem;color:var(--muted);display:none;"></div>
@@ -1120,7 +1120,7 @@ body.light .co-qr-spinner {
                 <?php endif; ?>
             </div>
 
-            <div class="co-card-help">Card payments are processed directly in Ginto Pay. If your bank requires OTP or 3DS verification, it will open inside this checkout flow.</div>
+            <div class="co-card-help">Card payments are processed securely by PayMongo. If your bank requires OTP or 3DS verification, it will open inside this checkout flow.</div>
             <div id="coCardStatus" class="co-card-status"></div>
         </div>
         <div class="co-actions">
@@ -1457,7 +1457,7 @@ body.light .co-qr-spinner {
     // ── Payment method display metadata ──
     const pmMeta = {
         ginto_pay_qr: {
-            name: 'Ginto Pay',
+            name: 'via PayMongo',
             iconBg: 'transparent',
             iconHtml: '<img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:contain;">',
             confirmLabel: 'Generate QR & Pay',
@@ -1652,7 +1652,7 @@ body.light .co-qr-spinner {
         coCardBox.style.display  = selectedMethod === 'ginto_pay_card' ? 'block' : 'none';
         coPpBox.style.display    = 'none';
         coPpContainer.innerHTML  = '';
-        coCardStatus.textContent = selectedMethod === 'ginto_pay_card' ? 'Enter card details to pay directly inside Ginto Pay.' : '';
+        coCardStatus.textContent = selectedMethod === 'ginto_pay_card' ? 'Enter your card details to pay securely via PayMongo.' : '';
         coCancel.textContent     = 'Cancel';
         coModal.querySelector('.co-card').classList.toggle('is-scrollable', selectedMethod === 'ginto_pay_card');
         coModal.style.display    = 'flex';
@@ -1753,7 +1753,7 @@ body.light .co-qr-spinner {
                 return;
             }
             if (selectedMethod === 'wallet' && walletBalance <= 0) {
-                setError('Your Ginto Wallet balance is ₱0.00. Please top up first.');
+                setError('Your Mall Credit balance is ₱0.00. Please add credits first.');
                 return;
             }
             openModal();

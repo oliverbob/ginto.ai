@@ -1922,6 +1922,11 @@ $router->req('/privacy', function() {
     \Ginto\Core\View::view('privacy', ['title' => 'Privacy Policy | Ginto']);
 });
 
+// Terms of Service
+$router->req('/terms', function() {
+    \Ginto\Core\View::view('terms', ['title' => 'Terms of Service | Ginto']);
+});
+
 // Delete account — confirmation page (GET) and execution (POST)
 $router->req('/account/delete', function() use ($db) {
     $ctrl = new \Ginto\Controllers\UserController($db);
