@@ -464,6 +464,9 @@
         const p = state.products.find(x => x.id === id);
         if (!p || !qvOverlay) return;
 
+        // Push history entry so Android back button closes the modal
+        history.pushState({ qvProduct: id }, '', '?product=' + id);
+
         _qvImgs = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : [PLACEHOLDER]);
         _qvIdx  = 0;
 
@@ -548,15 +551,28 @@
         wrap.addEventListener('mousemove', _qvZoomFn);
     }
 
-    function closeQV() {
+    function closeQV(opts) {
         if (!qvOverlay) return;
         qvOverlay.classList.remove('active');
         qvOverlay.setAttribute('aria-hidden', 'true');
         document.body.style.overflow = '';
         const wrap = document.getElementById('qvMainWrap');
         if (wrap && _qvZoomFn) { wrap.removeEventListener('mousemove', _qvZoomFn); _qvZoomFn = null; }
+        // Clean URL unless already handled by popstate
+        if (!opts || !opts._fromPopstate) {
+            if (location.search.includes('product=')) {
+                history.back();
+            }
+        }
     }
     if (qvOverlay) qvOverlay.addEventListener('click', function (e) { if (e.target === qvOverlay) closeQV(); });
+
+    // Handle Android/browser back button
+    window.addEventListener('popstate', function (e) {
+        if (qvOverlay && qvOverlay.classList.contains('active')) {
+            closeQV({ _fromPopstate: true });
+        }
+    });
 
     /* ============================
      * UPLOAD MODAL

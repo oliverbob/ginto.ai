@@ -273,10 +273,12 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     width: auto;
     padding: 0 10px;
     min-width: 42px;
+    color: #d4af37 !important;
 }
 .wallet-balance-text {
     font-size: 0.75rem;
     font-weight: 700;
+    color: #d4af37;
 }
 .notify-wrap {
     position: relative;
