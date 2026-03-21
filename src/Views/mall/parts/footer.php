@@ -30,7 +30,9 @@
             'img'      => $img,
             'imgs'     => $imgs_arr,
             'desc'     => $p['short_description'] ?? '',
-            'badge'    => $p['badge'] ?? null,
+            'badge'        => $p['badge'] ?? null,
+            'seller_slug'  => $p['seller_slug'] ?? null,
+            'seller_name'  => $p['seller_name'] ?? null,
         ];
     }, $products ?? [])) ?>;
 
@@ -349,6 +351,7 @@
                     </div>
                     <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
                     <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart">Add to Cart</button>
+                    ${p.seller_slug ? `<a class="product-store-link" href="/mall/${esc(p.seller_slug)}" onclick="event.stopPropagation()">🏪 ${esc(p.seller_name || 'View Store')}</a>` : ''}
                 </div>`;
             frag.appendChild(card);
         });

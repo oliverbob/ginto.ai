@@ -29,6 +29,23 @@ class MallController extends \Core\Controller
 
         $productModel = new \Ginto\Models\Product();
         $products = $productModel->list(['limit' => 48]);
+
+        // Attach seller storefront slugs to each product
+        $sellerIds = array_values(array_unique(array_filter(array_column($products, 'seller_id'))));
+        $sellerMap = [];
+        if (!empty($sellerIds)) {
+            $storefronts = $this->db->select('seller_storefronts', ['user_id', 'slug', 'display_name'], ['user_id' => $sellerIds, 'is_active' => 1]) ?: [];
+            foreach ($storefronts as $sf) {
+                $sellerMap[(int)$sf['user_id']] = ['slug' => $sf['slug'], 'name' => $sf['display_name']];
+            }
+        }
+        foreach ($products as &$p) {
+            $sid = (int)($p['seller_id'] ?? 0);
+            $p['seller_slug'] = $sellerMap[$sid]['slug'] ?? null;
+            $p['seller_name'] = $sellerMap[$sid]['name'] ?? null;
+        }
+        unset($p);
+
         $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
         $commerce = new MallCommerceService($this->db);
         $walletSummary = $userId > 0 ? $commerce->getWalletSummary($userId) : ['account' => []];
