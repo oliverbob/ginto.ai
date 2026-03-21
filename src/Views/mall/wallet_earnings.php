@@ -59,11 +59,11 @@ $deductions = $gross - $net;
 
     <div class="balance-grid">
         <div class="balance-item">
-            <div class="balance-item-label">Wallet Balance</div>
+            <div class="balance-item-label">Platform Credits <small style="font-size:0.75em;color:var(--muted);">(Non-withdrawable)</small></div>
             <div class="balance-item-val" style="color:var(--accent);">₱<?= number_format($balance, 2) ?></div>
         </div>
         <div class="balance-item">
-            <div class="balance-item-label">Net Earnings (Total)</div>
+            <div class="balance-item-label">Estimated Revenue <small style="font-size:0.75em;color:var(--muted);">Reporting only</small></div>
             <div class="balance-item-val" style="color:#a5b4fc;">₱<?= number_format($net, 2) ?></div>
         </div>
     </div>
@@ -91,10 +91,10 @@ $deductions = $gross - $net;
 
     <div class="earnings-card" style="text-align:center;padding:32px;">
         <div class="big-num">₱<?= number_format($net, 2) ?></div>
-        <div class="big-sub">Total net earnings from <?= (int)$sellerStats['order_count'] ?> paid order<?= (int)$sellerStats['order_count'] !== 1 ? 's' : '' ?></div>
+        <div class="big-sub">For reporting purposes only. Actual funds are settled externally by your payment provider.</div>
         <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
             <a href="/wallet/sales" class="btn btn-secondary" style="text-decoration:none;font-size:0.82rem;">View Sales</a>
-            <a href="/wallet/payout-accounts" class="btn btn-primary" style="text-decoration:none;font-size:0.82rem;">Manage Payout Account</a>
+            <a href="/wallet/payout-accounts" class="btn btn-primary" style="text-decoration:none;font-size:0.82rem;">Manage Settlement Account</a>
         </div>
     </div>
 </div>

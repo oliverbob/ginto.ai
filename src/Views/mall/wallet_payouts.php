@@ -51,13 +51,13 @@ $sellerStats = $seller_stats ?? ['gross_sales'=>0,'net_earnings'=>0,'order_count
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
         <div>
-            <div class="wpage-title">Pending Payouts</div>
-            <div class="wpage-sub">Earnings automatically sent to your registered account on schedule</div>
+            <div class="wpage-title">Pending Settlements</div>
+            <div class="wpage-sub">Amounts pending settlement by your selected payment provider</div>
         </div>
     </div>
 
     <div class="info-note">
-        Payouts are automatically sent to your registered bank or e-wallet account on a scheduled basis. This complies with BSP regulations — no manual withdrawal is required or allowed.
+        Settlement amounts are processed by your selected payment provider and routed to your registered account. Ginto Mall does not hold or process user funds.
         <a href="/wallet/payout-accounts" style="color:#93c5fd;font-weight:700;margin-left:8px;">Manage payout accounts →</a>
     </div>
 

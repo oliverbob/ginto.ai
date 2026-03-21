@@ -523,32 +523,32 @@ $payoutAccount = $payout_account ?? null;
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['gross_sales'], 2) ?></div>
         <div class="wstat-sub"><?= (int)$sellerStats['order_count'] ?> paid order<?= (int)$sellerStats['order_count'] !== 1 ? 's' : '' ?></div>
     </a>
-    <!-- Commissions -->
+    <!-- Referral Rewards -->
     <a class="wstat" href="/wallet/commissions">
         <div class="wstat-icon" style="background:rgba(245,158,11,0.12);color:#fbbf24;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
-        <div class="wstat-label">Commissions</div>
+        <div class="wstat-label">Referral Rewards <small style="font-size:0.65em;color:var(--muted);font-weight:500;">(Off-platform)</small></div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['total_commissions'], 2) ?></div>
-        <div class="wstat-sub">From referral chain (10%)</div>
+        <div class="wstat-sub">Issued separately, not in wallet</div>
     </a>
-    <!-- Earnings -->
+    <!-- Estimated Revenue -->
     <a class="wstat" href="/wallet/earnings">
         <div class="wstat-icon" style="background:rgba(99,102,241,0.12);color:#a5b4fc;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
         </div>
-        <div class="wstat-label">Earnings</div>
+        <div class="wstat-label">Estimated Revenue</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['net_earnings'], 2) ?></div>
-        <div class="wstat-sub">Net after fees &amp; charges</div>
+        <div class="wstat-sub">For reporting purposes only</div>
     </a>
-    <!-- Pending Payouts -->
+    <!-- Pending Settlements -->
     <a class="wstat" href="/wallet/payouts">
         <div class="wstat-icon" style="background:rgba(239,68,68,0.10);color:#f87171;">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
         </div>
-        <div class="wstat-label">Pending Payouts</div>
+        <div class="wstat-label">Pending Settlements</div>
         <div class="wstat-value">₱<?= number_format((float)$sellerStats['pending_payout'], 2) ?></div>
-        <div class="wstat-sub">Auto-sent on schedule</div>
+        <div class="wstat-sub">Processed by your payment provider</div>
     </a>
 </section>
 
@@ -561,12 +561,12 @@ $payoutAccount = $payout_account ?? null;
                 <div style="display:flex;align-items:center;justify-content:space-between;">
                     <span class="gw-chip">
                         <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#a5b4fc" opacity="0.7"/></svg>
-                        Ginto Wallet
+                        Platform Credits
                     </span>
-                    <span style="font-size:0.68rem;color:rgba(199,210,254,0.45);font-weight:600;letter-spacing:0.06em;">ACTIVE</span>
+                    <span style="font-size:0.68rem;color:rgba(239,68,68,0.55);font-weight:600;letter-spacing:0.06em;">NON-WITHDRAWABLE</span>
                 </div>
                 <div class="gw-balance">₱<?= number_format((float)($wallet['balance'] ?? 0), 2) ?></div>
-                <div class="gw-balance-sub">Available balance</div>
+                <div class="gw-balance-sub">Can only be used for Ginto Mall purchases</div>
                 <div class="gw-divider"></div>
                 <div class="wallet-actions">
                     <a href="/wallet/storefront" class="gw-btn gw-btn-ghost">
@@ -599,7 +599,7 @@ $payoutAccount = $payout_account ?? null;
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
             </div>
             <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
-                Ginto Pay top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. PayPal top-ups include ₱25.00 plus a 5% service fee. Wallet funds are purchase-only and cannot be withdrawn. This may change depending on bank or payment processor, bank or international card type.
+                Ginto Pay top-ups (QR or card) include a fixed fee of ₱25.00 per transaction. PayPal top-ups include ₱25.00 plus a 5% service fee. Platform credits are non-withdrawable and can only be used for Ginto Mall purchases. This may change depending on bank or payment processor, bank or international card type.
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
@@ -658,19 +658,19 @@ $payoutAccount = $payout_account ?? null;
             </div>
         </div>
 
-        <!-- Payout Account Panel -->
+        <!-- Settlement Account Panel -->
         <div class="payout-panel">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
                 <div>
-                    <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Payout Account</h2>
-                    <p style="margin:0;font-size:0.76rem;color:var(--muted);">Where we send your earnings automatically.</p>
+                    <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Settlement Account (External)</h2>
+                    <p style="margin:0;font-size:0.76rem;color:var(--muted);">Where your payment provider sends your sales proceeds.</p>
                 </div>
                 <?php if ($payoutAccount): ?>
                 <span style="font-size:0.65rem;padding:3px 8px;border-radius:6px;background:rgba(34,197,94,0.12);color:#4ade80;font-weight:700;border:1px solid rgba(34,197,94,0.2);">SAVED</span>
                 <?php endif; ?>
             </div>
             <div style="margin:12px 0;padding:10px 12px;border-radius:10px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.18);font-size:0.76rem;color:#93c5fd;line-height:1.55;">
-                Earnings are automatically sent to your registered account on schedule. This complies with Bangko Sentral ng Pilipinas regulations — no manual withdrawal required.
+                Ginto Mall does not hold or process user funds. All payments and settlements are handled by licensed payment providers.
             </div>
             <div style="display:flex;gap:8px;margin-bottom:16px;" id="payoutTypeRow">
                 <button type="button" class="payout-type-btn active" data-type="bank" id="ptypeBank">🏦 Bank Account</button>
@@ -694,7 +694,7 @@ $payoutAccount = $payout_account ?? null;
                     <input id="payoutAccountNumber" type="text" class="pf-input" placeholder="e.g. 09XX XXX XXXX or account number" value="<?= htmlspecialchars($payoutAccount['account_number'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                 </label>
                 <div id="payoutSaveMsg" style="display:none;padding:10px 12px;border-radius:10px;font-size:0.82rem;"></div>
-                <button type="button" id="payoutSaveBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.88rem;font-weight:800;padding:11px 18px;">Save Payout Account</button>
+                <button type="button" id="payoutSaveBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.88rem;font-weight:800;padding:11px 18px;">Save Settlement Account</button>
             </div>
         </div>
     </div>

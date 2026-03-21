@@ -50,13 +50,13 @@ $sellerStats = $seller_stats ?? ['gross_sales'=>0,'net_earnings'=>0,'order_count
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         </div>
         <div>
-            <div class="wpage-title">My Commissions</div>
-            <div class="wpage-sub">Earned via your referral chain at 10% per level</div>
+            <div class="wpage-title">Referral Rewards</div>
+            <div class="wpage-sub">Rewards are issued separately and are not stored in your wallet</div>
         </div>
     </div>
 
     <div class="info-note">
-        Commissions are computed at <strong>10%</strong> of the transaction amount for each referral in your chain. The referral chain is determined at registration and follows the hierarchy set in the admin panel.
+        <strong>Off-platform rewards (Off-platform):</strong> These figures are for reference only. Rewards are issued separately and are not stored in your Ginto Mall wallet. Ginto Mall does not hold or process user funds.
     </div>
 
     <div class="wstat-mini">

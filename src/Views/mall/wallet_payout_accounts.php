@@ -78,13 +78,13 @@ $csrfToken = $csrf_token ?? '';
             <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
         </div>
         <div>
-            <div class="wpage-title">Payout Accounts</div>
-            <div class="wpage-sub">Manage bank accounts and e-wallets for automatic payouts</div>
+            <div class="wpage-title">Settlement Accounts (External)</div>
+            <div class="wpage-sub">Manage bank accounts and e-wallets where your payment provider sends your sales proceeds</div>
         </div>
     </div>
 
     <div class="info-note">
-        <strong>Auto-Payout:</strong> Your <strong>default account</strong> receives scheduled earnings automatically — no manual withdrawal needed. This complies with BSP regulations.
+        <strong>Settlement Notice:</strong> Your <strong>default account</strong> is where your payment provider routes your sales proceeds. Ginto Mall does not hold or process user funds — all payments and settlements are handled by licensed payment providers.
         Set any account as default below.
     </div>
 
@@ -137,7 +137,7 @@ $csrfToken = $csrf_token ?? '';
     <!-- Add New Account -->
     <div class="add-acct-section">
         <h2 class="section-title">Add New Account</h2>
-        <p class="section-sub">Bank accounts and e-wallets listed here are regulated by the Bangko Sentral ng Pilipinas (BSP).</p>
+        <p class="section-sub">Add the bank account or e-wallet where your payment provider should send your sales proceeds.</p>
 
         <div style="display:flex;gap:8px;margin-bottom:16px;">
             <button type="button" class="payout-type-btn active" data-type="bank" id="ptypeBank">🏦 Bank Account</button>
@@ -163,10 +163,10 @@ $csrfToken = $csrf_token ?? '';
             </label>
             <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
                 <input type="checkbox" id="newPayoutIsDefault" style="width:16px;height:16px;accent-color:var(--accent);">
-                <span style="font-size:0.82rem;font-weight:600;">Set as default payout account</span>
+                <span style="font-size:0.82rem;font-weight:600;">Set as default settlement account</span>
             </label>
             <div id="addAcctMsg" class="feedback-msg"></div>
-            <button type="button" id="addAcctBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.88rem;font-weight:800;padding:11px 18px;">Add Account</button>
+            <button type="button" id="addAcctBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.88rem;font-weight:800;padding:11px 18px;">Add Settlement Account</button>
         </div>
     </div>
 </div>
