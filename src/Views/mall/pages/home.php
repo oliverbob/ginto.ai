@@ -36,6 +36,27 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                 </a>
             </div>
 
+            <!-- Mall quick links -->
+            <div class="sidebar-section" style="margin-bottom:16px">
+                <div class="sidebar-section-title">Mall</div>
+                <a class="cat-item" href="/marketplace" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#a5b4fc" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </span>
+                    Mall Home
+                </a>
+                <a class="cat-item" href="/mall/orders" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(99,102,241,0.1);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#a5b4fc" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    </span>
+                    My Orders
+                </a>
+                <a class="cat-item" href="/wallet" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,rgba(214,180,75,0.18),rgba(245,210,90,0.10));border:1px solid rgba(214,180,75,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;font-weight:800;color:#d4af37;">₱</span>
+                    Ginto Pay<?php if ($isLoggedIn && isset($mall_wallet_balance)): ?> <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#d4af37;">₱<?= number_format((float)$mall_wallet_balance, 2) ?></span><?php endif; ?>
+                </a>
+            </div>
+
             <!-- Categories -->
             <div class="sidebar-section">
                 <div class="sidebar-section-title">Categories</div>
@@ -93,28 +114,6 @@ $isLoggedIn = !empty($_SESSION['user_id']);
 
     <!-- ===== MAIN CONTENT ===== -->
     <main class="main-content" id="mainContent">
-
-        <?php if ($isLoggedIn): ?>
-        <!-- Quick access bar -->
-        <div style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 0 4px;margin-bottom:4px;">
-            <a href="/wallet" style="display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(214,180,75,0.13),rgba(245,210,90,0.07));border:1px solid rgba(214,180,75,0.28);text-decoration:none;color:inherit;min-width:0;flex:1;max-width:220px;">
-                <span style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#92650a,#d4af37);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.95rem;font-weight:800;color:#fff;">₱</span>
-                <div style="min-width:0;">
-                    <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Ginto Pay</div>
-                    <div style="font-size:0.92rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">₱<?= number_format((float)($mall_wallet_balance ?? 0), 2) ?></div>
-                </div>
-            </a>
-            <a href="/mall/orders" style="display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:14px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);text-decoration:none;color:inherit;flex:1;max-width:180px;">
-                <span style="width:30px;height:30px;border-radius:9px;background:rgba(99,102,241,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-                    <svg width="15" height="15" fill="none" stroke="#a5b4fc" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
-                </span>
-                <div>
-                    <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Orders</div>
-                    <div style="font-size:0.92rem;font-weight:800;">My Orders</div>
-                </div>
-            </a>
-        </div>
-        <?php endif; ?>
 
         <!-- Toolbar -->
         <div class="main-toolbar">
