@@ -9,6 +9,7 @@ $pageTitle = $pageKind === 'seller' ? 'Seller Orders' : ($pageKind === 'delivery
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 
+<div class="mall-content-push">
 <section style="max-width:1260px;margin:28px auto 72px;padding:0 18px;display:flex;flex-direction:column;gap:18px;">
     <div style="border:1px solid var(--border);background:linear-gradient(140deg, rgba(255,255,255,0.05), rgba(69,122,255,0.1), rgba(255,214,102,0.15));border-radius:26px;padding:26px;display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap;">
         <div>

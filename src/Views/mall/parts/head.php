@@ -1188,12 +1188,16 @@ input[type="file"].form-input { padding: 7px 12px; }
     body.has-fallback-sidebar .wallet-layout,
     body.has-fallback-sidebar .wallet-stats-row,
     body.has-fallback-sidebar .page-layout,
+    body.has-fallback-sidebar .mall-content-push,
+    body.has-fallback-sidebar .wpage-wrap,
     body.has-fallback-sidebar section[style*="max-width"] {
         transition: margin-left var(--trans);
     }
     body.has-fallback-sidebar.fallback-sidebar-open .wallet-layout,
     body.has-fallback-sidebar.fallback-sidebar-open .wallet-stats-row,
     body.has-fallback-sidebar.fallback-sidebar-open .page-layout,
+    body.has-fallback-sidebar.fallback-sidebar-open .mall-content-push,
+    body.has-fallback-sidebar.fallback-sidebar-open .wpage-wrap,
     body.has-fallback-sidebar.fallback-sidebar-open section[style*="max-width"] {
         margin-left: 300px;
     }
