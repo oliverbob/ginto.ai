@@ -1628,6 +1628,14 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
 
   // ============ SIMPLE CONVERSATION PERSISTENCE ============
   const STORAGE_KEY = 'ginto_conversations_v2';
+
+  // Generate a UUID v4 for conversation IDs (format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx)
+  function generateUUID() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      const r = Math.random() * 16 | 0;
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  }
   
   // ============ DATABASE SYNC FOR LOGGED-IN USERS ============
   // Check if user is logged in (set by view template)
@@ -1821,6 +1829,45 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     if (allConvos[activeConvoId]) {
       console.log('[initializeChat] convo messages:', allConvos[activeConvoId].messages?.length);
     }
+
+    // Handle chat routing targets set by the server:
+    //   GINTO_CHAT_TARGET.forceNew = true  → /chat was loaded, always start empty
+    //   GINTO_CHAT_TARGET.convoId          → /chat/c/{id} was loaded, load that conversation
+    const chatTarget = window.GINTO_CHAT_TARGET || {};
+    if (chatTarget.forceNew) {
+      // /chat always starts with a fresh conversation
+      activeConvoId = generateUUID();
+      history.length = 0;
+      window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+      console.log('[initializeChat] forceNew: started fresh convo', activeConvoId);
+      renderMessages();
+      renderConvoList();
+      return;
+    }
+    if (chatTarget.convoId) {
+      const targetId = chatTarget.convoId;
+      console.log('[initializeChat] target convoId:', targetId, 'found:', !!allConvos[targetId]);
+      if (allConvos[targetId]) {
+        activeConvoId = targetId;
+        history.length = 0;
+        (allConvos[targetId].messages || []).forEach(m => {
+          if (m && m.role && (m.content !== undefined || m.html !== undefined)) {
+            history.push({...m});
+          }
+        });
+        window.history.replaceState({ convoId: targetId }, '', '/chat/c/' + targetId);
+        console.log('[initializeChat] Loaded target convo with', history.length, 'messages');
+      } else {
+        // Conversation not found — start fresh
+        activeConvoId = generateUUID();
+        history.length = 0;
+        window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+        console.warn('[initializeChat] target convo not found, starting fresh');
+      }
+      renderMessages();
+      renderConvoList();
+      return;
+    }
     
     // If we have an active convo, load its messages
     if (activeConvoId && allConvos[activeConvoId]) {
@@ -1834,7 +1881,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       console.log('[initializeChat] Loaded', history.length, 'messages into history');
     } else {
       // Create first conversation
-      activeConvoId = 'c_' + Date.now();
+      activeConvoId = generateUUID();
       allConvos[activeConvoId] = { id: activeConvoId, title: 'New chat', messages: [], ts: Date.now() };
       console.log('[initializeChat] Created new conversation:', activeConvoId);
     }
@@ -1885,7 +1932,30 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     }
   });
 
-  // Clear ALL persisted data on logout click
+  // Handle browser back/forward navigation to switch conversations
+  window.addEventListener('popstate', (e) => {
+    try {
+      const state = e.state || {};
+      if (state.convoId && allConvos[state.convoId]) {
+        // Navigate to a specific conversation
+        activeConvoId = state.convoId;
+        history.length = 0;
+        (allConvos[activeConvoId].messages || []).forEach(m => history.push({...m}));
+        renderMessages();
+        renderConvoList();
+        console.log('[popstate] Switched to convo:', activeConvoId);
+      } else if (!state.convoId) {
+        // Navigate back to empty /chat
+        activeConvoId = generateUUID();
+        history.length = 0;
+        renderMessages();
+        renderConvoList();
+        console.log('[popstate] Back to empty chat, new id:', activeConvoId);
+      }
+    } catch (e) {
+      console.warn('[popstate] error', e);
+    }
+  });
   (function bindLogoutClear() {
     try {
       const logoutEl = document.getElementById('logout-link');
@@ -1931,6 +2001,10 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     if (!allConvos[activeConvoId]) {
       allConvos[activeConvoId] = { id: activeConvoId, title: 'New chat', messages: [], ts: Date.now() };
     }
+    // Push URL to /chat/c/{id} when this is the first sync (i.e., we're still at /chat)
+    if (history.length > 0 && window.location.pathname === '/chat') {
+      window.history.pushState({ convoId: activeConvoId }, '', '/chat/c/' + activeConvoId);
+    }
     console.log('[syncCurrentConvo] Syncing', activeConvoId, 'with', history.length, 'messages');
     // Deep copy messages, but strip large base64 imageUrl data to avoid localStorage quota issues
     // Keep server URLs (they start with /) as they are small and needed for display
@@ -1960,8 +2034,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       syncCurrentConvo();
     }
     console.log('[newConvo] After sync - allConvos:', Object.keys(allConvos).length);
-    // Create new
-    activeConvoId = 'c_' + Date.now();
+    // Create new with UUID
+    activeConvoId = generateUUID();
     const newConvoData = { id: activeConvoId, title: 'New chat', messages: [], ts: Date.now() };
     allConvos[activeConvoId] = newConvoData;
     history.length = 0;
@@ -1971,10 +2045,14 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     if (isUserLoggedIn()) {
       saveConvoToDb(activeConvoId, newConvoData);
     }
+    // Update URL to /chat (fresh empty conversation)
+    window.history.pushState({ convoId: null, fresh: true }, '', '/chat');
     console.log('[newConvo] Saved. Rendering...');
     renderConvoList();
     renderMessages();
   }
+  // Expose newConvo globally so other scripts can call it without a page reload
+  window.newConvo = newConvo;
   
   // Switch to a conversation
   function switchConvo(id) {
@@ -1986,6 +2064,8 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     history.length = 0;
     allConvos[id].messages.forEach(m => history.push({...m}));
     saveAllConvos();
+    // Update URL to reflect the selected conversation
+    window.history.pushState({ convoId: id }, '', '/chat/c/' + id);
     renderConvoList();
     renderMessages();
   }

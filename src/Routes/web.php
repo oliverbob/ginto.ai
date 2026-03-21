@@ -1462,6 +1462,7 @@ $router->req('/editor/file', 'EditorController@file');
 // Chat routes
 $router->get('/chat', 'ChatController@index');
 $router->post('/chat', 'ChatController@stream');
+$router->get('/chat/c/{convoId:[a-zA-Z0-9_\-]+}', 'ChatController@chatConversation');
 
 // Mobile WebView embed route — no header, no sidebar, no drawer JS
 $router->get('/chat-m', 'ChatController@chatMobile');

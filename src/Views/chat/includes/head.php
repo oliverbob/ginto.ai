@@ -22,6 +22,14 @@
     
     // Sandbox backend type (docker or lxd)
     window.SANDBOX_BACKEND = <?= json_encode($sandboxBackend) ?>;
+
+    // Chat routing target — set by the server based on which URL was loaded:
+    //   /chat           → forceNew: true, convoId: null  (always start fresh)
+    //   /chat/c/{id}    → forceNew: false, convoId: '{id}' (load specific conversation)
+    window.GINTO_CHAT_TARGET = {
+      forceNew: <?= json_encode($forceNewChat ?? true) ?>,
+      convoId: <?= json_encode($targetConvoId ?? null) ?>
+    };
     
     // Auth status - will be populated by fetching /user endpoint
     window.GINTO_AUTH = {

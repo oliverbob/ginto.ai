@@ -304,10 +304,8 @@
   document.getElementById('new_chat')?.addEventListener('click', () => {
     if (window.newConvo) {
       window.newConvo();
-    } else {
-      // fallback: reload page if JS not loaded
-      location.reload();
     }
+    // No fallback reload — chat.js exposes window.newConvo after initialization
   });
   
   // Auto-resize textarea

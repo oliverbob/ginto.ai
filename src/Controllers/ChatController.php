@@ -746,7 +746,55 @@ class ChatController
             'userId' => $isLoggedIn ? $_SESSION['user_id'] : null,
             'sandboxId' => $sandboxId,
             'csrf_token' => $csrf_token,
-            'paymentStatus' => $paymentStatus
+            'paymentStatus' => $paymentStatus,
+            'forceNewChat' => true,
+            'targetConvoId' => null,
+        ]);
+        exit;
+    }
+
+    /**
+     * Load a specific conversation by its convo_id (GET /chat/c/{convoId})
+     * Serves the same chat UI with the target conversation pre-selected client-side.
+     */
+    public function chatConversation(string $convoId): void
+    {
+        // Validate convoId format (alphanumeric, dashes, underscores only)
+        if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $convoId)) {
+            http_response_code(400);
+            echo 'Invalid conversation ID';
+            exit;
+        }
+
+        $isLoggedIn = !empty($_SESSION['user_id']);
+        $isAdmin = UserController::isAdmin();
+        $sandboxId = $_SESSION['sandbox_id'] ?? null;
+
+        if (function_exists('generateCsrfToken')) {
+            $csrf_token = generateCsrfToken();
+        } else {
+            if (empty($_SESSION['csrf_token'])) {
+                $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+            }
+            $csrf_token = $_SESSION['csrf_token'];
+        }
+
+        $paymentStatus = null;
+        if ($isLoggedIn) {
+            $paymentStatus = $this->db->get('users', 'payment_status', ['id' => $_SESSION['user_id']]);
+            $_SESSION['payment_status'] = $paymentStatus;
+        }
+
+        \Ginto\Core\View::view('chat/chat', [
+            'title' => 'Ginto AI - agentic chat',
+            'isLoggedIn' => $isLoggedIn,
+            'isAdmin' => $isAdmin,
+            'userId' => $isLoggedIn ? $_SESSION['user_id'] : null,
+            'sandboxId' => $sandboxId,
+            'csrf_token' => $csrf_token,
+            'paymentStatus' => $paymentStatus,
+            'forceNewChat' => false,
+            'targetConvoId' => $convoId,
         ]);
         exit;
     }
