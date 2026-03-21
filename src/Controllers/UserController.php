@@ -1700,8 +1700,13 @@ class UserController extends \Core\Controller
             return;
         }
 
-        // Redirect to chat (default post-login destination)
-        header('Location: /chat');
+        // Redirect to intended page if set, otherwise default to chat
+        $redirect = '/chat';
+        if (!empty($_SESSION['login_redirect'])) {
+            $redirect = $_SESSION['login_redirect'];
+            unset($_SESSION['login_redirect']);
+        }
+        header('Location: ' . $redirect);
         exit;
     }
 

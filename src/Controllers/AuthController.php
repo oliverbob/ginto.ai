@@ -48,6 +48,15 @@ class AuthController
             $controller = new UserController($this->db, $this->countries);
             $controller->loginAction($_POST);
         } else {
+            // Store ?next= redirect target in session so loginAction can use it after success
+            if (!empty($_GET['next'])) {
+                if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+                $next = $_GET['next'];
+                // Only allow relative URLs to prevent open redirect
+                if (str_starts_with($next, '/') && !str_starts_with($next, '//')) {
+                    $_SESSION['login_redirect'] = $next;
+                }
+            }
             View::view('user/login', [
                 'title' => 'Login'
             ]);

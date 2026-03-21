@@ -476,6 +476,8 @@ class MallCheckoutController extends Controller
     private function requireUser(): int
     {
         if (empty($_SESSION['user_id'])) {
+            if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+            $_SESSION['login_redirect'] = $_SERVER['REQUEST_URI'] ?? '/mall/checkout';
             header('Location: /login');
             exit;
         }
