@@ -94,6 +94,28 @@ $isLoggedIn = !empty($_SESSION['user_id']);
     <!-- ===== MAIN CONTENT ===== -->
     <main class="main-content" id="mainContent">
 
+        <?php if ($isLoggedIn): ?>
+        <!-- Quick access bar -->
+        <div style="display:flex;gap:10px;flex-wrap:wrap;padding:12px 0 4px;margin-bottom:4px;">
+            <a href="/wallet" style="display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:14px;background:linear-gradient(135deg,rgba(214,180,75,0.13),rgba(245,210,90,0.07));border:1px solid rgba(214,180,75,0.28);text-decoration:none;color:inherit;min-width:0;flex:1;max-width:220px;">
+                <span style="width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#92650a,#d4af37);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.95rem;font-weight:800;color:#fff;">₱</span>
+                <div style="min-width:0;">
+                    <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Ginto Pay</div>
+                    <div style="font-size:0.92rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">₱<?= number_format((float)($mall_wallet_balance ?? 0), 2) ?></div>
+                </div>
+            </a>
+            <a href="/mall/orders" style="display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:14px;background:rgba(99,102,241,0.07);border:1px solid rgba(99,102,241,0.18);text-decoration:none;color:inherit;flex:1;max-width:180px;">
+                <span style="width:30px;height:30px;border-radius:9px;background:rgba(99,102,241,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="15" height="15" fill="none" stroke="#a5b4fc" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                </span>
+                <div>
+                    <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Orders</div>
+                    <div style="font-size:0.92rem;font-weight:800;">My Orders</div>
+                </div>
+            </a>
+        </div>
+        <?php endif; ?>
+
         <!-- Toolbar -->
         <div class="main-toolbar">
             <p class="results-text">Showing <strong id="resultCount">0</strong> results</p>
