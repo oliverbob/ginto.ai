@@ -605,7 +605,7 @@ $payoutAccount = $payout_account ?? null;
                     </a>
                     <button type="button" class="gw-btn gw-btn-gold" id="toggleTopupBtn">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M12 5v14M5 12h14"/></svg>
-                        Add Mall Credits
+                        Top Up Ginto Pay
                     </button>
                 </div>
             </div>
@@ -615,13 +615,13 @@ $payoutAccount = $payout_account ?? null;
         <div class="topup-panel" id="topupPanel" style="display:none;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
                 <div>
-                    <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Add Mall Credits</h2>
+                    <h2 style="margin:0 0 2px;font-size:1rem;font-weight:800;">Ginto Pay</h2>
                     <p style="margin:0;font-size:0.76rem;color:var(--muted);">Select an amount and payment method.</p>
                 </div>
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
             </div>
             <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
-                Payments are processed by PayMongo (QR/card) or PayPal — Ginto does not hold or process funds. A fixed processing fee of ₱25.00 applies per transaction (QR/card); PayPal adds an additional 5% service fee. Mall credits are non-cash platform credits valid only for purchases within Ginto Mall and are non-withdrawable. <a href="/terms" target="_blank" style="color:inherit;text-decoration:underline;opacity:0.7;">Terms apply.</a>
+                Payments are processed by PayMongo (QR/card) or PayPal — Ginto does not hold or process funds. A fixed processing fee of ₱25.00 applies per transaction (QR/card); PayPal adds an additional 5% service fee. Ginto Pay credits are closed-loop, non-cash platform credits valid only for purchases within Ginto Mall and are non-withdrawable. <a href="/terms" target="_blank" style="color:inherit;text-decoration:underline;opacity:0.7;">Terms apply.</a>
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
@@ -675,14 +675,14 @@ $payoutAccount = $payout_account ?? null;
                         <div id="topupFee" style="font-weight:800;color:#fca5a5;margin-top:3px;">₱0.00</div>
                     </div>
                     <div>
-                        <div style="color:var(--muted);">Mall credit</div>
+                        <div style="color:var(--muted);">Ginto Pay credit</div>
                         <div id="topupCredit" style="font-weight:800;color:#86efac;margin-top:3px;">₱0.00</div>
                     </div>
                 </div>
                 <div id="walletTopupError" style="display:none;padding:12px 14px;border-radius:13px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fecaca;font-size:0.85rem;"></div>
                 <div id="walletTopupInfo" style="display:none;padding:12px 14px;border-radius:13px;background:rgba(99,102,241,0.1);border:1px solid rgba(99,102,241,0.3);color:#c7d2fe;font-size:0.85rem;"></div>
                 <div id="walletTopupQr" style="display:none;text-align:center;padding:20px;border-radius:18px;border:1px dashed var(--border);background:var(--surface2);"></div>
-                <button type="button" id="walletTopupBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.9rem;font-weight:800;padding:12px 18px;">Add Mall Credits</button>
+                <button type="button" id="walletTopupBtn" class="btn btn-primary" style="border-radius:14px;font-size:0.9rem;font-weight:800;padding:12px 18px;">Top Up Ginto Pay</button>
             </div>
         </div>
 
@@ -828,14 +828,14 @@ $payoutAccount = $payout_account ?? null;
 
     const methodMeta = {
         ginto_pay_qr: {
-            confirmLabel: 'Generate QR & Load Credits',
+            confirmLabel: 'Generate QR & Pay',
             helper: 'Use your GCash / Maya / QR PH app to scan and complete the payment. Credits will be added to your Mall balance.',
             name: 'QR Code Payment',
             iconBg: 'linear-gradient(135deg, #f59e0b, #d97706)',
             iconHtml: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="5" height="5"/><rect x="16" y="3" width="5" height="5"/><rect x="3" y="16" width="5" height="5"/><path d="M21 16h-3a2 2 0 0 0-2 2v3"/><path d="M21 21v.01"/><path d="M12 7v3a2 2 0 0 1-2 2H7"/><path d="M3 12h.01"/><path d="M12 3h.01"/><path d="M12 16v.01"/><path d="M16 12h1"/><path d="M21 12v.01"/><path d="M12 21v-1"/></svg>',
         },
         ginto_pay_card: {
-            confirmLabel: 'Pay with Card & Load Credits',
+            confirmLabel: 'Pay with Card',
             helper: 'You will be redirected to PayMongo secure card checkout. Credits are added after payment confirmation.',
             name: 'Credit/Debit Card',
             iconBg: 'linear-gradient(135deg, #3b82f6, #1d4ed8)',
@@ -1041,7 +1041,7 @@ $payoutAccount = $payout_account ?? null;
 
     function applySelectedMethodUI() {
         const meta = methodMeta[selectedMethod] || {};
-topupBtn.textContent = meta.confirmLabel || 'Add Mall Credits';
+topupBtn.textContent = meta.confirmLabel || 'Top Up Ginto Pay';
 
         methodButtons.forEach(function (button) {
             button.classList.toggle('is-selected', button.dataset.method === selectedMethod);
@@ -1069,7 +1069,7 @@ topupBtn.textContent = meta.confirmLabel || 'Add Mall Credits';
                 const json = await response.json();
                 if (json.status === 'completed') {
                     window.clearInterval(statusPoll);
-                    setInfo('Mall credits confirmed and added to your balance. Refreshing...');
+                    setInfo('Ginto Pay credits confirmed and added to your balance. Refreshing...');
                     // Try to update top-bar wallet balance immediately using the current session's credited amount
                     try {
                         const creditAdded = (currentCreate && Number(currentCreate.credit_amount)) ? Number(currentCreate.credit_amount) : 0;

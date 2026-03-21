@@ -905,8 +905,8 @@ body.light .co-qr-spinner {
                 <button type="button" class="pm-card is-selected" data-method="ginto_pay_qr">
                     <div class="pm-icon" style="background:linear-gradient(135deg,#92650a,#d4af37);"><div style="width:28px;height:28px;border-radius:50%;overflow:hidden;box-shadow:0 0 0 1px rgba(0,0,0,0.15);"><img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:cover;"></div></div>
                     <div class="pm-body">
-                        <div class="pm-name">via PayMongo</div>
-                        <div class="pm-desc">QR · InstaPay / PESONet</div>
+                        <div class="pm-name">Ginto Pay</div>
+                        <div class="pm-desc">QR · GCash / Maya / InstaPay (via PayMongo)</div>
                     </div>
                     <div class="pm-check">✓</div>
                 </button>
@@ -917,7 +917,7 @@ body.light .co-qr-spinner {
                     </div>
                     <div class="pm-body">
                         <div class="pm-name">Card</div>
-                        <div class="pm-desc">Regular credit/debit cards via PayMongo</div>
+                        <div class="pm-desc">Credit/debit card (via PayMongo)</div>
                     </div>
                     <div class="pm-check">✓</div>
                 </button>
@@ -965,7 +965,7 @@ body.light .co-qr-spinner {
 
             <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;">
                 <button type="button" id="startCheckoutBtn" style="display:none;" aria-hidden="true"></button>
-                <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Add Mall Credits</a>
+                <a href="/wallet" class="btn btn-secondary" style="font-size:0.85rem;">Top Up Ginto Pay</a>
                 <span class="checkout-hint" style="font-size:0.82rem;color:var(--muted);">Select a payment method above to begin checkout</span>
             </div>
         </div>
@@ -1457,7 +1457,7 @@ body.light .co-qr-spinner {
     // ── Payment method display metadata ──
     const pmMeta = {
         ginto_pay_qr: {
-            name: 'via PayMongo',
+            name: 'Ginto Pay',
             iconBg: 'transparent',
             iconHtml: '<img src="/assets/images/mall.png" alt="" style="width:100%;height:100%;object-fit:contain;">',
             confirmLabel: 'Generate QR & Pay',

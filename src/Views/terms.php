@@ -103,7 +103,7 @@
                         <ul class="space-y-2 text-gray-600 dark:text-gray-400">
                             <li class="flex gap-2"><i class="fas fa-robot text-teal-500 mt-1 flex-shrink-0"></i><span><strong>Ginto AI</strong> — An AI-powered assistant and development platform offering chat, code generation, and sandbox tooling.</span></li>
                             <li class="flex gap-2"><i class="fas fa-store text-teal-500 mt-1 flex-shrink-0"></i><span><strong>Ginto Mall</strong> — A peer-to-peer marketplace platform that allows registered sellers to list products and buyers to purchase them.</span></li>
-                            <li class="flex gap-2"><i class="fas fa-wallet text-teal-500 mt-1 flex-shrink-0"></i><span><strong>Ginto Mall Credits</strong> (marketed as "Ginto Pay" in some areas) — A platform credit-loading feature that allows users to fund a purchase balance within Ginto Mall. See Section 3 for full details.</span></li>
+                            <li class="flex gap-2"><i class="fas fa-wallet text-teal-500 mt-1 flex-shrink-0"></i><span><strong>Ginto Pay</strong> — Ginto Mall's internal closed-loop platform credit wallet. It is not an electronic money instrument. Funds loaded into Ginto Pay are processed exclusively by licensed third-party payment providers and may only be used for purchases within the Ginto Mall platform. See Section 3 for full details.</span></li>
                         </ul>
                     </section>
 
@@ -113,20 +113,20 @@
                             <i class="fas fa-shield-alt"></i> Important — Read Carefully
                         </div>
                         <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                            <span class="text-teal-500">03</span> Ginto Mall Credits &amp; the "Ginto Pay" Credit-Loading Feature
+                            <span class="text-teal-500">03</span> Ginto Pay — Closed-Loop Platform Credit Wallet
                         </h2>
 
                         <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-2">3.1 What Ginto Pay Is</h3>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed mb-3">"<strong>Ginto Pay</strong>" is a trade name for Ginto's <em>platform credit-loading feature</em> — not a payment service, e-wallet, or electronic money instrument. It refers solely to the in-platform mechanism by which users fund a purchase balance usable exclusively within Ginto Mall.</p>
+                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed mb-3"><strong>Ginto Pay</strong> is Ginto Mall's internal closed-loop credit wallet. It is not an electronic money instrument. Funds loaded into Ginto Pay are processed exclusively by licensed third-party payment providers and may only be used for purchases within the Ginto Mall platform.</p>
                         <div class="my-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
                             <strong>Disclosure:</strong> All monetary transactions — including QR code payments (GCash, Maya, QR PH) and credit/debit card payments — are processed exclusively by <strong>PayMongo</strong>, a BSP-licensed payment service provider. International transactions may be processed by <strong>PayPal</strong>. <strong>Ginto does not hold, process, transmit, or custody funds at any point.</strong> Ginto records a ledger credit in your Mall account only after the licensed payment processor confirms successful receipt of payment.
                         </div>
 
                         <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-2">3.2 Nature of Mall Credits</h3>
                         <ul class="space-y-2 text-gray-600 dark:text-gray-400 text-sm">
-                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Mall credits are <strong>non-cash platform credits</strong>. They are not electronic money, stored value, legal tender, or a financial instrument of any kind.</span></li>
-                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Mall credits are <strong>non-withdrawable</strong>. Once loaded, they can only be applied toward purchases in Ginto Mall and cannot be redeemed for cash, transferred to another user, or refunded except as expressly provided in these Terms or required by applicable law.</span></li>
-                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Mall credits have <strong>no monetary value outside of Ginto Mall</strong> and do not constitute a deposit, investment, or financial product.</span></li>
+                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Ginto Pay credits are <strong>non-cash platform credits</strong>. They are not electronic money, stored value, legal tender, or a financial instrument of any kind.</span></li>
+                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Ginto Pay credits are <strong>non-withdrawable</strong>. Once loaded, they can only be applied toward purchases in Ginto Mall and cannot be redeemed for cash, transferred to another user, or refunded except as expressly provided in these Terms or required by applicable law.</span></li>
+                            <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Ginto Pay credits have <strong>no monetary value outside of Ginto Mall</strong> and do not constitute a deposit, investment, or financial product.</span></li>
                             <li class="flex gap-2"><i class="fas fa-circle text-xs text-gray-400 mt-1.5 flex-shrink-0"></i><span>Processing fees charged by the payment provider (PayMongo, PayPal) are non-refundable and are not collected by Ginto.</span></li>
                         </ul>
 
