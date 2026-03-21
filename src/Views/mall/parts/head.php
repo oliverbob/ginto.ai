@@ -1,11 +1,41 @@
 <?php
-$title = $title ?? 'ePower Mall';
+$title       = $title       ?? 'Ginto Mall';
+$ogTitle     = $ogTitle     ?? $title;
+$ogDesc      = $ogDesc      ?? 'Discover products and sellers on Ginto Mall — the Filipino social commerce marketplace.';
+$ogImage     = $ogImage     ?? '/assets/images/mall-og.png';
+$ogType      = $ogType      ?? 'website';
+$_proto      = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+$_host       = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+$ogUrl       = $ogUrl       ?? ($_proto . '://' . $_host . ($_SERVER['REQUEST_URI'] ?? '/'));
+// Ensure absolute image URL for crawlers
+if (!empty($ogImage) && !str_starts_with($ogImage, 'http')) {
+    $ogImage = $_proto . '://' . $_host . $ogImage;
+}
 ?>
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($title) ?></title>
-    <meta name="description" content="ePower Mall — shop anything, anytime">
+    <meta name="description" content="<?= htmlspecialchars($ogDesc) ?>">
+
+    <!-- Open Graph —  Facebook, Messenger, Viber, LinkedIn, iMessage -->
+    <meta property="og:type"        content="<?= htmlspecialchars($ogType) ?>">
+    <meta property="og:url"         content="<?= htmlspecialchars($ogUrl) ?>">
+    <meta property="og:title"       content="<?= htmlspecialchars($ogTitle) ?>">
+    <meta property="og:description" content="<?= htmlspecialchars($ogDesc) ?>">
+    <meta property="og:image"       content="<?= htmlspecialchars($ogImage) ?>">
+    <meta property="og:image:width"  content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name"   content="Ginto Mall">
+    <meta property="og:locale"      content="en_PH">
+
+    <!-- Twitter / X Card -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="<?= htmlspecialchars($ogTitle) ?>">
+    <meta name="twitter:description" content="<?= htmlspecialchars($ogDesc) ?>">
+    <meta name="twitter:image"       content="<?= htmlspecialchars($ogImage) ?>">
+
+    <link rel="canonical" href="<?= htmlspecialchars($ogUrl) ?>">
     <link rel="icon" type="image/svg+xml" href="/assets/images/mall-favicon.svg">
     <link rel="shortcut icon" href="/assets/images/mall-favicon.svg">
     <link rel="preconnect" href="https://fonts.googleapis.com">
