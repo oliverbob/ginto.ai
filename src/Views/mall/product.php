@@ -381,6 +381,7 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
         'seller_name' => $storefront['display_name'] ?? null,
     ]) ?>;
     const CANON_URL = <?= json_encode($canonicalUrl) ?>;
+    const CSRF_TOKEN = <?= json_encode($csrf_token ?? '') ?>;
 
     // Qty controls
     let qty = 1;
@@ -400,10 +401,42 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
         thumb.classList.add('active');
     };
 
-    // Share: copy link
+    function sanitizeShareText(value) {
+        const text = String(value || '');
+        return text
+            // Remove control chars except newline and tab.
+            .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+            // Remove hidden/bidi chars often used in spoofed text.
+            .replace(/[\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g, '')
+            // Remove obvious HTML/script delimiters from user-origin fields.
+            .replace(/[<>`]/g, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+    }
+
+    function buildProductShareText() {
+        const safeTitle = sanitizeShareText(PRODUCT.title || 'Product');
+        const safeStore = sanitizeShareText(PRODUCT.seller_name || 'Ginto Mall');
+        const safeUrl = sanitizeShareText(CANON_URL);
+        const symbols = { USD: '$', PHP: '₱', NGN: '₦', EUR: '€' };
+        const currency = String(PRODUCT.currency || 'PHP').toUpperCase();
+        const symbol = symbols[currency] || (currency + ' ');
+        const amount = Number(PRODUCT.price || 0);
+        const safePrice = Number.isFinite(amount) ? (symbol + amount.toFixed(2)) : (symbol + '0.00');
+
+        return [
+            '🛍️ ' + safeTitle,
+            '💰 Price: ' + safePrice,
+            '🏪 Store: ' + safeStore,
+            '🔗 ' + safeUrl,
+        ].join('\n');
+    }
+
+    // Share: copy social-ready product text
     window.copyProductLink = function () {
         const btn = document.getElementById('copyLinkBtn');
-        navigator.clipboard.writeText(CANON_URL).then(function () {
+        const shareText = buildProductShareText();
+        navigator.clipboard.writeText(shareText).then(function () {
             btn.textContent = '✓ Copied!';
             btn.classList.add('copy-done');
             setTimeout(function () {
@@ -413,7 +446,7 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
         }).catch(function () {
             // Fallback
             const ta = document.createElement('textarea');
-            ta.value = CANON_URL;
+            ta.value = shareText;
             ta.style.position = 'fixed'; ta.style.opacity = '0';
             document.body.appendChild(ta); ta.select();
             document.execCommand('copy');
@@ -539,6 +572,140 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
             if (!q) return;
             window.location.href = '/mall?q=' + encodeURIComponent(q);
         });
+    }
+
+    // Theme toggle behavior for standalone product page.
+    var themeToggle = document.getElementById('themeToggle');
+    var themeIcon = document.getElementById('themeIcon');
+
+    function applyTheme(theme) {
+        if (theme === 'light') {
+            document.body.classList.add('light');
+            if (themeIcon) themeIcon.textContent = '🌙';
+        } else {
+            document.body.classList.remove('light');
+            if (themeIcon) themeIcon.textContent = '☀️';
+        }
+        localStorage.setItem('epower_theme', theme);
+    }
+
+    if (themeToggle) {
+        themeToggle.addEventListener('click', function () {
+            applyTheme(document.body.classList.contains('light') ? 'dark' : 'light');
+        });
+    }
+    applyTheme(localStorage.getItem('epower_theme') || 'dark');
+
+    // Mall notification panel behavior for standalone product page.
+    var mallNotifyToggle = document.getElementById('mallNotifyToggle');
+    var mallNotifyPanel = document.getElementById('mallNotifyPanel');
+    var mallNotifyList = document.getElementById('mallNotifyList');
+    var mallNotifyBadge = document.getElementById('mallNotifyBadge');
+
+    function escHtml(s) {
+        return String(s || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
+    function notifDate(v) {
+        if (!v) return '';
+        var d = new Date(v);
+        if (Number.isNaN(d.getTime())) return String(v);
+        return d.toLocaleString();
+    }
+
+    function notificationTarget(n) {
+        if (!n || typeof n !== 'object') return '/mall/notifications';
+        return n.link || n.action_url || n.product_link || n.buyer_link || '/mall/notifications';
+    }
+
+    function renderNotifications(list) {
+        if (!mallNotifyList) return;
+        if (!Array.isArray(list) || list.length === 0) {
+            mallNotifyList.innerHTML =
+                '<div style="padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);font-size:0.8rem;color:var(--muted);">No mall notifications yet.</div>';
+            return;
+        }
+
+        mallNotifyList.innerHTML = list.map(function (n) {
+            var unread = Number(n.is_read || 0) === 0;
+            return ''
+                + '<a href="' + escHtml(notificationTarget(n)) + '"'
+                + ' data-notif-id="' + escHtml(n.id || '') + '"'
+                + ' style="display:block;padding:10px 12px;border-radius:12px;background:var(--surface2);border:1px solid ' + (unread ? 'rgba(59,130,246,.35)' : 'var(--border)') + ';text-decoration:none;color:inherit;">'
+                + '  <div style="font-size:0.82rem;font-weight:600;line-height:1.35;">' + escHtml(n.message || '') + '</div>'
+                + '  <div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">' + escHtml(notifDate(n.created_at)) + '</div>'
+                + '</a>';
+        }).join('');
+
+        mallNotifyList.querySelectorAll('[data-notif-id]').forEach(function (el) {
+            el.addEventListener('click', function () {
+                var id = this.getAttribute('data-notif-id');
+                if (!id) return;
+                var body = JSON.stringify({ ids: [Number(id)] });
+                fetch('/api/mall/notifications/mark-read-app', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: body,
+                    keepalive: true,
+                    credentials: 'same-origin'
+                }).catch(function () {});
+                fetch('/api/mall/notifications/mark-read', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ids: [Number(id)], csrf_token: CSRF_TOKEN }),
+                    keepalive: true,
+                    credentials: 'same-origin'
+                }).catch(function () {});
+            });
+        });
+    }
+
+    async function refreshNotifications() {
+        if (!mallNotifyPanel) return;
+        try {
+            var res = await fetch('/api/mall/notifications?limit=8', { credentials: 'same-origin' });
+            if (!res.ok) return;
+            var json = await res.json();
+            var list = Array.isArray(json) ? json : (Array.isArray(json.notifications) ? json.notifications : []);
+            var unread = Number(json.unread_count != null ? json.unread_count : json.unreadCount);
+            if (Number.isNaN(unread)) {
+                unread = list.reduce(function (sum, n) { return sum + (Number(n.is_read || 0) === 0 ? 1 : 0); }, 0);
+            }
+            renderNotifications(list);
+            if (mallNotifyBadge) {
+                if (unread > 0) {
+                    mallNotifyBadge.style.display = 'flex';
+                    mallNotifyBadge.textContent = unread > 99 ? '99+' : String(unread);
+                } else {
+                    mallNotifyBadge.style.display = 'none';
+                    mallNotifyBadge.textContent = '';
+                }
+            }
+        } catch (e) {
+            // Keep server-rendered notifications if API refresh fails.
+        }
+    }
+
+    if (mallNotifyToggle && mallNotifyPanel) {
+        mallNotifyToggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            var show = mallNotifyPanel.style.display !== 'block';
+            mallNotifyPanel.style.display = show ? 'block' : 'none';
+            if (show) refreshNotifications();
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!mallNotifyPanel.contains(e.target) && !mallNotifyToggle.contains(e.target)) {
+                mallNotifyPanel.style.display = 'none';
+            }
+        });
+
+        refreshNotifications();
     }
 
     document.addEventListener('keydown', function (e) {
