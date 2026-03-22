@@ -200,9 +200,73 @@ class Product
             $stmt = $this->db->query($sql, $params);
             if (!$stmt) return [];
             $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            return is_array($rows) ? $rows : [];
+            $rows = is_array($rows) ? $rows : [];
+
+            // Fallback for environments with legacy publishing states/flags.
+            if (empty($rows) && empty($opts['status'])) {
+                $rows = $this->listLegacyFallback($opts, $orderBy, $offset, $limit);
+            }
+
+            return $rows;
         } catch (\Throwable $e) {
             error_log('Product::list query error: ' . $e->getMessage());
+            if (empty($opts['status'])) {
+                return $this->listLegacyFallback($opts, $orderBy, $offset, $limit);
+            }
+            return [];
+        }
+    }
+
+    private function listLegacyFallback(array $opts, string $orderBy, int $offset, int $limit): array
+    {
+        $sql = "SELECT * FROM {$this->table} WHERE 1=1";
+        $params = [];
+
+        // Legacy-safe public-ish fallback: exclude hard-deleted rows and keep non-empty titles.
+        if ($this->hasColumn('status')) {
+            $sql .= " AND (status IS NULL OR status <> 'deleted')";
+        }
+        $sql .= " AND title IS NOT NULL AND title <> ''";
+
+        if (!empty($opts['category_id'])) {
+            $sql .= " AND category_id = :category_id";
+            $params[':category_id'] = (int)$opts['category_id'];
+        }
+        if (!empty($opts['seller_id'])) {
+            $sql .= " AND seller_id = :seller_id";
+            $params[':seller_id'] = (int)$opts['seller_id'];
+        }
+
+        if (!empty($opts['search'])) {
+            $search = trim((string)$opts['search']);
+            if ($search !== '') {
+                $tokens = preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $tokens = array_slice($tokens, 0, 6);
+                $searchCols = ['title'];
+                if ($this->hasColumn('slug')) $searchCols[] = 'slug';
+                if ($this->hasColumn('short_description')) $searchCols[] = 'short_description';
+                if ($this->hasColumn('description')) $searchCols[] = 'description';
+
+                foreach ($tokens as $i => $token) {
+                    $key = ':qf' . $i;
+                    $clauses = [];
+                    foreach ($searchCols as $col) {
+                        $clauses[] = "LOWER({$col}) LIKE {$key}";
+                    }
+                    $sql .= " AND (" . implode(' OR ', $clauses) . ")";
+                    $params[$key] = '%' . $token . '%';
+                }
+            }
+        }
+
+        $sql .= " ORDER BY {$orderBy} LIMIT {$offset}, {$limit}";
+        try {
+            $stmt = $this->db->query($sql, $params);
+            if (!$stmt) return [];
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            error_log('Product::list legacy fallback error: ' . $e->getMessage());
             return [];
         }
     }
