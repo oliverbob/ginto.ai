@@ -378,7 +378,9 @@
                     <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
                     <div style="display:flex;gap:7px;margin-top:8px;">
                         <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart" style="flex:1;">Add to Cart</button>
-                        ${p.slug ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;" aria-label="View ${esc(p.title)} product page">View</a>` : ''}
+                        ${p.slug
+                            ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;" aria-label="View ${esc(p.title)} product page">View</a>`
+                            : `<button class="btn btn-secondary" type="button" onclick="event.stopPropagation();openQV(${p.id})" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;" aria-label="Quick view ${esc(p.title)}">View</button>`}
                     </div>
                     ${p.seller_slug ? `<a class="product-store-link" href="/mall/${esc(p.seller_slug)}" onclick="event.stopPropagation()">🏪 ${esc(p.seller_name || 'View Store')}</a>` : ''}
                 </div>`;
@@ -1153,7 +1155,9 @@
                     <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
                     <div style="display:flex;gap:7px;margin-top:8px;">
                         <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart" style="flex:1;">Add to Cart</button>
-                        ${p.slug ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;">View</a>` : ''}
+                        ${p.slug
+                            ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;">View</a>`
+                            : `<button class="btn btn-secondary" type="button" onclick="event.stopPropagation();openQV(${p.id})" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;">View</button>`}
                     </div>
                     ${p.seller_slug ? `<a class="product-store-link" href="/mall/${esc(p.seller_slug)}" onclick="event.stopPropagation()">🏪 ${esc(p.seller_name || 'View Store')}</a>` : ''}
                 </div>`;
