@@ -164,6 +164,55 @@ class MallPushService
         );
     }
 
+    /**
+     * Send a silent FCM data message to all the user's OTHER devices when cart count changes.
+     * No visible notification is shown — the device simply updates the cart badge.
+     */
+    public function sendSilentCartUpdate(int $userId, int $count): void
+    {
+        $tokens = $this->getFcmTokensForUsers([$userId]);
+        if (empty($tokens)) return;
+
+        $saSource  = getenv('FCM_SERVICE_ACCOUNT_JSON') ?: '';
+        $projectId = getenv('FCM_PROJECT_ID') ?: '';
+        if ($saSource === '' || $projectId === '') return;
+
+        $saJson = file_exists($saSource) ? file_get_contents($saSource) : $saSource;
+        $sa     = json_decode($saJson, true);
+        if (!$sa || empty($sa['private_key'])) return;
+
+        $accessToken = $this->getFcmAccessToken($sa);
+        if (!$accessToken) return;
+
+        $endpoint = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+
+        foreach ($tokens as $token) {
+            $payload = json_encode([
+                'message' => [
+                    'token' => $token,
+                    // Data-only message (no notification block) → silent, no banner/sound
+                    'data'  => ['type' => 'cart_update', 'count' => (string)$count],
+                    'android' => ['priority' => 'normal'],
+                ],
+            ]);
+            try {
+                $conn = curl_init($endpoint);
+                curl_setopt_array($conn, [
+                    CURLOPT_POST           => true,
+                    CURLOPT_POSTFIELDS     => $payload,
+                    CURLOPT_HTTPHEADER     => [
+                        'Authorization: Bearer ' . $accessToken,
+                        'Content-Type: application/json',
+                    ],
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_TIMEOUT        => 5,
+                ]);
+                curl_exec($conn);
+                curl_close($conn);
+            } catch (\Throwable $e) {}
+        }
+    }
+
     /** Notify seller when a new order is placed on their product. */
     public function notifyNewOrder(int $sellerId, array $order): void
     {

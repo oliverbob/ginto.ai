@@ -178,8 +178,9 @@ class SellerController extends \Core\Controller
         try {
             $productModel = new Product();
             // Always filter by the logged-in user — even admins only see their own products here
-            $filterPublished = ['seller_id' => $userId, 'status' => 'published'];
-            $filterDraft     = ['seller_id' => $userId, 'status' => 'draft'];
+            // limit: 9999 ensures the count is accurate for sellers with many products
+            $filterPublished = ['seller_id' => $userId, 'status' => 'published', 'limit' => 9999];
+            $filterDraft     = ['seller_id' => $userId, 'status' => 'draft',     'limit' => 9999];
             $products = $productModel->list($filterPublished);
             $drafts   = $productModel->list($filterDraft);
 

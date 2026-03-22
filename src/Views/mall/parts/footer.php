@@ -404,6 +404,16 @@
     function saveCart() {
         try { localStorage.setItem('epower_cart', JSON.stringify(state.cart)); } catch (e) {}
         updateCartUI();
+        try {
+            var total = state.cart.reduce(function(s, i){ return s + (i.qty || 1); }, 0);
+            if (window.AndroidCart) { window.AndroidCart.onUpdate(total); }
+            if (document.cookie.indexOf('PHPSESSID') !== -1) {
+                fetch('/api/mall/cart/sync', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({count: total}), keepalive: true
+                }).catch(function(){});
+            }
+        } catch(e) {}
     }
     function updateCartUI() {
         const total = state.cart.reduce((s, i) => s + i.qty, 0);

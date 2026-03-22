@@ -154,4 +154,46 @@ class MallController extends \Core\Controller
             echo json_encode(['balance' => '0.00', 'notif_count' => 0, 'cart_count' => 0]);
         }
     }
+
+    /**
+     * POST /api/mall/cart/sync — called by frontend saveCart() after localStorage update.
+     * Stores the cart count per user and triggers a silent FCM push to their other devices.
+     */
+    public function apiCartSync(): void
+    {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405); echo json_encode(['ok' => false]); return;
+        }
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            echo json_encode(['ok' => false, 'reason' => 'not_logged_in']); return;
+        }
+        $body  = (string)file_get_contents('php://input');
+        $input = $body ? json_decode($body, true) : [];
+        $count = max(0, (int)($input['count'] ?? $_POST['count'] ?? 0));
+
+        // Upsert cart count in DB for cross-device polling
+        try {
+            $now = date('Y-m-d H:i:s');
+            $this->db->pdo()->prepare(
+                "INSERT INTO cart_items (user_id, count, updated_at)
+                 VALUES (?, ?, ?)
+                 ON DUPLICATE KEY UPDATE count = VALUES(count), updated_at = VALUES(updated_at)"
+            )->execute([$userId, $count, $now]);
+        } catch (\Throwable $e) {
+            // Non-critical — cart_items table may not have this schema; continue to FCM
+        }
+
+        // Silent FCM push to other devices so their cart badge updates
+        try {
+            $pushService = new \Ginto\Services\MallPushService($this->db);
+            $pushService->sendSilentCartUpdate($userId, $count);
+        } catch (\Throwable $e) {
+            error_log('apiCartSync FCM error: ' . $e->getMessage());
+        }
+
+        echo json_encode(['ok' => true, 'count' => $count]);
+    }
 }
+
