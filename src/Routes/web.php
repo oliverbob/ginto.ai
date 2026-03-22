@@ -1309,6 +1309,19 @@ $router->req('/api/mall/wallet/payout-account/delete', 'MallCheckoutController@d
 $router->req('/api/mall/delivery/claim', 'MallCheckoutController@deliveryClaim', ['POST']);
 $router->req('/api/mall/orders/status', 'MallCheckoutController@orderStatusUpdate', ['POST']);
 
+// Delivery system
+$router->req('/mall/delivery', 'MallDeliveryController@index');
+$router->req('/mall/delivery/rider', 'MallDeliveryController@riderDashboard');
+$router->req('/mall/delivery/admin', 'MallDeliveryController@adminLogistics');
+$router->req('/mall/delivery/track/{token}', 'MallDeliveryController@track');
+$router->req('/api/mall/delivery/gps', 'MallDeliveryController@apiGpsUpdate', ['POST']);
+$router->req('/api/mall/delivery/status', 'MallDeliveryController@apiStatusUpdate', ['POST']);
+$router->req('/api/mall/delivery/rider/profile', 'MallDeliveryController@apiRiderProfile', ['POST']);
+$router->req('/api/mall/delivery/assign-rider', 'MallDeliveryController@apiAssignRider', ['POST']);
+$router->req('/api/mall/delivery/shipment/{token}', 'MallDeliveryController@apiShipmentInfo');
+$router->req('/api/mall/push/subscribe', 'MallDeliveryController@apiPushSubscribe', ['POST']);
+$router->req('/api/mall/push/vapid-public-key', 'MallDeliveryController@apiVapidPublicKey');
+
 // Keep dynamic storefront route after static /mall/* routes.
 $router->req('/mall/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallCheckoutController@storefront');
 

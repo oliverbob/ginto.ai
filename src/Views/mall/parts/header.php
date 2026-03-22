@@ -1,5 +1,9 @@
 <?php
 // header.php — mall header partial
+// Suppress header for native app webview (Android/iOS)
+if (isset($_GET['device']) && in_array($_GET['device'], ['smartphone', 'android', 'ios'], true)) {
+    return;
+}
 $isLoggedIn = !empty($_SESSION['user_id']);
 $mallUnreadNotifications = isset($mall_unread_notifications) ? (int)$mall_unread_notifications : 0;
 $mallNotifications = is_array($mall_notifications ?? null) ? $mall_notifications : [];

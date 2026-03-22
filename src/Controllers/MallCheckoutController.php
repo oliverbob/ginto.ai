@@ -624,6 +624,12 @@ class MallCheckoutController extends Controller
         $_SESSION['role']                 = 'user';
         try { $this->db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $newUser['id']]); } catch (\Throwable $__e) {}
 
+        // Push notification to the first-product seller about new registration
+        try {
+            $push = new \Ginto\Services\MallPushService($this->db);
+            $push->notifySellerVisitorRegistered($referrerId, $fullname);
+        } catch (\Throwable $__e) {}
+
         $redirect = '/mall/checkout';
         if (!empty($_SESSION['login_redirect'])) {
             $redirect = $_SESSION['login_redirect'];

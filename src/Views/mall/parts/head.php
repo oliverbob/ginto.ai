@@ -1205,4 +1205,64 @@ input[type="file"].form-input { padding: 7px 12px; }
     }
 }
     </style>
+
+    <!-- Service Worker + Web Push registration -->
+    <?php
+    $__csrfForSw = (function_exists('generateCsrfToken') ? generateCsrfToken() : ($_SESSION['csrf_token'] ?? ''));
+    $__loggedIn  = !empty($_SESSION['user_id']) ? '1' : '0';
+    ?>
+    <meta name="csrf-token" content="<?= htmlspecialchars($__csrfForSw, ENT_QUOTES, 'UTF-8') ?>">
+    <meta name="mall-li"    content="<?= $__loggedIn ?>">
+    <script>
+    (function () {
+        if (!('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.register('/assets/js/mall-push-sw.js', { scope: '/mall/' })
+            .then(function (reg) {
+                window._mallSWReg = reg;
+            }).catch(function () {});
+
+        async function subscribePush(csrfToken) {
+            if (!window._mallSWReg) return;
+            const permission = await Notification.requestPermission();
+            if (permission !== 'granted') return;
+            try {
+                // Fetch VAPID public key
+                const res  = await fetch('/api/mall/push/vapid-public-key');
+                const json = await res.json();
+                if (!json.public_key) return;
+                // Convert base64url to Uint8Array
+                const b64  = json.public_key.replace(/-/g, '+').replace(/_/g, '/');
+                const raw  = atob(b64);
+                const key  = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) key[i] = raw.charCodeAt(i);
+                const sub = await window._mallSWReg.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: key
+                });
+                const subJson = sub.toJSON();
+                await fetch('/api/mall/push/subscribe', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        csrf_token: csrfToken,
+                        endpoint: subJson.endpoint,
+                        p256dh:   subJson.keys.p256dh,
+                        auth:     subJson.keys.auth,
+                        scope:    'mall'
+                    })
+                });
+            } catch (_) {}
+        }
+
+        window._mallSubscribePush = subscribePush;
+        // Auto-subscribe if user is logged-in (signalled by data attribute on body)
+        document.addEventListener('DOMContentLoaded', function () {
+            const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+            const liMeta   = document.querySelector('meta[name="mall-li"]');
+            if (csrfMeta && liMeta && liMeta.content === '1') {
+                window._mallSubscribePush(csrfMeta.content);
+            }
+        });
+    })();
+    </script>
 </head>
