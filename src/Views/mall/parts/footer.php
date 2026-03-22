@@ -1155,6 +1155,28 @@
      * INIT
      * ============================ */
     async function init() {
+        // Hydrate filters from URL so deep links like ?search=... work from app/web.
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSearch = (urlParams.get('search') || urlParams.get('q') || '').trim();
+        const urlCat = (urlParams.get('cat') || '').trim();
+        if (urlSearch) {
+            state.filters.search = urlSearch;
+            if (searchInput) searchInput.value = urlSearch;
+        }
+        if (urlCat) {
+            state.filters.cat = urlCat;
+            if (catList) {
+                const target = Array.from(catList.querySelectorAll('.cat-item')).find(function (el) {
+                    return String(el.getAttribute('data-cat') || '') === urlCat;
+                });
+                if (target) {
+                    catList.querySelectorAll('.cat-item').forEach(i => { i.classList.remove('active'); i.setAttribute('aria-pressed', 'false'); });
+                    target.classList.add('active');
+                    target.setAttribute('aria-pressed', 'true');
+                }
+            }
+        }
+
         await loadServerProducts();
         renderProducts();
         setupInfiniteScroll();
