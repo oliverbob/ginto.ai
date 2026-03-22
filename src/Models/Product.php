@@ -43,7 +43,7 @@ class Product
             'seller_id' => $sellerId,
             'category_id' => $data['category_id'] ?? ($data['category'] ?? null),
             'title' => $data['title'] ?? '',
-            'slug' => $data['slug'] ?? null,
+            'slug' => $this->uniqueSlug($data['slug'] ?? null, $data['title'] ?? ''),
             'short_description' => $data['short_description'] ?? ($data['excerpt'] ?? null),
             'description' => $data['description'] ?? null,
             'price' => $price,
@@ -66,6 +66,32 @@ class Product
         if (!$res || $res->rowCount() === 0) return null;
         $id = $this->db->id();
         return $this->find((int)$id);
+    }
+
+    /**
+     * Generate a URL-safe slug from a string.
+     */
+    private function makeSlug(string $text): string
+    {
+        $slug = mb_strtolower(trim($text));
+        $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
+        $slug = preg_replace('/[\s-]+/', '-', $slug);
+        return trim($slug, '-') ?: 'product';
+    }
+
+    /**
+     * Return a slug that does not yet exist in the products table.
+     * Appends -2, -3, … until unique.
+     */
+    private function uniqueSlug(?string $provided, string $title): string
+    {
+        $base = $provided !== null && $provided !== '' ? $this->makeSlug($provided) : $this->makeSlug($title);
+        $slug = $base;
+        $counter = 2;
+        while ($this->db->get($this->table, 'id', ['slug' => $slug]) !== null) {
+            $slug = $base . '-' . $counter++;
+        }
+        return $slug;
     }
 
     /**
