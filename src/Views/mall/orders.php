@@ -31,6 +31,7 @@ $pageTitle = $pageKind === 'seller' ? 'Seller Orders' : ($pageKind === 'delivery
             <?php if ($pageKind !== 'seller'): ?>
             <a href="/marketplace/sellers/orders" class="btn btn-secondary">Seller Dashboard</a>
             <?php endif; ?>
+            <a href="/mall/delivery" class="btn btn-secondary">📦 Delivery &amp; Tracking</a>
         </div>
     </div>
 
@@ -99,6 +100,9 @@ $pageTitle = $pageKind === 'seller' ? 'Seller Orders' : ($pageKind === 'delivery
 
                     <?php if ($pageKind === 'delivery' && empty($order['delivery_assignee_user_id'])): ?>
                     <button type="button" class="btn btn-primary delivery-claim-btn" data-order-id="<?= (int)$order['id'] ?>">Claim Delivery</button>
+                    <?php endif; ?>
+                    <?php if (!empty($order['tracking_token'])): ?>
+                    <a href="/mall/delivery/track/<?= htmlspecialchars($order['tracking_token'], ENT_QUOTES, 'UTF-8') ?>" class="btn btn-secondary" style="display:inline-flex;align-items:center;gap:6px;">📍 Track Shipment</a>
                     <?php endif; ?>
 
                     <?php if (in_array($pageKind, ['seller', 'delivery'], true)): ?>

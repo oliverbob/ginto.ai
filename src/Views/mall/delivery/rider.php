@@ -6,6 +6,7 @@ $riderProfile    = $rider_profile ?? [];
 <!doctype html>
 <html lang="en">
 <?php include __DIR__ . '/../parts/head.php'; ?>
+
 <style>
 .shipment-card { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;margin-bottom:14px;cursor:pointer;transition:border-color .15s,box-shadow .15s; }
 .shipment-card:hover { border-color:var(--accent);box-shadow:0 4px 20px rgba(0,0,0,.15); }
@@ -18,10 +19,8 @@ $riderProfile    = $rider_profile ?? [];
 </style>
 <body>
 <?php include __DIR__ . '/../parts/header.php'; ?>
-<div class="container wrapper">
-    <?php include __DIR__ . '/../parts/sidebar.php'; ?>
-    <main class="main-content" style="padding:24px 0;">
-        <div style="max-width:680px;margin:0 auto;padding:0 16px;">
+<div class="mall-content-push">
+    <main style="max-width:720px;margin:32px auto 72px;padding:0 18px;">
             <h1 style="font-size:1.5rem;font-weight:800;margin-bottom:6px;">🛵 Rider Dashboard</h1>
             <p style="color:var(--muted);font-size:0.88rem;margin-bottom:24px;">Manage your deliveries and share your live GPS location.</p>
 
@@ -107,7 +106,6 @@ $riderProfile    = $rider_profile ?? [];
                     <button type="submit" style="background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 24px;font-weight:700;cursor:pointer;font-size:0.88rem;">Save Profile</button>
                 </form>
             </div>
-        </div>
     </main>
 </div>
 <?php include __DIR__ . '/../parts/footer.php'; ?>

@@ -18,6 +18,7 @@ $items  = $shipment['items'] ?? [];
 <html lang="en">
 <?php include __DIR__ . '/../parts/head.php'; ?>
 <!-- Leaflet.js for map -->
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WLs=" crossorigin=""></script>
 <style>
@@ -37,10 +38,8 @@ $items  = $shipment['items'] ?? [];
 </style>
 <body>
 <?php include __DIR__ . '/../parts/header.php'; ?>
-<div class="container wrapper">
-    <?php include __DIR__ . '/../parts/sidebar.php'; ?>
-    <main class="main-content" style="padding:24px 0;">
-        <div style="max-width:820px;margin:0 auto;padding:0 16px;">
+<div class="mall-content-push">
+    <main style="max-width:860px;margin:32px auto 72px;padding:0 18px;">
 
             <!-- Back + status -->
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px;">
@@ -227,7 +226,6 @@ $items  = $shipment['items'] ?? [];
             </div>
             <?php endif; ?>
 
-        </div>
     </main>
 </div>
 <?php include __DIR__ . '/../parts/footer.php'; ?>

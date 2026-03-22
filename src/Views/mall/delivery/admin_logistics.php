@@ -7,6 +7,7 @@ $riders    = $all_riders       ?? [];
 <!doctype html>
 <html lang="en">
 <?php include __DIR__ . '/../parts/head.php'; ?>
+
 <style>
 .stat-card { background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:20px;text-align:center; }
 .stat-num  { font-size:2rem;font-weight:800; }
@@ -22,10 +23,8 @@ tr:hover td { background:var(--surface2); }
 </style>
 <body>
 <?php include __DIR__ . '/../parts/header.php'; ?>
-<div class="container wrapper">
-    <?php include __DIR__ . '/../parts/sidebar.php'; ?>
-    <main class="main-content" style="padding:24px 0;">
-        <div style="max-width:1100px;margin:0 auto;padding:0 16px;">
+<div class="mall-content-push">
+    <main style="max-width:1160px;margin:32px auto 72px;padding:0 18px;">
             <h1 style="font-size:1.4rem;font-weight:800;margin-bottom:6px;">📦 Logistics Dashboard</h1>
             <p style="color:var(--muted);font-size:0.87rem;margin-bottom:22px;">Overview of all deliveries, riders, and shipment statuses.</p>
 
@@ -179,7 +178,6 @@ tr:hover td { background:var(--surface2); }
                 </div>
             </div>
 
-        </div>
     </main>
 </div>
 <?php include __DIR__ . '/../parts/footer.php'; ?>

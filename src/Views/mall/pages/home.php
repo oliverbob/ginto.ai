@@ -55,6 +55,28 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                     <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,rgba(214,180,75,0.18),rgba(245,210,90,0.10));border:1px solid rgba(214,180,75,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;font-weight:800;color:#d4af37;">₱</span>
                     Ginto Pay<?php if ($isLoggedIn && isset($mall_wallet_balance)): ?> <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#d4af37;">₱<?= number_format((float)$mall_wallet_balance, 2) ?></span><?php endif; ?>
                 </a>
+                <a class="cat-item" href="/mall/delivery" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#a78bfa" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v4h-7V8z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
+                    </span>
+                    Delivery &amp; Tracking
+                </a>
+                <?php if ($isLoggedIn && !empty($_SESSION['role_id']) && (int)$_SESSION['role_id'] <= 2): ?>
+                <a class="cat-item" href="/mall/delivery/admin" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(59,130,246,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#93c5fd" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v4H3z"/><path d="M3 10h18v4H3z"/><path d="M3 17h18v4H3z"/></svg>
+                    </span>
+                    Logistics Dashboard
+                </a>
+                <?php endif; ?>
+                <?php if ($isLoggedIn && !empty($_SESSION['is_rider'])): ?>
+                <a class="cat-item" href="/mall/delivery/rider" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(34,197,94,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#86efac" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    </span>
+                    Rider Dashboard
+                </a>
+                <?php endif; ?>
             </div>
 
             <!-- Categories -->

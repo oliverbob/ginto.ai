@@ -9,10 +9,8 @@ $isSeller = $is_seller ?? false;
 <?php include __DIR__ . '/../parts/head.php'; ?>
 <body>
 <?php include __DIR__ . '/../parts/header.php'; ?>
-<div class="container wrapper">
-    <?php include __DIR__ . '/../parts/sidebar.php'; ?>
-    <main class="main-content" style="padding:24px 0;">
-        <div style="max-width:760px;margin:0 auto;padding:0 16px;">
+<div class="mall-content-push">
+    <main style="max-width:860px;margin:32px auto 72px;padding:0 18px;">
 
             <h1 style="font-size:1.6rem;font-weight:800;margin-bottom:8px;">📦 Delivery Tracking</h1>
             <p style="color:var(--muted);margin-bottom:28px;">Track your Ginto Mall shipments in real time.</p>
@@ -75,7 +73,6 @@ $isSeller = $is_seller ?? false;
             </div>
             <?php endif; ?>
 
-        </div>
     </main>
 </div>
 <?php include __DIR__ . '/../parts/footer.php'; ?>
