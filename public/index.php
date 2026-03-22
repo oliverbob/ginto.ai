@@ -140,6 +140,10 @@ if (strpos($path, '/install') === 0) {
         if (isset($mimeTypes[$ext])) {
             header('Content-Type: ' . $mimeTypes[$ext]);
         }
+        // Allow service worker scripts to claim any scope (e.g. /mall/ from /assets/js/).
+        if ($ext === 'js' && str_ends_with($path, '-sw.js')) {
+            header('Service-Worker-Allowed: /');
+        }
         readfile($filePath);
         exit;
     }
