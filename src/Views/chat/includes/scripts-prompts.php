@@ -25,8 +25,13 @@
               allowfullscreen>
             </iframe>
           </div>
-          <a href="/marketplace" aria-label="Visit Ginto Mall" style="display:block;margin-top:18px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 12px 40px rgba(0,0,0,0.28)';" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(0,0,0,0.18)';">
-            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now" style="width:100%;display:block;border-radius:14px;">
+          <a href="/marketplace" aria-label="Visit Ginto Mall" style="display:block;margin-top:18px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;" onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 12px 40px rgba(0,0,0,0.28)';" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(0,0,0,0.18)';">
+            <img src="/assets/images/mall.png" alt="Ginto Mall" style="width:100%;display:block;border-radius:14px 14px 0 0;">
+            <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:10px 16px;border-radius:0 0 14px 14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <span style="font-size:1.1rem;">🛍️</span>
+              <span style="color:#fff;font-weight:700;font-size:0.92rem;letter-spacing:0.01em;">Shop and sell now at Ginto Mall</span>
+              <span style="color:rgba(255,255,255,0.75);font-size:0.85rem;">→</span>
+            </div>
           </a>
         </div>
       `;

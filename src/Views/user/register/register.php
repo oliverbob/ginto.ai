@@ -704,10 +704,15 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
           <!-- Mall banner — mobile only (desktop uses right column) -->
           <a href="/marketplace" aria-label="Visit Ginto Mall"
              class="md:hidden block mt-5 rounded-2xl overflow-hidden shadow-2xl"
-             style="transition:transform 0.2s,box-shadow 0.2s;"
+             style="transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;"
              onmouseover="this.style.transform='scale(1.02)';" onmouseout="this.style.transform='';">
-            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now"
-                 style="width:100%;height:80px;object-fit:cover;display:block;border-radius:16px;">
+            <img src="/assets/images/mall.png" alt="Ginto Mall"
+                 style="width:100%;height:80px;object-fit:cover;display:block;border-radius:16px 16px 0 0;">
+            <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:8px 14px;border-radius:0 0 16px 16px;display:flex;align-items:center;justify-content:center;gap:7px;">
+              <span style="font-size:1rem;">🛍️</span>
+              <span style="color:#fff;font-weight:700;font-size:0.85rem;">Shop and sell now at Ginto Mall</span>
+              <span style="color:rgba(255,255,255,0.75);font-size:0.8rem;">→</span>
+            </div>
           </a>
         </div>
         <div class="md:w-1/2 flex flex-col items-center justify-center gap-6">
@@ -717,10 +722,15 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
           <!-- Mall banner — desktop only (mobile uses left column above) -->
           <a href="/marketplace" aria-label="Visit Ginto Mall"
              class="hidden md:block w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
-             style="transition:transform 0.2s,box-shadow 0.2s;"
+             style="transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;"
              onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 16px 48px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='';this.style.boxShadow='';">
-            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now"
-                 style="width:100%;display:block;border-radius:16px;">
+            <img src="/assets/images/mall.png" alt="Ginto Mall"
+                 style="width:100%;display:block;border-radius:16px 16px 0 0;">
+            <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:11px 18px;border-radius:0 0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;">
+              <span style="font-size:1.1rem;">🛍️</span>
+              <span style="color:#fff;font-weight:700;font-size:0.93rem;letter-spacing:0.01em;">Shop and sell now at Ginto Mall</span>
+              <span style="color:rgba(255,255,255,0.75);font-size:0.88rem;">→</span>
+            </div>
           </a>
         </div>
       </div>
