@@ -638,11 +638,18 @@ select.pf-input    { cursor: pointer; }
                 </div>
                 <div class="pf-grid-2">
                     <div class="pf-group">
-                        <label class="pf-label" for="pf-weight">Packed Weight (kg)</label>
-                        <input class="pf-input" id="pf-weight" type="number" step="0.001" min="0" name="weight_kg"
-                            placeholder="e.g. 0.500"
+                        <label class="pf-label">Packed Weight</label>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <input class="pf-input" id="pf-weight-display" type="number" min="0" style="flex:1;"
+                                placeholder="e.g. 500">
+                            <select id="pf-weight-unit" class="pf-input" style="width:72px;flex-shrink:0;padding-left:8px;">
+                                <option value="g">g</option>
+                                <option value="kg">kg</option>
+                            </select>
+                        </div>
+                        <input type="hidden" id="pf-weight" name="weight_kg"
                             value="<?= htmlspecialchars((string)($p['weight_kg'] ?? '')) ?>">
-                        <span class="pf-hint">Total weight of item + all packaging in kilograms.</span>
+                        <span class="pf-hint">Enter total weight including packaging. Use <strong>g</strong> for grams or <strong>kg</strong> for kilograms.</span>
                     </div>
                     <div class="pf-group">
                         <label class="pf-label">Packed Box Dimensions (cm)</label>
@@ -925,6 +932,58 @@ select.pf-input    { cursor: pointer; }
             if (tosOverlay) tosOverlay.classList.add('hidden');
         }
     } catch (_) {}
+}());
+
+// ── Packed weight g/kg unit toggle ──────────────────────────────────────────
+(function () {
+    var display = document.getElementById('pf-weight-display');
+    var unit    = document.getElementById('pf-weight-unit');
+    var hidden  = document.getElementById('pf-weight');
+    if (!display || !unit || !hidden) return;
+
+    // Populate display from existing kg value (edit page)
+    var existingKg = parseFloat(hidden.value);
+    if (!isNaN(existingKg) && existingKg > 0) {
+        if (existingKg < 1) {
+            unit.value = 'g';
+            display.value = Math.round(existingKg * 1000);
+            display.step = '1';
+        } else {
+            unit.value = 'kg';
+            display.value = existingKg;
+            display.step = '0.001';
+        }
+    } else {
+        unit.value = 'g';
+        display.step = '1';
+    }
+    display.dataset.prevUnit = unit.value;
+
+    function sync() {
+        var v = parseFloat(display.value) || 0;
+        hidden.value = unit.value === 'g' ? (v / 1000).toFixed(3) : v.toFixed(3);
+        hidden.dispatchEvent(new Event('input'));
+    }
+
+    display.addEventListener('input', sync);
+
+    unit.addEventListener('change', function () {
+        var v = parseFloat(display.value) || 0;
+        var prev = display.dataset.prevUnit || 'g';
+        if (unit.value === 'g' && prev === 'kg') {
+            display.value = Math.round(v * 1000);
+            display.step = '1';
+        } else if (unit.value === 'kg' && prev === 'g') {
+            display.value = (v / 1000).toFixed(3);
+            display.step = '0.001';
+        }
+        display.dataset.prevUnit = unit.value;
+        sync();
+    });
+
+    // Ensure hidden is synced on form submit
+    var form = display.closest('form');
+    if (form) form.addEventListener('submit', sync, true);
 }());
 
 // ── Live shipping estimate preview ──────────────────────────────────────────
