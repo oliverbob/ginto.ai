@@ -360,6 +360,7 @@ class SellerController extends \Core\Controller
         $planRateMap = ['hands_off'=>12.00,'active_discovery'=>25.00,'full_service'=>35.00,'referral'=>15.00,'markup'=>0.00,'standard'=>10.00];
         $pricingRate = $planRateMap[$pricingModel] ?? 12.00;
         $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
+        $qty         = intval($_POST['quantity'] ?? 0);
 
         // Available colors (JSON array from tag input)
         $colorsJson = null;
@@ -437,6 +438,7 @@ class SellerController extends \Core\Controller
             'pricing_model' => $pricingModel,
             'pricing_rate' => $pricingRate,
             'markup_rate'  => $markupRate,
+            'quantity'     => $qty,
             'category_id'  => $category,
             'images'       => $imagesArray,
             'status'       => 'draft',
@@ -459,6 +461,14 @@ class SellerController extends \Core\Controller
             $commerce->ensureStorefront($userId);
         } catch (\Throwable $_) {
             // Non-blocking: product listing should still succeed.
+        }
+
+        // Push notification to seller confirming product was listed.
+        try {
+            $pushService = new \Ginto\Services\MallPushService($this->db);
+            $pushService->notifyProductListed($userId, $title);
+        } catch (\Throwable $_) {
+            // Non-blocking: redirect should still proceed.
         }
 
         header('Location: ' . $this->productsUrl()); exit;

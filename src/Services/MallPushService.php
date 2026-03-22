@@ -153,6 +153,17 @@ class MallPushService
 
     // ── Specific notification events ──────────────────────────────────────────
 
+    /** Notify seller when their product listing goes live / is successfully created. */
+    public function notifyProductListed(int $sellerId, string $productTitle): void
+    {
+        $this->notify(
+            [$sellerId],
+            "Your product \"{$productTitle}\" has been listed successfully! It's now draft and pending review.",
+            'product_listed',
+            ['url' => '/marketplace/sellers/products']
+        );
+    }
+
     /** Notify seller when a new order is placed on their product. */
     public function notifyNewOrder(int $sellerId, array $order): void
     {
