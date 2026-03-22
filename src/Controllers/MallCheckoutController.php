@@ -330,10 +330,15 @@ class MallCheckoutController extends Controller
                 }
             }
 
-            $n['link'] = $ctx['link'] ?? $ctx['url'] ?? null;
-            $n['buyer_link'] = $ctx['buyer_link'] ?? null;
+            $buyerLink = $this->resolveBuyerLink($ctx);
+            $productLink = $this->resolveProductLink($ctx);
+            $n['link'] = $this->normalizeActionUrl($ctx['link'] ?? $ctx['url'] ?? null)
+                ?? $productLink
+                ?? $buyerLink
+                ?? '/mall/notifications';
+            $n['buyer_link'] = $buyerLink;
             $n['buyer_label'] = $ctx['buyer_name'] ?? null;
-            $n['product_link'] = $ctx['product_link'] ?? null;
+            $n['product_link'] = $productLink;
             $n['product_label'] = $ctx['product_title'] ?? null;
             $n['activity'] = $ctx['activity'] ?? null;
             $n['is_unread'] = empty($n['is_read']) ? 1 : 0;
@@ -742,6 +747,78 @@ class MallCheckoutController extends Controller
             $this->jsonError('Invalid CSRF token.', 403);
             exit;
         }
+    }
+
+    private function normalizeActionUrl($url): ?string
+    {
+        if (!is_string($url)) {
+            return null;
+        }
+
+        $url = trim($url);
+        if ($url === '') {
+            return null;
+        }
+
+        $lower = strtolower($url);
+        if (in_array($lower, ['null', 'undefined', '/null', '/undefined', '#'], true)) {
+            return null;
+        }
+        if (str_starts_with($lower, 'javascript:') || str_starts_with($lower, 'data:')) {
+            return null;
+        }
+
+        if (str_starts_with($url, 'http://') || str_starts_with($url, 'https://')) {
+            return $url;
+        }
+
+        if (!str_starts_with($url, '/')) {
+            $url = '/' . ltrim($url, '/');
+        }
+
+        return $url;
+    }
+
+    private function resolveBuyerLink(array $ctx): ?string
+    {
+        $direct = $this->normalizeActionUrl($ctx['buyer_link'] ?? null);
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        $buyerId = (int)($ctx['buyer_id'] ?? 0);
+        if ($buyerId <= 0) {
+            return null;
+        }
+
+        $buyer = $this->db->get('users', ['public_id', 'username'], ['id' => $buyerId]);
+        $ident = trim((string)($buyer['public_id'] ?? $buyer['username'] ?? ''));
+        if ($ident === '') {
+            return null;
+        }
+
+        return '/user/profile/' . rawurlencode($ident);
+    }
+
+    private function resolveProductLink(array $ctx): ?string
+    {
+        $direct = $this->normalizeActionUrl($ctx['product_link'] ?? null);
+        if ($direct !== null) {
+            return $direct;
+        }
+
+        $productId = (int)($ctx['product_id'] ?? 0);
+        if ($productId <= 0) {
+            return null;
+        }
+
+        $product = $this->db->get('products', ['slug'], ['id' => $productId]);
+        $slug = trim((string)($product['slug'] ?? ''));
+        if ($slug === '') {
+            return null;
+        }
+
+        return '/mall/product/' . rawurlencode($slug);
     }
 
     private function json(array $payload, int $status = 200): void

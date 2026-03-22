@@ -8,6 +8,16 @@ $unreadCount        = (int)($unreadCount ?? 0);
 $page               = (int)($page ?? 1);
 $hasMore            = (bool)($hasMore ?? false);
 $isLoggedIn         = !empty($_SESSION['user_id']);
+
+$cleanLink = static function ($v): ?string {
+    if (!is_string($v)) return null;
+    $v = trim($v);
+    if ($v === '') return null;
+    $l = strtolower($v);
+    if (in_array($l, ['null', 'undefined', '/null', '/undefined', '#'], true)) return null;
+    if (str_starts_with($l, 'javascript:') || str_starts_with($l, 'data:')) return null;
+    return $v;
+};
 ?>
 <style>
 .notif-page {
@@ -315,9 +325,9 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
                     if (is_array($decoded)) $ctx = array_merge($ctx, $decoded);
                 }
             }
-            $link = $ctx['link'] ?? $ctx['url'] ?? null;
-            $buyerLink = $ctx['buyer_link'] ?? null;
-            $productLink = $ctx['product_link'] ?? null;
+            $link = $cleanLink($ctx['link'] ?? $ctx['url'] ?? null);
+            $buyerLink = $cleanLink($ctx['buyer_link'] ?? null);
+            $productLink = $cleanLink($ctx['product_link'] ?? null);
         ?>
         <div class="notif-item <?= $isUnread ? 'unread' : '' ?>" data-id="<?= (int)$n['id'] ?>">
             <div class="notif-icon"><?= $icon ?></div>
@@ -490,12 +500,24 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
     }
 
     function actionButtonsHtml(n) {
-        const links = [];
-        if (n && n.buyer_link) {
-            links.push('<a class="notif-mini-btn" href="' + escHtml(String(n.buyer_link)) + '">View Buyer</a>');
+        function validActionLink(v) {
+            if (typeof v !== 'string') return null;
+            const t = v.trim();
+            if (!t) return null;
+            const l = t.toLowerCase();
+            if (l === 'null' || l === 'undefined' || l === '/null' || l === '/undefined' || l === '#') return null;
+            if (l.startsWith('javascript:') || l.startsWith('data:')) return null;
+            return t;
         }
-        if (n && n.product_link) {
-            links.push('<a class="notif-mini-btn" href="' + escHtml(String(n.product_link)) + '">View Product</a>');
+
+        const links = [];
+        const buyerLink = validActionLink(n && n.buyer_link);
+        const productLink = validActionLink(n && n.product_link);
+        if (buyerLink) {
+            links.push('<a class="notif-mini-btn" href="' + escHtml(String(buyerLink)) + '">View Buyer</a>');
+        }
+        if (productLink) {
+            links.push('<a class="notif-mini-btn" href="' + escHtml(String(productLink)) + '">View Product</a>');
         }
         return links.length ? ('<div class="notif-actions-row">' + links.join('') + '</div>') : '';
     }
