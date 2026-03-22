@@ -489,7 +489,7 @@ class SellerController extends \Core\Controller
             $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
             $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
 
-            $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
+            $product = $this->db->get('products', ['id', 'seller_id', 'title'], ['id' => $productId]);
             if (!$product || (!$isAdmin && (int)$product['seller_id'] !== $userId)) {
                 http_response_code(403); echo 'Not authorized'; return;
             }
@@ -500,6 +500,18 @@ class SellerController extends \Core\Controller
                 'is_visible' => ($newStatus === 'published') ? 1 : 0,
                 'updated_at' => date('Y-m-d H:i:s'),
             ], ['id' => $productId]);
+
+            try {
+                $pushService = new \Ginto\Services\MallPushService($this->db);
+                $productTitle = (string)($product['title'] ?? 'your product');
+                if ($newStatus === 'published') {
+                    $pushService->notifyProductPublished($userId, $productTitle, $productId);
+                } else {
+                    $pushService->notifyProductUnpublished($userId, $productTitle, $productId);
+                }
+            } catch (\Throwable $_) {
+                // Non-blocking: publishing should not fail on notification errors.
+            }
 
             header('Location: ' . $this->productsUrl()); exit;
         } catch (\Throwable $e) {

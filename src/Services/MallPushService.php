@@ -138,12 +138,20 @@ class MallPushService
             }
         }
 
-        // FCM push — Android devices (best-effort)
-        $fcmTokens = $this->getFcmTokensForUsers($userIds);
-        if (!empty($fcmTokens)) {
-            $notifData = array_merge($meta, ['url' => $meta['url'] ?? '/mall/orders']);
+        // FCM push — Android devices (best-effort), personalized per recipient
+        foreach ($userIds as $uid) {
+            $tokens = $this->getFcmTokensForUsers([$uid]);
+            if (empty($tokens)) continue;
+
+            $notifData = array_merge($meta, [
+                'url'         => $meta['url'] ?? '/mall/orders',
+                'type'        => $type,
+                'event_key'   => $meta['event_key'] ?? $type,
+                'notif_count' => (string)$this->countUnreadForUser((int)$uid),
+            ]);
+
             $this->sendFcmNotifications(
-                $fcmTokens,
+                $tokens,
                 $this->titleForType($type),
                 $message,
                 $notifData
@@ -158,9 +166,49 @@ class MallPushService
     {
         $this->notify(
             [$sellerId],
-            "Your product \"{$productTitle}\" has been listed successfully! It's now draft and pending review.",
+            "Product saved: \"{$productTitle}\". Complete details and publish when ready.",
             'product_listed',
-            ['url' => '/marketplace/sellers/products']
+            [
+                'url' => '/marketplace/sellers/products',
+                'event_key' => 'product_listed',
+                'product_title' => $productTitle,
+            ]
+        );
+    }
+
+    /** Notify seller when a product is explicitly published live. */
+    public function notifyProductPublished(int $sellerId, string $productTitle, int $productId = 0): void
+    {
+        $meta = [
+            'url' => '/marketplace/sellers/products',
+            'event_key' => 'product_published',
+            'product_title' => $productTitle,
+        ];
+        if ($productId > 0) $meta['product_id'] = $productId;
+
+        $this->notify(
+            [$sellerId],
+            "Live now: \"{$productTitle}\" is published and visible to buyers.",
+            'product_published',
+            $meta
+        );
+    }
+
+    /** Notify seller when a product is moved back to draft / paused visibility. */
+    public function notifyProductUnpublished(int $sellerId, string $productTitle, int $productId = 0): void
+    {
+        $meta = [
+            'url' => '/marketplace/sellers/products',
+            'event_key' => 'product_unpublished',
+            'product_title' => $productTitle,
+        ];
+        if ($productId > 0) $meta['product_id'] = $productId;
+
+        $this->notify(
+            [$sellerId],
+            "Visibility paused: \"{$productTitle}\" is now in draft mode.",
+            'product_unpublished',
+            $meta
         );
     }
 
@@ -699,6 +747,9 @@ class MallPushService
     private function titleForType(string $type): string
     {
         $map = [
+            'product_listed'      => '🧾 Product Saved',
+            'product_published'   => '🚀 Product Live',
+            'product_unpublished' => '⏸️ Product Paused',
             'new_order'          => '🛍️ New Order!',
             'order_confirmed'    => '✅ Order Confirmed',
             'visitor_registered' => '👤 New Buyer Registered',
@@ -711,6 +762,20 @@ class MallPushService
             'shipment_failed_delivery' => '⚠️ Delivery Failed',
         ];
         return $map[$type] ?? '🔔 Ginto Mall';
+    }
+
+    private function countUnreadForUser(int $userId): int
+    {
+        try {
+            return (int)$this->db->count('notifications', [
+                'user_id' => $userId,
+                'is_read' => 0,
+            ]);
+        } catch (
+            \Throwable $e
+        ) {
+            return 0;
+        }
     }
 
     private function shipmentStatusMessage(string $status): string
