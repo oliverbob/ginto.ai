@@ -356,7 +356,6 @@ class MallController extends \Core\Controller
             // Fetch one extra to detect has_more
             $notifs = $this->db->select('notifications', '*', [
                 'user_id'  => $userId,
-                'type[~]'  => 'mall_',
                 'ORDER'    => ['created_at' => 'DESC'],
                 'LIMIT'    => [($page - 1) * $limit, $limit + 1],
             ]) ?: [];

@@ -308,7 +308,6 @@ class MallCheckoutController extends Controller
         $limit = 20;
         $notifs = $this->db->select('notifications', '*', [
             'user_id'  => $userId,
-            'type[~]'  => 'mall_',
             'ORDER'    => ['created_at' => 'DESC'],
             'LIMIT'    => [($page - 1) * $limit, $limit + 1],
         ]) ?: [];

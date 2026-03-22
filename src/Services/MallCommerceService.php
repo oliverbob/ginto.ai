@@ -207,7 +207,6 @@ class MallCommerceService
     {
         return $this->db->select('notifications', '*', [
             'user_id' => $userId,
-            'type[~]' => 'mall_',
             'ORDER' => ['created_at' => 'DESC'],
             'LIMIT' => [0, $limit],
         ]) ?: [];
@@ -217,7 +216,6 @@ class MallCommerceService
     {
         $count = $this->db->count('notifications', [
             'user_id' => $userId,
-            'type[~]' => 'mall_',
             'is_read' => 0,
         ]);
 
@@ -228,7 +226,6 @@ class MallCommerceService
     {
         $this->db->update('notifications', ['is_read' => 1], [
             'user_id' => $userId,
-            'type[~]' => 'mall_',
             'is_read' => 0,
         ]);
     }
