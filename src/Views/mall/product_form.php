@@ -19,6 +19,14 @@ $tosAgreed  = $tos_agreed ?? false;
 $isAdmin    = $is_admin ?? false;
 
 $p = $product; // shorthand
+$productAttrs = [];
+if (!empty($p['attributes'])) {
+    $decodedAttrs = json_decode((string)$p['attributes'], true);
+    if (is_array($decodedAttrs)) {
+        $productAttrs = $decodedAttrs;
+    }
+}
+$volumeMlValue = isset($productAttrs['volume_ml']) ? (string)$productAttrs['volume_ml'] : '';
 $existingImgs = [];
 if (!empty($p['images'])) $existingImgs = json_decode($p['images'], true) ?: [];
 if (empty($existingImgs) && !empty($p['image_path'])) $existingImgs = [$p['image_path']];
@@ -536,6 +544,7 @@ select.pf-input    { cursor: pointer; }
                         $curType = $p['product_type'] ?? 'physical';
                         $ptypes = [
                             'physical'     => ['📦', 'Physical', 'Shipped to buyer'],
+                            'liquid'       => ['🧪', 'Liquid', 'Measured in mL'],
                             'digital'      => ['📄', 'Digital', 'Downloadable file'],
                             'virtual'      => ['🎭', 'Virtual', 'Service / voucher'],
                             'subscription' => ['🔄', 'Subscription', 'Recurring access'],
@@ -717,6 +726,13 @@ select.pf-input    { cursor: pointer; }
                         <input type="hidden" id="pf-weight" name="weight_kg"
                             value="<?= htmlspecialchars((string)($p['weight_kg'] ?? '')) ?>">
                         <span class="pf-hint">Enter total weight including packaging. Use <strong>g</strong> for grams or <strong>kg</strong> for kilograms.</span>
+                    </div>
+                    <div class="pf-group" id="pf-liquid-volume-group" style="display:none;">
+                        <label class="pf-label" for="pf-volume-ml">Liquid Volume (mL)</label>
+                        <input class="pf-input" id="pf-volume-ml" type="number" min="0" step="0.1" name="volume_ml"
+                            placeholder="e.g. 500"
+                            value="<?= htmlspecialchars($volumeMlValue) ?>">
+                        <span class="pf-hint">For liquid items, enter the package volume in milliliters. This appears in notification context and product metadata.</span>
                     </div>
                     <div class="pf-group">
                         <label class="pf-label">Packed Box Dimensions (cm)</label>
@@ -906,17 +922,22 @@ select.pf-input    { cursor: pointer; }
     var ptypeHidden      = document.getElementById('pf-product-type');
     var shippingSection  = document.getElementById('pf-shipping-section');
     var qtyHint          = document.getElementById('pf-qty-hint');
+    var liquidVolumeGroup = document.getElementById('pf-liquid-volume-group');
 
     function applyProductType(type) {
         document.querySelectorAll('.ptype-btn').forEach(function (btn) {
             btn.classList.toggle('active', btn.dataset.ptype === type);
         });
         if (ptypeHidden) ptypeHidden.value = type;
+        var requiresShipping = (type === 'physical' || type === 'liquid');
         if (shippingSection) {
-            shippingSection.style.display = (type === 'physical') ? '' : 'none';
+            shippingSection.style.display = requiresShipping ? '' : 'none';
         }
         if (qtyHint) {
-            qtyHint.style.display = (type === 'physical') ? 'none' : '';
+            qtyHint.style.display = requiresShipping ? 'none' : '';
+        }
+        if (liquidVolumeGroup) {
+            liquidVolumeGroup.style.display = (type === 'liquid') ? '' : 'none';
         }
     }
 

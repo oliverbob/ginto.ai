@@ -1292,6 +1292,7 @@ $router->req('/marketplace/delivery/orders', 'MallCheckoutController@deliveryOrd
 
 $router->req('/api/mall/notifications', 'MallCheckoutController@notificationsApi', ['GET']);
 $router->req('/api/mall/notifications/mark-read', 'MallCheckoutController@notificationsMarkRead', ['POST']);
+$router->req('/api/mall/notifications/mark-read-app', 'MallCheckoutController@notificationsMarkReadApp', ['POST']);
 $router->req('/api/mall/checkout/create', 'MallCheckoutController@checkoutCreate', ['POST']);
 $router->req('/api/mall/checkout/paymongo/qr/init', 'MallCheckoutController@checkoutPaymongoQrInit', ['POST']);
 $router->req('/api/mall/checkout/paymongo/card/init', 'MallCheckoutController@checkoutPaymongoCardInit', ['POST']);

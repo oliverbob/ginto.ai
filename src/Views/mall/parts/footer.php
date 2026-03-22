@@ -789,11 +789,25 @@
             const msg = esc(String(n.message || ''));
             const dt  = esc(String(n.created_at || ''));
             const icon = notifIcon(n.type);
+            const isUnread = !!(n.is_unread || (!n.is_read && n.is_read !== 1));
+            const livePill = isUnread
+                ? '<span style="display:inline-flex;align-items:center;justify-content:center;min-height:19px;padding:0 7px;border-radius:999px;font-size:0.62rem;font-weight:800;background:rgba(37,99,235,0.28);border:1px solid rgba(96,165,250,0.42);color:#bfdbfe;">LIVE</span>'
+                : '<span style="display:inline-flex;align-items:center;justify-content:center;min-height:19px;padding:0 7px;border-radius:999px;font-size:0.62rem;font-weight:800;background:rgba(71,85,105,0.25);border:1px solid rgba(100,116,139,0.34);color:#cbd5e1;">READ</span>';
             const link = n.link ? ('<a href="' + esc(String(n.link)) + '" style="display:inline-block;margin-top:6px;font-size:0.72rem;color:var(--accent);text-decoration:none;">View details →</a>') : '';
+            const buyerBtn = n.buyer_link
+                ? ('<a href="' + esc(String(n.buyer_link)) + '" style="display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-size:0.68rem;font-weight:700;color:var(--text);text-decoration:none;">Buyer</a>')
+                : '';
+            const productBtn = n.product_link
+                ? ('<a href="' + esc(String(n.product_link)) + '" style="display:inline-flex;align-items:center;justify-content:center;min-height:26px;padding:0 8px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);font-size:0.68rem;font-weight:700;color:var(--text);text-decoration:none;">Product</a>')
+                : '';
+            const actionRow = (buyerBtn || productBtn)
+                ? ('<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;">' + buyerBtn + productBtn + '</div>')
+                : '';
             return '<div style="padding:10px 12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);">'
                 + '<div style="font-size:0.82rem;font-weight:600;line-height:1.4;">' + icon + ' ' + msg + '</div>'
-                + '<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">' + dt + '</div>'
+                + '<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px;">' + dt + livePill + '</div>'
                 + link
+                + actionRow
                 + '</div>';
         }).join('');
     }

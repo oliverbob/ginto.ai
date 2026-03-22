@@ -160,6 +160,28 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
     font-size:0.72rem;
     color:var(--muted);
 }
+.notif-state-pill {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:20px;
+    padding:0 8px;
+    border-radius:999px;
+    font-size:0.64rem;
+    font-weight:800;
+    letter-spacing:0.02em;
+    border:1px solid transparent;
+}
+.notif-state-pill.live {
+    color:#bfdbfe;
+    background:rgba(37,99,235,0.28);
+    border-color:rgba(96,165,250,0.42);
+}
+.notif-state-pill.read {
+    color:#cbd5e1;
+    background:rgba(71,85,105,0.25);
+    border-color:rgba(100,116,139,0.34);
+}
 .notif-action {
     display:inline-flex;
     align-items:center;
@@ -167,6 +189,30 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
     font-weight:700;
     color:var(--accent);
     text-decoration:none;
+}
+.notif-actions-row {
+    margin-top:7px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+}
+.notif-mini-btn {
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    min-height:28px;
+    padding:0 9px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    background:var(--surface2);
+    color:var(--text);
+    text-decoration:none;
+    font-size:0.7rem;
+    font-weight:700;
+}
+.notif-mini-btn:hover {
+    border-color:rgba(96,165,250,0.45);
+    background:rgba(59,130,246,0.1);
 }
 .notif-empty {
     border:1px dashed var(--border);
@@ -262,11 +308,16 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
             elseif (str_contains($type, 'product_listed')) $icon = '🏷️';
             elseif (str_contains($type, 'wallet')) $icon = '💰';
             $isUnread = empty($n['is_read']);
-            $payload  = [];
-            if (!empty($n['payload'])) {
-                $payload = json_decode($n['payload'], true) ?: [];
+            $ctx = [];
+            foreach (['context_json', 'payload', 'meta'] as $field) {
+                if (!empty($n[$field])) {
+                    $decoded = json_decode((string)$n[$field], true) ?: [];
+                    if (is_array($decoded)) $ctx = array_merge($ctx, $decoded);
+                }
             }
-            $link = $payload['link'] ?? null;
+            $link = $ctx['link'] ?? $ctx['url'] ?? null;
+            $buyerLink = $ctx['buyer_link'] ?? null;
+            $productLink = $ctx['product_link'] ?? null;
         ?>
         <div class="notif-item <?= $isUnread ? 'unread' : '' ?>" data-id="<?= (int)$n['id'] ?>">
             <div class="notif-icon"><?= $icon ?></div>
@@ -274,10 +325,17 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
                 <div class="notif-msg"><?= htmlspecialchars($n['message'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
                 <div class="notif-meta">
                     <div class="notif-time"><?= htmlspecialchars($n['created_at'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
+                    <span class="notif-state-pill <?= $isUnread ? 'live' : 'read' ?>"><?= $isUnread ? 'LIVE' : 'READ' ?></span>
                     <?php if ($link): ?>
                     <a class="notif-action" href="<?= htmlspecialchars($link, ENT_QUOTES, 'UTF-8') ?>">Open</a>
                     <?php endif; ?>
                 </div>
+                <?php if ($buyerLink || $productLink): ?>
+                <div class="notif-actions-row">
+                    <?php if ($buyerLink): ?><a class="notif-mini-btn" href="<?= htmlspecialchars($buyerLink, ENT_QUOTES, 'UTF-8') ?>">View Buyer</a><?php endif; ?>
+                    <?php if ($productLink): ?><a class="notif-mini-btn" href="<?= htmlspecialchars($productLink, ENT_QUOTES, 'UTF-8') ?>">View Product</a><?php endif; ?>
+                </div>
+                <?php endif; ?>
             </div>
         </div>
         <?php endforeach; ?>
@@ -344,14 +402,22 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
                     const iconMap = {order:'📦', payment:'💳', delivery:'🚚', product_listed:'🏷️', wallet:'💰'};
                     let icon = '🔔';
                     for (const k in iconMap) { if ((n.type || '').includes(k)) { icon = iconMap[k]; break; } }
+                    const isUnread = !!(n.is_unread || (!n.is_read && n.is_read !== 1));
+                    const state = isUnread
+                        ? '<span class="notif-state-pill live">LIVE</span>'
+                        : '<span class="notif-state-pill read">READ</span>';
+                    const actions = actionButtonsHtml(n);
                     const div = document.createElement('div');
-                    div.className = 'notif-item' + (n.is_read ? '' : ' unread');
+                    div.className = 'notif-item' + (isUnread ? ' unread' : '');
                     div.dataset.id = n.id;
                     div.innerHTML = '<div class="notif-icon">' + icon + '</div>'
                         + '<div class="notif-body">'
                         + '<div class="notif-msg">' + escHtml(n.message || '') + '</div>'
                         + '<div class="notif-meta"><div class="notif-time">' + escHtml(n.created_at || '') + '</div>'
+                        + state
                         + (n.link ? '<a class="notif-action" href="' + escHtml(n.link) + '">Open</a>' : '')
+                        + '</div>'
+                        + actions
                         + '</div></div>';
                     list.appendChild(div);
                 });
@@ -388,14 +454,20 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
                         const iconMap = {order:'📦', payment:'💳', delivery:'🚚', product_listed:'🏷️', wallet:'💰'};
                         let icon = '🔔';
                         for (const k in iconMap) { if ((n.type || '').includes(k)) { icon = iconMap[k]; break; } }
+                        const isUnread = !!(n.is_unread || (!n.is_read && n.is_read !== 1));
+                        const state = isUnread
+                            ? '<span class="notif-state-pill live">LIVE</span>'
+                            : '<span class="notif-state-pill read">READ</span>';
+                        const actions = actionButtonsHtml(n);
                         const div = document.createElement('div');
-                        div.className = 'notif-item' + (n.is_read ? '' : ' unread');
+                        div.className = 'notif-item' + (isUnread ? ' unread' : '');
                         div.dataset.id = n.id;
                         div.innerHTML = '<div class="notif-icon">' + icon + '</div>'
                             + '<div class="notif-body">'
                             + '<div class="notif-msg">' + escHtml(n.message || '') + '</div>'
-                            + '<div class="notif-time">' + escHtml(n.created_at || '') + '</div>'
-                            + (n.link ? '<a class="notif-action" href="' + escHtml(n.link) + '">View details →</a>' : '')
+                            + '<div class="notif-meta"><div class="notif-time">' + escHtml(n.created_at || '') + '</div>' + state
+                            + (n.link ? '<a class="notif-action" href="' + escHtml(n.link) + '">Open</a>' : '') + '</div>'
+                            + actions
                             + '</div>';
                         list.appendChild(div);
                     });
@@ -415,6 +487,17 @@ $isLoggedIn         = !empty($_SESSION['user_id']);
 
     function escHtml(s) {
         return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function actionButtonsHtml(n) {
+        const links = [];
+        if (n && n.buyer_link) {
+            links.push('<a class="notif-mini-btn" href="' + escHtml(String(n.buyer_link)) + '">View Buyer</a>');
+        }
+        if (n && n.product_link) {
+            links.push('<a class="notif-mini-btn" href="' + escHtml(String(n.product_link)) + '">View Product</a>');
+        }
+        return links.length ? ('<div class="notif-actions-row">' + links.join('') + '</div>') : '';
     }
 }());
 </script>

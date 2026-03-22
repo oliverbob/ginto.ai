@@ -342,7 +342,7 @@ class SellerController extends \Core\Controller
         }
 
         $productType = trim((string)($_POST['product_type'] ?? 'physical'));
-        if (!in_array($productType, ['physical','digital','virtual','subscription'], true)) {
+        if (!in_array($productType, ['physical','liquid','digital','virtual','subscription'], true)) {
             $productType = 'physical';
         }
         $title = trim($_POST['title'] ?? '');
@@ -379,6 +379,13 @@ class SellerController extends \Core\Controller
         $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
         $widthCm  = isset($_POST['width_cm'])  && $_POST['width_cm']  !== '' ? max(0.0, (float)$_POST['width_cm'])  : null;
         $heightCm = isset($_POST['height_cm']) && $_POST['height_cm'] !== '' ? max(0.0, (float)$_POST['height_cm']) : null;
+        $volumeMl = isset($_POST['volume_ml']) && $_POST['volume_ml'] !== '' ? max(0.0, (float)$_POST['volume_ml']) : null;
+
+        $attributes = [];
+        if ($productType === 'liquid' && $volumeMl !== null && $volumeMl > 0) {
+            $attributes['volume_ml'] = round($volumeMl, 2);
+            $attributes['liquid_unit'] = 'mL';
+        }
 
         // Handle images upload (multiple) — use B2 when configured, else local storage
         $imagesArray = [];
@@ -444,10 +451,11 @@ class SellerController extends \Core\Controller
             'images'       => $imagesArray,
             'status'       => 'draft',
             'is_visible'   => 0,
-            'weight_kg'    => $productType === 'physical' ? $weightKg : null,
-            'length_cm'    => $productType === 'physical' ? $lengthCm : null,
-            'width_cm'     => $productType === 'physical' ? $widthCm  : null,
-            'height_cm'    => $productType === 'physical' ? $heightCm : null,
+            'weight_kg'    => in_array($productType, ['physical', 'liquid'], true) ? $weightKg : null,
+            'length_cm'    => in_array($productType, ['physical', 'liquid'], true) ? $lengthCm : null,
+            'width_cm'     => in_array($productType, ['physical', 'liquid'], true) ? $widthCm  : null,
+            'height_cm'    => in_array($productType, ['physical', 'liquid'], true) ? $heightCm : null,
+            'attributes'   => !empty($attributes) ? $attributes : null,
             'colors'       => $colorsJson,
         ];
 
@@ -610,13 +618,13 @@ class SellerController extends \Core\Controller
         $user      = $this->db->get('users', ['id','role_id'], ['id' => $userId]);
         $isAdmin   = in_array($user['role_id'] ?? 0, [1, 2]);
 
-        $existing = $this->db->get('products', ['id', 'seller_id', 'images'], ['id' => $productId]);
+        $existing = $this->db->get('products', ['id', 'seller_id', 'images', 'attributes'], ['id' => $productId]);
         if (!$existing || (!$isAdmin && (int)$existing['seller_id'] !== $userId)) {
             http_response_code(403); echo 'Not authorized'; return;
         }
 
         $productType = trim((string)($_POST['product_type'] ?? 'physical'));
-        if (!in_array($productType, ['physical','digital','virtual','subscription'], true)) {
+        if (!in_array($productType, ['physical','liquid','digital','virtual','subscription'], true)) {
             $productType = 'physical';
         }
         $title    = trim($_POST['title'] ?? '');
@@ -652,6 +660,21 @@ class SellerController extends \Core\Controller
         $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
         $widthCm  = isset($_POST['width_cm'])  && $_POST['width_cm']  !== '' ? max(0.0, (float)$_POST['width_cm'])  : null;
         $heightCm = isset($_POST['height_cm']) && $_POST['height_cm'] !== '' ? max(0.0, (float)$_POST['height_cm']) : null;
+        $volumeMl = isset($_POST['volume_ml']) && $_POST['volume_ml'] !== '' ? max(0.0, (float)$_POST['volume_ml']) : null;
+
+        $attributes = [];
+        if (!empty($existing['attributes'])) {
+            $decodedAttrs = json_decode((string)$existing['attributes'], true);
+            if (is_array($decodedAttrs)) {
+                $attributes = $decodedAttrs;
+            }
+        }
+        if ($productType === 'liquid' && $volumeMl !== null && $volumeMl > 0) {
+            $attributes['volume_ml'] = round($volumeMl, 2);
+            $attributes['liquid_unit'] = 'mL';
+        } else {
+            unset($attributes['volume_ml'], $attributes['liquid_unit']);
+        }
 
         // Start from the kept images (user may have removed some via delete buttons)
         $allExisting  = json_decode($existing['images'] ?? '[]', true) ?: [];
@@ -719,10 +742,11 @@ class SellerController extends \Core\Controller
             'pricing_rate'      => $pricingRate,
             'markup_rate'       => $markupRate,
             'images'            => json_encode($imagesArray),
-            'weight_kg'         => $productType === 'physical' ? $weightKg : null,
-            'length_cm'         => $productType === 'physical' ? $lengthCm : null,
-            'width_cm'          => $productType === 'physical' ? $widthCm  : null,
-            'height_cm'         => $productType === 'physical' ? $heightCm : null,
+            'weight_kg'         => in_array($productType, ['physical', 'liquid'], true) ? $weightKg : null,
+            'length_cm'         => in_array($productType, ['physical', 'liquid'], true) ? $lengthCm : null,
+            'width_cm'          => in_array($productType, ['physical', 'liquid'], true) ? $widthCm  : null,
+            'height_cm'         => in_array($productType, ['physical', 'liquid'], true) ? $heightCm : null,
+            'attributes'        => !empty($attributes) ? json_encode($attributes) : null,
             'colors'            => $colorsJson,
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);

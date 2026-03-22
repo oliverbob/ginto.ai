@@ -274,8 +274,19 @@ class MallCommerceService
                     $sellerIds[$sellerId] = true;
                 }
             }
-            foreach (array_keys($sellerIds) as $sellerId) {
-                $this->recordStorefrontImpression($sellerId, $buyerId, 'added_to_cart');
+            foreach ($bundle['orders'] as $orderSummary) {
+                $sellerId = (int)($orderSummary['seller_id'] ?? 0);
+                if ($sellerId <= 0) {
+                    continue;
+                }
+                $firstItem = is_array($orderSummary['items'] ?? null) ? ($orderSummary['items'][0] ?? null) : null;
+                $context = [];
+                if (is_array($firstItem)) {
+                    $context['product_id'] = (int)($firstItem['product_id'] ?? 0);
+                    $context['product_title'] = (string)($firstItem['title'] ?? '');
+                }
+                $context['storefront_slug'] = (string)($orderSummary['storefront_slug'] ?? '');
+                $this->recordStorefrontImpression($sellerId, $buyerId, 'added_to_cart', $context);
             }
         }
 
@@ -755,7 +766,7 @@ class MallCommerceService
         return count($orderIds);
     }
 
-    public function recordStorefrontImpression(int $sellerId, ?int $viewerUserId, string $activity = 'viewed'): void
+    public function recordStorefrontImpression(int $sellerId, ?int $viewerUserId, string $activity = 'viewed', array $context = []): void
     {
         if ($sellerId <= 0) {
             return;
@@ -764,9 +775,58 @@ class MallCommerceService
             return;
         }
 
+        $buyer = null;
+        if (!empty($viewerUserId)) {
+            $buyer = $this->db->get('users', ['id', 'username', 'fullname', 'public_id'], ['id' => (int)$viewerUserId]);
+        }
+
+        $buyerLabel = 'A visitor';
+        $buyerIdent = null;
+        if (!empty($buyer)) {
+            $buyerLabel = trim((string)($buyer['fullname'] ?: $buyer['username'] ?: ('Buyer #' . (int)$buyer['id'])));
+            $buyerIdent = trim((string)($buyer['public_id'] ?: $buyer['username'] ?: ''));
+        }
+
+        $productId = (int)($context['product_id'] ?? 0);
+        $productTitle = trim((string)($context['product_title'] ?? ''));
+        $productSlug = '';
+        if ($productId > 0) {
+            $p = $this->db->get('products', ['slug', 'title'], ['id' => $productId]);
+            if ($productTitle === '') {
+                $productTitle = trim((string)($p['title'] ?? ''));
+            }
+            $productSlug = trim((string)($p['slug'] ?? ''));
+        }
+
+        $notifContext = [
+            'activity' => $activity,
+            'privacy_mode' => 'seller_context',
+        ];
+        if (!empty($viewerUserId)) {
+            $notifContext['buyer_id'] = (int)$viewerUserId;
+        }
+        if ($buyerLabel !== '') {
+            $notifContext['buyer_name'] = $buyerLabel;
+        }
+        if ($buyerIdent !== null && $buyerIdent !== '') {
+            $notifContext['buyer_link'] = '/user/profile/' . rawurlencode($buyerIdent);
+        }
+        if ($productId > 0) {
+            $notifContext['product_id'] = $productId;
+        }
+        if ($productTitle !== '') {
+            $notifContext['product_title'] = $productTitle;
+        }
+        if ($productSlug !== '') {
+            $notifContext['product_link'] = '/mall/product/' . rawurlencode($productSlug);
+            $notifContext['link'] = '/mall/product/' . rawurlencode($productSlug);
+        } else {
+            $notifContext['link'] = '/marketplace/sellers/storefront';
+        }
+
         $message = match ($activity) {
-            'added_to_cart' => 'User added items to cart but has not paid yet.',
-            default => 'User viewed your storefront but never paid yet.',
+            'added_to_cart' => $buyerLabel . ' added ' . ($productTitle !== '' ? ('"' . $productTitle . '"') : 'items') . ' to cart but has not paid yet.',
+            default => $buyerLabel . ' viewed your storefront but has not paid yet.',
         };
 
         $this->createMallNotification(
@@ -774,10 +834,7 @@ class MallCommerceService
             !empty($viewerUserId) ? $viewerUserId : null,
             'mall_seller_impression',
             $message,
-            [
-                'activity' => $activity,
-                'privacy_mode' => 'no_pii',
-            ]
+            $notifContext
         );
     }
 
@@ -1318,6 +1375,14 @@ class MallCommerceService
             'is_read' => 0,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+
+        // Realtime push to Android/web devices so notifications arrive live.
+        try {
+            $push = new \Ginto\Services\MallPushService($this->db);
+            $push->pushRealtimeNotification($userId, $type, $message, $context);
+        } catch (\Throwable $_) {
+            // Non-blocking: notification persistence succeeded already.
+        }
     }
 
     private function emailSellerPaidOrder(int $orderId): void

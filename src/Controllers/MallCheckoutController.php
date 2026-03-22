@@ -34,7 +34,12 @@ class MallCheckoutController extends Controller
         }
 
         $viewerId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
-        $this->commerce->recordStorefrontImpression((int)($data['storefront']['user_id'] ?? 0), $viewerId, 'viewed');
+        $this->commerce->recordStorefrontImpression(
+            (int)($data['storefront']['user_id'] ?? 0),
+            $viewerId,
+            'viewed',
+            ['storefront_slug' => (string)($data['storefront']['slug'] ?? '')]
+        );
 
         // Remember the store owner so buyer registration can assign them as upline
         $sellerId = (int)($data['storefront']['user_id'] ?? 0);
@@ -313,10 +318,26 @@ class MallCheckoutController extends Controller
         ]) ?: [];
         $hasMore = count($notifs) > $limit;
         if ($hasMore) $notifs = array_slice($notifs, 0, $limit);
-        // Add payload link to each
+        // Normalize action links and unread/live fields.
         foreach ($notifs as &$n) {
-            $payload = !empty($n['payload']) ? (json_decode($n['payload'], true) ?: []) : [];
-            $n['link'] = $payload['link'] ?? null;
+            $ctx = [];
+            foreach (['context_json', 'payload', 'meta'] as $ctxField) {
+                if (!empty($n[$ctxField])) {
+                    $decoded = json_decode((string)$n[$ctxField], true);
+                    if (is_array($decoded)) {
+                        $ctx = array_merge($ctx, $decoded);
+                    }
+                }
+            }
+
+            $n['link'] = $ctx['link'] ?? $ctx['url'] ?? null;
+            $n['buyer_link'] = $ctx['buyer_link'] ?? null;
+            $n['buyer_label'] = $ctx['buyer_name'] ?? null;
+            $n['product_link'] = $ctx['product_link'] ?? null;
+            $n['product_label'] = $ctx['product_title'] ?? null;
+            $n['activity'] = $ctx['activity'] ?? null;
+            $n['is_unread'] = empty($n['is_read']) ? 1 : 0;
+            $n['live_badge'] = empty($n['is_read']) ? 1 : 0;
         }
         unset($n);
         $this->json([
@@ -333,6 +354,26 @@ class MallCheckoutController extends Controller
         $userId = $this->requireUserJson();
         $this->requirePostJson();
         $this->validateCsrfFromJson();
+        $this->commerce->markMallNotificationsRead($userId);
+        $this->json(['success' => true]);
+    }
+
+    /**
+     * App-only mark-read endpoint (session-authenticated), used by native bell flow.
+     */
+    public function notificationsMarkReadApp()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+
+        $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+        $device = (string)($_GET['device'] ?? $_POST['device'] ?? '');
+        $isApp = str_contains($ua, 'GintoApp') || $device === 'android' || $device === 'ios';
+        if (!$isApp) {
+            $this->jsonError('App context required.', 403);
+            return;
+        }
+
         $this->commerce->markMallNotificationsRead($userId);
         $this->json(['success' => true]);
     }

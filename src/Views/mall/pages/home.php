@@ -51,6 +51,14 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                     </span>
                     My Orders
                 </a>
+                <?php if ($isLoggedIn): ?>
+                <a class="cat-item" href="/marketplace/sellers/storefront" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:rgba(16,185,129,0.14);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#34d399" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10h18"/><path d="M5 10v10h14V10"/><path d="M2 10l2-6h16l2 6"/></svg>
+                    </span>
+                    My Storefront
+                </a>
+                <?php endif; ?>
                 <a class="cat-item" href="/wallet" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
                     <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,rgba(214,180,75,0.18),rgba(245,210,90,0.10));border:1px solid rgba(214,180,75,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;font-weight:800;color:#d4af37;">₱</span>
                     Ginto Pay<?php if ($isLoggedIn && isset($mall_wallet_balance)): ?> <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#d4af37;">₱<?= number_format((float)$mall_wallet_balance, 2) ?></span><?php endif; ?>

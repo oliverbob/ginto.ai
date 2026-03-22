@@ -316,6 +316,39 @@ class MallPushService
         $this->notify([$sellerId], $msg, 'visitor_registered', $meta);
     }
 
+    /**
+     * Push realtime update to a user's active FCM devices without creating new DB rows.
+     * Intended for notifications that are already persisted by another service layer.
+     */
+    public function pushRealtimeNotification(int $userId, string $type, string $message, array $meta = []): void
+    {
+        if ($userId <= 0) return;
+
+        $tokens = $this->getFcmTokensForUsers([$userId]);
+        if (empty($tokens)) return;
+
+        $defaultUrl = '/mall/notifications';
+        if (!empty($meta['product_link'])) {
+            $defaultUrl = (string)$meta['product_link'];
+        } elseif (!empty($meta['buyer_link'])) {
+            $defaultUrl = (string)$meta['buyer_link'];
+        }
+
+        $payload = array_merge($meta, [
+            'type'        => $type,
+            'event_key'   => $meta['event_key'] ?? $type,
+            'url'         => $meta['url'] ?? $meta['link'] ?? $defaultUrl,
+            'notif_count' => (string)$this->countUnreadForUser($userId),
+        ]);
+
+        $this->sendFcmNotifications(
+            $tokens,
+            $this->titleForType($type),
+            $message,
+            $payload
+        );
+    }
+
     // ── FCM (Android) Push ────────────────────────────────────────────────────
 
     private function getFcmTokensForUsers(array $userIds): array
@@ -750,6 +783,7 @@ class MallPushService
             'product_listed'      => '🧾 Product Saved',
             'product_published'   => '🚀 Product Live',
             'product_unpublished' => '⏸️ Product Paused',
+            'mall_seller_impression' => '👀 Buyer Activity',
             'new_order'          => '🛍️ New Order!',
             'order_confirmed'    => '✅ Order Confirmed',
             'visitor_registered' => '👤 New Buyer Registered',
