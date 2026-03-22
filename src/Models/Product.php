@@ -194,18 +194,17 @@ class Product
         } elseif ($sort === 'rating') {
             $orderBy = 'rating DESC';
         }
-        $sql .= " ORDER BY {$orderBy} LIMIT :offset, :limit";
+        $sql .= " ORDER BY {$orderBy} LIMIT {$offset}, {$limit}";
 
-        $stmt = $this->db->pdo()->prepare($sql);
-        foreach ($params as $k => $v) {
-            $type = is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
-            $stmt->bindValue($k, $v, $type);
+        try {
+            $stmt = $this->db->query($sql, $params);
+            if (!$stmt) return [];
+            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            error_log('Product::list query error: ' . $e->getMessage());
+            return [];
         }
-        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
-        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
-        $stmt->execute();
-
-        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
     private function hasColumn(string $column): bool
@@ -215,9 +214,11 @@ class Product
         }
 
         try {
-            $stmt = $this->db->pdo()->prepare("SHOW COLUMNS FROM {$this->table} LIKE :col");
-            $stmt->bindValue(':col', $column, \PDO::PARAM_STR);
-            $stmt->execute();
+            $stmt = $this->db->query("SHOW COLUMNS FROM {$this->table} LIKE :col", [':col' => $column]);
+            if (!$stmt) {
+                $this->columnExistsCache[$column] = false;
+                return false;
+            }
             $exists = (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
             $this->columnExistsCache[$column] = $exists;
             return $exists;
