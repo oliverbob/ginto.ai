@@ -130,4 +130,28 @@ class MallController extends \Core\Controller
             http_response_code(500); echo json_encode(['success'=>false,'message'=>'Server error occurred']); return;
         }
     }
+
+    public function apiHeaderData(): void
+    {
+        header('Content-Type: application/json');
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            echo json_encode(['balance' => '0.00', 'notif_count' => 0, 'cart_count' => 0]);
+            return;
+        }
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $walletSummary = $commerce->getWalletSummary($userId);
+            $notifCount = $commerce->getMallUnreadNotificationCount($userId);
+            $cartCount = (int)($this->db->count('cart_items', ['user_id' => $userId]) ?? 0);
+            echo json_encode([
+                'balance'     => number_format((float)($walletSummary['account']['balance'] ?? 0), 2),
+                'notif_count' => (int)$notifCount,
+                'cart_count'  => $cartCount,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('MallController::apiHeaderData error: ' . $e->getMessage());
+            echo json_encode(['balance' => '0.00', 'notif_count' => 0, 'cart_count' => 0]);
+        }
+    }
 }
