@@ -83,6 +83,48 @@ textarea.pf-input  { resize: vertical; }
 select.pf-input    { cursor: pointer; }
 .pf-hint { font-size: 0.76rem; color: var(--muted); }
 
+/* Color tags */
+.color-tags-wrap {
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+    padding: 7px 10px; min-height: 42px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    cursor: text;
+    transition: border-color var(--trans), box-shadow var(--trans);
+}
+.color-tags-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59,130,246,0.12); }
+.color-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 0.78rem; font-weight: 600;
+    background: rgba(59,130,246,0.12); color: var(--accent);
+    border: 1px solid rgba(59,130,246,0.25);
+    white-space: nowrap;
+}
+.color-tag-close {
+    cursor: pointer; opacity: 0.65; font-size: 1rem; line-height: 1;
+    background: none; border: none; padding: 0; color: inherit;
+}
+.color-tag-close:hover { opacity: 1; }
+.color-tag-input {
+    border: none; background: transparent; outline: none;
+    font-size: 0.86rem; font-family: inherit; color: var(--text);
+    min-width: 140px; flex: 1;
+}
+.color-tag-input::placeholder { color: var(--muted); }
+.color-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.color-preset-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 9px; border-radius: 20px;
+    font-size: 0.76rem; cursor: pointer;
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-family: inherit;
+    transition: border-color 0.15s, color 0.15s;
+}
+.color-preset-btn:hover { border-color: var(--accent); color: var(--accent); }
+.color-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+
 /* Image upload */
 .img-upload-area {
     border: 2px dashed var(--border);
@@ -550,6 +592,31 @@ select.pf-input    { cursor: pointer; }
                     </div>
                 </div>
 
+                <!-- Colors / Variants -->
+                <div class="pf-group">
+                    <label class="pf-label">Available Colors <span style="font-weight:400;color:var(--muted)">(optional)</span></label>
+                    <div class="color-tags-wrap" id="pf-color-tags-wrap">
+                        <input class="color-tag-input" id="pf-color-input" type="text"
+                            placeholder="Type a color, press Enter or comma…" autocomplete="off" maxlength="50">
+                    </div>
+                    <input type="hidden" id="pf-colors-hidden" name="colors"
+                        value="<?= htmlspecialchars($p['colors'] ?? '[]') ?>">
+                    <div class="color-presets" id="pf-color-presets">
+                        <?php foreach ([
+                            ['Black','#222'], ['White','#f0f0f0'], ['Gray','#9ca3af'],
+                            ['Red','#ef4444'], ['Orange','#f97316'], ['Yellow','#eab308'],
+                            ['Green','#22c55e'], ['Blue','#3b82f6'], ['Purple','#a855f7'],
+                            ['Pink','#ec4899'], ['Brown','#92400e'], ['Beige','#d4b896'],
+                        ] as [$cname, $hex]): ?>
+                        <button type="button" class="color-preset-btn" data-color="<?= $cname ?>">
+                            <span class="color-swatch" style="background:<?= $hex ?>;border:1px solid rgba(0,0,0,0.18)"></span>
+                            <?= $cname ?>
+                        </button>
+                        <?php endforeach; ?>
+                    </div>
+                    <span class="pf-hint" style="margin-top:2px">Press <kbd style="font-size:0.72rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--surface2)">Enter</kbd> or <kbd style="font-size:0.72rem;padding:1px 4px;border:1px solid var(--border);border-radius:3px;background:var(--surface2)">,</kbd> to add. Click a preset to quick-add. Buyers will see these as filter options.</span>
+                </div>
+
                 <!-- Platform Fee Plan -->
                 <?php
                 $validPlanModels = ['hands_off','active_discovery','full_service','referral','markup','standard'];
@@ -932,6 +999,72 @@ select.pf-input    { cursor: pointer; }
             if (tosOverlay) tosOverlay.classList.add('hidden');
         }
     } catch (_) {}
+}());
+
+// ── Product colors tag input ────────────────────────────────────────────────
+(function () {
+    var wrap    = document.getElementById('pf-color-tags-wrap');
+    var input   = document.getElementById('pf-color-input');
+    var hidden  = document.getElementById('pf-colors-hidden');
+    if (!wrap || !input || !hidden) return;
+
+    var colors = [];
+    try { colors = JSON.parse(hidden.value || '[]'); } catch (_) { colors = []; }
+    if (!Array.isArray(colors)) colors = [];
+
+    function render() {
+        wrap.querySelectorAll('.color-tag').forEach(function (t) { t.remove(); });
+        colors.forEach(function (c) {
+            var tag = document.createElement('span');
+            tag.className = 'color-tag';
+            var txt = document.createTextNode(c + '\u00a0');
+            tag.appendChild(txt);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'color-tag-close';
+            btn.setAttribute('aria-label', 'Remove ' + c);
+            btn.textContent = '×';
+            btn.addEventListener('click', function () {
+                colors = colors.filter(function (x) { return x !== c; });
+                render();
+            });
+            tag.appendChild(btn);
+            wrap.insertBefore(tag, input);
+        });
+        hidden.value = JSON.stringify(colors);
+    }
+
+    function addColor(raw) {
+        var c = raw.trim().replace(/,+$/, '').trim();
+        if (!c || c.length > 40) return;
+        c = c.charAt(0).toUpperCase() + c.slice(1);
+        if (!colors.includes(c)) { colors.push(c); render(); }
+    }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ',') {
+            e.preventDefault();
+            addColor(input.value);
+            input.value = '';
+        } else if (e.key === 'Backspace' && input.value === '' && colors.length > 0) {
+            colors.pop();
+            render();
+        }
+    });
+
+    input.addEventListener('blur', function () {
+        if (input.value.trim()) { addColor(input.value); input.value = ''; }
+    });
+
+    document.querySelectorAll('#pf-color-presets .color-preset-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () { addColor(btn.dataset.color); input.focus(); });
+    });
+
+    wrap.addEventListener('click', function (e) {
+        if (e.target === wrap) input.focus();
+    });
+
+    render();
 }());
 
 // ── Packed weight g/kg unit toggle ──────────────────────────────────────────

@@ -51,6 +51,7 @@ class Product
             'quantity' => $quantity,
             'images' => $imagesJson,
             'attributes' => !empty($data['attributes']) ? (is_array($data['attributes']) ? json_encode($data['attributes']) : $data['attributes']) : null,
+            'colors'     => $data['colors'] ?? null,
             'status' => $data['status'] ?? 'draft',
             'is_visible' => isset($data['is_visible']) ? (int)$data['is_visible'] : 0,
             // Shipping dimensions — packed weight + outer box size (including packaging)

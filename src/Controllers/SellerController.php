@@ -361,6 +361,17 @@ class SellerController extends \Core\Controller
         $pricingRate = $planRateMap[$pricingModel] ?? 12.00;
         $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
+        // Available colors (JSON array from tag input)
+        $colorsJson = null;
+        $rawColors = trim($_POST['colors'] ?? '');
+        if ($rawColors !== '' && $rawColors !== '[]') {
+            $colorsArr = json_decode($rawColors, true);
+            if (is_array($colorsArr)) {
+                $colorsArr = array_slice(array_values(array_map('strval', $colorsArr)), 0, 50);
+                $colorsJson = !empty($colorsArr) ? json_encode($colorsArr) : null;
+            }
+        }
+
         // Shipping dimensions — must include item + all packaging (box, wrap, etc.)
         $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
         $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
@@ -434,6 +445,7 @@ class SellerController extends \Core\Controller
             'length_cm'    => $productType === 'physical' ? $lengthCm : null,
             'width_cm'     => $productType === 'physical' ? $widthCm  : null,
             'height_cm'    => $productType === 'physical' ? $heightCm : null,
+            'colors'       => $colorsJson,
         ];
 
         $created = $productModel->create($data);
@@ -601,6 +613,17 @@ class SellerController extends \Core\Controller
         $pricingRate = $planRateMap[$pricingModel] ?? 12.00;
         $markupRate  = max(0, min(200, (float)($_POST['markup_rate'] ?? 0)));
 
+        // Available colors (JSON array from tag input)
+        $colorsJson = null;
+        $rawColors = trim($_POST['colors'] ?? '');
+        if ($rawColors !== '' && $rawColors !== '[]') {
+            $colorsArr = json_decode($rawColors, true);
+            if (is_array($colorsArr)) {
+                $colorsArr = array_slice(array_values(array_map('strval', $colorsArr)), 0, 50);
+                $colorsJson = !empty($colorsArr) ? json_encode($colorsArr) : null;
+            }
+        }
+
         // Shipping dimensions — must include item + all packaging
         $weightKg = isset($_POST['weight_kg']) && $_POST['weight_kg'] !== '' ? max(0.0, (float)$_POST['weight_kg']) : null;
         $lengthCm = isset($_POST['length_cm']) && $_POST['length_cm'] !== '' ? max(0.0, (float)$_POST['length_cm']) : null;
@@ -677,6 +700,7 @@ class SellerController extends \Core\Controller
             'length_cm'         => $productType === 'physical' ? $lengthCm : null,
             'width_cm'          => $productType === 'physical' ? $widthCm  : null,
             'height_cm'         => $productType === 'physical' ? $heightCm : null,
+            'colors'            => $colorsJson,
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
 
