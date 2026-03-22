@@ -130,36 +130,67 @@ class Product
      */
     public function list(array $opts = []): array
     {
-        $where = [];
+        $limit = isset($opts['limit']) ? max(1, (int)$opts['limit']) : 24;
+        $offset = isset($opts['offset']) ? max(0, (int)$opts['offset']) : 0;
 
-        // If caller wants all statuses (e.g., admin or seller panel), pass status in opts
+        $sql = "SELECT * FROM {$this->table} WHERE 1=1";
+        $params = [];
+
+        // If caller specifies status, honor it. Otherwise use marketplace defaults.
         if (!empty($opts['status'])) {
-            $where['status'] = $opts['status'];
+            $sql .= " AND status = :status";
+            $params[':status'] = (string)$opts['status'];
         } else {
-            // Marketplace default
-            $where['status'] = 'published';
-            $where['is_visible'] = 1;
+            // Include legacy published rows where is_visible may be NULL.
+            $sql .= " AND status = 'published' AND (is_visible = 1 OR is_visible IS NULL)";
         }
 
-        if (!empty($opts['category_id'])) $where['category_id'] = $opts['category_id'];
-        if (!empty($opts['seller_id'])) $where['seller_id'] = (int)$opts['seller_id'];
-        if (!empty($opts['search'])) $where['title[~]'] = $opts['search'];
+        if (!empty($opts['category_id'])) {
+            $sql .= " AND category_id = :category_id";
+            $params[':category_id'] = (int)$opts['category_id'];
+        }
+
+        if (!empty($opts['seller_id'])) {
+            $sql .= " AND seller_id = :seller_id";
+            $params[':seller_id'] = (int)$opts['seller_id'];
+        }
+
+        // Tokenized depth search across key textual fields.
+        if (!empty($opts['search'])) {
+            $search = trim((string)$opts['search']);
+            if ($search !== '') {
+                $tokens = preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+                $tokens = array_slice($tokens, 0, 6); // Guard against pathological long queries.
+                foreach ($tokens as $i => $token) {
+                    $key = ':q' . $i;
+                    $sql .= " AND (LOWER(title) LIKE {$key} OR LOWER(short_description) LIKE {$key} OR LOWER(description) LIKE {$key} OR LOWER(slug) LIKE {$key})";
+                    $params[$key] = '%' . $token . '%';
+                }
+            }
+        }
 
         // Sorting
-        $order = ['created_at' => 'DESC'];
-        if (!empty($opts['sort'])) {
-            if ($opts['sort'] === 'price_asc') $order = ['price' => 'ASC'];
-            if ($opts['sort'] === 'price_desc') $order = ['price' => 'DESC'];
-            if ($opts['sort'] === 'rating') $order = ['rating' => 'DESC'];
+        $sort = (string)($opts['sort'] ?? 'default');
+        $orderBy = 'created_at DESC';
+        if ($sort === 'price_asc') {
+            $orderBy = 'price ASC';
+        } elseif ($sort === 'price_desc') {
+            $orderBy = 'price DESC';
+        } elseif ($sort === 'rating') {
+            $orderBy = 'rating DESC';
         }
+        $sql .= " ORDER BY {$orderBy} LIMIT :offset, :limit";
 
-        $limit = isset($opts['limit']) ? (int)$opts['limit'] : 24;
-        $offset = isset($opts['offset']) ? (int)$opts['offset'] : 0;
+        $stmt = $this->db->pdo()->prepare($sql);
+        foreach ($params as $k => $v) {
+            $type = is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR;
+            $stmt->bindValue($k, $v, $type);
+        }
+        $stmt->bindValue(':offset', $offset, \PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
 
-        $where['ORDER'] = $order;
-        $where['LIMIT'] = [$offset, $limit];
-
-        return $this->db->select($this->table, '*', $where) ?: [];
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
