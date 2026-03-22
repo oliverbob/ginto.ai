@@ -195,5 +195,193 @@ class MallController extends \Core\Controller
 
         echo json_encode(['ok' => true, 'count' => $count]);
     }
+
+    /**
+     * GET /api/mall/products — paginated product list for infinite scroll + typeahead
+     * Query params: page, limit, cat (category_id), search, sort, seller_id
+     */
+    public function apiProducts(): void
+    {
+        header('Content-Type: application/json');
+        $page     = max(1, (int)($_GET['page']   ?? 1));
+        $limit    = min(48, max(4, (int)($_GET['limit'] ?? 24)));
+        $offset   = ($page - 1) * $limit;
+        $catId    = isset($_GET['cat']) && is_numeric($_GET['cat']) ? (int)$_GET['cat'] : null;
+        $search   = trim(strip_tags($_GET['search'] ?? ''));
+        $sort     = preg_replace('/[^a-z_]/', '', strtolower($_GET['sort'] ?? 'default'));
+        $sellerId = isset($_GET['seller_id']) && is_numeric($_GET['seller_id']) ? (int)$_GET['seller_id'] : null;
+
+        try {
+            $productModel = new \Ginto\Models\Product();
+            $opts = ['offset' => $offset, 'limit' => $limit];
+            if ($catId)    $opts['category_id'] = $catId;
+            if ($search)   $opts['search']      = $search;
+            if ($sort !== 'default') $opts['sort'] = $sort;
+            if ($sellerId) $opts['seller_id']   = $sellerId;
+
+            $products = $productModel->list($opts);
+
+            // Attach seller storefront slugs
+            $sellerIds = array_values(array_unique(array_filter(array_column($products, 'seller_id'))));
+            $sellerMap = [];
+            if (!empty($sellerIds)) {
+                $storefronts = $this->db->select('seller_storefronts', ['user_id', 'slug', 'display_name'], ['user_id' => $sellerIds, 'is_active' => 1]) ?: [];
+                foreach ($storefronts as $sf) {
+                    $sellerMap[(int)$sf['user_id']] = ['slug' => $sf['slug'], 'name' => $sf['display_name']];
+                }
+            }
+
+            $out = [];
+            foreach ($products as $p) {
+                $sid = (int)($p['seller_id'] ?? 0);
+                $imgs_arr = [];
+                $img = null;
+                if (!empty($p['images'])) {
+                    $decoded = json_decode($p['images'], true);
+                    if (is_array($decoded)) { $imgs_arr = array_values(array_filter($decoded)); $img = $imgs_arr[0] ?? null; }
+                }
+                if (!$img && !empty($p['image_path'])) { $img = $p['image_path']; if (empty($imgs_arr)) $imgs_arr = [$img]; }
+                $out[] = [
+                    'id'          => (int)$p['id'],
+                    'title'       => $p['title'] ?? '',
+                    'price'       => (float)($p['price'] ?? 0),
+                    'currency'    => $p['currency'] ?? 'PHP',
+                    'cat'         => isset($p['category_id']) ? (int)$p['category_id'] : null,
+                    'rating'      => (float)($p['rating'] ?? 0),
+                    'img'         => $img,
+                    'imgs'        => $imgs_arr,
+                    'desc'        => $p['short_description'] ?? '',
+                    'slug'        => $p['slug'] ?? '',
+                    'badge'       => $p['badge'] ?? null,
+                    'seller_slug' => $sellerMap[$sid]['slug'] ?? null,
+                    'seller_name' => $sellerMap[$sid]['name'] ?? null,
+                    'seller_id'   => $sid,
+                ];
+            }
+
+            // has_more: try to fetch one more to check
+            $hasMore = count($products) === $limit;
+            echo json_encode(['products' => $out, 'page' => $page, 'has_more' => $hasMore]);
+        } catch (\Throwable $e) {
+            error_log('MallController::apiProducts error: ' . $e->getMessage());
+            echo json_encode(['products' => [], 'page' => $page, 'has_more' => false]);
+        }
+    }
+
+    /**
+     * GET /mall/product/{slug} — SEO + social-friendly single product page
+     */
+    public function productPage(string $slug = ''): void
+    {
+        $slug = preg_replace('/[^a-zA-Z0-9_\-]/', '', trim($slug));
+        if ($slug === '') { http_response_code(404); echo '<h1>Product not found</h1>'; return; }
+
+        try {
+            $productModel = new \Ginto\Models\Product();
+            $product = $productModel->findBySlug($slug);
+            if (!$product || ($product['status'] ?? '') !== 'published') {
+                http_response_code(404); echo '<h1>Product not found</h1>'; return;
+            }
+
+            $sellerId  = (int)($product['seller_id'] ?? 0);
+            $storefront = $sellerId > 0 ? ($this->db->get('seller_storefronts', '*', ['user_id' => $sellerId, 'is_active' => 1]) ?: []) : [];
+            $seller     = $sellerId > 0 ? ($this->db->get('users', ['id', 'username', 'fullname'], ['id' => $sellerId]) ?: []) : [];
+
+            // Related products from same seller (exclude this product)
+            $related = [];
+            if ($sellerId > 0) {
+                $related = $productModel->list(['seller_id' => $sellerId, 'limit' => 6]);
+                $related = array_filter($related, fn($r) => (int)($r['id'] ?? 0) !== (int)$product['id']);
+                $related = array_values($related);
+            }
+
+            // Build OG image from first product image or mall-og
+            $imgs = [];
+            if (!empty($product['images'])) {
+                $d = json_decode($product['images'], true);
+                if (is_array($d)) $imgs = array_values(array_filter($d));
+            }
+            if (empty($imgs) && !empty($product['image_path'])) $imgs = [$product['image_path']];
+            $_proto  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+            $_host   = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+            $ogImg   = !empty($imgs[0]) ? (str_starts_with($imgs[0], 'http') ? $imgs[0] : ($_proto . '://' . $_host . $imgs[0])) : '/assets/images/mall-og.png';
+            $ogTitle = ($product['title'] ?? 'Product') . ' — Ginto Mall';
+            $ogDesc  = $product['short_description'] ?: strip_tags(substr($product['description'] ?? '', 0, 160));
+            $ogUrl   = $_proto . '://' . $_host . '/mall/product/' . $slug;
+
+            $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $walletSummary = $userId > 0 ? $commerce->getWalletSummary($userId) : ['account' => []];
+
+            $this->view('mall/product', [
+                'title'       => $ogTitle,
+                'ogTitle'     => $ogTitle,
+                'ogDesc'      => $ogDesc ?: 'Buy ' . ($product['title'] ?? 'this product') . ' on Ginto Mall.',
+                'ogImage'     => $ogImg,
+                'ogType'      => 'product',
+                'ogUrl'       => $ogUrl,
+                'product'     => $product,
+                'seller'      => $seller,
+                'storefront'  => $storefront,
+                'relatedProducts' => $related,
+                'csrf_token'  => generateCsrfToken(),
+                'categories'  => $this->db->select('categories', '*', ['ORDER' => ['name' => 'ASC']]) ?: [],
+                'mall_unread_notifications' => $userId > 0 ? $commerce->getMallUnreadNotificationCount($userId) : 0,
+                'mall_notifications' => $userId > 0 ? $commerce->getMallNotifications($userId) : [],
+                'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('MallController::productPage error: ' . $e->getMessage());
+            http_response_code(500); echo '<h1>Error loading product</h1>';
+        }
+    }
+
+    /**
+     * GET /mall/notifications — full notifications page
+     */
+    public function notificationsPage(): void
+    {
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            header('Location: /login?redirect=/mall/notifications'); exit;
+        }
+
+        $page  = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 20;
+
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $walletSummary = $commerce->getWalletSummary($userId);
+
+            // Fetch one extra to detect has_more
+            $notifs = $this->db->select('notifications', '*', [
+                'user_id'  => $userId,
+                'type[~]'  => 'mall_',
+                'ORDER'    => ['created_at' => 'DESC'],
+                'LIMIT'    => [($page - 1) * $limit, $limit + 1],
+            ]) ?: [];
+
+            $hasMore = count($notifs) > $limit;
+            if ($hasMore) $notifs = array_slice($notifs, 0, $limit);
+
+            $unreadCount = $commerce->getMallUnreadNotificationCount($userId);
+
+            $this->view('mall/notifications', [
+                'title'           => 'Notifications — Ginto Mall',
+                'notifications'   => $notifs,
+                'unreadCount'     => $unreadCount,
+                'page'            => $page,
+                'hasMore'         => $hasMore,
+                'csrf_token'      => generateCsrfToken(),
+                'categories'      => $this->db->select('categories', '*', ['ORDER' => ['name' => 'ASC']]) ?: [],
+                'mall_unread_notifications' => $unreadCount,
+                'mall_notifications'        => array_slice($notifs, 0, 8),
+                'mall_wallet_balance'       => (float)($walletSummary['account']['balance'] ?? 0),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('MallController::notificationsPage error: ' . $e->getMessage());
+            http_response_code(500); echo '<h1>Error loading notifications</h1>';
+        }
+    }
 }
 

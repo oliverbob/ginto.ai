@@ -104,6 +104,14 @@ class Product
     }
 
     /**
+     * Find a product by slug
+     */
+    public function findBySlug(string $slug): ?array
+    {
+        return $this->db->get($this->table, '*', ['slug' => $slug]) ?: null;
+    }
+
+    /**
      * Update a product by id
      */
     public function update(int $id, array $data): ?array

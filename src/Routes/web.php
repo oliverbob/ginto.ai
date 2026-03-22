@@ -1324,6 +1324,9 @@ $router->req('/api/mall/push/vapid-public-key', 'MallDeliveryController@apiVapid
 $router->req('/api/mall/push/register-fcm', 'MallDeliveryController@apiRegisterFcm', ['POST']);
 $router->req('/api/mall/header-data', 'MallController@apiHeaderData', ['GET']);
 $router->req('/api/mall/cart/sync', 'MallController@apiCartSync', ['POST']);
+$router->req('/api/mall/products', 'MallController@apiProducts', ['GET']);
+$router->req('/mall/notifications', 'MallController@notificationsPage');
+$router->req('/mall/product/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallController@productPage');
 
 // Keep dynamic storefront route after static /mall/* routes.
 $router->req('/mall/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallCheckoutController@storefront');
@@ -1412,46 +1415,6 @@ $router->req('/storage/products/{userId}/{filename}', function($userId, $filenam
 // Upload endpoint used by marketplace upload modal (seller area)
 $router->req('/marketplace/sellers/upload', 'MallController@upload', ['POST']);
 
-// API: get marketplace products (published & visible)
-$router->req('/api/mall/products', function() use ($db) {
-
-    header('Content-Type: application/json');
-    $products = [];
-    try {
-        $rows = $db->select('products', '*', ['status' => 'published', 'is_visible' => 1, 'ORDER' => ['created_at' => 'DESC'], 'LIMIT' => [0, 200]]);
-        foreach ($rows as $r) {
-            $imgs_arr = [];
-            $img = null;
-            if (!empty($r['images'])) {
-                $decoded = json_decode($r['images'], true);
-                if (is_array($decoded)) {
-                    $imgs_arr = array_values(array_filter($decoded));
-                    $img = $imgs_arr[0] ?? null;
-                }
-            }
-            if (!$img && !empty($r['image_path'])) {
-                $img = $r['image_path'];
-                if (empty($imgs_arr)) $imgs_arr = [$img];
-            }
-            $products[] = [
-                'id'       => (int)$r['id'],
-                'title'    => $r['title'] ?? '',
-                'price'    => (float)($r['price'] ?? 0),
-                'currency' => $r['currency'] ?? 'USD',
-                'cat'      => isset($r['category_id']) ? (int)$r['category_id'] : null,
-                'rating'   => (float)($r['rating'] ?? 0),
-                'img'      => $img,
-                'imgs'     => $imgs_arr,
-                'desc'     => $r['short_description'] ?? '',
-                'badge'    => $r['badge'] ?? null,
-            ];
-        }
-    } catch (\Throwable $e) {
-        http_response_code(500);
-        echo json_encode(['success' => false, 'error' => 'DB error']); return;
-    }
-    echo json_encode(['success' => true, 'products' => $products]);
-});
 $router->req('/user/profile/{ident}', 'UserController@profile');
 $router->req('/user/commissions', 'CommissionsController@index');
 $router->req('/user/network-tree/compact-view', 'UserController@networkTreeCompact');

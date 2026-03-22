@@ -304,10 +304,28 @@ class MallCheckoutController extends Controller
     public function notificationsApi()
     {
         $userId = $this->requireUserJson();
+        $page  = max(1, (int)($_GET['page'] ?? 1));
+        $limit = 20;
+        $notifs = $this->db->select('notifications', '*', [
+            'user_id'  => $userId,
+            'type[~]'  => 'mall_',
+            'ORDER'    => ['created_at' => 'DESC'],
+            'LIMIT'    => [($page - 1) * $limit, $limit + 1],
+        ]) ?: [];
+        $hasMore = count($notifs) > $limit;
+        if ($hasMore) $notifs = array_slice($notifs, 0, $limit);
+        // Add payload link to each
+        foreach ($notifs as &$n) {
+            $payload = !empty($n['payload']) ? (json_decode($n['payload'], true) ?: []) : [];
+            $n['link'] = $payload['link'] ?? null;
+        }
+        unset($n);
         $this->json([
-            'success' => true,
-            'count' => $this->commerce->getMallUnreadNotificationCount($userId),
-            'notifications' => $this->commerce->getMallNotifications($userId),
+            'success'       => true,
+            'count'         => $this->commerce->getMallUnreadNotificationCount($userId),
+            'notifications' => $notifs,
+            'has_more'      => $hasMore,
+            'page'          => $page,
         ]);
     }
 

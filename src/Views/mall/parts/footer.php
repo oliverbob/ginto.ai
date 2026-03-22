@@ -30,6 +30,7 @@
             'img'      => $img,
             'imgs'     => $imgs_arr,
             'desc'     => $p['short_description'] ?? '',
+            'slug'     => $p['slug'] ?? '',
             'badge'        => $p['badge'] ?? null,
             'seller_slug'  => $p['seller_slug'] ?? null,
             'seller_name'  => $p['seller_name'] ?? null,
@@ -38,6 +39,7 @@
     }, $products ?? [])) ?>;
 
     const CSRF_TOKEN = <?= json_encode($csrf_token ?? '') ?>;
+    const SELLER_ID  = <?= json_encode(isset($storefront['user_id']) ? (int)$storefront['user_id'] : 0) ?>; // 0 = marketplace
     const PLACEHOLDER = '/assets/images/placeholder_ceramic.svg';
 
     function ensureMallShellElements() {
@@ -177,7 +179,11 @@
     let state = {
         products: [...PRODUCTS],
         cart: [],
-        filters: { cat: 'all', search: '', sort: 'default', sale: false, ship: false }
+        filters: { cat: 'all', search: '', sort: 'default', sale: false, ship: false },
+        page: 1,
+        hasMore: true,
+        loading: false,
+        serverSearchQuery: '',
     };
     try { state.cart = JSON.parse(localStorage.getItem('epower_cart') || '[]'); } catch (e) { state.cart = []; }
 
@@ -336,7 +342,12 @@
         grid.innerHTML = '';
 
         if (list.length === 0) {
-            grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><p>No products found matching your criteria.</p></div>';
+            if (state.filters.search || state.filters.cat !== 'all') {
+                // Trigger a server-side search when local results are empty
+                serverSearch();
+            } else {
+                grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><p>No products found matching your criteria.</p></div>';
+            }
             return;
         }
 
@@ -349,6 +360,7 @@
             const imgSrc  = imgs[0] || PLACEHOLDER;
             const stars   = '&#9733;'.repeat(Math.round(p.rating)) + '&#9734;'.repeat(5 - Math.round(p.rating));
             const multiBadge = imgs.length > 1 ? `<span class="card-multi-badge">&#128247; ${imgs.length}</span>` : '';
+            const itemHref = p.slug ? `/mall/product/${esc(p.slug)}` : '#';
             card.innerHTML = `
                 <div class="product-img-wrap" role="button" tabindex="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
                     <img class="product-img" src="${esc(imgSrc)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
@@ -362,7 +374,10 @@
                         <span class="star-rating" aria-label="${p.rating} stars">${stars}</span>
                     </div>
                     <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
-                    <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart">Add to Cart</button>
+                    <div style="display:flex;gap:7px;margin-top:8px;">
+                        <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart" style="flex:1;">Add to Cart</button>
+                        ${p.slug ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;" aria-label="View ${esc(p.title)} product page">View</a>` : ''}
+                    </div>
                     ${p.seller_slug ? `<a class="product-store-link" href="/mall/${esc(p.seller_slug)}" onclick="event.stopPropagation()">🏪 ${esc(p.seller_name || 'View Store')}</a>` : ''}
                 </div>`;
             frag.appendChild(card);
@@ -751,6 +766,64 @@
      * ============================ */
     const mallNotifyToggle = document.getElementById('mallNotifyToggle');
     const mallNotifyPanel = document.getElementById('mallNotifyPanel');
+    const mallNotifyList = document.getElementById('mallNotifyList');
+    const mallNotifyBadge = document.getElementById('mallNotifyBadge');
+
+    function notifIcon(type) {
+        const t = String(type || '');
+        if (t.indexOf('order') !== -1) return '📦';
+        if (t.indexOf('payment') !== -1) return '💳';
+        if (t.indexOf('delivery') !== -1) return '🚚';
+        if (t.indexOf('wallet') !== -1) return '💰';
+        if (t.indexOf('product_listed') !== -1) return '🏷️';
+        return '🔔';
+    }
+
+    function renderNotificationPanel(items) {
+        if (!mallNotifyList) return;
+        if (!Array.isArray(items) || items.length === 0) {
+            mallNotifyList.innerHTML = '<div style="padding:12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);font-size:0.8rem;color:var(--muted);">No mall notifications yet.</div>';
+            return;
+        }
+        mallNotifyList.innerHTML = items.slice(0, 8).map(function (n) {
+            const msg = esc(String(n.message || ''));
+            const dt  = esc(String(n.created_at || ''));
+            const icon = notifIcon(n.type);
+            const link = n.link ? ('<a href="' + esc(String(n.link)) + '" style="display:inline-block;margin-top:6px;font-size:0.72rem;color:var(--accent);text-decoration:none;">View details →</a>') : '';
+            return '<div style="padding:10px 12px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);">'
+                + '<div style="font-size:0.82rem;font-weight:600;line-height:1.4;">' + icon + ' ' + msg + '</div>'
+                + '<div style="font-size:0.7rem;color:var(--muted);margin-top:4px;">' + dt + '</div>'
+                + link
+                + '</div>';
+        }).join('');
+    }
+
+    function updateNotificationBadge(count) {
+        if (!mallNotifyBadge) return;
+        if (count > 0) {
+            mallNotifyBadge.textContent = count > 99 ? '99+' : String(count);
+            mallNotifyBadge.style.display = 'flex';
+        } else {
+            mallNotifyBadge.textContent = '';
+            mallNotifyBadge.style.display = 'none';
+        }
+    }
+
+    async function refreshNotifications() {
+        try {
+            const res = await fetch('/api/mall/notifications?page=1', {
+                headers: { 'Accept': 'application/json' },
+                credentials: 'same-origin',
+                cache: 'no-store'
+            });
+            if (!res.ok) return;
+            const json = await res.json();
+            if (!json || json.success !== true) return;
+            updateNotificationBadge(parseInt(json.count || 0, 10) || 0);
+            renderNotificationPanel(Array.isArray(json.notifications) ? json.notifications : []);
+        } catch (_) { }
+    }
+
     if (mallNotifyToggle && mallNotifyPanel) {
         mallNotifyToggle.addEventListener('click', async function (e) {
             e.stopPropagation();
@@ -758,6 +831,7 @@
             mallNotifyPanel.style.display = isOpen ? 'none' : 'block';
             if (!isOpen) {
                 try {
+                    await refreshNotifications();
                     await fetch('/api/mall/notifications/mark-read', {
                         method: 'POST',
                         headers: {
@@ -766,8 +840,7 @@
                         },
                         body: JSON.stringify({ csrf_token: CSRF_TOKEN }),
                     });
-                    const badge = document.getElementById('mallNotifyBadge');
-                    if (badge) badge.style.display = 'none';
+                    updateNotificationBadge(0);
                 } catch (_) {}
             }
         });
@@ -775,6 +848,13 @@
             if (!mallNotifyPanel.contains(e.target) && !mallNotifyToggle.contains(e.target)) {
                 mallNotifyPanel.style.display = 'none';
             }
+        });
+
+        // Keep notification panel and badge live for web clients.
+        refreshNotifications();
+        setInterval(refreshNotifications, 15000);
+        document.addEventListener('visibilitychange', function () {
+            if (!document.hidden) refreshNotifications();
         });
     }
 
@@ -866,29 +946,191 @@
         const imgs = raw.filter(Boolean);
         const img  = p.img || imgs[0] || null;
         return {
-            id:       p.id,
-            title:    p.title || '',
-            price:    parseFloat(p.price) || 0,
-            currency: p.currency || 'USD',
-            cat:      p.cat != null ? p.cat : (p.category_id != null ? parseInt(p.category_id, 10) : null),
-            rating:   parseFloat(p.rating) || 0,
-            img:      img,
-            imgs:     imgs.length ? imgs : (img ? [img] : []),
-            desc:     p.desc || p.short_description || '',
-            badge:    p.badge || null,
+            id:          p.id,
+            title:       p.title || '',
+            price:       parseFloat(p.price) || 0,
+            currency:    p.currency || 'PHP',
+            cat:         p.cat != null ? p.cat : (p.category_id != null ? parseInt(p.category_id, 10) : null),
+            rating:      parseFloat(p.rating) || 0,
+            img:         img,
+            imgs:        imgs.length ? imgs : (img ? [img] : []),
+            desc:        p.desc || p.short_description || '',
+            slug:        p.slug || '',
+            badge:       p.badge || null,
+            seller_slug: p.seller_slug || null,
+            seller_name: p.seller_name || null,
+            seller_id:   parseInt(p.seller_id, 10) || 0,
         };
+    }
+
+    /* ============================
+     * INFINITE SCROLL + SERVER SEARCH
+     * ============================ */
+    function buildApiUrl(extraPage) {
+        const p    = extraPage || state.page;
+        const base = '/api/mall/products?page=' + p + '&limit=24';
+        const parts = [base];
+        if (SELLER_ID > 0)           parts.push('seller_id=' + SELLER_ID);
+        if (state.filters.cat !== 'all' && state.filters.cat)
+                                     parts.push('cat=' + encodeURIComponent(state.filters.cat));
+        if (state.filters.search)    parts.push('search=' + encodeURIComponent(state.filters.search));
+        if (state.filters.sort !== 'default')
+                                     parts.push('sort=' + encodeURIComponent(state.filters.sort));
+        return parts.join('&').replace('/api/mall/products?page=', '/api/mall/products?page=').replace('&', '&').replace(/&([a-z])/g, '&$1');
+        // rebuild cleanly
+    }
+
+    function buildCleanApiUrl(page) {
+        const params = new URLSearchParams({ page, limit: 24 });
+        if (SELLER_ID > 0)                              params.set('seller_id', SELLER_ID);
+        if (state.filters.cat && state.filters.cat !== 'all') params.set('cat', state.filters.cat);
+        if (state.filters.search)                       params.set('search', state.filters.search);
+        if (state.filters.sort && state.filters.sort !== 'default') params.set('sort', state.filters.sort);
+        return '/api/mall/products?' + params.toString();
+    }
+
+    async function loadMoreProducts() {
+        if (state.loading || !state.hasMore) return;
+        state.loading = true;
+        showScrollSpinner(true);
+        try {
+            const nextPage = state.page + 1;
+            const res  = await fetch(buildCleanApiUrl(nextPage));
+            if (!res.ok) { state.hasMore = false; return; }
+            const json = await res.json();
+            const incoming = Array.isArray(json.products) ? json.products.map(normaliseProduct) : [];
+            if (incoming.length === 0) { state.hasMore = false; return; }
+            const existingIds = new Set(state.products.map(p => p.id));
+            const newProds    = incoming.filter(p => !existingIds.has(p.id));
+            state.products    = state.products.concat(newProds);
+            state.page        = nextPage;
+            state.hasMore     = !!json.has_more;
+            appendProducts(newProds);
+            if (resultCount) resultCount.textContent = state.products.filter(applyFilters).length;
+        } catch (e) {
+            console.warn('loadMoreProducts error', e);
+        } finally {
+            state.loading = false;
+            showScrollSpinner(false);
+        }
+    }
+
+    async function serverSearch() {
+        // Called when local filter returns 0 products — fetch from server with current filters
+        const q    = state.filters.search;
+        const cat  = state.filters.cat;
+        const key  = q + '::' + cat;
+        if (key === state.serverSearchQuery) return; // already fetched
+        state.serverSearchQuery = key;
+        if (grid) grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon" style="animation:spin 1s linear infinite;">⏳</div><p>Searching…</p></div>';
+        try {
+            const res  = await fetch(buildCleanApiUrl(1));
+            if (!res.ok) { showEmptyState(); return; }
+            const json = await res.json();
+            const incoming = Array.isArray(json.products) ? json.products.map(normaliseProduct) : [];
+            if (incoming.length === 0) { showEmptyState(); return; }
+            const existing = new Set(state.products.map(p => p.id));
+            const newProds = incoming.filter(p => !existing.has(p.id));
+            state.products = state.products.concat(newProds);
+            state.hasMore  = !!json.has_more;
+            renderProducts(); // re-run filter with updated local pool
+        } catch(e) {
+            showEmptyState();
+        }
+    }
+
+    function showEmptyState() {
+        if (grid) grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><p>No products found matching your criteria.</p></div>';
+        if (resultCount) resultCount.textContent = '0';
+    }
+
+    function applyFilters(p) {
+        const matchCat    = state.filters.cat === 'all' || String(p.cat) === String(state.filters.cat);
+        const matchSearch = !state.filters.search || p.title.toLowerCase().includes(state.filters.search.toLowerCase());
+        return matchCat && matchSearch;
+    }
+
+    function appendProducts(list) {
+        if (!grid || !list.length) return;
+        const frag = document.createDocumentFragment();
+        list.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'product-card';
+            card.dataset.id = p.id;
+            const imgs = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
+            const imgSrc = imgs[0] || PLACEHOLDER;
+            const stars  = '&#9733;'.repeat(Math.round(p.rating)) + '&#9734;'.repeat(5 - Math.round(p.rating));
+            const multiBadge = imgs.length > 1 ? `<span class="card-multi-badge">&#128247; ${imgs.length}</span>` : '';
+            const itemHref = p.slug ? `/mall/product/${esc(p.slug)}` : '#';
+            card.innerHTML = `
+                <div class="product-img-wrap" role="button" tabindex="0" aria-label="Quick view ${esc(p.title)}" onclick="openQV(${p.id})" onkeydown="if(event.key==='Enter'||event.key===' ')openQV(${p.id})">
+                    <img class="product-img" src="${esc(imgSrc)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
+                    ${p.badge ? `<span class="product-badge">${esc(p.badge)}</span>` : ''}
+                    ${multiBadge}
+                </div>
+                <div class="product-body">
+                    <div class="product-title">${esc(p.title)}</div>
+                    <div class="product-meta">
+                        <span>${esc(formatPrice(p.price, p.currency))}</span>
+                        <span class="star-rating" aria-label="${p.rating} stars">${stars}</span>
+                    </div>
+                    <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
+                    <div style="display:flex;gap:7px;margin-top:8px;">
+                        <button class="product-add-btn" onclick="addToCart(${p.id})" aria-label="Add ${esc(p.title)} to cart" style="flex:1;">Add to Cart</button>
+                        ${p.slug ? `<a class="btn btn-secondary" href="${itemHref}" onclick="event.stopPropagation()" style="padding:7px 10px;font-size:0.72rem;flex-shrink:0;">View</a>` : ''}
+                    </div>
+                    ${p.seller_slug ? `<a class="product-store-link" href="/mall/${esc(p.seller_slug)}" onclick="event.stopPropagation()">🏪 ${esc(p.seller_name || 'View Store')}</a>` : ''}
+                </div>`;
+            frag.appendChild(card);
+        });
+        // Insert before the sentinel
+        const sentinel = document.getElementById('productSentinel');
+        if (sentinel) grid.insertBefore(frag, sentinel);
+        else grid.appendChild(frag);
+    }
+
+    function showScrollSpinner(show) {
+        let el = document.getElementById('scrollSpinner');
+        if (!el && show) {
+            el = document.createElement('div');
+            el.id = 'scrollSpinner';
+            el.style.cssText = 'width:100%;text-align:center;padding:20px;color:var(--muted);font-size:0.85rem;grid-column:1/-1;';
+            el.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation:spin 1s linear infinite;vertical-align:middle;"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg> Loading…';
+            if (grid) grid.appendChild(el);
+        } else if (el && !show) {
+            el.remove();
+        }
+    }
+
+    function setupInfiniteScroll() {
+        if (!grid || !window.IntersectionObserver) return;
+        // Create sentinel if not already present
+        let sentinel = document.getElementById('productSentinel');
+        if (!sentinel) {
+            sentinel = document.createElement('div');
+            sentinel.id = 'productSentinel';
+            sentinel.style.cssText = 'height:1px;width:100%;grid-column:1/-1;';
+            grid.appendChild(sentinel);
+        }
+        const observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) loadMoreProducts();
+            });
+        }, { rootMargin: '200px' });
+        observer.observe(sentinel);
     }
 
     async function loadServerProducts() {
         try {
-            const res = await fetch('/api/mall/products');
+            const res = await fetch(buildCleanApiUrl(1));
             if (!res.ok) return;
             const json = await res.json();
-            if (json?.success && Array.isArray(json.products)) {
-                // Merge: server products first (normalised), then any local stubs not in server list
+            if (Array.isArray(json.products)) {
                 const normalised = json.products.map(normaliseProduct);
                 const ids = new Set(normalised.map(p => p.id));
-                state.products = [...normalised, ...state.products.filter(p => !ids.has(p.id))];
+                state.products  = [...normalised, ...state.products.filter(p => !ids.has(p.id))];
+                state.hasMore   = !!json.has_more;
+                state.page      = 1;
             }
         } catch (e) {
             console.warn('Failed to fetch server products', e);
@@ -901,6 +1143,7 @@
     async function init() {
         await loadServerProducts();
         renderProducts();
+        setupInfiniteScroll();
         updateCartUI();
         applyTheme(localStorage.getItem('epower_theme') || 'dark');
 
