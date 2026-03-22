@@ -531,13 +531,21 @@ class MallCheckoutController extends Controller
         }
 
         // Required fields
-        $fullname = strip_tags(trim($post['fullname'] ?? ''));
-        $email    = filter_var(trim($post['email'] ?? ''), FILTER_SANITIZE_EMAIL);
-        $phone    = preg_replace('/[^0-9+\-\s]/', '', $post['phone'] ?? '');
-        $password = $post['password'] ?? '';
+        $fullname  = strip_tags(trim($post['fullname'] ?? ''));
+        $email     = filter_var(trim($post['email'] ?? ''), FILTER_SANITIZE_EMAIL);
+        $phoneRaw  = trim($post['phone'] ?? '');
+        $phone     = preg_replace('/[^0-9+\-\s\(\)]/', '', $phoneRaw);
+        $password  = $post['password'] ?? '';
 
-        if (!$fullname || !$email || !$phone || !$password) {
+        if (!$fullname || !$email || !$phoneRaw || !$password) {
             $_SESSION['buyer_reg_error'] = 'All fields are required.';
+            $_SESSION['buyer_reg_old']   = $post;
+            header('Location: /mall/buyer-register');
+            exit;
+        }
+
+        if ($phone === '') {
+            $_SESSION['buyer_reg_error'] = 'Please enter a valid phone number (digits only, e.g. +63 912 345 6789).';
             $_SESSION['buyer_reg_old']   = $post;
             header('Location: /mall/buyer-register');
             exit;
