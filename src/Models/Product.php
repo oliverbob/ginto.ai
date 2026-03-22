@@ -8,6 +8,7 @@ class Product
 {
     private Medoo $db;
     private string $table = 'products';
+    private array $columnExistsCache = [];
 
     public function __construct()
     {
@@ -141,8 +142,13 @@ class Product
             $sql .= " AND status = :status";
             $params[':status'] = (string)$opts['status'];
         } else {
+            if ($this->hasColumn('status')) {
+                $sql .= " AND status = 'published'";
+            }
             // Include legacy published rows where is_visible may be NULL.
-            $sql .= " AND status = 'published' AND (is_visible = 1 OR is_visible IS NULL)";
+            if ($this->hasColumn('is_visible')) {
+                $sql .= " AND (is_visible = 1 OR is_visible IS NULL)";
+            }
         }
 
         if (!empty($opts['category_id'])) {
@@ -161,9 +167,18 @@ class Product
             if ($search !== '') {
                 $tokens = preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
                 $tokens = array_slice($tokens, 0, 6); // Guard against pathological long queries.
+                $searchCols = ['title'];
+                if ($this->hasColumn('slug')) $searchCols[] = 'slug';
+                if ($this->hasColumn('short_description')) $searchCols[] = 'short_description';
+                if ($this->hasColumn('description')) $searchCols[] = 'description';
+
                 foreach ($tokens as $i => $token) {
                     $key = ':q' . $i;
-                    $sql .= " AND (LOWER(title) LIKE {$key} OR LOWER(short_description) LIKE {$key} OR LOWER(description) LIKE {$key} OR LOWER(slug) LIKE {$key})";
+                    $clauses = [];
+                    foreach ($searchCols as $col) {
+                        $clauses[] = "LOWER({$col}) LIKE {$key}";
+                    }
+                    $sql .= " AND (" . implode(' OR ', $clauses) . ")";
                     $params[$key] = '%' . $token . '%';
                 }
             }
@@ -191,6 +206,25 @@ class Product
         $stmt->execute();
 
         return $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function hasColumn(string $column): bool
+    {
+        if (array_key_exists($column, $this->columnExistsCache)) {
+            return $this->columnExistsCache[$column];
+        }
+
+        try {
+            $stmt = $this->db->pdo()->prepare("SHOW COLUMNS FROM {$this->table} LIKE :col");
+            $stmt->bindValue(':col', $column, \PDO::PARAM_STR);
+            $stmt->execute();
+            $exists = (bool)$stmt->fetch(\PDO::FETCH_ASSOC);
+            $this->columnExistsCache[$column] = $exists;
+            return $exists;
+        } catch (\Throwable $e) {
+            $this->columnExistsCache[$column] = false;
+            return false;
+        }
     }
 
     /**
