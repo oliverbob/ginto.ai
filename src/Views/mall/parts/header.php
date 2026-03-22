@@ -1,7 +1,14 @@
 <?php
 // header.php — mall header partial
-// Suppress header for native app webview (Android/iOS)
-if (isset($_GET['device']) && in_array($_GET['device'], ['smartphone', 'android', 'ios'], true)) {
+// Suppress header for native app webview (Android/iOS).
+// Detection: ?device=android/ios param  OR  GintoApp custom UA  OR  Android WebView (wv marker).
+$_ua = $_SERVER['HTTP_USER_AGENT'] ?? '';
+$_isAppWebView =
+    (isset($_GET['device']) && in_array($_GET['device'], ['smartphone', 'android', 'ios'], true))
+    || str_contains($_ua, 'GintoApp')
+    || (str_contains($_ua, ' wv)') || str_contains($_ua, '; wv)') || strpos($_ua, 'wv)') !== false)
+       && stripos($_ua, 'Android') !== false;
+if ($_isAppWebView) {
     return;
 }
 $isLoggedIn = !empty($_SESSION['user_id']);
