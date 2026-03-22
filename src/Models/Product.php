@@ -134,137 +134,111 @@ class Product
         $limit = isset($opts['limit']) ? max(1, (int)$opts['limit']) : 24;
         $offset = isset($opts['offset']) ? max(0, (int)$opts['offset']) : 0;
 
-        $sql = "SELECT * FROM {$this->table} WHERE 1=1";
-        $params = [];
+        // Sorting
+        $sort = (string)($opts['sort'] ?? 'default');
+        $order = ['created_at' => 'DESC'];
+        if ($sort === 'price_asc') {
+            $order = ['price' => 'ASC'];
+        } elseif ($sort === 'price_desc') {
+            $order = ['price' => 'DESC'];
+        } elseif ($sort === 'rating') {
+            $order = ['rating' => 'DESC'];
+        }
+
+        $where = [];
 
         // If caller specifies status, honor it. Otherwise use marketplace defaults.
         if (!empty($opts['status'])) {
-            $sql .= " AND status = :status";
-            $params[':status'] = (string)$opts['status'];
+            $where['status'] = (string)$opts['status'];
         } else {
             if ($this->hasColumn('status')) {
-                $sql .= " AND status = 'published'";
+                $where['status'] = 'published';
             }
-            // Include legacy published rows where is_visible may be NULL.
             if ($this->hasColumn('is_visible')) {
-                $sql .= " AND (is_visible = 1 OR is_visible IS NULL)";
+                $where['is_visible'] = 1;
             }
         }
 
         if (!empty($opts['category_id'])) {
-            $sql .= " AND category_id = :category_id";
-            $params[':category_id'] = (int)$opts['category_id'];
+            $where['category_id'] = (int)$opts['category_id'];
         }
-
         if (!empty($opts['seller_id'])) {
-            $sql .= " AND seller_id = :seller_id";
-            $params[':seller_id'] = (int)$opts['seller_id'];
+            $where['seller_id'] = (int)$opts['seller_id'];
         }
 
-        // Tokenized depth search across key textual fields.
         if (!empty($opts['search'])) {
             $search = trim((string)$opts['search']);
             if ($search !== '') {
-                $tokens = preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                $tokens = array_slice($tokens, 0, 6); // Guard against pathological long queries.
-                $searchCols = ['title'];
-                if ($this->hasColumn('slug')) $searchCols[] = 'slug';
-                if ($this->hasColumn('short_description')) $searchCols[] = 'short_description';
-                if ($this->hasColumn('description')) $searchCols[] = 'description';
+                $searchOr = ['title[~]' => $search];
+                if ($this->hasColumn('slug')) $searchOr['slug[~]'] = $search;
+                if ($this->hasColumn('short_description')) $searchOr['short_description[~]'] = $search;
+                if ($this->hasColumn('description')) $searchOr['description[~]'] = $search;
 
-                foreach ($tokens as $i => $token) {
-                    $key = ':q' . $i;
-                    $clauses = [];
-                    foreach ($searchCols as $col) {
-                        $clauses[] = "LOWER({$col}) LIKE {$key}";
-                    }
-                    $sql .= " AND (" . implode(' OR ', $clauses) . ")";
-                    $params[$key] = '%' . $token . '%';
-                }
+                // Compose AND conditions with OR full-text-like matching fields.
+                $where = ['AND' => [
+                    $where,
+                    ['OR' => $searchOr],
+                ]];
             }
         }
 
-        // Sorting
-        $sort = (string)($opts['sort'] ?? 'default');
-        $orderBy = 'created_at DESC';
-        if ($sort === 'price_asc') {
-            $orderBy = 'price ASC';
-        } elseif ($sort === 'price_desc') {
-            $orderBy = 'price DESC';
-        } elseif ($sort === 'rating') {
-            $orderBy = 'rating DESC';
-        }
-        $sql .= " ORDER BY {$orderBy} LIMIT {$offset}, {$limit}";
+        $where['ORDER'] = $order;
+        $where['LIMIT'] = [$offset, $limit];
 
         try {
-            $stmt = $this->db->query($sql, $params);
-            if (!$stmt) return [];
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            $rows = is_array($rows) ? $rows : [];
+            $rows = $this->db->select($this->table, '*', $where) ?: [];
 
             // Fallback for environments with legacy publishing states/flags.
             if (empty($rows) && empty($opts['status'])) {
-                $rows = $this->listLegacyFallback($opts, $orderBy, $offset, $limit);
+                $rows = $this->listLegacyFallback($opts, $order, $offset, $limit);
             }
 
             return $rows;
         } catch (\Throwable $e) {
             error_log('Product::list query error: ' . $e->getMessage());
             if (empty($opts['status'])) {
-                return $this->listLegacyFallback($opts, $orderBy, $offset, $limit);
+                return $this->listLegacyFallback($opts, $order, $offset, $limit);
             }
             return [];
         }
     }
 
-    private function listLegacyFallback(array $opts, string $orderBy, int $offset, int $limit): array
+    private function listLegacyFallback(array $opts, array $order, int $offset, int $limit): array
     {
-        $sql = "SELECT * FROM {$this->table} WHERE 1=1";
-        $params = [];
+        $where = [];
 
-        // Legacy-safe public-ish fallback: exclude hard-deleted rows and keep non-empty titles.
+        // Legacy-safe public-ish fallback: exclude hard-deleted rows.
         if ($this->hasColumn('status')) {
-            $sql .= " AND (status IS NULL OR status <> 'deleted')";
+            $where['status[!]'] = 'deleted';
         }
-        $sql .= " AND title IS NOT NULL AND title <> ''";
 
         if (!empty($opts['category_id'])) {
-            $sql .= " AND category_id = :category_id";
-            $params[':category_id'] = (int)$opts['category_id'];
+            $where['category_id'] = (int)$opts['category_id'];
         }
         if (!empty($opts['seller_id'])) {
-            $sql .= " AND seller_id = :seller_id";
-            $params[':seller_id'] = (int)$opts['seller_id'];
+            $where['seller_id'] = (int)$opts['seller_id'];
         }
 
         if (!empty($opts['search'])) {
             $search = trim((string)$opts['search']);
             if ($search !== '') {
-                $tokens = preg_split('/\s+/', mb_strtolower($search), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-                $tokens = array_slice($tokens, 0, 6);
-                $searchCols = ['title'];
-                if ($this->hasColumn('slug')) $searchCols[] = 'slug';
-                if ($this->hasColumn('short_description')) $searchCols[] = 'short_description';
-                if ($this->hasColumn('description')) $searchCols[] = 'description';
+                $searchOr = ['title[~]' => $search];
+                if ($this->hasColumn('slug')) $searchOr['slug[~]'] = $search;
+                if ($this->hasColumn('short_description')) $searchOr['short_description[~]'] = $search;
+                if ($this->hasColumn('description')) $searchOr['description[~]'] = $search;
 
-                foreach ($tokens as $i => $token) {
-                    $key = ':qf' . $i;
-                    $clauses = [];
-                    foreach ($searchCols as $col) {
-                        $clauses[] = "LOWER({$col}) LIKE {$key}";
-                    }
-                    $sql .= " AND (" . implode(' OR ', $clauses) . ")";
-                    $params[$key] = '%' . $token . '%';
-                }
+                $where = ['AND' => [
+                    $where,
+                    ['OR' => $searchOr],
+                ]];
             }
         }
 
-        $sql .= " ORDER BY {$orderBy} LIMIT {$offset}, {$limit}";
+        $where['ORDER'] = $order;
+        $where['LIMIT'] = [$offset, $limit];
+
         try {
-            $stmt = $this->db->query($sql, $params);
-            if (!$stmt) return [];
-            $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
-            return is_array($rows) ? $rows : [];
+            return $this->db->select($this->table, '*', $where) ?: [];
         } catch (\Throwable $e) {
             error_log('Product::list legacy fallback error: ' . $e->getMessage());
             return [];
