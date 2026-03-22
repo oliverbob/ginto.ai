@@ -992,61 +992,23 @@ $router->req('/auth/github/callback', function() use ($db) {
 });
 
 // Dedicated GitHub webhook endpoint (separate from PayPal /webhook)
-$router->req('/github/webhook', function() use ($db) {
+$router->req('/webhook/github', function() {
     try {
-        $secret = getenv('GITHUB_WEBHOOK_SECRET') ?: ($_ENV['GITHUB_WEBHOOK_SECRET'] ?? null);
-        if (empty($secret)) {
-            error_log('GitHub webhook received but GITHUB_WEBHOOK_SECRET is not configured');
-            http_response_code(500);
-            echo json_encode(['error' => 'Webhook secret not configured']);
-            exit;
-        }
-
-        $raw = file_get_contents('php://input');
-        $headerSig = null;
-        // Prefer the server-populated header
-        if (!empty($_SERVER['HTTP_X_HUB_SIGNATURE_256'])) {
-            $headerSig = $_SERVER['HTTP_X_HUB_SIGNATURE_256'];
-        } else {
-            // Fallback to getallheaders if available
-            if (function_exists('getallheaders')) {
-                $h = getallheaders();
-                if (!empty($h['X-Hub-Signature-256'])) $headerSig = $h['X-Hub-Signature-256'];
-                elseif (!empty($h['x-hub-signature-256'])) $headerSig = $h['x-hub-signature-256'];
-            }
-        }
-
-        if (empty($headerSig)) {
-            error_log('GitHub webhook missing X-Hub-Signature-256');
-            http_response_code(400);
-            echo json_encode(['error' => 'Missing signature header']);
-            exit;
-        }
-
-        $computed = 'sha256=' . hash_hmac('sha256', $raw ?? '', $secret);
-        if (!hash_equals($computed, $headerSig)) {
-            error_log('GitHub webhook signature mismatch');
-            http_response_code(401);
-            echo json_encode(['error' => 'Invalid signature']);
-            exit;
-        }
-
-        // Parse payload for logging and quick inspection
-        $payload = json_decode($raw, true) ?: ['raw' => substr($raw ?? '', 0, 4096)];
         $logDir = STORAGE_PATH . '/logs';
         if (!is_dir($logDir)) @mkdir($logDir, 0755, true);
+
+        $raw = file_get_contents('php://input');
         $entry = [
             'time' => date('c'),
             'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
             'headers' => [
-                'x-hub-signature-256' => $headerSig,
+                'x-hub-signature-256' => $_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? null,
                 'x-github-event' => $_SERVER['HTTP_X_GITHUB_EVENT'] ?? null,
             ],
-            'payload' => $payload,
+            'payload' => $raw ? json_decode($raw, true) : null,
         ];
         file_put_contents($logDir . '/github_webhook.log', json_encode($entry) . PHP_EOL, FILE_APPEND | LOCK_EX);
 
-        // Return success quickly
         header('Content-Type: application/json');
         echo json_encode(['success' => true]);
         exit;
@@ -1056,6 +1018,13 @@ $router->req('/github/webhook', function() use ($db) {
         echo json_encode(['error' => 'internal error']);
         exit;
     }
+});
+
+// Products API for marketplace infinite scroll
+$router->req('/api/mall/products', function() {
+    $controller = new \Ginto\Controllers\MallController();
+    $controller->apiProducts();
+    exit;
 });
 
 // Dev helper: return a JSON containing the current session CSRF token (only allowed from localhost or when not in production)

@@ -645,35 +645,8 @@ req($router, '/api/data', function() use ($db) {
 });
 
 req($router, '/api/mall/products', function() {
-    header('Content-Type: application/json');
-    $products = [];
-    try {
-        if (class_exists('Ginto\\Core\\Database') && \Ginto\Core\Database::isInstalled()) {
-            require_once ROOT_PATH . '/src/Models/Product.php';
-            $pm = new \Ginto\Models\Product();
-            $opts = [];
-            if (isset($_GET['category'])) $opts['category'] = $_GET['category'];
-            if (isset($_GET['search'])) $opts['search'] = $_GET['search'];
-            if (isset($_GET['sort'])) $opts['sort'] = $_GET['sort'];
-            if (isset($_GET['limit'])) $opts['limit'] = (int)$_GET['limit'];
-            if (isset($_GET['offset'])) $opts['offset'] = (int)$_GET['offset'];
-            $products = $pm->list($opts);
-        } else {
-            $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(ROOT_PATH) . '/storage';
-            $storeFile = $storagePath . '/mall_products.json';
-            if (file_exists($storeFile)) { $json = @file_get_contents($storeFile); $products = json_decode($json, true) ?: []; }
-        }
-        require_once ROOT_PATH . '/src/Helpers/CurrencyHelper.php';
-        $chClass = '\\Ginto\\Helpers\\CurrencyHelper';
-        $detectedCurrency = $chClass::detectCurrency();
-        foreach ($products as &$p) {
-            $currency = $p['price_currency'] ?? $p['currency'] ?? $detectedCurrency;
-            $p['price_currency'] = $currency;
-            $p['formatted_price'] = $chClass::formatAmount($p['price_amount'] ?? ($p['price'] ?? 0), $currency);
-        }
-        unset($p);
-    } catch (\Throwable $e) { http_response_code(500); echo json_encode(['success' => false, 'message' => $e->getMessage()]); exit; }
-    echo json_encode(['success' => true, 'products' => $products]);
+    $controller = new \Ginto\Controllers\MallController();
+    $controller->apiProducts();
     exit;
 });
 
