@@ -1321,6 +1321,7 @@ $router->req('/api/mall/delivery/assign-rider', 'MallDeliveryController@apiAssig
 $router->req('/api/mall/delivery/shipment/{token}', 'MallDeliveryController@apiShipmentInfo');
 $router->req('/api/mall/push/subscribe', 'MallDeliveryController@apiPushSubscribe', ['POST']);
 $router->req('/api/mall/push/vapid-public-key', 'MallDeliveryController@apiVapidPublicKey');
+$router->req('/api/mall/push/register-fcm', 'MallDeliveryController@apiRegisterFcm', ['POST']);
 
 // Keep dynamic storefront route after static /mall/* routes.
 $router->req('/mall/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallCheckoutController@storefront');

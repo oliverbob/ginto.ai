@@ -438,6 +438,41 @@ class MallDeliveryController extends Controller
     }
 
     /**
+     * POST /api/mall/push/register-fcm
+     * Store an FCM device token for the authenticated user (Android app).
+     */
+    public function apiRegisterFcm(): void
+    {
+        header('Content-Type: application/json');
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'message' => 'Not authenticated.']);
+            return;
+        }
+
+        $token      = trim((string)($input['fcm_token']    ?? ''));
+        $deviceType = trim((string)($input['device_type']  ?? 'android'));
+        $deviceType = in_array($deviceType, ['android', 'ios'], true) ? $deviceType : 'android';
+
+        if ($token === '' || strlen($token) > 512) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Invalid FCM token.']);
+            return;
+        }
+
+        if ($this->push->saveFcmToken($userId, $token, $deviceType)) {
+            echo json_encode(['success' => true]);
+        } else {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'message' => 'Failed to save token.']);
+        }
+    }
+
+    /**
      * GET /api/mall/delivery/shipment/{id}
      * Returns shipment details + latest GPS. Access controlled.
      */

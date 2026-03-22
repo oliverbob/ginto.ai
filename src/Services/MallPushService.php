@@ -74,6 +74,28 @@ class MallPushService
         catch (\Throwable $e) {}
     }
 
+    /**
+     * Upsert an FCM device token for a user.
+     * Called by MallDeliveryController::apiRegisterFcm() when the Android app registers.
+     */
+    public function saveFcmToken(int $userId, string $token, string $deviceType = 'android'): bool
+    {
+        if ($token === '') return false;
+        try {
+            $now  = date('Y-m-d H:i:s');
+            $stmt = $this->db->pdo()->prepare(
+                "INSERT INTO device_fcm_tokens (user_id, fcm_token, device_type, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), device_type = VALUES(device_type), updated_at = VALUES(updated_at)"
+            );
+            $stmt->execute([$userId, $token, $deviceType, $now, $now]);
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[MallPushService] saveFcmToken error: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     // ── DB notification fanout ────────────────────────────────────────────────
 
     /**
@@ -114,6 +136,18 @@ class MallPushService
             foreach ($subs as $sub) {
                 $this->sendWebPush($sub, $payload);
             }
+        }
+
+        // FCM push — Android devices (best-effort)
+        $fcmTokens = $this->getFcmTokensForUsers($userIds);
+        if (!empty($fcmTokens)) {
+            $notifData = array_merge($meta, ['url' => $meta['url'] ?? '/mall/orders']);
+            $this->sendFcmNotifications(
+                $fcmTokens,
+                $this->titleForType($type),
+                $message,
+                $notifData
+            );
         }
     }
 
@@ -172,6 +206,132 @@ class MallPushService
         $meta = ['url' => '/mall/seller-orders'];
         if ($pendingOrderId) $meta['order_id'] = $pendingOrderId;
         $this->notify([$sellerId], $msg, 'visitor_registered', $meta);
+    }
+
+    // ── FCM (Android) Push ────────────────────────────────────────────────────
+
+    private function getFcmTokensForUsers(array $userIds): array
+    {
+        try {
+            $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+            $stmt = $this->db->pdo()->prepare(
+                "SELECT fcm_token FROM device_fcm_tokens WHERE user_id IN ($placeholders)"
+            );
+            $stmt->execute($userIds);
+            return array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'fcm_token');
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Send a notification to a list of FCM device tokens via the FCM HTTP v1 API.
+     *
+     * Required env vars:
+     *   FCM_SERVICE_ACCOUNT_JSON — path to service-account JSON file, OR the raw JSON string
+     *   FCM_PROJECT_ID           — Firebase project ID
+     */
+    private function sendFcmNotifications(array $tokens, string $title, string $body, array $data): void
+    {
+        $saSource  = getenv('FCM_SERVICE_ACCOUNT_JSON') ?: '';
+        $projectId = getenv('FCM_PROJECT_ID') ?: '';
+
+        if ($saSource === '' || $projectId === '' || empty($tokens)) return;
+
+        $saJson = file_exists($saSource) ? file_get_contents($saSource) : $saSource;
+        $sa     = json_decode($saJson, true);
+
+        if (!$sa || empty($sa['private_key']) || empty($sa['client_email'])) {
+            error_log('[MallPushService] FCM: invalid service account credential');
+            return;
+        }
+
+        $accessToken = $this->getFcmAccessToken($sa);
+        if (!$accessToken) return;
+
+        $endpoint = "https://fcm.googleapis.com/v1/projects/{$projectId}/messages:send";
+        $strData  = array_map('strval', $data);
+
+        foreach ($tokens as $token) {
+            $payload = json_encode([
+                'message' => [
+                    'token'        => $token,
+                    'notification' => ['title' => $title, 'body' => $body],
+                    'data'         => $strData,
+                    'android'      => [
+                        'priority'     => 'high',
+                        'notification' => [
+                            'channel_id'    => 'ginto_mall',
+                            'default_sound' => true,
+                        ],
+                    ],
+                ],
+            ]);
+
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $payload,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'Authorization: Bearer ' . $accessToken,
+                ],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $resp = curl_exec($ch);
+            $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($code !== 200) {
+                error_log('[MallPushService] FCM send error HTTP ' . $code . ': ' . $resp);
+                // 404/410 → stale token; silently discard for now
+            }
+        }
+    }
+
+    /**
+     * Exchange a service-account private key for a short-lived OAuth2 Bearer token
+     * using the Google JWT grant flow.
+     */
+    private function getFcmAccessToken(array $sa): ?string
+    {
+        try {
+            $now    = time();
+            $header = $this->b64url(json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
+            $claims = $this->b64url(json_encode([
+                'iss'   => $sa['client_email'],
+                'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
+                'aud'   => 'https://oauth2.googleapis.com/token',
+                'iat'   => $now,
+                'exp'   => $now + 3600,
+            ]));
+
+            $signing = $header . '.' . $claims;
+            openssl_sign($signing, $sig, $sa['private_key'], 'SHA256');
+            $jwt = $signing . '.' . $this->b64url($sig);
+
+            $ch = curl_init('https://oauth2.googleapis.com/token');
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => http_build_query([
+                    'grant_type' => 'urn:ietf:params:oauth2:grant-type:jwt-bearer',
+                    'assertion'  => $jwt,
+                ]),
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/x-www-form-urlencoded'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT        => 10,
+                CURLOPT_SSL_VERIFYPEER => true,
+            ]);
+            $resp = json_decode(curl_exec($ch), true);
+            curl_close($ch);
+
+            return $resp['access_token'] ?? null;
+        } catch (\Throwable $e) {
+            error_log('[MallPushService] FCM auth error: ' . $e->getMessage());
+            return null;
+        }
     }
 
     // ── VAPID Web Push ────────────────────────────────────────────────────────
