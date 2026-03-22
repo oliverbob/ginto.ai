@@ -178,12 +178,14 @@
      * ============================ */
     let state = {
         products: [...PRODUCTS],
+        localPool: [...PRODUCTS],
         cart: [],
         filters: { cat: 'all', search: '', sort: 'default', sale: false, ship: false },
         page: 1,
         hasMore: true,
         loading: false,
         serverSearchQuery: '',
+        searchUsingServerResults: false,
         requestSeq: 0,
         searchInputDebounce: null,
     };
@@ -330,7 +332,7 @@
      * ============================ */
     function renderProducts() {
         if (!grid) return;
-        const serverSearchMode = !!(state.filters.search && state.filters.search.trim());
+        const serverSearchMode = !!(state.filters.search && state.filters.search.trim()) && state.searchUsingServerResults;
         let list = state.products.filter(p => {
             const matchCat = state.filters.cat === 'all' || String(p.cat) === String(state.filters.cat);
             const matchSearch = serverSearchMode
@@ -408,16 +410,28 @@
 
             const json = await res.json();
             const incoming = Array.isArray(json.products) ? json.products.map(normaliseProduct) : [];
-            state.products = incoming;
-            state.page = 1;
-            state.hasMore = !!json.has_more;
+            if (incoming.length > 0) {
+                state.products = incoming;
+                state.searchUsingServerResults = true;
+                const seen = new Set(state.localPool.map(p => p.id));
+                incoming.forEach(p => { if (!seen.has(p.id)) state.localPool.push(p); });
+                state.page = 1;
+                state.hasMore = !!json.has_more;
+            } else {
+                // Fallback: keep search functional even when server returns no page-1 rows.
+                state.products = [...state.localPool];
+                state.searchUsingServerResults = false;
+                state.page = 1;
+                state.hasMore = false;
+            }
             renderProducts();
         } catch (e) {
             if (requestId !== state.requestSeq) return;
-            state.products = [];
+            state.products = [...state.localPool];
+            state.searchUsingServerResults = false;
             state.page = 1;
             state.hasMore = false;
-            showEmptyState();
+            renderProducts();
         } finally {
             if (requestId === state.requestSeq) {
                 state.loading = false;
@@ -1063,6 +1077,8 @@
             const existingIds = new Set(state.products.map(p => p.id));
             const newProds    = incoming.filter(p => !existingIds.has(p.id));
             state.products    = state.products.concat(newProds);
+            const localSeen = new Set(state.localPool.map(p => p.id));
+            newProds.forEach(p => { if (!localSeen.has(p.id)) state.localPool.push(p); });
             state.page        = nextPage;
             state.hasMore     = !!json.has_more;
             appendProducts(newProds);
@@ -1189,6 +1205,7 @@
                 const normalised = json.products.map(normaliseProduct);
                 const ids = new Set(normalised.map(p => p.id));
                 state.products  = [...normalised, ...state.products.filter(p => !ids.has(p.id))];
+                state.localPool = [...state.products];
                 state.hasMore   = !!json.has_more;
                 state.page      = 1;
             }
