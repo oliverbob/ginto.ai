@@ -1687,49 +1687,10 @@ $router->req('/api/data', function() use ($db) {
     $controller->index();
 });
 
-// Serve uploaded mall products stored on the server
+// Unified API: delegate to MallController for DB-backed pagination + search.
 $router->req('/api/mall/products', function() {
-    header('Content-Type: application/json');
-    // If DB is available, serve from DB; otherwise use JSON file
-    $products = [];
-    try {
-        if (class_exists('Ginto\\Core\\Database') && \Ginto\Core\Database::isInstalled()) {
-            require_once ROOT_PATH . '/src/Models/Product.php';
-            $pm = new \Ginto\Models\Product();
-            // Basic support for query params: category, search, sort, limit, offset
-            $opts = [];
-            if (isset($_GET['category'])) $opts['category'] = $_GET['category'];
-            if (isset($_GET['search'])) $opts['search'] = $_GET['search'];
-            if (isset($_GET['sort'])) $opts['sort'] = $_GET['sort'];
-            if (isset($_GET['limit'])) $opts['limit'] = (int)$_GET['limit'];
-            if (isset($_GET['offset'])) $opts['offset'] = (int)$_GET['offset'];
-            $products = $pm->list($opts);
-        } else {
-            $storeFile = STORAGE_PATH . '/mall_products.json';
-            if (file_exists($storeFile)) {
-                $json = @file_get_contents($storeFile);
-                $products = json_decode($json, true) ?: [];
-            }
-        }
-
-        // Add currency formatted price using helper
-        require_once ROOT_PATH . '/src/Helpers/CurrencyHelper.php';
-        $chClass = '\\Ginto\\Helpers\\CurrencyHelper';
-        $detectedCurrency = $chClass::detectCurrency();
-        foreach ($products as &$p) {
-            $currency = $p['price_currency'] ?? $p['currency'] ?? $detectedCurrency;
-            $p['price_currency'] = $currency;
-            $p['formatted_price'] = $chClass::formatAmount($p['price_amount'] ?? ($p['price'] ?? 0), $currency);
-        }
-        unset($p);
-    } catch (\Throwable $e) {
-        // On any failure return an empty list and an error message
-        http_response_code(500);
-        echo json_encode(['success' => false, 'message' => $e->getMessage()]);
-        exit;
-    }
-
-    echo json_encode(['success' => true, 'products' => $products]);
+    $controller = new \Ginto\Controllers\MallController();
+    $controller->apiProducts();
     exit;
 });
 
