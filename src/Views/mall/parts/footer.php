@@ -184,6 +184,8 @@
         hasMore: true,
         loading: false,
         serverSearchQuery: '',
+        requestSeq: 0,
+        searchInputDebounce: null,
     };
     try { state.cart = JSON.parse(localStorage.getItem('epower_cart') || '[]'); } catch (e) { state.cart = []; }
 
@@ -328,9 +330,12 @@
      * ============================ */
     function renderProducts() {
         if (!grid) return;
+        const serverSearchMode = !!(state.filters.search && state.filters.search.trim());
         let list = state.products.filter(p => {
-            const matchCat    = state.filters.cat === 'all' || String(p.cat) === String(state.filters.cat);
-            const matchSearch = !state.filters.search || p.title.toLowerCase().includes(state.filters.search.toLowerCase());
+            const matchCat = state.filters.cat === 'all' || String(p.cat) === String(state.filters.cat);
+            const matchSearch = serverSearchMode
+                ? true // In search mode, dataset already comes from server-side DB query.
+                : (!state.filters.search || p.title.toLowerCase().includes(state.filters.search.toLowerCase()));
             return matchCat && matchSearch;
         });
 
@@ -342,12 +347,7 @@
         grid.innerHTML = '';
 
         if (list.length === 0) {
-            if (state.filters.search || state.filters.cat !== 'all') {
-                // Trigger a server-side search when local results are empty
-                serverSearch();
-            } else {
-                grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><p>No products found matching your criteria.</p></div>';
-            }
+            grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon">🛍️</div><p>No products found matching your criteria.</p></div>';
             return;
         }
 
@@ -383,6 +383,47 @@
             frag.appendChild(card);
         });
         grid.appendChild(frag);
+        setupInfiniteScroll();
+    }
+
+    async function refreshSearchResultsFromServer() {
+        const requestId = ++state.requestSeq;
+        state.loading = true;
+        showScrollSpinner(true);
+        if (grid) {
+            grid.innerHTML = '<div class="empty-state"><div class="empty-state-icon" style="animation:spin 1s linear infinite;">⏳</div><p>Searching…</p></div>';
+        }
+        if (resultCount) resultCount.textContent = '0';
+
+        try {
+            const res = await fetch(buildCleanApiUrl(1), { cache: 'no-store' });
+            if (requestId !== state.requestSeq) return;
+            if (!res.ok) {
+                state.products = [];
+                state.page = 1;
+                state.hasMore = false;
+                showEmptyState();
+                return;
+            }
+
+            const json = await res.json();
+            const incoming = Array.isArray(json.products) ? json.products.map(normaliseProduct) : [];
+            state.products = incoming;
+            state.page = 1;
+            state.hasMore = !!json.has_more;
+            renderProducts();
+        } catch (e) {
+            if (requestId !== state.requestSeq) return;
+            state.products = [];
+            state.page = 1;
+            state.hasMore = false;
+            showEmptyState();
+        } finally {
+            if (requestId === state.requestSeq) {
+                state.loading = false;
+                showScrollSpinner(false);
+            }
+        }
     }
 
     function esc(str) {
@@ -929,7 +970,12 @@
     if (searchInput) {
         searchInput.addEventListener('input', function () {
             state.filters.search = this.value;
-            renderProducts();
+            if (state.searchInputDebounce) {
+                clearTimeout(state.searchInputDebounce);
+            }
+            state.searchInputDebounce = setTimeout(function () {
+                refreshSearchResultsFromServer();
+            }, 220);
         });
         // Prevent form submit reload
         var searchForm = document.getElementById('searchForm');
