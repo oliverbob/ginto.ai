@@ -173,12 +173,8 @@ class Product
                 if ($this->hasColumn('slug')) $searchOr['slug[~]'] = $search;
                 if ($this->hasColumn('short_description')) $searchOr['short_description[~]'] = $search;
                 if ($this->hasColumn('description')) $searchOr['description[~]'] = $search;
-
-                // Compose AND conditions with OR full-text-like matching fields.
-                $where = ['AND' => [
-                    $where,
-                    ['OR' => $searchOr],
-                ]];
+                // Compose base filters with OR full-text-like matching fields.
+                $where['OR'] = $searchOr;
             }
         }
 
@@ -226,11 +222,7 @@ class Product
                 if ($this->hasColumn('slug')) $searchOr['slug[~]'] = $search;
                 if ($this->hasColumn('short_description')) $searchOr['short_description[~]'] = $search;
                 if ($this->hasColumn('description')) $searchOr['description[~]'] = $search;
-
-                $where = ['AND' => [
-                    $where,
-                    ['OR' => $searchOr],
-                ]];
+                $where['OR'] = $searchOr;
             }
         }
 
