@@ -67,6 +67,12 @@ $jsonLd = [
 ];
 $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
 ?>
+<!doctype html>
+<html lang="en">
+<?php include __DIR__ . '/parts/head.php'; ?>
+<body>
+<?php include __DIR__ . '/parts/header.php'; ?>
+
 <!-- Product JSON-LD structured data -->
 <script type="application/ld+json"><?= json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) ?></script>
 
@@ -323,7 +329,7 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
             $rCur  = ['USD' => '$', 'PHP' => '₱', 'NGN' => '₦', 'EUR' => '€'][$r['currency'] ?? 'PHP'] ?? '₱';
         ?>
         <a class="prod-related-card"
-            href="/mall/product/<?= htmlspecialchars($rSlug, ENT_QUOTES, 'URL') ?>"
+            href="/mall/product/<?= htmlspecialchars($rSlug, ENT_QUOTES, 'UTF-8') ?>"
             title="<?= htmlspecialchars($r['title'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
             <img class="prod-related-img"
                 src="<?= htmlspecialchars($rImg, ENT_QUOTES, 'UTF-8') ?>"
@@ -502,5 +508,46 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
         badge.textContent = total > 0 ? (total > 99 ? '99+' : total) : '';
         badge.style.display = total > 0 ? 'flex' : 'none';
     }
+
+    // Header search behavior for standalone product page.
+    var searchTrigger = document.getElementById('searchTrigger');
+    var searchOverlay = document.getElementById('searchOverlay');
+    var searchClose = document.getElementById('searchClose');
+    var searchInput = document.getElementById('searchInput');
+    var searchForm = document.getElementById('searchForm');
+
+    function openSearch() {
+        if (!searchOverlay) return;
+        searchOverlay.classList.add('open');
+        if (searchTrigger) searchTrigger.setAttribute('aria-expanded', 'true');
+        setTimeout(function () { if (searchInput) searchInput.focus(); }, 60);
+    }
+
+    function closeSearch() {
+        if (!searchOverlay) return;
+        searchOverlay.classList.remove('open');
+        if (searchTrigger) searchTrigger.setAttribute('aria-expanded', 'false');
+    }
+
+    if (searchTrigger) searchTrigger.addEventListener('click', openSearch);
+    if (searchClose) searchClose.addEventListener('click', closeSearch);
+
+    if (searchForm) {
+        searchForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var q = (searchInput && searchInput.value ? searchInput.value.trim() : '');
+            if (!q) return;
+            window.location.href = '/mall?q=' + encodeURIComponent(q);
+        });
+    }
+
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && searchOverlay && searchOverlay.classList.contains('open')) {
+            closeSearch();
+        }
+    });
 }());
 </script>
+
+</body>
+</html>
