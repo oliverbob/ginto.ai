@@ -701,40 +701,25 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               Learn More <i class="fas fa-info-circle ml-2" style="color: var(--primary-600);"></i>
             </a>
           </div>
-          <!-- Mall banner — mobile only (desktop uses right column) -->
-          <a href="/marketplace" aria-label="Visit Ginto Mall"
-             class="md:hidden block mt-5 rounded-2xl overflow-hidden shadow-2xl"
-             style="transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;"
-             onmouseover="this.style.transform='scale(1.02)';" onmouseout="this.style.transform='';">
-            <img src="/assets/images/mall.png" alt="Ginto Mall"
-                 style="width:100%;height:80px;object-fit:cover;display:block;border-radius:16px 16px 0 0;">
-            <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:8px 14px;border-radius:0 0 16px 16px;display:flex;align-items:center;justify-content:center;gap:7px;">
-              <span style="font-size:1rem;">🛍️</span>
-              <span style="color:#fff;font-weight:700;font-size:0.85rem;">Shop and sell now at Ginto Mall</span>
-              <span style="color:rgba(255,255,255,0.75);font-size:0.8rem;">→</span>
-            </div>
-          </a>
         </div>
-        <div class="md:w-1/2 flex flex-col items-center justify-center gap-6">
+        <div class="md:w-1/2 flex justify-center">
           <div id="networkGraph" class="animate-pulse-light w-full">
             <!-- Network visualization will be displayed here -->
           </div>
-          <!-- Mall banner — desktop only (mobile uses left column above) -->
-          <a href="/marketplace" aria-label="Visit Ginto Mall"
-             class="hidden md:block w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
-             style="transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;"
-             onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 16px 48px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='';this.style.boxShadow='';">
-            <img src="/assets/images/mall.png" alt="Ginto Mall"
-                 style="width:100%;display:block;border-radius:16px 16px 0 0;">
-            <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);padding:11px 18px;border-radius:0 0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;">
-              <span style="font-size:1.1rem;">🛍️</span>
-              <span style="color:#fff;font-weight:700;font-size:0.93rem;letter-spacing:0.01em;">Shop and sell now at Ginto Mall</span>
-              <span style="color:rgba(255,255,255,0.75);font-size:0.88rem;">→</span>
-            </div>
-          </a>
         </div>
       </div>
     </section>
+    <!-- Ginto Mall Banner Strip -->
+    <a href="/marketplace" aria-label="Visit Ginto Mall"
+       style="display:block;text-decoration:none;background:linear-gradient(90deg,#6366f1,#7c3aed);transition:opacity 0.15s;"
+       onmouseover="this.style.opacity='0.92';" onmouseout="this.style.opacity='1';">
+      <div style="max-width:960px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:12px;padding:11px 20px;">
+        <img src="/assets/images/mall.png" alt="Ginto Mall" style="height:42px;width:auto;border-radius:7px;object-fit:cover;flex-shrink:0;">
+        <span style="font-size:1.1rem;">🛍️</span>
+        <span style="color:#fff;font-weight:700;font-size:0.95rem;letter-spacing:0.01em;">Shop and sell now at Ginto Mall</span>
+        <span style="color:rgba(255,255,255,0.75);font-size:0.9rem;">→</span>
+      </div>
+    </a>
 
     <!-- Benefits & Features Section -->
     <section class="py-16 px-4" style="background: var(--bg-secondary);">

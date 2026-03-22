@@ -218,28 +218,27 @@ function generateCsrfToken(bool $forVisitor = false): string {
         session_start();
     }
     
-    // For visitors (not logged in), create expiring tokens (1 hour max)
-    // But reuse existing token if it hasn't expired yet
-    if ($forVisitor || empty($_SESSION['user_id'])) {
-        // Check if we already have a valid non-expired token
-        if (!empty($_SESSION['csrf_token']) && !empty($_SESSION['csrf_token_expires'])) {
-            if (time() < $_SESSION['csrf_token_expires']) {
-                return $_SESSION['csrf_token']; // Reuse existing valid token
-            }
+    // Logged-in users always get a persistent session token — never expiring,
+    // regardless of the $forVisitor hint (e.g. called from shared form helpers).
+    if (!empty($_SESSION['user_id'])) {
+        if (empty($_SESSION['csrf_token'])) {
+            $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
         }
-        // Generate new token (first time or expired)
-        $token = bin2hex(random_bytes(32));
-        $_SESSION['csrf_token'] = $token;
-        $_SESSION['csrf_token_expires'] = time() + 3600; // 1 hour expiration
-        return $token;
+        unset($_SESSION['csrf_token_expires']); // Strip any stale expiry
+        return $_SESSION['csrf_token'];
     }
-    
-    // For logged-in users, use persistent token per session
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-        unset($_SESSION['csrf_token_expires']); // No expiration for logged-in users
+
+    // For visitors (not logged in), reuse token if still valid (8-hour window)
+    if (!empty($_SESSION['csrf_token']) && !empty($_SESSION['csrf_token_expires'])) {
+        if (time() < $_SESSION['csrf_token_expires']) {
+            return $_SESSION['csrf_token'];
+        }
     }
-    return $_SESSION['csrf_token'];
+    // Generate new visitor token
+    $token = bin2hex(random_bytes(32));
+    $_SESSION['csrf_token'] = $token;
+    $_SESSION['csrf_token_expires'] = time() + 28800; // 8 hours for visitors
+    return $token;
 }
 
 function validateCsrfToken($token): bool {
