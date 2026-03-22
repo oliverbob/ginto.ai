@@ -683,9 +683,9 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
 
 
     <!-- Hero Section with Network Visualization -->
-    <section class="text-white py-20 px-4 overflow-hidden relative" style="background: linear-gradient(120deg, var(--primary-500) 0%, var(--accent-500) 100%);">
+    <section class="text-white py-10 md:py-20 px-4 overflow-hidden relative" style="background: linear-gradient(120deg, var(--primary-500) 0%, var(--accent-500) 100%);">
       <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between relative z-10">
-        <div class="md:w-1/2 text-center md:text-left mb-10 md:mb-0">
+        <div class="md:w-1/2 text-center md:text-left mb-4 md:mb-0">
           <span class="text-lg font-semibold uppercase mb-3 block" style="color: var(--primary-700);">The shortcut to your best work.</span>
           <h1 class="text-5xl lg:text-6xl font-extrabold leading-tight mb-6">
             <br>Think faster. <span style="color: var(--accent-500);"> Build more. Do more!</span>
@@ -701,11 +701,27 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               Learn More <i class="fas fa-info-circle ml-2" style="color: var(--primary-600);"></i>
             </a>
           </div>
+          <!-- Mall banner — mobile only (desktop uses right column) -->
+          <a href="/marketplace" aria-label="Visit Ginto Mall"
+             class="md:hidden block mt-5 rounded-2xl overflow-hidden shadow-2xl"
+             style="transition:transform 0.2s,box-shadow 0.2s;"
+             onmouseover="this.style.transform='scale(1.02)';" onmouseout="this.style.transform='';">
+            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now"
+                 style="width:100%;height:80px;object-fit:cover;display:block;border-radius:16px;">
+          </a>
         </div>
-        <div class="md:w-1/2 flex justify-center">
-          <div id="networkGraph" class="animate-pulse-light">
+        <div class="md:w-1/2 flex flex-col items-center justify-center gap-6">
+          <div id="networkGraph" class="animate-pulse-light w-full">
             <!-- Network visualization will be displayed here -->
           </div>
+          <!-- Mall banner — desktop only (mobile uses left column above) -->
+          <a href="/marketplace" aria-label="Visit Ginto Mall"
+             class="hidden md:block w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl"
+             style="transition:transform 0.2s,box-shadow 0.2s;"
+             onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 16px 48px rgba(0,0,0,0.3)';" onmouseout="this.style.transform='';this.style.boxShadow='';">
+            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now"
+                 style="width:100%;display:block;border-radius:16px;">
+          </a>
         </div>
       </div>
     </section>

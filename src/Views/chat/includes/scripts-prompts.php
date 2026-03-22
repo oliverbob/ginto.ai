@@ -25,6 +25,9 @@
               allowfullscreen>
             </iframe>
           </div>
+          <a href="/marketplace" aria-label="Visit Ginto Mall" style="display:block;margin-top:18px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;" onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 12px 40px rgba(0,0,0,0.28)';" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(0,0,0,0.18)';">
+            <img src="/assets/images/mall.png" alt="Ginto Mall — Shop Now" style="width:100%;display:block;border-radius:14px;">
+          </a>
         </div>
       `;
     }
