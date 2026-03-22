@@ -55,6 +55,12 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                     <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,rgba(214,180,75,0.18),rgba(245,210,90,0.10));border:1px solid rgba(214,180,75,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:0.75rem;font-weight:800;color:#d4af37;">₱</span>
                     Ginto Pay<?php if ($isLoggedIn && isset($mall_wallet_balance)): ?> <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#d4af37;">₱<?= number_format((float)$mall_wallet_balance, 2) ?></span><?php endif; ?>
                 </a>
+                <a class="cat-item" href="/wallet" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
+                    <span style="width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,rgba(99,102,241,0.18),rgba(139,92,246,0.12));border:1px solid rgba(99,102,241,0.22);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="13" height="13" fill="none" stroke="#a5b4fc" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 13a1 1 0 1 1 2 0 1 1 0 0 1-2 0z" fill="#a5b4fc" stroke="none"/><path d="M2 10h20"/></svg>
+                    </span>
+                    Ginto Wallet<?php if ($isLoggedIn && isset($mall_wallet_balance)): ?> <span style="margin-left:auto;font-size:0.75rem;font-weight:700;color:#a5b4fc;">₱<?= number_format((float)$mall_wallet_balance, 2) ?></span><?php endif; ?>
+                </a>
                 <a class="cat-item" href="/mall/delivery" style="display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit;">
                     <span style="width:26px;height:26px;border-radius:8px;background:rgba(139,92,246,0.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
                         <svg width="13" height="13" fill="none" stroke="#a78bfa" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="3" width="15" height="13" rx="1"/><path d="M16 8h4l3 5v4h-7V8z"/><circle cx="5.5" cy="18.5" r="1.5"/><circle cx="18.5" cy="18.5" r="1.5"/></svg>
