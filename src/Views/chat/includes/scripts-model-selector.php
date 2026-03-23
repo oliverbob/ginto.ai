@@ -3,10 +3,20 @@
  * Admin Model Selector Scripts
  * For admin users to select and configure AI models
  */
+// Determine if the current user may change the model (admins only)
+$isAdmin = false;
+try {
+    if (class_exists('Ginto\\Controllers\\UserController') && \Ginto\Controllers\UserController::isAdmin()) {
+        $isAdmin = true;
+    }
+} catch (\Throwable $_) { /* ignore */ }
 ?>
-<!-- Model Selector Script (available to admin and non-admin users) -->
+<!-- Model Selector Script -->
 <script>
 (function() {
+  // Only admins may switch models; non-admin users see a read-only display
+  const canChangeModel = <?= $isAdmin ? 'true' : 'false' ?>;
+
   const forceGroqVisionForAllModels = <?= ((getenv('GROQ_VISION_FOR_ALL_MODELS') ?: ($_ENV['GROQ_VISION_FOR_ALL_MODELS'] ?? 'false')) === 'true') ? 'true' : 'false' ?>;
 
   // Support both desktop and mobile model selector elements.
@@ -75,7 +85,8 @@
     }
   }
 
-  btnEls.forEach(btn => {
+  // Only register dropdown click handlers for admins
+  if (canChangeModel) btnEls.forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       const isMobileBtn = btn.id && btn.id.includes('mobile');
@@ -364,8 +375,9 @@
     }
   }
   
-  // Select a model
+  // Select a model (admin only)
   async function selectModel(provider, model) {
+    if (!canChangeModel) return;
     updateModelDisplay(model, 'w-2 h-2 rounded-full bg-yellow-500 animate-pulse');
     
     try {

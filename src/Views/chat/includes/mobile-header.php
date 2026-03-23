@@ -45,7 +45,7 @@ try {
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 3v3M12 18v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M4 12H1M23 12h-3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12M7 7h10v10H7z"/>
       </svg>
     </button>
-    <?php if ($isLoggedIn || $isAdmin): ?>
+    <?php if ($isAdmin): ?>
     <button id="model-selector-btn-mobile" class="model-replace-on-tiny relative flex items-center justify-center flex-shrink-0 w-9 h-9 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer" aria-haspopup="true" aria-expanded="false" title="Select AI model">
       <!-- Bot icon -->
       <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -56,11 +56,11 @@ try {
         <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
         <path d="M8 19h8"/>
       </svg>
-      <!-- Green live indicator — offset further from icon -->
+      <!-- Green live indicator -->
       <span id="mobile-model-status-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900" aria-hidden="true"></span>
       <span class="sr-only" id="mobile-model-name">Ginto AI</span>
     </button>
-    <!-- Mobile dropdown (hidden by default) -->
+    <!-- Mobile dropdown (admin only) -->
     <div id="model-dropdown-mobile" class="hidden fixed top-12 mx-0 w-auto max-w-[350px] bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 max-h-[50vh] overflow-hidden flex flex-col" style="left:5px; right:5px; max-width: calc(100vw - 10px);">
       <div class="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
         <div class="relative flex-1">
@@ -69,23 +69,30 @@ try {
           </svg>
           <input type="text" id="model-search-mobile" placeholder="Search models..." class="w-full pl-9 pr-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
         </div>
-        <?php if ($isLoggedIn): ?>
         <button id="add-provider-btn-mobile" class="flex-shrink-0 ml-3 flex items-center gap-2 px-3 h-9 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap" title="+ Add API Key">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
           </svg>
           <span class="ml-2">+ Add API Key</span>
         </button>
-        <?php else: ?>
-        <a href="/register" id="add-provider-register-mobile" class="flex-shrink-0 ml-3 flex items-center gap-2 px-3 h-9 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap" title="Create account to add key">
-          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-          <span class="ml-2">Create account</span>
-        </a>
-        <?php endif; ?>
       </div>
       <div id="model-list-mobile" class="py-2 overflow-y-auto flex-1">
         <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
       </div>
+    </div>
+    <?php elseif ($isLoggedIn): ?>
+    <!-- Non-admin logged-in user: read-only status indicator (model managed by admin) -->
+    <div id="model-selector-btn-mobile" class="model-replace-on-tiny relative flex items-center justify-center flex-shrink-0 w-9 h-9 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300" title="Model is managed by admin">
+      <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="10" rx="2"/>
+        <path d="M12 11V7"/>
+        <circle cx="12" cy="5" r="2"/>
+        <circle cx="8.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+        <circle cx="15.5" cy="15.5" r="1.5" fill="currentColor" stroke="none"/>
+        <path d="M8 19h8"/>
+      </svg>
+      <span id="mobile-model-status-dot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white dark:ring-gray-900" aria-hidden="true"></span>
+      <span class="sr-only" id="mobile-model-name">Ginto AI</span>
     </div>
     <?php else: ?>
     <div class="flex items-center gap-2 px-2 h-8 min-h-8 py-0.5 rounded-lg min-w-0">

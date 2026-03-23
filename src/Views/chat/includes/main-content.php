@@ -39,9 +39,9 @@
     <div class="flex items-center justify-between px-4 h-14">
       <!-- Model selector -->
       <div class="flex items-center gap-2">
-        <!-- Model selector: interactive for logged-in users/admins, static label for visitors -->
+        <!-- Model selector: interactive for admins, read-only for logged-in users, static label for visitors -->
           <div class="relative" id="model-selector-wrapper">
-            <?php if ($isLoggedIn || $isAdmin): ?>
+            <?php if ($isAdmin): ?>
             <button id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer max-w-[350px] min-w-0 overflow-hidden">
               <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="model-status-dot"></div>
               <span class="text-sm text-gray-700 dark:text-gray-200 truncate min-w-0" id="model-name">ginto-default</span>
@@ -49,26 +49,8 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
               </svg>
             </button>
-            <!-- Inline compact Add Key for small screens (visible next to selector) -->
-            <?php if ($isLoggedIn): ?>
-            <button id="add-provider-inline-mobile" class="ml-2 p-2 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white lg:hidden flex items-center justify-center" title="+ Add API Key">
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-              </svg>
-            </button>
-            <?php else: ?>
-            <a id="add-provider-inline-register" href="/register" class="ml-2 p-2 rounded-md bg-amber-600 hover:bg-amber-500 text-white lg:hidden flex items-center justify-center" title="Create account to add key">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-            </a>
-            <?php endif; ?>
-            <!-- Dropdown menu -->
-            <!--
-              Responsive behavior:
-              - On small screens make dropdown fixed to viewport with 5px left/right padding
-              - On large screens (lg and up) keep original absolute positioning and fixed width
-            -->
+            <!-- Dropdown menu (admin only) -->
             <div id="model-dropdown" class="hidden fixed top-14 left-1 right-1 mx-0 lg:absolute lg:left-0 lg:mt-2 lg:top-auto lg:right-auto w-auto lg:w-[350px] lg:min-w-[350px] lg:max-w-[350px] max-h-[60vh] overflow-hidden bg-white dark:bg-gray-900 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-20 flex flex-col" style="max-width: calc(100vw - 10px);">
-              <!-- Search bar and Add Provider button (Add Key visible only to admins) -->
               <div class="sticky top-0 z-30 p-3 border-b border-gray-200 dark:border-gray-700 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm flex items-center gap-2">
                 <div class="relative flex-1">
                   <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,23 +58,22 @@
                   </svg>
                   <input type="text" id="model-search" placeholder="Search models..." class="w-full pl-9 pr-3 h-10 text-sm bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg focus:outline-none focus:ring-1 focus:ring-offset-0 focus:ring-indigo-500 focus:border-indigo-500">
                 </div>
-                <?php if ($isLoggedIn): ?>
                 <button id="add-provider-btn" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 h-10 text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap" title="+ Add API Key">
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                   </svg>
                   <span class="ml-2">+ Add API Key</span>
                 </button>
-                <?php else: ?>
-                <a href="/register" id="add-provider-register" class="flex-shrink-0 ml-3 flex items-center gap-2 px-4 h-10 text-sm font-semibold bg-amber-600 hover:bg-amber-500 text-white rounded-xl shadow-sm transition-colors whitespace-nowrap">
-                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
-                  <span class="ml-2">Create account</span>
-                </a>
-                <?php endif; ?>
               </div>
               <div id="model-list" class="py-2 overflow-y-auto flex-1">
                 <div class="px-4 py-3 text-sm text-gray-500">Loading models...</div>
               </div>
+            </div>
+            <?php elseif ($isLoggedIn): ?>
+            <!-- Non-admin logged-in user: read-only model display (model managed by admin) -->
+            <div id="model-selector-btn" class="flex items-center gap-2 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 max-w-[350px] min-w-0 overflow-hidden" title="Model is managed by admin">
+              <div class="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" id="model-status-dot"></div>
+              <span class="text-sm text-gray-700 dark:text-gray-200 truncate min-w-0" id="model-name">Loading...</span>
             </div>
             <?php else: ?>
             <div class="flex items-center gap-2 px-3 py-1.5 bg-transparent rounded-lg min-w-0">

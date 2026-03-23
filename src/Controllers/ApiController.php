@@ -1503,42 +1503,19 @@ class ApiController extends Controller
         $model = $this->normalizeModelForProvider((string)$provider, $model);
 
         // Validate that the requesting user may select this provider.
-        // Rules:
-        // - Admins can select any provider/model.
-        // - Non-admin users can only override when they have their own active key
-        //   for the selected provider.
+        // Only admins are allowed to change the active model/provider.
+        // Non-admin users always use the admin-configured global selection.
         $currentUserId = $_SESSION['user_id'] ?? null;
         $isAdmin = $this->isCurrentUserAdminStrict();
 
-        if (!$isAdmin && $provider) {
-            $db = $this->db;
-            // If the user is not logged in and not admin, they cannot set a provider
-            if ($currentUserId === null && !$isAdmin) {
-                http_response_code(403);
-                echo json_encode(['success' => false, 'error' => 'forbidden', 'message' => 'Authentication required to set provider']);
-                exit();
-            }
-
-            $hasUserDbKey = false;
-            try {
-                if ($db && $currentUserId !== null) {
-                    $hasUserDbKey = (bool)($db->count('provider_keys', [
-                        'provider' => $provider,
-                        'user_id' => $currentUserId,
-                        'is_active' => 1,
-                    ]) > 0);
-                }
-            } catch (\Throwable $_) { /* ignore */ }
-
-            if (!$hasUserDbKey) {
-                http_response_code(403);
-                echo json_encode([
-                    'success' => false,
-                    'error' => 'forbidden',
-                    'message' => 'You need your own provider key to override model selection'
-                ]);
-                exit();
-            }
+        if (!$isAdmin) {
+            http_response_code(403);
+            echo json_encode([
+                'success' => false,
+                'error' => 'forbidden',
+                'message' => 'Only admins can change the active model'
+            ]);
+            exit();
         }
 
         if ($provider) {
