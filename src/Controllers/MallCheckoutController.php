@@ -330,8 +330,8 @@ class MallCheckoutController extends Controller
                 }
             }
 
-            $buyerLink = $this->resolveBuyerLink($ctx);
-            $productLink = $this->resolveProductLink($ctx);
+            $buyerLink = $this->resolveBuyerLink($ctx, $n);
+            $productLink = $this->resolveProductLink($ctx, $n);
             $n['link'] = $this->normalizeActionUrl($ctx['link'] ?? $ctx['url'] ?? null)
                 ?? $productLink
                 ?? $buyerLink
@@ -779,7 +779,7 @@ class MallCheckoutController extends Controller
         return $url;
     }
 
-    private function resolveBuyerLink(array $ctx): ?string
+    private function resolveBuyerLink(array $ctx, array $row = []): ?string
     {
         $direct = $this->normalizeActionUrl($ctx['buyer_link'] ?? null);
         if ($direct !== null) {
@@ -787,9 +787,8 @@ class MallCheckoutController extends Controller
         }
 
         $buyerId = (int)($ctx['buyer_id'] ?? 0);
-        if ($buyerId <= 0) {
-            return null;
-        }
+        if ($buyerId <= 0) $buyerId = (int)($row['actor_user_id'] ?? 0);
+        if ($buyerId <= 0) return null;
 
         $buyer = $this->db->get('users', ['public_id', 'username'], ['id' => $buyerId]);
         $ident = trim((string)($buyer['public_id'] ?? $buyer['username'] ?? ''));
@@ -800,7 +799,7 @@ class MallCheckoutController extends Controller
         return '/user/profile/' . rawurlencode($ident);
     }
 
-    private function resolveProductLink(array $ctx): ?string
+    private function resolveProductLink(array $ctx, array $row = []): ?string
     {
         $direct = $this->normalizeActionUrl($ctx['product_link'] ?? null);
         if ($direct !== null) {
@@ -809,8 +808,18 @@ class MallCheckoutController extends Controller
 
         $productId = (int)($ctx['product_id'] ?? 0);
         if ($productId <= 0) {
-            return null;
+            $orderId = (int)($ctx['order_id'] ?? 0);
+            if ($orderId <= 0) {
+                $orderId = (int)($row['order_id'] ?? 0);
+            }
+            if ($orderId > 0) {
+                $productId = (int)($this->db->get('mall_order_items', 'product_id', [
+                    'order_id' => $orderId,
+                    'ORDER' => ['id' => 'ASC'],
+                ]) ?? 0);
+            }
         }
+        if ($productId <= 0) return null;
 
         $product = $this->db->get('products', ['slug'], ['id' => $productId]);
         $slug = trim((string)($product['slug'] ?? ''));
