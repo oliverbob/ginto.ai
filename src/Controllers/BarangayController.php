@@ -80,6 +80,7 @@ class BarangayController extends \Core\Controller
 
             $b = $barangays[0];
             echo json_encode([
+                'success'  => true,
                 'barangay' => [
                     'id'       => (int)$b['id'],
                     'name'     => $b['name'],
@@ -144,7 +145,20 @@ class BarangayController extends \Core\Controller
             return;
         }
 
-        $barangayId = (int)($_POST['barangay_id'] ?? 0);
+        $barangayId = (int)($_POST['barangay_id'] ?? -1);
+
+        // barangay_id = 0 means clear the pinned barangay
+        if ($barangayId === 0) {
+            unset($_SESSION['buyer_barangay_id']);
+            $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+            if ($userId > 0) {
+                try { $this->db->update('users', ['buyer_barangay_id' => null], ['id' => $userId]); }
+                catch (\Throwable $ignored) {}
+            }
+            echo json_encode(['success' => true, 'barangay' => null]);
+            return;
+        }
+
         if ($barangayId <= 0) {
             echo json_encode(['success' => false, 'error' => 'Invalid barangay_id']);
             return;
