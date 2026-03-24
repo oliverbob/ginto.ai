@@ -1218,12 +1218,15 @@ class ApiController extends Controller
             }
         }
 
-        // If session does not have current selection, try restoring from cookies
-        if (empty($_SESSION['current_provider']) && !empty($_COOKIE['current_provider'])) {
-            $_SESSION['current_provider'] = $_COOKIE['current_provider'];
-        }
-        if (empty($_SESSION['current_model']) && !empty($_COOKIE['current_model'])) {
-            $_SESSION['current_model'] = $_COOKIE['current_model'];
+        // Only admins may restore session values from cookies; non-admin users always
+        // use the admin's global selection and should not inherit stale cookie values.
+        if ($isAdmin) {
+            if (empty($_SESSION['current_provider']) && !empty($_COOKIE['current_provider'])) {
+                $_SESSION['current_provider'] = $_COOKIE['current_provider'];
+            }
+            if (empty($_SESSION['current_model']) && !empty($_COOKIE['current_model'])) {
+                $_SESSION['current_model'] = $_COOKIE['current_model'];
+            }
         }
 
         // Load any global selection (admin-set) from settings table
@@ -1311,9 +1314,9 @@ class ApiController extends Controller
             }
         }
 
-        // Non-admin users without their own API keys must always use the admin global selection.
-        // This prevents stale session/cookie values from overriding the admin's chosen default.
-        if (!$isAdmin && !$userHasAnyKey) {
+        // Non-admin users always use the admin's global selection regardless of
+        // session state or whether they have their own API keys.
+        if (!$isAdmin) {
             $effectiveCurrentProvider = !empty($globalSelection['provider']) ? $globalSelection['provider'] : null;
             $effectiveCurrentModel = !empty($globalSelection['model']) ? $globalSelection['model'] : null;
         } else {

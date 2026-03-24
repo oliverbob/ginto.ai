@@ -154,8 +154,14 @@ class ChatStreamHandler
             }
         } catch (\Throwable $_) { /* ignore */ }
 
-        $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
-        $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+        // Non-admin users always use the admin's global selection; only admins use session values.
+        if ($isAdminUser) {
+            $sessionProvider = $_SESSION['llm_provider_name'] ?? ($_SESSION['current_provider'] ?? null);
+            $sessionModel = $_SESSION['llm_model'] ?? ($_SESSION['current_model'] ?? null);
+        } else {
+            $sessionProvider = null;
+            $sessionModel = null;
+        }
 
         if ((empty($sessionProvider) || empty($sessionModel)) && !empty($globalSelection['provider'])) {
             $sessionProvider = $globalSelection['provider'];
@@ -771,8 +777,14 @@ class ChatStreamHandler
             $globalSelection = null;
         }
 
-        $sessionProvider = $_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null);
-        $sessionModel = $_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null);
+        // Non-admin users always use the admin's global selection; only admins use session values.
+        if ($isAdminUser) {
+            $sessionProvider = $_SESSION['current_provider'] ?? ($_SESSION['llm_provider_name'] ?? null);
+            $sessionModel = $_SESSION['current_model'] ?? ($_SESSION['llm_model'] ?? null);
+        } else {
+            $sessionProvider = null;
+            $sessionModel = null;
+        }
 
         if ((empty($sessionProvider) || empty($sessionModel)) && !empty($globalSelection['provider'])) {
             $sessionProvider = $globalSelection['provider'];
@@ -867,9 +879,10 @@ class ChatStreamHandler
                 }
             }
 
-            // Non-admin users without a personal API key must always use the admin's global selection.
-            // This prevents stale session values from overriding the admin-chosen default.
-            if (!$isAdminUser && $userProvidedKey === null && !empty($globalSelection['provider'])) {
+            // Non-admin users must always use the admin's global selection, regardless of
+            // whether they have a personal API key. Reset selectedProvider and apiKey so the
+            // remainder of the key-resolution logic uses the global selection.
+            if (!$isAdminUser && !empty($globalSelection['provider'])) {
                 $sessionCloudProvider = $globalSelection['provider'];
                 $rawGlobalModel = $globalSelection['model'] ?? null;
                 // Normalize model name for provider
@@ -881,7 +894,13 @@ class ChatStreamHandler
                     }
                 }
                 $sessionCloudModel = $rawGlobalModel;
-                error_log(sprintf('[ChatStream] Non-key user forced to global selection: provider=%s model=%s', $sessionCloudProvider, $sessionCloudModel ?? 'null'));
+                // Force selectedProvider and apiKey to the global selection so the user's
+                // personal key (e.g. ginto_tunnel) does not accidentally route the request.
+                $selectedProvider = $sessionCloudProvider;
+                $apiKey = null;
+                $currentKeyId = null;
+                $userProvidedKey = null;
+                error_log(sprintf('[ChatStream] Non-admin forced to global selection: provider=%s model=%s', $sessionCloudProvider, $sessionCloudModel ?? 'null'));
             }
 
             // Detect web search needs
