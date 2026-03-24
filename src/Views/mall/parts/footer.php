@@ -42,6 +42,11 @@
     const SELLER_ID  = <?= json_encode(isset($storefront['user_id']) ? (int)$storefront['user_id'] : 0) ?>; // 0 = marketplace
     const PLACEHOLDER = '/assets/images/placeholder_ceramic.svg';
 
+    // Barangay GPS geofencing — persisted via PHP session + localStorage for offline persistence
+    let currentBarangayId = <?= json_encode((int)($buyer_barangay_id ?? 0)) ?>;
+    const _savedBarangay = localStorage.getItem('ginto_barangay_id');
+    if (!currentBarangayId && _savedBarangay) currentBarangayId = parseInt(_savedBarangay) || 0;
+
     function ensureMallShellElements() {
         if (!document.getElementById('sidebarBackdrop')) {
             const sidebarBackdrop = document.createElement('div');
@@ -1059,6 +1064,7 @@
     function buildCleanApiUrl(page) {
         const params = new URLSearchParams({ page, limit: 24 });
         if (SELLER_ID > 0)                              params.set('seller_id', SELLER_ID);
+        if (currentBarangayId > 0)                      params.set('barangay_id', currentBarangayId);
         if (state.filters.cat && state.filters.cat !== 'all') params.set('cat', state.filters.cat);
         if (state.filters.search)                       params.set('search', state.filters.search);
         if (state.filters.sort && state.filters.sort !== 'default') params.set('sort', state.filters.sort);
@@ -1272,6 +1278,102 @@
     window.checkout         = checkout;
     window.openUploadModal  = openUploadModal;
     window.closeUploadModal = closeUploadModal;
+
+    // ── Barangay GPS selector ─────────────────────────────────────────────
+    let _barangayDropdownOpen = false;
+
+    function toggleBarangayDropdown() {
+        const dd = document.getElementById('barangayDropdown');
+        if (!dd) return;
+        _barangayDropdownOpen = !_barangayDropdownOpen;
+        dd.style.display = _barangayDropdownOpen ? 'block' : 'none';
+        if (_barangayDropdownOpen) {
+            const inp = document.getElementById('barangaySearchInput');
+            if (inp) { inp.focus(); _doSearchBarangay(''); }
+        }
+    }
+
+    document.addEventListener('click', function(e) {
+        const wrap = document.getElementById('barangayPillWrap');
+        if (wrap && !wrap.contains(e.target)) {
+            const dd = document.getElementById('barangayDropdown');
+            if (dd) dd.style.display = 'none';
+            _barangayDropdownOpen = false;
+        }
+    });
+
+    let _bzTimer = null;
+    function searchBarangay(q) {
+        clearTimeout(_bzTimer);
+        const res = document.getElementById('barangayResults');
+        if (!res) return;
+        if (!q || q.trim().length < 1) {
+            _doSearchBarangay('');
+            return;
+        }
+        _bzTimer = setTimeout(function() { _doSearchBarangay(q); }, 250);
+    }
+
+    function _doSearchBarangay(q) {
+        const res = document.getElementById('barangayResults');
+        if (!res) return;
+        const url = '/api/barangay/list?limit=20' + (q.trim() ? '&q=' + encodeURIComponent(q.trim()) : '');
+        fetch(url)
+            .then(r => r.json())
+            .then(function(d) {
+                if (!d.barangays || !d.barangays.length) {
+                    res.innerHTML = '<div style="padding:8px 14px;color:var(--muted);font-size:0.83rem;">' +
+                        (q.trim() ? 'No results' : 'No barangays found') + '</div>';
+                    return;
+                }
+                res.innerHTML = d.barangays.map(function(b) {
+                    const active = (b.id === currentBarangayId) ? ' style="background:var(--primary-bg,#f0f7ff);"' : '';
+                    return '<div onclick="selectBarangay(' + b.id + ')"' + active +
+                        ' style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border,#eee);font-size:0.87rem;">' +
+                        '<strong>' + b.name + '</strong>, ' + b.city +
+                        ' <span style="color:var(--muted,#888);font-size:0.78rem;">' + b.province + '</span>' +
+                        '</div>';
+                }).join('');
+            })
+            .catch(function() {
+                if (res) res.innerHTML = '<div style="padding:8px 14px;color:var(--muted);font-size:0.83rem;">Error loading barangays</div>';
+            });
+    }
+
+    function selectBarangay(id) {
+        const body = new URLSearchParams({ barangay_id: id, _token: CSRF_TOKEN });
+        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+            .then(r => r.json())
+            .then(function(d) {
+                if (d.success && d.barangay) {
+                    currentBarangayId = d.barangay.id;
+                    localStorage.setItem('ginto_barangay_id', currentBarangayId);
+                    const pill = document.getElementById('barangayPillText');
+                    if (pill) pill.textContent = d.barangay.name + ', ' + d.barangay.city;
+                }
+                const dd = document.getElementById('barangayDropdown');
+                if (dd) dd.style.display = 'none';
+                _barangayDropdownOpen = false;
+                refreshSearchResultsFromServer();
+            })
+            .catch(function() { window.location.reload(); });
+    }
+
+    function clearBarangay() {
+        const body = new URLSearchParams({ barangay_id: 0, _token: CSRF_TOKEN });
+        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+            .then(function() {
+                currentBarangayId = 0;
+                localStorage.removeItem('ginto_barangay_id');
+                window.location.reload();
+            })
+            .catch(function() { window.location.reload(); });
+    }
+
+    window.toggleBarangayDropdown = toggleBarangayDropdown;
+    window.searchBarangay         = searchBarangay;
+    window.selectBarangay         = selectBarangay;
+    window.clearBarangay          = clearBarangay;
 
 }());
 

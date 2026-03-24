@@ -1326,6 +1326,16 @@ $router->req('/api/mall/push/register-fcm', 'MallDeliveryController@apiRegisterF
 $router->req('/api/mall/header-data', 'MallController@apiHeaderData', ['GET']);
 $router->req('/api/mall/cart/sync', 'MallController@apiCartSync', ['POST']);
 $router->req('/api/mall/products', 'MallController@apiProducts', ['GET']);
+
+// Barangay GPS geofencing API
+$router->req('/api/barangay/detect',               'BarangayController@detect',         ['GET']);
+$router->req('/api/barangay/list',                 'BarangayController@list',            ['GET']);
+$router->req('/api/barangay/set',                  'BarangayController@set',             ['POST']);
+$router->req('/api/barangay/current',              'BarangayController@current',         ['GET']);
+$router->req('/api/barangay/seller/zones',         'BarangayController@sellerZones',     ['GET']);
+$router->req('/api/barangay/seller/zones/save',    'BarangayController@saveSellerZones', ['POST']);
+$router->req('/api/barangay/runner/register',      'BarangayController@runnerRegister',  ['POST']);
+$router->req('/api/barangay/runners',              'BarangayController@listRunners',     ['GET']);
 $router->req('/mall/notifications', 'MallController@notificationsPage');
 $router->req('/mall/product/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallController@productPage');
 

@@ -24,11 +24,32 @@ class MallController extends \Core\Controller
 
     public function marketplace()
     {
+        // Resolve buyer's pinned barangay (session > user profile)
+        $barangayId = (int)($_SESSION['buyer_barangay_id'] ?? 0);
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+
+        if ($barangayId <= 0 && $userId > 0) {
+            $userRow = $this->db->get('users', ['buyer_barangay_id'], ['id' => $userId]);
+            $barangayId = (int)($userRow['buyer_barangay_id'] ?? 0);
+            if ($barangayId > 0) {
+                $_SESSION['buyer_barangay_id'] = $barangayId;
+            }
+        }
+
+        $currentBarangay = null;
+        if ($barangayId > 0) {
+            $currentBarangay = $this->db->get('barangays', ['id', 'name', 'city', 'province', 'region'], [
+                'id' => $barangayId, 'is_active' => 1
+            ]);
+        }
+
         // Load categories and published products from DB
         $categories = $this->db->select('categories', '*', ['ORDER' => ['name' => 'ASC']]) ?: [];
 
         $productModel = new \Ginto\Models\Product();
-        $products = $productModel->list(['limit' => 48]);
+        $listOpts = ['limit' => 48];
+        if ($barangayId > 0) $listOpts['barangay_id'] = $barangayId;
+        $products = $productModel->list($listOpts);
 
         // Attach seller storefront slugs to each product
         $sellerIds = array_values(array_unique(array_filter(array_column($products, 'seller_id'))));
@@ -52,13 +73,15 @@ class MallController extends \Core\Controller
 
         // Pass data to the view
         $this->view('mall/marketplace', [
-            'categories' => $categories,
-            'products' => $products,
-            'csrf_token' => generateCsrfToken(),
-            'title' => 'ePower Mall',
+            'categories'  => $categories,
+            'products'    => $products,
+            'csrf_token'  => generateCsrfToken(),
+            'title'       => 'ePower Mall',
             'mall_unread_notifications' => $userId > 0 ? $commerce->getMallUnreadNotificationCount($userId) : 0,
-            'mall_notifications' => $userId > 0 ? $commerce->getMallNotifications($userId) : [],
-            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'mall_notifications'        => $userId > 0 ? $commerce->getMallNotifications($userId) : [],
+            'mall_wallet_balance'       => (float)($walletSummary['account']['balance'] ?? 0),
+            'current_barangay'          => $currentBarangay,
+            'buyer_barangay_id'         => $barangayId,
         ]);
     }
 
@@ -210,14 +233,21 @@ class MallController extends \Core\Controller
         $search   = trim(strip_tags($_GET['search'] ?? ''));
         $sort     = preg_replace('/[^a-z_]/', '', strtolower($_GET['sort'] ?? 'default'));
         $sellerId = isset($_GET['seller_id']) && is_numeric($_GET['seller_id']) ? (int)$_GET['seller_id'] : null;
+        $barangayId = isset($_GET['barangay_id']) && is_numeric($_GET['barangay_id']) ? (int)$_GET['barangay_id'] : null;
+
+        // Also accept barangay from session (set by GPS detect or manual selector)
+        if (!$barangayId && !empty($_SESSION['buyer_barangay_id'])) {
+            $barangayId = (int)$_SESSION['buyer_barangay_id'];
+        }
 
         try {
             $productModel = new \Ginto\Models\Product();
             $opts = ['offset' => $offset, 'limit' => $limit];
-            if ($catId)    $opts['category_id'] = $catId;
-            if ($search)   $opts['search']      = $search;
+            if ($catId)      $opts['category_id'] = $catId;
+            if ($search)     $opts['search']      = $search;
             if ($sort !== 'default') $opts['sort'] = $sort;
-            if ($sellerId) $opts['seller_id']   = $sellerId;
+            if ($sellerId)   $opts['seller_id']   = $sellerId;
+            if ($barangayId) $opts['barangay_id'] = $barangayId;
 
             $products = $productModel->list($opts);
 
@@ -253,15 +283,21 @@ class MallController extends \Core\Controller
                     'desc'        => $p['short_description'] ?? '',
                     'slug'        => $p['slug'] ?? '',
                     'badge'       => $p['badge'] ?? null,
-                    'seller_slug' => $sellerMap[$sid]['slug'] ?? null,
-                    'seller_name' => $sellerMap[$sid]['name'] ?? null,
-                    'seller_id'   => $sid,
+                    'seller_slug'  => $sellerMap[$sid]['slug'] ?? null,
+                    'seller_name'  => $sellerMap[$sid]['name'] ?? null,
+                    'seller_id'    => $sid,
+                    'product_type' => $p['product_type'] ?? 'physical',
                 ];
             }
 
             // has_more: try to fetch one more to check
             $hasMore = count($products) === $limit;
-            echo json_encode(['products' => $out, 'page' => $page, 'has_more' => $hasMore]);
+            $resp = ['products' => $out, 'page' => $page, 'has_more' => $hasMore];
+            if ($barangayId) {
+                $brow = $this->db->get('barangays', ['id','name','city','province'], ['id' => $barangayId, 'is_active' => 1]);
+                $resp['barangay'] = $brow ?: null;
+            }
+            echo json_encode($resp);
         } catch (\Throwable $e) {
             error_log('MallController::apiProducts error: ' . $e->getMessage());
             echo json_encode(['products' => [], 'page' => $page, 'has_more' => false]);

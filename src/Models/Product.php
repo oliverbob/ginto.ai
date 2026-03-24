@@ -166,6 +166,13 @@ class Product
             $where['seller_id'] = (int)$opts['seller_id'];
         }
 
+        // Barangay geofence filter: when provided, delegate to a JOIN-based query
+        // because Medoo's where builder can't cleanly express the subselect.
+        // Digital products are exempt from barangay gating (no delivery needed).
+        if (!empty($opts['barangay_id'])) {
+            return $this->listByBarangay($opts, $order, $offset, $limit);
+        }
+
         if (!empty($opts['search'])) {
             $search = trim((string)$opts['search']);
             if ($search !== '') {
@@ -196,6 +203,70 @@ class Product
                 return $this->listLegacyFallback($opts, $order, $offset, $limit);
             }
             return [];
+        }
+    }
+
+    /**
+     * List products from sellers who deliver to a specific barangay.
+     * Digital/virtual/subscription products are always included (no delivery).
+     * Physical products are only shown if the seller has declared the given
+     * barangay in their seller_delivery_zones.
+     */
+    private function listByBarangay(array $opts, array $order, int $offset, int $limit): array
+    {
+        $barangayId = (int)$opts['barangay_id'];
+        $params = [':barangay_id' => $barangayId, ':limit' => $limit, ':offset' => $offset];
+
+        // Build dynamic WHERE fragments
+        $extraWhere = "AND p.status = 'published' AND p.is_visible = 1";
+
+        if (!empty($opts['category_id'])) {
+            $extraWhere .= ' AND p.category_id = :category_id';
+            $params[':category_id'] = (int)$opts['category_id'];
+        }
+        if (!empty($opts['seller_id'])) {
+            $extraWhere .= ' AND p.seller_id = :seller_id';
+            $params[':seller_id'] = (int)$opts['seller_id'];
+        }
+        if (!empty($opts['search'])) {
+            $extraWhere .= ' AND (p.title LIKE :search OR p.short_description LIKE :search2)';
+            $params[':search']  = '%' . $opts['search'] . '%';
+            $params[':search2'] = '%' . $opts['search'] . '%';
+        }
+
+        // Sort clause (column whitelist – never interpolate raw user input)
+        $orderSql = 'p.created_at DESC';
+        $sortKey = array_key_first($order);
+        $sortDir = reset($order);
+        if ($sortKey === 'price'      && $sortDir === 'ASC')  $orderSql = 'p.price ASC';
+        if ($sortKey === 'price'      && $sortDir === 'DESC') $orderSql = 'p.price DESC';
+        if ($sortKey === 'rating'     && $sortDir === 'DESC') $orderSql = 'p.rating DESC';
+
+        try {
+            $stmt = $this->db->query("
+                SELECT p.*
+                FROM products p
+                WHERE (
+                    -- Digital / virtual / subscription: no delivery zone required
+                    p.product_type IN ('digital', 'virtual', 'subscription')
+                    OR
+                    -- Physical: seller must have declared this barangay as a delivery zone
+                    EXISTS (
+                        SELECT 1 FROM seller_delivery_zones z
+                        WHERE z.seller_id = p.seller_id
+                          AND z.barangay_id = :barangay_id
+                    )
+                )
+                {$extraWhere}
+                ORDER BY {$orderSql}
+                LIMIT :offset, :limit
+            ", $params);
+
+            return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+        } catch (\Throwable $e) {
+            error_log('Product::listByBarangay error: ' . $e->getMessage());
+            // Graceful degradation: return unfiltered results so the app stays usable
+            return $this->list(array_merge($opts, ['barangay_id' => null]));
         }
     }
 

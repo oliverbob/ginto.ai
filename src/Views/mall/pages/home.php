@@ -156,6 +156,32 @@ $isLoggedIn = !empty($_SESSION['user_id']);
             <p class="results-text">Showing <strong id="resultCount">0</strong> results</p>
 
             <div class="toolbar-actions">
+                <!-- Barangay GPS Pill -->
+                <div id="barangayPillWrap" style="position:relative;">
+                    <button id="barangayPill"
+                        onclick="toggleBarangayDropdown()"
+                        style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-secondary,var(--bg));color:var(--text);font-size:0.82rem;cursor:pointer;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;"
+                        title="Filter by barangay">
+                        <span style="font-size:1rem;">📍</span>
+                        <span id="barangayPillText"><?php
+                            if (!empty($current_barangay)):
+                                echo htmlspecialchars($current_barangay['name'] . ', ' . $current_barangay['city'], ENT_QUOTES, 'UTF-8');
+                            else: ?>Tap to set location<?php endif; ?></span>
+                        <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <div id="barangayDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:var(--bg);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:1000;padding:12px;">
+                        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Choose your barangay</div>
+                        <input id="barangaySearchInput" type="text" placeholder="Search barangay…"
+                            style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.87rem;margin-bottom:8px;box-sizing:border-box;"
+                            oninput="searchBarangay(this.value)">
+                        <div id="barangayResults" style="max-height:220px;overflow-y:auto;"></div>
+                        <?php if (!empty($current_barangay)): ?>
+                        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:center;">
+                            <button onclick="clearBarangay()" style="font-size:0.8rem;color:var(--muted);background:none;border:none;cursor:pointer;">✕ Clear — show all products</button>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <?php if ($isLoggedIn): ?>
                 <a href="/marketplace/sellers/products" class="btn btn-secondary">My Products</a>
                 <a href="/marketplace/sellers/kyc" class="btn btn-secondary">KYC</a>

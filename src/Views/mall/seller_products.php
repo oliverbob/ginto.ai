@@ -420,6 +420,122 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             </div>
         </div>
 
+        <!-- Delivery Zone Card -->
+        <div class="sc-card" id="deliveryZoneCard" style="margin-bottom:20px;">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+                <span style="font-size:1.4rem;">📍</span>
+                <div>
+                    <div style="font-weight:600;font-size:0.97rem;">Delivery Zones (Barangay GPS)</div>
+                    <div style="font-size:0.82rem;color:var(--muted);">Buyers in your selected barangays will see your products. Physical products are hidden from outside your zones.</div>
+                </div>
+            </div>
+            <div id="dz-current" style="margin-bottom:12px;min-height:32px;"></div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <input id="dz-search" type="text" placeholder="Search barangay…"
+                    style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.88rem;">
+                <button id="dz-save-btn" class="btn btn-primary btn-sm" style="white-space:nowrap;">Save Zones</button>
+            </div>
+            <div id="dz-results" style="margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;display:none;"></div>
+            <input type="hidden" id="dz-home-id" value="">
+        </div>
+
+        <script>
+        (function(){
+            var _csrf = <?= json_encode($csrf_token ?? '') ?>;
+            var selectedZones = []; // [{id, name, city, province}]
+            var homeId = 0;
+
+            function renderZones() {
+                var el = document.getElementById('dz-current');
+                if (!selectedZones.length) {
+                    el.innerHTML = '<span style="color:var(--muted);font-size:0.83rem;">No zones set — buyers outside your barangay cannot see your physical products.</span>';
+                    return;
+                }
+                el.innerHTML = selectedZones.map(function(z) {
+                    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--accent-bg,#1e3a5f);color:var(--accent,#3b82f6);border-radius:20px;padding:3px 10px;margin:2px;font-size:0.8rem;">'
+                        + (z.id === homeId ? '🏠 ' : '📦 ')
+                        + htmlesc(z.name + ', ' + z.city)
+                        + '<button onclick="removeZone(' + z.id + ')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:0.95rem;padding:0 0 0 4px;line-height:1;">×</button>'
+                        + '</span>';
+                }).join('');
+            }
+
+            function htmlesc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+            window.removeZone = function(id) {
+                selectedZones = selectedZones.filter(function(z){ return z.id !== id; });
+                if (homeId === id) homeId = selectedZones.length ? selectedZones[0].id : 0;
+                document.getElementById('dz-home-id').value = homeId;
+                renderZones();
+            };
+
+            // Load existing zones
+            fetch('/api/barangay/seller/zones?seller_id=<?= (int)($_SESSION['user_id'] ?? 0) ?>')
+                .then(r=>r.json()).then(function(d){
+                    if (!d.zones) return;
+                    selectedZones = d.zones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province}; });
+                    homeId = d.zones.find(function(z){ return z.is_home==1||z.is_home===true; });
+                    homeId = homeId ? parseInt(homeId.id) : (selectedZones[0] ? selectedZones[0].id : 0);
+                    document.getElementById('dz-home-id').value = homeId;
+                    renderZones();
+                }).catch(function(){});
+
+            // Live search
+            var _st; document.getElementById('dz-search').addEventListener('input', function() {
+                var q = this.value.trim();
+                clearTimeout(_st);
+                if (q.length < 2) { document.getElementById('dz-results').style.display='none'; return; }
+                _st = setTimeout(function(){
+                    fetch('/api/barangay/list?q=' + encodeURIComponent(q) + '&limit=20')
+                        .then(r=>r.json()).then(function(d){
+                            var res = document.getElementById('dz-results');
+                            if (!d.barangays || !d.barangays.length) { res.style.display='none'; return; }
+                            res.innerHTML = d.barangays.map(function(b){
+                                var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
+                                return '<div onclick="addZone(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + b.city.replace(/'/g,'\\\'') + '\',\'' + b.province.replace(/'/g,'\\\'') + '\')" '
+                                    + 'style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.87rem;display:flex;justify-content:space-between;align-items:center;'
+                                    + (added ? 'opacity:0.4;pointer-events:none;' : '') + '">'
+                                    + '<span>' + htmlesc(b.name + ', ' + b.city) + ' <span style="color:var(--muted);font-size:0.78rem;">' + htmlesc(b.province) + '</span></span>'
+                                    + (added ? '<span style="color:#22c55e;font-size:0.78rem;">Added</span>' : '<span style="color:var(--accent);font-size:0.78rem;">+ Add</span>')
+                                    + '</div>';
+                            }).join('');
+                            res.style.display = 'block';
+                        }).catch(function(){});
+                }, 250);
+            });
+
+            window.addZone = function(id, name, city, province) {
+                id = parseInt(id);
+                if (selectedZones.some(function(z){ return z.id === id; })) return;
+                if (selectedZones.length >= 10) { alert('Maximum 10 delivery zones'); return; }
+                selectedZones.push({id:id, name:name, city:city, province:province});
+                if (!homeId) { homeId = id; document.getElementById('dz-home-id').value = homeId; }
+                document.getElementById('dz-results').style.display = 'none';
+                document.getElementById('dz-search').value = '';
+                renderZones();
+            };
+
+            document.getElementById('dz-save-btn').addEventListener('click', function(){
+                var btn = this; btn.disabled = true; btn.textContent = 'Saving…';
+                var body = new URLSearchParams();
+                body.append('csrf_token', _csrf);
+                body.append('home_barangay_id', homeId);
+                selectedZones.forEach(function(z){ body.append('barangay_ids[]', z.id); });
+                fetch('/api/barangay/seller/zones/save', { method:'POST', body: body })
+                    .then(r=>r.json()).then(function(d){
+                        btn.disabled = false;
+                        if (d.success) {
+                            btn.textContent = 'Saved ✓';
+                            setTimeout(function(){ btn.textContent = 'Save Zones'; }, 2000);
+                        } else {
+                            btn.textContent = 'Save Zones';
+                            alert('Error: ' + (d.error || 'Failed'));
+                        }
+                    }).catch(function(){ btn.disabled=false; btn.textContent='Save Zones'; alert('Network error'); });
+            });
+        })();
+        </script>
+
         <!-- Product table card -->
         <div class="sc-card">
             <!-- Tabs -->
