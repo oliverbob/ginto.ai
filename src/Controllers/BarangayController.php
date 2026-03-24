@@ -40,7 +40,13 @@ class BarangayController extends \Core\Controller
         $lat = isset($_GET['lat']) ? (float)$_GET['lat'] : null;
         $lng = isset($_GET['lng']) ? (float)$_GET['lng'] : null;
 
-        if ($lat === null || $lng === null || $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+        // No coords supplied — try to geolocate by IP
+        if ($lat === null || $lng === null) {
+            $this->detectByIp();
+            return;
+        }
+
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
             echo json_encode(['error' => 'Invalid coordinates']);
             return;
         }
@@ -95,6 +101,88 @@ class BarangayController extends \Core\Controller
         } catch (\Throwable $e) {
             error_log('BarangayController::detect error: ' . $e->getMessage());
             echo json_encode(['error' => 'Could not detect barangay']);
+        }
+    }
+
+    // ── IP-based barangay detection fallback ────────────────────────────────
+    private function detectByIp(): void
+    {
+        // Resolve real client IP (behind proxies/LB)
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP']       // Cloudflare
+            ?? $_SERVER['HTTP_X_FORWARDED_FOR']
+            ?? $_SERVER['REMOTE_ADDR']
+            ?? '';
+        // Take the first IP from a forwarded list
+        if (str_contains($ip, ',')) {
+            $ip = trim(explode(',', $ip)[0]);
+        }
+        $ip = filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '';
+
+        if ($ip === '' || $ip === '127.0.0.1' || str_starts_with($ip, '192.168.') || str_starts_with($ip, '10.')) {
+            // Localhost / LAN — can't geo-resolve, default to Manila
+            $ip = '';
+        }
+
+        $lat = null; $lng = null;
+        if ($ip !== '') {
+            try {
+                // Use ip-api.com free tier (no key, Philippines-friendly, max 45 req/min)
+                $geo = @file_get_contents('http://ip-api.com/json/' . rawurlencode($ip) . '?fields=status,lat,lon,countryCode');
+                if ($geo) {
+                    $geoData = json_decode($geo, true);
+                    if (!empty($geoData['status']) && $geoData['status'] === 'success') {
+                        $lat = (float)$geoData['lat'];
+                        $lng = (float)$geoData['lon'];
+                    }
+                }
+            } catch (\Throwable $ignored) {}
+        }
+
+        if ($lat === null) {
+            // Final fallback: Manila City Hall centroid
+            $lat = 14.5995; $lng = 120.9842;
+        }
+
+        // Reuse the haversine query with 50 km radius
+        try {
+            $barangays = $this->db->query("
+                SELECT id, name, city, province, region, lat, lng,
+                       ROUND(6371000 * 2 * ASIN(SQRT(
+                           POWER(SIN(RADIANS(:lat - lat) / 2), 2) +
+                           COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *
+                           POWER(SIN(RADIANS(:lng - lng) / 2), 2)
+                       ))) AS dist_m
+                FROM barangays
+                WHERE is_active = 1
+                  AND lat BETWEEN :lat_min AND :lat_max
+                  AND lng BETWEEN :lng_min AND :lng_max
+                ORDER BY dist_m ASC
+                LIMIT 1
+            ", [
+                ':lat'     => $lat, ':lat2'    => $lat, ':lng'     => $lng,
+                ':lat_min' => $lat - 50/111.0, ':lat_max' => $lat + 50/111.0,
+                ':lng_min' => $lng - 50/(111.0 * cos(deg2rad($lat))),
+                ':lng_max' => $lng + 50/(111.0 * cos(deg2rad($lat))),
+            ])->fetchAll(\PDO::FETCH_ASSOC);
+
+            $b = $barangays[0] ?? null;
+            if (!$b) {
+                echo json_encode(['success' => false, 'message' => 'Could not determine location from IP']);
+                return;
+            }
+            echo json_encode([
+                'success'  => true,
+                'source'   => 'ip',
+                'barangay' => [
+                    'id' => (int)$b['id'], 'name' => $b['name'], 'city' => $b['city'],
+                    'province' => $b['province'], 'region' => $b['region'],
+                    'lat' => (float)$b['lat'], 'lng' => (float)$b['lng'],
+                    'dist_m' => (int)$b['dist_m'],
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            error_log('BarangayController::detectByIp error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'IP geolocation failed']);
         }
     }
 

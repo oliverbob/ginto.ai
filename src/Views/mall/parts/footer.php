@@ -1422,10 +1422,34 @@
                     .catch(function() { _setBarangayPillText('📍', 'Set location'); });
             },
             function(err) {
-                // Permission denied or unavailable — let user pick manually
-                _setBarangayPillText('📍', 'Set location');
+                // Geolocation denied or unavailable — fall back to IP-based detection
+                fetch('/api/barangay/detect')
+                    .then(r => r.json())
+                    .then(function(d) {
+                        if (!d.success || !d.barangay) {
+                            _setBarangayPillText('\uD83D\uDCCD', 'Set location');
+                            return;
+                        }
+                        const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
+                        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+                            .then(function() {
+                                currentBarangayId = d.barangay.id;
+                                localStorage.setItem('ginto_barangay_id', currentBarangayId);
+                                _setBarangayPillText('\uD83D\uDCCD', d.barangay.name + ', ' + d.barangay.city);
+                                const disp      = document.getElementById('barangayCurrentDisplay');
+                                const nameEl    = document.getElementById('barangayCurrentName');
+                                const provEl    = document.getElementById('barangayCurrentProvince');
+                                const clearWrap = document.getElementById('barangayClearWrap');
+                                if (nameEl) nameEl.textContent = d.barangay.name + ', ' + d.barangay.city + ' (approximate)';
+                                if (provEl) provEl.textContent = d.barangay.province || '';
+                                if (disp)   disp.style.display = 'block';
+                                if (clearWrap) clearWrap.style.display = 'block';
+                                refreshSearchResultsFromServer();
+                            });
+                    })
+                    .catch(function() { _setBarangayPillText('\uD83D\uDCCD', 'Set location'); });
             },
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
         );
     }
 
