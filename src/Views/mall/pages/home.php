@@ -162,16 +162,19 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         onclick="toggleBarangayDropdown()"
                         style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--border);background:var(--bg-secondary,var(--bg));color:var(--text);font-size:0.82rem;cursor:pointer;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis;"
                         title="Filter by barangay">
-                        <span style="font-size:1rem;">📍</span>
+                        <span id="barangayPillIcon" style="font-size:1rem;"><?= empty($current_barangay) ? '🔍' : '📍' ?></span>
                         <span id="barangayPillText"><?php
                             if (!empty($current_barangay)):
                                 echo htmlspecialchars($current_barangay['name'] . ', ' . $current_barangay['city'], ENT_QUOTES, 'UTF-8');
-                            else: ?>Tap to set location<?php endif; ?></span>
+                            else: ?>Detecting location…<?php endif; ?></span>
                         <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
                     <div id="barangayDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:var(--bg);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:1000;padding:12px;">
-                        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Choose your barangay</div>
-                        <input id="barangaySearchInput" type="text" placeholder="Search barangay…"
+                        <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Your location</div>
+                        <button onclick="autoDetectBarangay(true)" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary,var(--bg));color:var(--text);font-size:0.87rem;cursor:pointer;margin-bottom:8px;">
+                            <span>📍</span> <span>Auto-detect my location</span>
+                        </button>
+                        <input id="barangaySearchInput" type="text" placeholder="Or search barangay manually…"
                             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.87rem;margin-bottom:8px;box-sizing:border-box;"
                             oninput="searchBarangay(this.value)">
                         <div id="barangayResults" style="max-height:220px;overflow-y:auto;"></div>

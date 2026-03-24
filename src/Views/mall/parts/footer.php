@@ -1370,10 +1370,65 @@
             .catch(function() { window.location.reload(); });
     }
 
+    // ── Auto-detect via browser Geolocation API ───────────────────────────────
+    function autoDetectBarangay(userInitiated) {
+        if (!navigator.geolocation) {
+            if (userInitiated) _setBarangayPillText('📍', 'Location unavailable');
+            return;
+        }
+        _setBarangayPillText('🔍', 'Detecting…');
+        const dd = document.getElementById('barangayDropdown');
+        if (dd) dd.style.display = 'none';
+        _barangayDropdownOpen = false;
+
+        navigator.geolocation.getCurrentPosition(
+            function(pos) {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                fetch('/api/barangay/detect?lat=' + lat + '&lng=' + lng)
+                    .then(r => r.json())
+                    .then(function(d) {
+                        if (!d.success || !d.barangay) {
+                            _setBarangayPillText('📍', 'Set location');
+                            return;
+                        }
+                        // Pin it in the server session
+                        const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
+                        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+                            .then(function() {
+                                currentBarangayId = d.barangay.id;
+                                localStorage.setItem('ginto_barangay_id', currentBarangayId);
+                                _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
+                                refreshSearchResultsFromServer();
+                            });
+                    })
+                    .catch(function() { _setBarangayPillText('📍', 'Set location'); });
+            },
+            function(err) {
+                // Permission denied or unavailable — let user pick manually
+                _setBarangayPillText('📍', 'Set location');
+            },
+            { enableHighAccuracy: true, timeout: 10000 }
+        );
+    }
+
+    function _setBarangayPillText(icon, text) {
+        const iconEl = document.getElementById('barangayPillIcon');
+        const textEl = document.getElementById('barangayPillText');
+        if (iconEl) iconEl.textContent = icon;
+        if (textEl) textEl.textContent = text;
+    }
+
+    // Auto-detect on page load if no barangay pinned yet
+    if (!currentBarangayId) {
+        autoDetectBarangay(false);
+    }
+
     window.toggleBarangayDropdown = toggleBarangayDropdown;
     window.searchBarangay         = searchBarangay;
     window.selectBarangay         = selectBarangay;
     window.clearBarangay          = clearBarangay;
+    window.autoDetectBarangay     = autoDetectBarangay;
 
 }());
 
