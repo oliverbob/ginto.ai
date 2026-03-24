@@ -1379,79 +1379,82 @@
     }
 
     // ── Auto-detect via browser Geolocation API ───────────────────────────────
+    // On Android the native app exposes window.AndroidLocation with accurate GPS coords
+    // and calls window.gintoOnNativeBarangay() after it resolves. We prefer that path.
     function autoDetectBarangay(userInitiated) {
-        if (!navigator.geolocation) {
-            if (userInitiated) _setBarangayPillText('📍', 'Location unavailable');
-            return;
-        }
         _setBarangayPillText('🔍', 'Detecting…');
         const dd = document.getElementById('barangayDropdown');
         if (dd) dd.style.display = 'none';
         _barangayDropdownOpen = false;
 
-        navigator.geolocation.getCurrentPosition(
-            function(pos) {
-                const lat = pos.coords.latitude;
-                const lng = pos.coords.longitude;
-                fetch('/api/barangay/detect?lat=' + lat + '&lng=' + lng)
-                    .then(r => r.json())
-                    .then(function(d) {
-                        if (!d.success || !d.barangay) {
-                            _setBarangayPillText('📍', 'Set location');
-                            return;
-                        }
-                        // Pin it in the server session
-                        const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
-                        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
-                            .then(function() {
-                                currentBarangayId = d.barangay.id;
-                                localStorage.setItem('ginto_barangay_id', currentBarangayId);
-                                _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
-                                // Update "Your current location is:" panel in dropdown
-                                const disp     = document.getElementById('barangayCurrentDisplay');
-                                const nameEl   = document.getElementById('barangayCurrentName');
-                                const provEl   = document.getElementById('barangayCurrentProvince');
-                                const clearWrap = document.getElementById('barangayClearWrap');
-                                if (nameEl) nameEl.textContent = d.barangay.name + ', ' + d.barangay.city;
-                                if (provEl) provEl.textContent = d.barangay.province || '';
-                                if (disp)   disp.style.display = 'block';
-                                if (clearWrap) clearWrap.style.display = 'block';
-                                refreshSearchResultsFromServer();
-                            });
-                    })
-                    .catch(function() { _setBarangayPillText('📍', 'Set location'); });
-            },
-            function(err) {
-                // Geolocation denied or unavailable — fall back to IP-based detection
-                fetch('/api/barangay/detect')
-                    .then(r => r.json())
-                    .then(function(d) {
-                        if (!d.success || !d.barangay) {
-                            _setBarangayPillText('\uD83D\uDCCD', 'Set location');
-                            return;
-                        }
-                        const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
-                        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
-                            .then(function() {
-                                currentBarangayId = d.barangay.id;
-                                localStorage.setItem('ginto_barangay_id', currentBarangayId);
-                                _setBarangayPillText('\uD83D\uDCCD', d.barangay.name + ', ' + d.barangay.city);
-                                const disp      = document.getElementById('barangayCurrentDisplay');
-                                const nameEl    = document.getElementById('barangayCurrentName');
-                                const provEl    = document.getElementById('barangayCurrentProvince');
-                                const clearWrap = document.getElementById('barangayClearWrap');
-                                if (nameEl) nameEl.textContent = d.barangay.name + ', ' + d.barangay.city + ' (approximate)';
-                                if (provEl) provEl.textContent = d.barangay.province || '';
-                                if (disp)   disp.style.display = 'block';
-                                if (clearWrap) clearWrap.style.display = 'block';
-                                refreshSearchResultsFromServer();
-                            });
-                    })
-                    .catch(function() { _setBarangayPillText('\uD83D\uDCCD', 'Set location'); });
-            },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
-        );
+        // 1. Native Android bridge — accurate GPS, already resolved by FusedLocationProvider
+        if (window.AndroidLocation && AndroidLocation.hasLocation()) {
+            _fetchAndPinBarangay(AndroidLocation.getLat(), AndroidLocation.getLng(), 'gps');
+            return;
+        }
+
+        // 2. Browser navigator.geolocation (desktop / iOS / WebView fallback)
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(pos) {
+                    _fetchAndPinBarangay(pos.coords.latitude, pos.coords.longitude, 'gps');
+                },
+                function() {
+                    // 3. IP fallback — server resolves from request IP
+                    _fetchAndPinBarangay(null, null, 'ip');
+                },
+                { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
+            );
+        } else {
+            _fetchAndPinBarangay(null, null, 'ip');
+        }
     }
+
+    function _fetchAndPinBarangay(lat, lng, source) {
+        const url = (lat !== null && lng !== null)
+            ? '/api/barangay/detect?lat=' + lat + '&lng=' + lng
+            : '/api/barangay/detect';
+        fetch(url)
+            .then(r => r.json())
+            .then(function(d) {
+                if (!d.success || !d.barangay) { _setBarangayPillText('📍', 'Set location'); return; }
+                const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
+                fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+                    .then(function() {
+                        currentBarangayId = d.barangay.id;
+                        localStorage.setItem('ginto_barangay_id', currentBarangayId);
+                        const label = source === 'ip'
+                            ? d.barangay.name + ', ' + d.barangay.city + ' (approx.)'
+                            : d.barangay.name + ', ' + d.barangay.city;
+                        _setBarangayPillText('📍', label);
+                        _updateCurrentLocationPanel(d.barangay, source);
+                        refreshSearchResultsFromServer();
+                    });
+            })
+            .catch(function() { _setBarangayPillText('📍', 'Set location'); });
+    }
+
+    function _updateCurrentLocationPanel(brgy, source) {
+        const disp      = document.getElementById('barangayCurrentDisplay');
+        const nameEl    = document.getElementById('barangayCurrentName');
+        const provEl    = document.getElementById('barangayCurrentProvince');
+        const clearWrap = document.getElementById('barangayClearWrap');
+        if (nameEl) nameEl.textContent = brgy.name + ', ' + brgy.city
+            + (source === 'ip' ? ' (approximate)' : '');
+        if (provEl) provEl.textContent = brgy.province || '';
+        if (disp)   disp.style.display = 'block';
+        if (clearWrap) clearWrap.style.display = 'block';
+    }
+
+    // Called by native Android after FusedLocationProvider resolves GPS barangay
+    window.gintoOnNativeBarangay = function(id, name, city, province) {
+        if (!id) return;
+        currentBarangayId = id;
+        localStorage.setItem('ginto_barangay_id', id);
+        _setBarangayPillText('📍', name + ', ' + city);
+        _updateCurrentLocationPanel({ name: name, city: city, province: province }, 'gps');
+        refreshSearchResultsFromServer();
+    };
 
     function _setBarangayPillText(icon, text) {
         const iconEl = document.getElementById('barangayPillIcon');
