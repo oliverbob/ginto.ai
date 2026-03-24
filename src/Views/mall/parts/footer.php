@@ -1348,8 +1348,16 @@
                 if (d.success && d.barangay) {
                     currentBarangayId = d.barangay.id;
                     localStorage.setItem('ginto_barangay_id', currentBarangayId);
-                    const pill = document.getElementById('barangayPillText');
-                    if (pill) pill.textContent = d.barangay.name + ', ' + d.barangay.city;
+                    _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
+                    // Update "Your current location is:" panel
+                    const disp      = document.getElementById('barangayCurrentDisplay');
+                    const nameEl    = document.getElementById('barangayCurrentName');
+                    const provEl    = document.getElementById('barangayCurrentProvince');
+                    const clearWrap = document.getElementById('barangayClearWrap');
+                    if (nameEl) nameEl.textContent = d.barangay.name + ', ' + d.barangay.city;
+                    if (provEl) provEl.textContent = d.barangay.province || '';
+                    if (disp)   disp.style.display = 'block';
+                    if (clearWrap) clearWrap.style.display = 'block';
                 }
                 const dd = document.getElementById('barangayDropdown');
                 if (dd) dd.style.display = 'none';
@@ -1399,6 +1407,15 @@
                                 currentBarangayId = d.barangay.id;
                                 localStorage.setItem('ginto_barangay_id', currentBarangayId);
                                 _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
+                                // Update "Your current location is:" panel in dropdown
+                                const disp     = document.getElementById('barangayCurrentDisplay');
+                                const nameEl   = document.getElementById('barangayCurrentName');
+                                const provEl   = document.getElementById('barangayCurrentProvince');
+                                const clearWrap = document.getElementById('barangayClearWrap');
+                                if (nameEl) nameEl.textContent = d.barangay.name + ', ' + d.barangay.city;
+                                if (provEl) provEl.textContent = d.barangay.province || '';
+                                if (disp)   disp.style.display = 'block';
+                                if (clearWrap) clearWrap.style.display = 'block';
                                 refreshSearchResultsFromServer();
                             });
                     })

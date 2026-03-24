@@ -171,6 +171,20 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                     </button>
                     <div id="barangayDropdown" style="display:none;position:absolute;top:calc(100% + 6px);left:0;min-width:300px;background:var(--bg);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.18);z-index:1000;padding:12px;">
                         <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Your location</div>
+
+                        <!-- Current location display -->
+                        <div id="barangayCurrentDisplay" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>margin-bottom:10px;padding:10px 12px;background:var(--primary-bg,#f0f7ff);border:1px solid var(--primary,#3b82f6);border-radius:8px;">
+                            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px;">Your current location is:</div>
+                            <div id="barangayCurrentName" style="font-size:0.9rem;font-weight:600;color:var(--text);"><?php
+                                if (!empty($current_barangay)):
+                                    echo htmlspecialchars($current_barangay['name'] . ', ' . $current_barangay['city'], ENT_QUOTES, 'UTF-8');
+                                endif; ?></div>
+                            <div id="barangayCurrentProvince" style="font-size:0.78rem;color:var(--muted);"><?php
+                                if (!empty($current_barangay)):
+                                    echo htmlspecialchars($current_barangay['province'] ?? '', ENT_QUOTES, 'UTF-8');
+                                endif; ?></div>
+                        </div>
+
                         <button onclick="autoDetectBarangay(true)" style="width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-secondary,var(--bg));color:var(--text);font-size:0.87rem;cursor:pointer;margin-bottom:8px;">
                             <span>📍</span> <span>Auto-detect my location</span>
                         </button>
@@ -178,11 +192,9 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.87rem;margin-bottom:8px;box-sizing:border-box;"
                             oninput="searchBarangay(this.value)">
                         <div id="barangayResults" style="max-height:220px;overflow-y:auto;"></div>
-                        <?php if (!empty($current_barangay)): ?>
-                        <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:center;">
+                        <div id="barangayClearWrap" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:center;">
                             <button onclick="clearBarangay()" style="font-size:0.8rem;color:var(--muted);background:none;border:none;cursor:pointer;">✕ Clear — show all products</button>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
                 <?php if ($isLoggedIn): ?>
