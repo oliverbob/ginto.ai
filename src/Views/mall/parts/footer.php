@@ -1387,20 +1387,28 @@
         if (dd) dd.style.display = 'none';
         _barangayDropdownOpen = false;
 
-        // 1. Native Android bridge — accurate GPS, already resolved by FusedLocationProvider
+        // 1. Native Android — open the Grab-style map picker if available
+        if (window.AndroidLocation && typeof AndroidLocation.openLocationPicker === 'function') {
+            AndroidLocation.openLocationPicker();
+            // gintoOnNativeBarangay() is called by the app when the user confirms on the map
+            _setBarangayPillText('📍', 'Opening map…');
+            return;
+        }
+
+        // 2. Native Android bridge with pre-fetched coords (no picker, instant)
         if (window.AndroidLocation && AndroidLocation.hasLocation()) {
             _fetchAndPinBarangay(AndroidLocation.getLat(), AndroidLocation.getLng(), 'gps');
             return;
         }
 
-        // 2. Browser navigator.geolocation (desktop / iOS / WebView fallback)
+        // 3. Browser navigator.geolocation (desktop / iOS / WebView fallback)
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
                     _fetchAndPinBarangay(pos.coords.latitude, pos.coords.longitude, 'gps');
                 },
                 function() {
-                    // 3. IP fallback — server resolves from request IP
+                    // 4. IP fallback — server resolves from request IP
                     _fetchAndPinBarangay(null, null, 'ip');
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
