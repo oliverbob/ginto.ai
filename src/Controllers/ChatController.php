@@ -739,10 +739,13 @@ class ChatController
             $_SESSION['payment_status'] = $paymentStatus;
         }
 
-        // Gate: must be paid (or admin) to access /chat
-        if (!$isAdmin && $paymentStatus !== 'paid') {
-            header('Location: /register');
-            exit;
+        // Daily prompt limit for non-paid logged-in users
+        $isPaid = ($paymentStatus === 'paid');
+        $dailyLimit = \Ginto\Helpers\DailyPromptLimiter::DAILY_LIMIT;
+        $dailyRemaining = $dailyLimit;
+        if ($isLoggedIn && !$isAdmin && !$isPaid) {
+            $limiter = new \Ginto\Helpers\DailyPromptLimiter($this->db);
+            $dailyRemaining = $limiter->remaining((int)$_SESSION['user_id']);
         }
 
         \Ginto\Core\View::view('chat/chat', [
@@ -753,6 +756,9 @@ class ChatController
             'sandboxId' => $sandboxId,
             'csrf_token' => $csrf_token,
             'paymentStatus' => $paymentStatus,
+            'isPaid' => $isPaid,
+            'dailyLimit' => $dailyLimit,
+            'dailyRemaining' => $dailyRemaining,
             'forceNewChat' => true,
             'targetConvoId' => null,
         ]);
@@ -791,10 +797,13 @@ class ChatController
             $_SESSION['payment_status'] = $paymentStatus;
         }
 
-        // Gate: must be paid (or admin) to access /chat/c/{convoId}
-        if (!$isAdmin && $paymentStatus !== 'paid') {
-            header('Location: /register');
-            exit;
+        // Daily prompt limit for non-paid logged-in users
+        $isPaid = ($paymentStatus === 'paid');
+        $dailyLimit = \Ginto\Helpers\DailyPromptLimiter::DAILY_LIMIT;
+        $dailyRemaining = $dailyLimit;
+        if ($isLoggedIn && !$isAdmin && !$isPaid) {
+            $limiter = new \Ginto\Helpers\DailyPromptLimiter($this->db);
+            $dailyRemaining = $limiter->remaining((int)$_SESSION['user_id']);
         }
 
         \Ginto\Core\View::view('chat/chat', [
@@ -805,6 +814,9 @@ class ChatController
             'sandboxId' => $sandboxId,
             'csrf_token' => $csrf_token,
             'paymentStatus' => $paymentStatus,
+            'isPaid' => $isPaid,
+            'dailyLimit' => $dailyLimit,
+            'dailyRemaining' => $dailyRemaining,
             'forceNewChat' => false,
             'targetConvoId' => $convoId,
         ]);
@@ -838,10 +850,13 @@ class ChatController
             $_SESSION['payment_status'] = $paymentStatus;
         }
 
-        // Gate: must be paid (or admin) to access /chat-m
-        if (!$isAdmin && $paymentStatus !== 'paid') {
-            header('Location: /register');
-            exit;
+        // Daily prompt limit for non-paid logged-in users
+        $isPaid = ($paymentStatus === 'paid');
+        $dailyLimit = \Ginto\Helpers\DailyPromptLimiter::DAILY_LIMIT;
+        $dailyRemaining = $dailyLimit;
+        if ($isLoggedIn && !$isAdmin && !$isPaid) {
+            $limiter = new \Ginto\Helpers\DailyPromptLimiter($this->db);
+            $dailyRemaining = $limiter->remaining((int)$_SESSION['user_id']);
         }
 
         \Ginto\Core\View::view('chat-m/chat-m', [
@@ -851,7 +866,10 @@ class ChatController
             'userId' => $isLoggedIn ? $_SESSION['user_id'] : null,
             'sandboxId' => $sandboxId,
             'csrf_token' => $csrf_token,
-            'paymentStatus' => $paymentStatus
+            'paymentStatus' => $paymentStatus,
+            'isPaid' => $isPaid,
+            'dailyLimit' => $dailyLimit,
+            'dailyRemaining' => $dailyRemaining,
         ]);
         exit;
     }

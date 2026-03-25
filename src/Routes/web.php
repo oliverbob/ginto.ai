@@ -1490,6 +1490,36 @@ $router->get('/chat-m', 'ChatController@chatMobile');
 $router->post('/chat-m', 'ChatController@stream');
 $router->req('/chat/create_sandbox', 'ChatController@createSandbox', ['POST']);
 
+// Daily prompt limit status endpoint
+$router->get('/api/chat/prompt-status', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    header('Content-Type: application/json');
+
+    $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+    if (!$userId) {
+        echo json_encode(['unlimited' => false, 'remaining' => 0, 'limit' => 0, 'loggedIn' => false]);
+        exit;
+    }
+
+    $userRow = $db->get('users', ['payment_status', 'is_admin', 'role_id'], ['id' => $userId]);
+    $isPaid  = ($userRow['payment_status'] ?? 'free') === 'paid';
+    $isAdmin = !empty($userRow['is_admin']) || in_array((int)($userRow['role_id'] ?? 0), [1, 2]);
+
+    if ($isPaid || $isAdmin) {
+        echo json_encode(['unlimited' => true, 'remaining' => -1, 'limit' => -1, 'loggedIn' => true]);
+        exit;
+    }
+
+    $limiter = new \Ginto\Helpers\DailyPromptLimiter($db);
+    echo json_encode([
+        'unlimited' => false,
+        'remaining' => $limiter->remaining($userId),
+        'limit'     => \Ginto\Helpers\DailyPromptLimiter::DAILY_LIMIT,
+        'loggedIn'  => true,
+    ]);
+    exit;
+});
+
 // Live Settings (v2 install - admin configuration panel)
 // Note: CSRF validated internally since /live needs to work before .installed exists
 $router->get('/live', 'LiveController@index');

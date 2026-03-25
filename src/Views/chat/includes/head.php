@@ -42,6 +42,13 @@
       canPersistLocally: true,
       ready: false // Flag to indicate when user info is loaded
     };
+
+    // Daily prompt limit for non-paid users (10/day)
+    window.GINTO_DAILY_LIMIT = {
+      isPaid: <?= json_encode($isPaid ?? false) ?>,
+      limit: <?= (int)($dailyLimit ?? 10) ?>,
+      remaining: <?= (int)($dailyRemaining ?? 10) ?>
+    };
     
     // Fetch user info from /user endpoint if logged in
     // This must complete before rendering messages

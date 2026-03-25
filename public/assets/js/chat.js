@@ -4704,6 +4704,22 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
               continue;
             }
 
+            // Daily prompt limit reached for non-paid users
+            if (data.action === 'daily_limit') {
+              if (data.html) {
+                currentCard.response.innerHTML = data.html;
+                currentCard.responseLabel.classList.remove('hidden');
+              }
+              // Update the client-side counter
+              if (window.GINTO_DAILY_LIMIT) {
+                window.GINTO_DAILY_LIMIT.remaining = 0;
+                updateDailyLimitBadge();
+              }
+              finishCardActivity(currentCard, activities);
+              currentCard.footer.classList.remove('hidden');
+              continue;
+            }
+
             // Handle phase events (matches pandasearch format - separate from activity events)
             // Phase events are one-time markers, not start/complete pairs, so no spinners needed
             if (data.phase && !data.activity && data.phase !== 'error') {
@@ -5449,6 +5465,12 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
       userHasScrolledUp = false; // Reset scroll flag when response completes
       finishCardActivity(currentCard, activities);
       currentCard.footer.classList.remove('hidden');
+
+      // Decrement daily prompt counter for non-paid users
+      if (window.GINTO_DAILY_LIMIT && !window.GINTO_DAILY_LIMIT.isPaid && window.GINTO_DAILY_LIMIT.remaining > 0) {
+        window.GINTO_DAILY_LIMIT.remaining--;
+        updateDailyLimitBadge();
+      }
       
       // Force scroll to show the completed response above the composer
       // Use setTimeout to ensure DOM has updated with final content
@@ -8224,4 +8246,51 @@ Is the ORIGINAL REQUEST complete? If not, output the next sandbox_delete. If don
     window.addEventListener('resize', injectStyles);
     window.addEventListener('orientationchange', injectStyles);
   } catch (e) { console.debug('fixChatOverflow init failed', e); }
+})();
+
+// ── Daily Prompt Limit Badge ────────────────────────────────────────
+// Shows remaining prompts for non-paid logged-in users.
+function updateDailyLimitBadge() {
+  const dl = window.GINTO_DAILY_LIMIT;
+  if (!dl || dl.isPaid) return;
+  const auth = window.GINTO_AUTH;
+  if (!auth || !auth.isLoggedIn) return;
+  if (auth.isAdmin) return;
+
+  let badge = document.getElementById('daily-limit-badge');
+  if (!badge) {
+    badge = document.createElement('div');
+    badge.id = 'daily-limit-badge';
+    badge.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:50;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:600;pointer-events:auto;cursor:pointer;transition:background .2s;';
+    badge.addEventListener('click', function() { window.location.href = '/register'; });
+    document.body.appendChild(badge);
+  }
+
+  const r = dl.remaining;
+  if (r <= 0) {
+    badge.style.background = '#dc2626';
+    badge.style.color = '#fff';
+    badge.textContent = '0/' + dl.limit + ' prompts — Subscribe for unlimited';
+  } else if (r <= 3) {
+    badge.style.background = '#f59e0b';
+    badge.style.color = '#000';
+    badge.textContent = r + '/' + dl.limit + ' prompts left today';
+  } else {
+    badge.style.background = 'rgba(55,65,81,0.85)';
+    badge.style.color = '#d1d5db';
+    badge.textContent = r + '/' + dl.limit + ' prompts left today';
+  }
+  badge.style.display = 'block';
+}
+
+// Initialize daily limit badge on page load
+(function initDailyLimitBadge() {
+  if (!window.GINTO_DAILY_LIMIT || window.GINTO_DAILY_LIMIT.isPaid) return;
+  if (!window.GINTO_AUTH || !window.GINTO_AUTH.isLoggedIn) return;
+  if (window.GINTO_AUTH.isAdmin) return;
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', updateDailyLimitBadge);
+  } else {
+    updateDailyLimitBadge();
+  }
 })();

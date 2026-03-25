@@ -42,6 +42,11 @@ class ChatStreamHandler
             exit;
         }
 
+        // Check daily prompt limit for logged-in non-paid users
+        if (!$this->checkDailyPromptLimit()) {
+            exit;
+        }
+
         // Initialize rate limiting
         $db = $this->db;
         $rateLimitService = new \App\Core\RateLimitService($db);
@@ -239,6 +244,73 @@ class ChatStreamHandler
 
         // Increment visitor prompt count
         $_SESSION[$visitorLimitKey] = $visitorPromptCount + 1;
+
+        return true;
+    }
+
+    /**
+     * Check daily prompt limit for logged-in non-paid users (10/day).
+     * Paid users and admins bypass. Guests are handled by checkVisitorLimit().
+     */
+    private function checkDailyPromptLimit(): bool
+    {
+        if (empty($_SESSION['user_id'])) {
+            return true; // Guests handled by visitor limit
+        }
+
+        $userId = (int) $_SESSION['user_id'];
+
+        // Check if user is admin
+        $isAdmin = !empty($_SESSION['is_admin'])
+            || (!empty($_SESSION['role']) && strtolower((string)$_SESSION['role']) === 'admin');
+        try {
+            if (!$isAdmin && class_exists('Ginto\\Controllers\\UserController')) {
+                $isAdmin = (bool) \Ginto\Controllers\UserController::isAdmin();
+            }
+        } catch (\Throwable $_) {}
+
+        if ($isAdmin) {
+            return true;
+        }
+
+        // Check payment status
+        $paymentStatus = null;
+        try {
+            $paymentStatus = $this->db->get('users', 'payment_status', ['id' => $userId]);
+        } catch (\Throwable $_) {}
+
+        if ($paymentStatus === 'paid') {
+            return true;
+        }
+
+        // Non-paid user — enforce daily limit
+        $limiter = new \Ginto\Helpers\DailyPromptLimiter($this->db);
+        $allowed = $limiter->consume($userId);
+
+        if (!$allowed) {
+            $limit = \Ginto\Helpers\DailyPromptLimiter::DAILY_LIMIT;
+            header('Content-Type: text/event-stream; charset=utf-8');
+            header('Cache-Control: no-cache');
+            echo str_repeat(' ', 1024);
+            flush();
+            echo "data: " . json_encode([
+                'error' => true,
+                'action' => 'daily_limit',
+                'text' => "You've used all {$limit} free prompts for today. Subscribe to get unlimited access!",
+                'prompts_used' => $limit,
+                'prompts_limit' => $limit,
+                'remaining' => 0,
+                'register_url' => '/register'
+            ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n\n";
+            flush();
+            echo "data: " . json_encode([
+                'final' => true,
+                'action' => 'daily_limit',
+                'html' => '<div class="text-amber-400"><p>You\'ve used all ' . $limit . ' free prompts for today.</p><p class="mt-2"><a href="/register" class="text-indigo-400 hover:text-indigo-300 underline font-semibold">Subscribe now</a> for unlimited access!</p></div>'
+            ]) . "\n\n";
+            flush();
+            return false;
+        }
 
         return true;
     }
