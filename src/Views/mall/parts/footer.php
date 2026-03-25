@@ -1379,36 +1379,45 @@
     }
 
     // ── Auto-detect via browser Geolocation API ───────────────────────────────
-    // On Android the native app exposes window.AndroidLocation with accurate GPS coords
-    // and calls window.gintoOnNativeBarangay() after it resolves. We prefer that path.
+    // On Android, window.AndroidLocation is a JavascriptInterface bridge.
+    // The native app sets coords via FusedLocationProviderClient (requestLocationUpdates).
+    // We poll the bridge every 500ms up to 10s to get the GPS fix, then fetch+pin silently.
     function autoDetectBarangay(userInitiated) {
         _setBarangayPillText('🔍', 'Detecting…');
         const dd = document.getElementById('barangayDropdown');
         if (dd) dd.style.display = 'none';
         _barangayDropdownOpen = false;
 
-        // 1. Native Android — open the Grab-style map picker if available
-        if (window.AndroidLocation && typeof AndroidLocation.openLocationPicker === 'function') {
-            AndroidLocation.openLocationPicker();
-            // gintoOnNativeBarangay() is called by the app when the user confirms on the map
-            _setBarangayPillText('📍', 'Opening map…');
+        // 1. Native Android bridge
+        if (window.AndroidLocation) {
+            if (AndroidLocation.hasLocation()) {
+                _fetchAndPinBarangay(AndroidLocation.getLat(), AndroidLocation.getLng(), 'gps');
+                return;
+            }
+            // GPS not fixed yet — poll until coordinates arrive (up to 10 seconds)
+            var pollCount = 0;
+            var pollTimer = setInterval(function() {
+                pollCount++;
+                if (window.AndroidLocation && AndroidLocation.hasLocation()) {
+                    clearInterval(pollTimer);
+                    _fetchAndPinBarangay(AndroidLocation.getLat(), AndroidLocation.getLng(), 'gps');
+                } else if (pollCount >= 20) {
+                    // 10s elapsed — fall back to IP geolocation
+                    clearInterval(pollTimer);
+                    _fetchAndPinBarangay(null, null, 'ip');
+                }
+            }, 500);
             return;
         }
 
-        // 2. Native Android bridge with pre-fetched coords (no picker, instant)
-        if (window.AndroidLocation && AndroidLocation.hasLocation()) {
-            _fetchAndPinBarangay(AndroidLocation.getLat(), AndroidLocation.getLng(), 'gps');
-            return;
-        }
-
-        // 3. Browser navigator.geolocation (desktop / iOS / WebView fallback)
+        // 2. Browser navigator.geolocation (desktop / iOS)
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 function(pos) {
                     _fetchAndPinBarangay(pos.coords.latitude, pos.coords.longitude, 'gps');
                 },
                 function() {
-                    // 4. IP fallback — server resolves from request IP
+                    // 3. IP fallback — server resolves from request IP
                     _fetchAndPinBarangay(null, null, 'ip');
                 },
                 { enableHighAccuracy: true, timeout: 15000, maximumAge: 300000 }
