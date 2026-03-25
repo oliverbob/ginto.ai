@@ -163,6 +163,16 @@ if ($isUserLoggedIn) {
             #prompt::-webkit-scrollbar-track { background-color: #1f2937; }
 
             .monaco-editor { --vscode-editor-background: var(--bg-darker) !important; }
+
+            /* Mobile: enable text selection inside Monaco/CodeMirror */
+            @media (max-width: 768px) {
+                .monaco-editor .view-line,
+                .CodeMirror-line,
+                .CodeMirror-code {
+                    -webkit-user-select: text;
+                    user-select: text;
+                }
+            }
             .splash-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: var(--bg-darker); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1000; transition: opacity 0.5s ease-out; }
             .splash-logo { font-size: 2.5rem; font-weight: 600; margin-bottom: 2rem; background: linear-gradient(90deg, var(--primary), #8b5cf6); -webkit-background-clip: text; background-clip: text; color: transparent; }
             .loader { width: 64px; height: 64px; border: 5px solid var(--border-dark); border-bottom-color: var(--primary); border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite; }
@@ -212,6 +222,10 @@ if ($isUserLoggedIn) {
                 window.CODE_ACCESS_EXPIRY_TIMESTAMP = null;
             <?php endif; ?>
             window.IS_USER_LOGGED_IN = <?php echo json_encode($isUserLoggedIn); ?>;
+            window.CODE_IS_PAID     = <?php echo json_encode(!empty($isPaid) || !empty($isAdmin)); ?>;
+            window.CODE_PROMPTS_USED      = <?php echo (int)($promptsUsed ?? 0); ?>;
+            window.CODE_PROMPTS_REMAINING = <?php echo (int)($promptsRemaining ?? \Ginto\Helpers\CodePromptLimiter::FREE_LIMIT); ?>;
+            window.CODE_FREE_LIMIT        = <?php echo (int)(\Ginto\Helpers\CodePromptLimiter::FREE_LIMIT); ?>;
         </script>
     </head>
     <body class="flex flex-col h-screen bg-[var(--bg-dark)]">
@@ -347,7 +361,12 @@ if ($isUserLoggedIn) {
                         <div class="text-xs text-gray-500 flex items-center gap-2">
                             <span class="status-bar"><span id="lineCount">1</span> lines</span><span>•</span><span id="charCount">0</span> chars
                         </div>
-                        <div><!-- spacer for alignment --></div>
+                        <div>
+                            <!-- Prompt usage counter for non-paid users -->
+                            <?php if (empty($isPaid) && empty($isAdmin)): ?>
+                            <span id="code-prompts-counter" class="text-xs font-medium cursor-pointer hover:underline" title="Click to upgrade for unlimited prompts"></span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -626,6 +645,13 @@ if ($isUserLoggedIn) {
                     const userInstruction = promptBox.value.trim();
                     if (!userInstruction) { alert("Please enter a prompt"); return; }
                     if (!this.monacoEditor) { alert("Editor not ready"); return; }
+
+                    // Prompt limit gate for non-paid users
+                    if (!window.CODE_IS_PAID && window.CODE_PROMPTS_REMAINING <= 0) {
+                        this.showCodeUpgradeModal();
+                        return;
+                    }
+
                     const currentHtmlContent = this.monacoEditor.getValue();
                     const theUserID = this.appUsername || "guest";
                     if (theUserID === "guest") console.warn("Using 'guest' as userID for API call.");
@@ -678,6 +704,13 @@ if ($isUserLoggedIn) {
                         this.updatePreview(result);
                         if (!(this.abortController && this.abortController.signal.aborted)) {
                             if (promptBox) promptBox.value = "";
+                            // Consume one prompt for non-paid users and update counter
+                            if (!window.CODE_IS_PAID) {
+                                window.CODE_PROMPTS_REMAINING = Math.max(0, (window.CODE_PROMPTS_REMAINING || 0) - 1);
+                                window.CODE_PROMPTS_USED = (window.CODE_PROMPTS_USED || 0) + 1;
+                                this._syncCodePromptCount();
+                                this._updatePromptCounter();
+                            }
                         }
                     } catch (error) {
                         if (error.name === "AbortError") {
@@ -1061,6 +1094,47 @@ if ($isUserLoggedIn) {
                     window.hideGlobalPremiumModal = this.hidePremiumModal.bind(this);
                 },
 
+                // ── Code Upgrade Modal (P250 / P1000) ──────────────────────
+                showCodeUpgradeModal: function() {
+                    const el = document.getElementById('code-upgrade-modal');
+                    if (el) { el.classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+                },
+
+                hideCodeUpgradeModal: function() {
+                    const el = document.getElementById('code-upgrade-modal');
+                    if (el) { el.classList.add('hidden'); document.body.style.overflow = ''; }
+                },
+
+                // POST to server to record prompt consumption (fire-and-forget)
+                _syncCodePromptCount: function() {
+                    try {
+                        const meta = document.querySelector('meta[name="csrf-token"]');
+                        const csrf = meta ? meta.getAttribute('content') : '';
+                        fetch('/api/code/consume-prompt', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+                            body: JSON.stringify({ _csrf: csrf }),
+                        }).catch(function(){});
+                    } catch(e) {}
+                },
+
+                // Update the visible prompt counter in the UI
+                _updatePromptCounter: function() {
+                    const el = document.getElementById('code-prompts-counter');
+                    if (!el) return;
+                    const rem = window.CODE_PROMPTS_REMAINING || 0;
+                    const total = window.CODE_FREE_LIMIT || 2;
+                    if (window.CODE_IS_PAID) {
+                        el.textContent = '∞ prompts';
+                    } else {
+                        el.textContent = rem + ' / ' + total + ' free ' + (rem === 1 ? 'prompt' : 'prompts') + ' left';
+                        el.classList.toggle('text-red-400', rem === 0);
+                        el.classList.toggle('text-yellow-400', rem === 1);
+                        el.classList.toggle('text-green-400', rem > 1);
+                    }
+                },
+
                 init: function() {
                     this.appUsername = window.APP_USERNAME;
                     this.codeAccessExpiryTimestamp = window.CODE_ACCESS_EXPIRY_TIMESTAMP;
@@ -1073,6 +1147,16 @@ if ($isUserLoggedIn) {
                     this._setupDragbar();
                     this._setupPremiumModal();
                     this._setupMobileMenu();
+
+                    // Upgrade modal close button
+                    const closeUpgrade = document.getElementById('code-upgrade-modal-close');
+                    if (closeUpgrade) closeUpgrade.addEventListener('click', this.hideCodeUpgradeModal.bind(this));
+                    document.getElementById('code-upgrade-modal')?.addEventListener('click', (e) => {
+                        if (e.target === e.currentTarget) this.hideCodeUpgradeModal();
+                    });
+
+                    // Init prompt counter
+                    this._updatePromptCounter();
                 }
             };
 
@@ -1314,6 +1398,63 @@ if ($isUserLoggedIn) {
 
             // Pull-to-refresh removed. Use the reload button in the preview toolbar instead.
         </script>
+
+        <!-- ── Code Upgrade Modal (P250 / P1000) ──────────────────────────── -->
+        <div id="code-upgrade-modal" class="fixed inset-0 bg-black/70 flex items-center justify-center p-4 z-[120] hidden" role="dialog" aria-modal="true" aria-labelledby="code-upgrade-title">
+            <div class="relative max-w-2xl w-full bg-gray-900 rounded-2xl shadow-2xl overflow-hidden border border-gray-700">
+                <!-- Close button -->
+                <button id="code-upgrade-modal-close" class="absolute top-3 right-3 text-gray-400 hover:text-white z-10 p-1" aria-label="Close">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+
+                <!-- Header -->
+                <div class="bg-gradient-to-r from-violet-700 to-indigo-600 px-6 py-5 text-white">
+                    <div class="flex items-center gap-3 mb-1">
+                        <i class="fas fa-rocket text-2xl"></i>
+                        <h2 id="code-upgrade-title" class="text-xl font-bold">Upgrade to Keep Building</h2>
+                    </div>
+                    <p class="text-sm text-indigo-200">You've used all your free AI code-generation prompts this month. Choose a plan to continue.</p>
+                </div>
+
+                <!-- Plan cards -->
+                <div class="p-6 grid sm:grid-cols-2 gap-4">
+                    <!-- P250 Plan -->
+                    <div class="bg-gray-800 border border-gray-600 rounded-xl p-5 flex flex-col gap-3 hover:border-violet-500 transition-colors">
+                        <div class="flex items-center justify-between">
+                            <span class="text-lg font-bold text-white">₱250 <span class="text-xs font-normal text-gray-400">/ month</span></span>
+                            <span class="text-xs bg-violet-700 text-violet-100 px-2 py-0.5 rounded-full font-medium">Code</span>
+                        </div>
+                        <ul class="text-sm text-gray-300 space-y-1.5">
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-violet-400 w-4"></i> 50 AI code-generation prompts / month</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-violet-400 w-4"></i> Full in-browser HTML/CSS/JS editor</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-violet-400 w-4"></i> Save & export your projects</li>
+                            <li class="flex items-center gap-2 text-gray-500"><i class="fas fa-times w-4"></i> No public subdomain</li>
+                        </ul>
+                        <a href="/register?plan=code_250" class="mt-auto block text-center bg-violet-600 hover:bg-violet-700 text-white font-medium py-2 rounded-lg transition-colors text-sm">Get ₱250 Plan</a>
+                    </div>
+
+                    <!-- P1000 Plan -->
+                    <div class="bg-gray-800 border border-indigo-500 rounded-xl p-5 flex flex-col gap-3 relative">
+                        <span class="absolute -top-3 left-1/2 -translate-x-1/2 text-xs bg-indigo-500 text-white px-3 py-0.5 rounded-full font-semibold shadow">Most Popular</span>
+                        <div class="flex items-center justify-between">
+                            <span class="text-lg font-bold text-white">₱1,000 <span class="text-xs font-normal text-gray-400">/ month</span></span>
+                            <span class="text-xs bg-indigo-700 text-indigo-100 px-2 py-0.5 rounded-full font-medium">Code + Domain</span>
+                        </div>
+                        <ul class="text-sm text-gray-300 space-y-1.5">
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> 50 AI code-generation prompts / month</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> Full in-browser HTML/CSS/JS editor</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> Save & export your projects</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> <strong class="text-white">1 free public subdomain</strong> (e.g. yoursite.ginto.ai)</li>
+                            <li class="flex items-center gap-2 text-xs text-indigo-300"><i class="fas fa-info-circle w-4"></i> Host &amp; share your sites instantly</li>
+                        </ul>
+                        <a href="/register?plan=code_1000" class="mt-auto block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition-colors text-sm">Get ₱1,000 Plan</a>
+                    </div>
+                </div>
+
+                <p class="text-xs text-gray-500 text-center pb-4">Plans renew monthly. Cancel anytime. <a href="/privacy" class="text-violet-400 hover:underline">Terms apply</a>.</p>
+            </div>
+        </div>
+
         <div id="universalPremiumModal" class="fixed inset-0 bg-gray-800 bg-opacity-75 flex items-center justify-center p-4 z-[100] hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
             <div class="max-w-3xl w-full bg-white dark:bg-slate-800 rounded-xl shadow-lg overflow-hidden transform transition-all sm:my-8 animate-fade-in">
                 <button id="closePremiumModal" class="absolute top-4 right-4 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100 z-[101]">

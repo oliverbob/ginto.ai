@@ -739,6 +739,12 @@ class ChatController
             $_SESSION['payment_status'] = $paymentStatus;
         }
 
+        // Gate: must be paid (or admin) to access /chat
+        if (!$isAdmin && $paymentStatus !== 'paid') {
+            header('Location: /register');
+            exit;
+        }
+
         \Ginto\Core\View::view('chat/chat', [
             'title' => 'Ginto AI - agentic chat',
             'isLoggedIn' => $isLoggedIn,
@@ -785,6 +791,12 @@ class ChatController
             $_SESSION['payment_status'] = $paymentStatus;
         }
 
+        // Gate: must be paid (or admin) to access /chat/c/{convoId}
+        if (!$isAdmin && $paymentStatus !== 'paid') {
+            header('Location: /register');
+            exit;
+        }
+
         \Ginto\Core\View::view('chat/chat', [
             'title' => 'Ginto AI - agentic chat',
             'isLoggedIn' => $isLoggedIn,
@@ -824,6 +836,12 @@ class ChatController
         if ($isLoggedIn) {
             $paymentStatus = $this->db->get('users', 'payment_status', ['id' => $_SESSION['user_id']]);
             $_SESSION['payment_status'] = $paymentStatus;
+        }
+
+        // Gate: must be paid (or admin) to access /chat-m
+        if (!$isAdmin && $paymentStatus !== 'paid') {
+            header('Location: /register');
+            exit;
         }
 
         \Ginto\Core\View::view('chat-m/chat-m', [

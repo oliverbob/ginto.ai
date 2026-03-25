@@ -6040,6 +6040,33 @@
             showContextMenu(e, { type: 'root', path: '' });
           }
         });
+
+        // Long-press (500 ms) on touch devices triggers the context menu
+        var _longPressTimer = null;
+        var _longPressFired = false;
+        fileTree.addEventListener('touchstart', function(e) {
+          _longPressFired = false;
+          var touch = e.touches[0];
+          _longPressTimer = setTimeout(function() {
+            _longPressFired = true;
+            // Prevent the subsequent click/touchend from dismissing the menu
+            var synth = { clientX: touch.clientX, clientY: touch.clientY,
+                          preventDefault: function(){}, target: e.target };
+            var item = e.target.closest('.file-item, .folder-item');
+            if (item) {
+              var isFolder = item.classList.contains('folder-item');
+              showContextMenu(synth, { type: isFolder ? 'folder' : 'file', path: item.dataset.path });
+            } else {
+              showContextMenu(synth, { type: 'root', path: '' });
+            }
+          }, 500);
+        }, { passive: true });
+        fileTree.addEventListener('touchend', function() {
+          clearTimeout(_longPressTimer);
+        }, { passive: true });
+        fileTree.addEventListener('touchmove', function() {
+          clearTimeout(_longPressTimer);
+        }, { passive: true });
         
         // Hide on click outside
         document.addEventListener('click', function(e) {

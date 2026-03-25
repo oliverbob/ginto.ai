@@ -1439,6 +1439,37 @@ $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 // Editor routes
 $router->req('/editor', 'EditorController@index');
 $router->req('/code', 'CodeController@code');
+
+// Record one code prompt for the current user/visitor (called after a successful generation)
+$router->post('/api/code/consume-prompt', function() use ($db) {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : null;
+
+    // Paid users and admins don't need tracking
+    if ($userId) {
+        $userRow = $db->get('users', ['payment_status', 'is_admin', 'role_id'], ['id' => $userId]);
+        $isPaid  = ($userRow['payment_status'] ?? 'free') === 'paid';
+        $isAdmin = !empty($userRow['is_admin']) || in_array((int)($userRow['role_id'] ?? 0), [1, 2]);
+        if ($isPaid || $isAdmin) {
+            header('Content-Type: application/json');
+            echo json_encode(['ok' => true]);
+            exit;
+        }
+    }
+
+    $limiter = new \Ginto\Helpers\CodePromptLimiter($db);
+    $allowed = $limiter->consume($userId);
+
+    header('Content-Type: application/json');
+    if ($allowed) {
+        echo json_encode(['ok' => true, 'remaining' => $limiter->remaining($userId)]);
+    } else {
+        http_response_code(429);
+        echo json_encode(['ok' => false, 'error' => 'Monthly prompt limit reached']);
+    }
+    exit;
+});
+
 $router->req('/editor/toggle_sandbox', 'EditorController@toggleSandbox', ['POST']);
 $router->req('/editor/settings', 'EditorController@settings', ['POST']);
 $router->req('/editor/tree', 'EditorController@tree');

@@ -883,6 +883,17 @@ html, body {
     font-family: 'Fira Code', 'JetBrains Mono', 'Monaco', 'Consolas', monospace;
     font-size: 14px;
     line-height: 1.5;
+    /* Enable text selection on mobile */
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+/* Ensure CodeMirror content area supports native mobile text selection */
+.CodeMirror-code,
+.CodeMirror-line,
+.CodeMirror-linenumber {
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 /* Light mode - ensure proper styling when not using theme */
