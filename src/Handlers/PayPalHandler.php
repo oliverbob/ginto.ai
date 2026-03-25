@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Handlers;
+namespace Ginto\Handlers;
 
 use PhpMcp\Server\Attributes\McpTool;
 use Ginto\Controllers\UserController;
