@@ -42,7 +42,7 @@ class UserController extends \Core\Controller
         $userId = $_SESSION['user_id'];
         
         // Get user data from database
-        $user = $this->db->get('users', ['firstname', 'username', 'role_id'], ['id' => $userId]);
+        $user = $this->db->get('users', ['firstname', 'username', 'role_id', 'payment_status', 'is_admin'], ['id' => $userId]);
         
         if (!$user) {
             http_response_code(404);
@@ -112,6 +112,7 @@ class UserController extends \Core\Controller
                 'firstname' => $user['firstname'] ?? '',
                 'displayName' => $displayName,
                 'isAdmin' => $isAdmin,
+                'paymentStatus' => $user['payment_status'] ?? 'free',
                 'sandbox' => $sandboxInfo
             ],
             'csrf_token' => $csrfToken
