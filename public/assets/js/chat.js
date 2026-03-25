@@ -1834,11 +1834,17 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     //   GINTO_CHAT_TARGET.forceNew = true  → /chat was loaded, always start empty
     //   GINTO_CHAT_TARGET.convoId          → /chat/c/{id} was loaded, load that conversation
     const chatTarget = window.GINTO_CHAT_TARGET || {};
+    // On the mobile WebView embed (/chat-m) never mutate the URL — the Android
+    // app uses webView.reload() which would reload /chat instead of /chat-m if
+    // we called replaceState here.
+    const isMobileEmbed = window.location.pathname.startsWith('/chat-m');
     if (chatTarget.forceNew) {
       // /chat always starts with a fresh conversation
       activeConvoId = generateUUID();
       history.length = 0;
-      window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+      if (!isMobileEmbed) {
+        window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+      }
       console.log('[initializeChat] forceNew: started fresh convo', activeConvoId);
       renderMessages();
       renderConvoList();
@@ -1861,7 +1867,9 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
         // Conversation not found — start fresh
         activeConvoId = generateUUID();
         history.length = 0;
-        window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+        if (!isMobileEmbed) {
+          window.history.replaceState({ convoId: null, fresh: true }, '', '/chat');
+        }
         console.warn('[initializeChat] target convo not found, starting fresh');
       }
       renderMessages();
