@@ -3,10 +3,14 @@ $wallet = $wallet ?? [];
 $walletTransactions = $wallet_transactions ?? [];
 $sellerStats  = $seller_stats  ?? ['gross_sales'=>0,'net_earnings'=>0,'order_count'=>0,'total_commissions'=>0,'pending_payout'=>0];
 $payoutAccount = $payout_account ?? null;
+$paypalClientId = trim((string)($paypal_client_id ?? ''));
 ?>
 <!doctype html>
 <html lang="en">
 <?php include __DIR__ . '/parts/head.php'; ?>
+<?php if ($paypalClientId !== ''): ?>
+<script src="https://www.paypal.com/sdk/js?client-id=<?= htmlspecialchars($paypalClientId, ENT_QUOTES, 'UTF-8') ?>&currency=PHP&intent=capture&components=buttons"></script>
+<?php endif; ?>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 
@@ -621,7 +625,7 @@ $payoutAccount = $payout_account ?? null;
                 <button type="button" id="closeTopupBtn" style="display:flex;align-items:center;justify-content:center;width:30px;height:30px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;color:var(--muted);cursor:pointer;font-size:0.85rem;line-height:1;">✕</button>
             </div>
             <div style="margin-bottom:14px;padding:11px 12px;border-radius:12px;background:rgba(214,180,75,0.08);border:1px solid rgba(214,180,75,0.24);font-size:0.78rem;color:#f3ddb0;line-height:1.55;">
-                Payments are processed by PayMongo (QR/card) or PayPal — Ginto does not hold or process funds. A fixed processing fee of ₱25.00 applies per transaction (QR/card); PayPal adds an additional 5% service fee. Ginto Pay credits are closed-loop, non-cash platform credits valid only for purchases within Ginto Mall and are non-withdrawable. <a href="/terms" target="_blank" style="color:inherit;text-decoration:underline;opacity:0.7;">Terms apply.</a>
+                Payments are processed by PayMongo (QR/card) or PayPal — Ginto does not hold or process funds. A fixed processing fee of ₱25.00 applies per transaction (QR/card); PayPal adds an additional 7% service fee. Ginto Pay credits are closed-loop, non-cash platform credits valid only for purchases within Ginto Mall and are non-withdrawable. <a href="/terms" target="_blank" style="color:inherit;text-decoration:underline;opacity:0.7;">Terms apply.</a>
             </div>
             <div style="display:flex;flex-direction:column;gap:14px;">
                 <label style="display:flex;flex-direction:column;gap:6px;">
@@ -788,6 +792,7 @@ $payoutAccount = $payout_account ?? null;
             </div>
         </div>
         <div class="wt-qr-box" id="wtQrBox" style="display:none;"></div>
+        <div id="wtPaypalButtonsContainer" style="display:none;margin:12px 0;"></div>
         <div class="wt-actions">
             <button type="button" class="wt-btn wt-btn-cancel" id="wtCancelBtn">Cancel</button>
             <button type="button" class="wt-btn wt-btn-confirm" id="wtConfirmBtn">Confirm Top-up</button>
@@ -820,10 +825,12 @@ $payoutAccount = $payout_account ?? null;
     const wtCredit = document.getElementById('wtCredit');
     const wtFee = document.getElementById('wtFee');
     const wtQrBox = document.getElementById('wtQrBox');
+    const wtPaypalButtonsContainer = document.getElementById('wtPaypalButtonsContainer');
     let selectedMethod = 'ginto_pay_qr';
     let currentSessionRef = '';
     let currentCreate = null;
     let currentQr = null;
+    let currentPayPalOrderId = null;
     let statusPoll = null;
 
     const methodMeta = {
@@ -892,7 +899,7 @@ $payoutAccount = $payout_account ?? null;
             if (isPayMongoMethod(selectedMethod)) {
                 fee = 25;
             } else if (isPayPalMethod(selectedMethod)) {
-                fee = 25 + (credit * 0.05);
+                fee = 25 + (credit * 0.07);
             }
         }
         const gross = credit + fee;
@@ -1020,6 +1027,9 @@ $payoutAccount = $payout_account ?? null;
     function closeModal() {
         wtModal.style.display = 'none';
         wtQrBox.innerHTML = '';
+        wtPaypalButtonsContainer.innerHTML = '';
+        wtPaypalButtonsContainer.style.display = 'none';
+        currentPayPalOrderId = null;
         if (statusPoll) { window.clearInterval(statusPoll); statusPoll = null; }
     }
 
@@ -1030,7 +1040,7 @@ $payoutAccount = $payout_account ?? null;
             if (isPayMongoMethod(selectedMethod)) {
                 fee = 25;
             } else if (isPayPalMethod(selectedMethod)) {
-                fee = 25 + (credit * 0.05);
+                fee = 25 + (credit * 0.07);
             }
         }
         const gross = credit + fee;
@@ -1153,13 +1163,47 @@ topupBtn.textContent = meta.confirmLabel || 'Top Up Ginto Pay';
                 return;
             } else {
                 const paypal = await api('/api/mall/checkout/paypal-order', { session_ref: currentSessionRef });
-                setInfo('PayPal order created: ' + paypal.paypal_order_id + '. Use the checkout page if you want to complete it there.');
+                currentPayPalOrderId = paypal.paypal_order_id;
+                setInfo('You pay ' + formatPrice(create.amount) + ', fee ' + formatPrice(create.fee) + ', wallet credit ' + formatPrice(create.credit_amount) + '. Complete payment below.');
+                renderWalletPayPalButtons();
             }
         } catch (error) {
             setError(error.message);
         } finally {
             topupBtn.disabled = false;
         }
+    }
+
+    function renderWalletPayPalButtons() {
+        if (!window.paypal || !wtPaypalButtonsContainer) {
+            setError('PayPal is not available right now. Please try again later.');
+            return;
+        }
+        wtPaypalButtonsContainer.innerHTML = '';
+        wtPaypalButtonsContainer.style.display = 'block';
+        window.paypal.Buttons({
+            createOrder: function () {
+                return currentPayPalOrderId;
+            },
+            onApprove: async function () {
+                try {
+                    await api('/api/mall/checkout/paypal-capture', {
+                        session_ref: currentSessionRef,
+                        paypal_order_id: currentPayPalOrderId,
+                    });
+                    setInfo('Payment successful! Your wallet has been credited.');
+                    setError('');
+                    wtPaypalButtonsContainer.style.display = 'none';
+                    // Reload to show updated balance
+                    setTimeout(function () { window.location.reload(); }, 1500);
+                } catch (error) {
+                    setError(error.message);
+                }
+            },
+            onError: function () {
+                setError('PayPal payment failed. Please try again.');
+            },
+        }).render('#wtPaypalButtonsContainer');
     }
 
     methodButtons.forEach(function (button) {

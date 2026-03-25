@@ -118,6 +118,12 @@ class MallCheckoutController extends Controller
     {
         $userId = $this->requireUser();
         $walletSummary = $this->commerce->getWalletSummary($userId);
+
+        $paypalEnv = strtolower((string)($_ENV['PAYPAL_ENVIRONMENT'] ?? getenv('PAYPAL_ENVIRONMENT') ?? 'sandbox'));
+        $paypalClientId = $paypalEnv === 'sandbox'
+            ? (string)($_ENV['PAYPAL_CLIENT_ID_SANDBOX'] ?? getenv('PAYPAL_CLIENT_ID_SANDBOX') ?? '')
+            : (string)($_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID') ?? '');
+
         $this->view('mall/wallet', [
             'title' => 'Ginto Wallet',
             'csrf_token' => generateCsrfToken(),
@@ -128,6 +134,7 @@ class MallCheckoutController extends Controller
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
             'seller_stats' => $this->commerce->getSellerStats($userId),
             'payout_account' => $this->commerce->getPayoutAccount($userId),
+            'paypal_client_id' => $paypalClientId,
         ]);
     }
 

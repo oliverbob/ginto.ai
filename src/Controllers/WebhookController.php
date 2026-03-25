@@ -368,19 +368,105 @@ class WebhookController
 
     private function handlePaymentCompleted($payment)
     {
+        $captureId = $payment['id'] ?? '';
+        $amount = $payment['amount']['value'] ?? '';
+        $currency = $payment['amount']['currency_code'] ?? '';
+
         $this->logWebhook('Payment completed', [
-            'payment_id' => $payment['id'] ?? '',
-            'amount' => $payment['amount']['value'] ?? '',
-            'currency' => $payment['amount']['currency_code'] ?? '',
-            'payer_email' => $payment['payer']['email_address'] ?? ''
+            'capture_id' => $captureId,
+            'amount' => $amount,
+            'currency' => $currency,
         ]);
-        // Add your payment completion logic here
+
+        // Resolve PayPal order ID from the capture resource
+        $orderId = $payment['supplementary_data']['related_ids']['order_id'] ?? null;
+
+        // If not in supplementary_data, try to get it from custom_id or invoice_id
+        if (!$orderId) {
+            $orderId = $payment['custom_id'] ?? ($payment['invoice_id'] ?? null);
+        }
+
+        if (!$orderId && $captureId) {
+            // Last resort: look up the order via the PayPal API using the capture
+            try {
+                $handler = new \Ginto\Handlers\PayPalHandler();
+                $captureDetails = $handler->getOrder($captureId);
+                $orderId = $captureDetails['id'] ?? null;
+            } catch (\Throwable $e) {
+                $this->logWebhook('Could not resolve order ID from capture', ['error' => $e->getMessage()]);
+            }
+        }
+
+        if (!$orderId) {
+            $this->logWebhook('Payment completed but no order ID could be resolved', ['capture_id' => $captureId]);
+            return;
+        }
+
+        // Find pending payment session by gateway_reference (PayPal order ID)
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($orderId);
+
+            if (!$session) {
+                $this->logWebhook('No pending payment session for PayPal order', ['order_id' => $orderId]);
+                return;
+            }
+
+            if ($session['status'] === 'completed') {
+                $this->logWebhook('Payment session already completed (synchronous capture)', ['order_id' => $orderId]);
+                return;
+            }
+
+            $commerce->completePaymentSession((string)$session['session_ref'], [
+                'gateway' => 'paypal',
+                'gateway_reference' => $orderId,
+                'gateway_payment_id' => $captureId,
+                'gateway_payload_json' => json_encode($payment),
+            ]);
+
+            $this->logWebhook('Payment session completed via webhook', [
+                'session_ref' => $session['session_ref'],
+                'purpose' => $session['purpose'],
+                'order_id' => $orderId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logWebhook('Error completing payment session from webhook', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function handlePaymentDenied($payment)
     {
-        $this->logWebhook('Payment denied', ['payment_id' => $payment['id'] ?? '']);
-        // Add your payment denial logic here
+        $captureId = $payment['id'] ?? '';
+        $this->logWebhook('Payment denied', ['payment_id' => $captureId]);
+
+        $orderId = $payment['supplementary_data']['related_ids']['order_id']
+                ?? ($payment['custom_id'] ?? ($payment['invoice_id'] ?? null));
+
+        if (!$orderId) {
+            return;
+        }
+
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($orderId);
+
+            if ($session && $session['status'] === 'pending') {
+                $this->db->update('mall_payment_sessions', [
+                    'status' => 'failed',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ], ['id' => $session['id']]);
+
+                $this->logWebhook('Payment session marked failed', [
+                    'session_ref' => $session['session_ref'],
+                    'order_id' => $orderId,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->logWebhook('Error handling payment denied', ['error' => $e->getMessage()]);
+        }
     }
 
     private function handlePaymentRefunded($refund)

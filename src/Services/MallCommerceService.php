@@ -12,7 +12,7 @@ class MallCommerceService
     private $db;
 
     private const MIN_TOPUP_FEE_PHP = 25.00;
-    private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.05;
+    private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.07;
 
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off'        => 12.00,   // standard listing, minimal promotion
@@ -452,15 +452,27 @@ class MallCommerceService
         }
 
         $payload = json_decode((string)($session['payload_json'] ?? '{}'), true) ?: [];
-        $orders = $payload['orders'] ?? [];
         $items = [];
-        foreach ($orders as $order) {
-            foreach (($order['items'] ?? []) as $item) {
-                $items[] = [
-                    'name' => $item['title'],
-                    'quantity' => (int)$item['quantity'],
-                    'unit_price' => (float)$item['charged_unit_price'],
-                ];
+
+        if (($session['purpose'] ?? '') === 'wallet_topup') {
+            // Wallet top-up: single item for the gross amount
+            $grossAmount = round((float)$session['amount_total'], 2);
+            $items[] = [
+                'name' => 'Ginto Wallet Top-Up',
+                'quantity' => 1,
+                'unit_price' => $grossAmount,
+            ];
+        } else {
+            // Product checkout: extract items from orders
+            $orders = $payload['orders'] ?? [];
+            foreach ($orders as $order) {
+                foreach (($order['items'] ?? []) as $item) {
+                    $items[] = [
+                        'name' => $item['title'],
+                        'quantity' => (int)$item['quantity'],
+                        'unit_price' => (float)$item['charged_unit_price'],
+                    ];
+                }
             }
         }
 
