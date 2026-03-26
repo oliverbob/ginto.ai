@@ -317,6 +317,105 @@ class MallPushService
     }
 
     /**
+     * Notify seller(s) about a successful purchase. Each seller gets notified only about
+     * their own products from the checkout.
+     */
+    public function notifySellerPurchase(array $ordersBySellerIds, array $orderDetails): void
+    {
+        foreach ($ordersBySellerIds as $sellerId => $items) {
+            $productNames = array_map(fn($i) => $i['title_snapshot'] ?? $i['title'] ?? 'Product', $items);
+            $itemCount = count($productNames);
+            $summaryNames = $itemCount > 2
+                ? implode(', ', array_slice($productNames, 0, 2)) . " +{$itemCount}" . " more"
+                : implode(', ', $productNames);
+            $orderId = (int)($orderDetails['order_id'] ?? $items[0]['order_id'] ?? 0);
+            $buyerName = htmlspecialchars(strip_tags((string)($orderDetails['buyer_name'] ?? 'A buyer')), ENT_QUOTES, 'UTF-8');
+
+            $this->notify(
+                [(int)$sellerId],
+                "{$buyerName} purchased: {$summaryNames}" . ($orderId > 0 ? " (Order #{$orderId})" : ''),
+                'purchase_completed',
+                [
+                    'order_id' => $orderId,
+                    'url' => '/marketplace/sellers/orders',
+                    'event_key' => 'purchase_completed',
+                    'buyer_name' => $buyerName,
+                    'product_titles' => $productNames,
+                    'item_count' => $itemCount,
+                ]
+            );
+        }
+    }
+
+    /** Notify buyer about successful purchase confirmation. */
+    public function notifyBuyerPurchaseSuccess(int $buyerId, int $orderId, string $totalAmount): void
+    {
+        $this->notify(
+            [$buyerId],
+            "Purchase successful! Order #{$orderId} (₱{$totalAmount}) is being processed. Track your delivery in the Delivery section.",
+            'purchase_completed',
+            ['order_id' => $orderId, 'url' => '/mall/orders', 'event_key' => 'purchase_completed']
+        );
+    }
+
+    /** Notify admin about purchase activity for ledgering. */
+    public function notifyAdminPurchase(int $orderId, int $buyerId, string $buyerName, float $totalAmount, int $itemCount): void
+    {
+        $adminIds = $this->getAdminUserIds();
+        if (empty($adminIds)) return;
+        $this->notify(
+            $adminIds,
+            "[ADMIN] Order #{$orderId}: {$buyerName} purchased {$itemCount} item(s) for ₱" . number_format($totalAmount, 2),
+            'admin_purchase',
+            [
+                'order_id' => $orderId, 'buyer_id' => $buyerId,
+                'url' => '/admin/mall/orders',
+                'event_key' => 'admin_purchase',
+            ]
+        );
+    }
+
+    /** Notify admin about delivery status changes for monitoring. */
+    public function notifyAdminDeliveryStatus(int $orderId, string $status, string $details): void
+    {
+        $adminIds = $this->getAdminUserIds();
+        if (empty($adminIds)) return;
+        $this->notify(
+            $adminIds,
+            "[ADMIN] Order #{$orderId} delivery: {$status} — {$details}",
+            'admin_delivery',
+            ['order_id' => $orderId, 'url' => '/mall/delivery/admin', 'event_key' => 'admin_delivery']
+        );
+    }
+
+    /** Notify seller that payment will be deposited after delivery. */
+    public function notifySellerPaymentPending(int $sellerId, int $orderId, float $netAmount): void
+    {
+        $this->notify(
+            [$sellerId],
+            "Order #{$orderId} delivered! ₱" . number_format($netAmount, 2) . " will be deposited to your account within 7-12 business days.",
+            'payment_pending_deposit',
+            [
+                'order_id' => $orderId,
+                'url' => '/wallet/earnings',
+                'event_key' => 'payment_pending_deposit',
+                'net_amount' => $netAmount,
+            ]
+        );
+    }
+
+    /** Get admin user IDs (role_id 1 or 2). */
+    private function getAdminUserIds(): array
+    {
+        try {
+            $admins = $this->db->select('users', ['id'], ['role_id' => [1, 2], 'LIMIT' => 20]);
+            return array_map(fn($a) => (int)$a['id'], $admins ?: []);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /**
      * Push realtime update to a user's active FCM devices without creating new DB rows.
      * Intended for notifications that are already persisted by another service layer.
      */
@@ -786,6 +885,10 @@ class MallPushService
             'mall_seller_impression' => '👀 Buyer Activity',
             'new_order'          => '🛍️ New Order!',
             'order_confirmed'    => '✅ Order Confirmed',
+            'purchase_completed' => '🛒 Purchase Completed!',
+            'payment_pending_deposit' => '💰 Payment Incoming',
+            'admin_purchase'     => '📊 [Admin] New Purchase',
+            'admin_delivery'     => '📊 [Admin] Delivery Update',
             'visitor_registered' => '👤 New Buyer Registered',
             'shipment_pending'   => '📦 Shipment Queued',
             'shipment_ready_for_pickup' => '📦 Ready for Pickup',
@@ -794,6 +897,9 @@ class MallPushService
             'shipment_out_for_delivery' => '📍 Out for Delivery',
             'shipment_delivered' => '✅ Delivered!',
             'shipment_failed_delivery' => '⚠️ Delivery Failed',
+            'delivery_proof'     => '📸 Delivery Proof Uploaded',
+            'product_rating'     => '⭐ New Product Review',
+            'seller_shipping'    => '🚚 Seller Shipped Order',
         ];
         return $map[$type] ?? '🔔 Ginto Mall';
     }

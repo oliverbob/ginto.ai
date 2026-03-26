@@ -37,6 +37,14 @@
         }
     }
     
+    # WebSocket proxy for mall notifications (Ratchet on port 31827)
+    handle /mall-notify-ws/* {
+        uri path_regexp .* /mall-notify
+        reverse_proxy php:31827 {
+            header_up Host localhost
+        }
+    }
+    
     # WebSocket proxy for terminal server
     @terminal {
         header Connection *Upgrade*

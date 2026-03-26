@@ -849,4 +849,177 @@ class MallCheckoutController extends Controller
     {
         $this->json(['success' => false, 'message' => $message], $status);
     }
+
+    // ── "Me" page — delivery & shipment status hub ───────────────────────────
+
+    public function mePage()
+    {
+        $userId = $this->requireUser();
+        $walletSummary = $this->commerce->getWalletSummary($userId);
+
+        // Buyer's orders grouped by status
+        $this->commerce->purgeUnpaidOrdersForUser($userId, 'buyer');
+        $orders = $this->commerce->listBuyerOrders($userId);
+
+        // Seller orders if they are a seller
+        $sellerOrders = [];
+        $isSeller = $this->db->has('products', ['seller_id' => $userId]);
+        if ($isSeller) {
+            $sellerOrders = $this->commerce->listSellerOrders($userId);
+        }
+
+        // Check for delivery proofs and ratings per order
+        $ratingsByOrder = [];
+        foreach ($orders as &$o) {
+            $o['proofs'] = $this->db->select('delivery_proofs', '*', ['order_id' => (int)$o['id']]) ?: [];
+            $ratings = $this->db->select('product_ratings', '*', ['order_id' => (int)$o['id'], 'buyer_id' => $userId]) ?: [];
+            $ratingsByOrder[(int)$o['id']] = $ratings;
+            $o['ratings'] = $ratings;
+        }
+        unset($o);
+
+        $this->view('mall/me', [
+            'title' => 'Me — Ginto Mall',
+            'csrf_token' => generateCsrfToken(),
+            'orders' => $orders,
+            'seller_orders' => $sellerOrders,
+            'is_seller' => $isSeller,
+            'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
+            'mall_notifications' => $this->commerce->getMallNotifications($userId),
+            'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+        ]);
+    }
+
+    // ── Delivery proof upload ────────────────────────────────────────────────
+
+    public function uploadDeliveryProof()
+    {
+        $userId = $this->requireUserJson();
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') { http_response_code(405); return; }
+
+        $token = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) { $this->jsonError('Invalid CSRF token', 400); return; }
+
+        $orderId = (int)($_POST['order_id'] ?? 0);
+        if ($orderId <= 0) { $this->jsonError('Invalid order.', 400); return; }
+
+        // Determine role
+        $order = $this->db->get('mall_orders', ['buyer_id', 'seller_id'], ['id' => $orderId]);
+        if (!$order) { $this->jsonError('Order not found.', 404); return; }
+
+        $role = 'buyer';
+        if ((int)$order['seller_id'] === $userId) $role = 'seller';
+        $user = $this->db->get('users', ['role_id'], ['id' => $userId]);
+        if (in_array($user['role_id'] ?? 0, [1, 2])) $role = 'admin';
+
+        if ((int)$order['buyer_id'] !== $userId && (int)$order['seller_id'] !== $userId && !in_array($user['role_id'] ?? 0, [1, 2])) {
+            $this->jsonError('Not authorized.', 403); return;
+        }
+
+        if (empty($_FILES['photo']) || $_FILES['photo']['error'] !== UPLOAD_ERR_OK) {
+            $this->jsonError('No photo uploaded.', 400); return;
+        }
+
+        $conditionRating = trim(strip_tags((string)($_POST['condition_rating'] ?? '')));
+        $notes = trim(strip_tags((string)($_POST['notes'] ?? '')));
+        $lat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
+        $lng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
+        $photoType = trim((string)($_POST['photo_type'] ?? 'product_arrival'));
+
+        try {
+            $result = $this->commerce->uploadDeliveryProof(
+                $orderId, $userId, $role, $_FILES['photo'],
+                $conditionRating ?: null, $notes ?: null, $lat, $lng, $photoType
+            );
+            $this->json(['success' => true, 'proof' => $result]);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 422);
+        }
+    }
+
+    public function getDeliveryProofs($orderId = null)
+    {
+        $userId = $this->requireUserJson();
+        $orderId = (int)$orderId;
+
+        $order = $this->db->get('mall_orders', ['buyer_id', 'seller_id'], ['id' => $orderId]);
+        if (!$order) { $this->jsonError('Order not found.', 404); return; }
+
+        $user = $this->db->get('users', ['role_id'], ['id' => $userId]);
+        $isAdmin = in_array($user['role_id'] ?? 0, [1, 2]);
+        if ((int)$order['buyer_id'] !== $userId && (int)$order['seller_id'] !== $userId && !$isAdmin) {
+            $this->jsonError('Not authorized.', 403); return;
+        }
+
+        $proofs = $this->db->select('delivery_proofs', '*', ['order_id' => $orderId, 'ORDER' => ['created_at' => 'DESC']]) ?: [];
+        $this->json(['success' => true, 'proofs' => $proofs]);
+    }
+
+    // ── Rating submission ────────────────────────────────────────────────────
+
+    public function submitRating()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+        $this->validateCsrfFromPayload($input);
+
+        $orderId = (int)($input['order_id'] ?? 0);
+        $productId = (int)($input['product_id'] ?? 0);
+        $productRating = (int)($input['product_rating'] ?? 5);
+        $sellerRating = (int)($input['seller_rating'] ?? 5);
+        $reviewText = trim(strip_tags((string)($input['review_text'] ?? '')));
+
+        try {
+            $result = $this->commerce->submitRating($orderId, $productId, $userId, $productRating, $sellerRating, $reviewText ?: null);
+            $this->json(['success' => true] + $result);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 422);
+        }
+    }
+
+    // ── Request more product (exceeds max qty threshold) ─────────────────────
+
+    public function requestMoreProduct()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $input = $this->jsonInput();
+        $this->validateCsrfFromPayload($input);
+
+        $productId = (int)($input['product_id'] ?? 0);
+        $requestedQty = max(1, (int)($input['requested_qty'] ?? 1));
+
+        $product = $this->db->get('products', ['id', 'seller_id', 'title', 'max_qty_per_buyer', 'request_more_enabled'], ['id' => $productId]);
+        if (!$product) { $this->jsonError('Product not found.', 404); return; }
+
+        if (empty($product['request_more_enabled'])) {
+            $this->jsonError('This product does not allow quantity requests.', 400); return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $this->db->insert('product_quantity_requests', [
+            'product_id' => $productId,
+            'buyer_id' => $userId,
+            'seller_id' => (int)$product['seller_id'],
+            'requested_qty' => $requestedQty,
+            'status' => 'pending',
+            'created_at' => $now,
+        ]);
+
+        // Notify seller
+        try {
+            $pushService = new \Ginto\Services\MallPushService($this->db);
+            $buyer = $this->db->get('users', ['fullname', 'username'], ['id' => $userId]);
+            $buyerName = trim(($buyer['fullname'] ?? '') ?: ($buyer['username'] ?? 'A buyer'));
+            $pushService->notify(
+                [(int)$product['seller_id']],
+                "{$buyerName} requested {$requestedQty} units of \"{$product['title']}\" (exceeds limit). Please review.",
+                'quantity_request',
+                ['product_id' => $productId, 'url' => '/marketplace/sellers/products', 'event_key' => 'quantity_request']
+            );
+        } catch (\Throwable $e) {}
+
+        $this->json(['success' => true, 'message' => 'Your request has been sent to the seller.']);
+    }
 }

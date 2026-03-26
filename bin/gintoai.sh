@@ -1544,6 +1544,18 @@ $CADDY_DOMAIN {
         }
     }
 
+    handle /mall-notify-ws/* {
+        uri path_regexp .* /mall-notify
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
+            flush_interval -1
+            transport http {
+                read_timeout 0
+                write_timeout 0
+            }
+            header_up Host localhost
+        }
+    }
+
     handle /terminal/* {
         uri strip_prefix /terminal
         reverse_proxy 127.0.0.1:$TERMINAL_PORT {
@@ -1656,6 +1668,13 @@ http://localhost, :80 {
 
     handle /messenger-ws/* {
         uri path_regexp .* /messenger
+        reverse_proxy 127.0.0.1:$TERMINAL_PORT {
+            header_up Host localhost
+        }
+    }
+
+    handle /mall-notify-ws/* {
+        uri path_regexp .* /mall-notify
         reverse_proxy 127.0.0.1:$TERMINAL_PORT {
             header_up Host localhost
         }

@@ -917,6 +917,35 @@ class MallCommerceService
         $buyerMessage = 'Your order ' . $order['order_code'] . ' is now ' . $this->humanizeStatus($toStatus) . '.';
         $this->createMallNotification((int)$order['buyer_id'], $actorUserId, 'mall_order_status_updated', $buyerMessage, ['order_id' => $orderId, 'status' => $toStatus]);
         $this->emailOrderStatusUpdate((int)$order['buyer_id'], $buyerMessage, $order, $message);
+
+        // Enhanced notifications based on status
+        try {
+            $pushService = new MallPushService($this->db);
+            $buyer = $this->db->get('users', ['fullname', 'username'], ['id' => (int)$order['buyer_id']]);
+            $buyerName = trim(($buyer['fullname'] ?? '') ?: ($buyer['username'] ?? 'Buyer'));
+
+            if ($toStatus === 'in_transit') {
+                // Seller shipped the order — email buyer + owner
+                $this->emailShipmentOnTheWay($orderId);
+                $pushService->notifyAdminDeliveryStatus($orderId, 'In Transit', "Order {$order['order_code']} shipped to {$buyerName}");
+                $this->logAdminActivity('order_shipped', $actorUserId, (int)$order['buyer_id'], $orderId, null, ['status' => $toStatus]);
+            } elseif ($toStatus === 'delivered') {
+                // Item delivered — email buyer + owner + notify seller about payment processing
+                $this->emailDeliveryCompleted($orderId);
+                $sellerNet = (float)($order['seller_net_amount'] ?? 0);
+                $pushService->notifySellerPaymentPending((int)$order['seller_id'], $orderId, $sellerNet);
+                $pushService->notifyAdminDeliveryStatus($orderId, 'Delivered', "Order {$order['order_code']} delivered to {$buyerName}");
+                $this->logAdminActivity('order_delivered', $actorUserId, (int)$order['buyer_id'], $orderId, null, [
+                    'status' => $toStatus,
+                    'seller_net' => $sellerNet,
+                ]);
+            } elseif ($toStatus === 'processing') {
+                $pushService->notifyAdminDeliveryStatus($orderId, 'Processing', "Seller is preparing order {$order['order_code']}");
+                $this->logAdminActivity('order_processing', $actorUserId, (int)$order['buyer_id'], $orderId, null, ['status' => $toStatus]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] updateOrderStatus notifications error: ' . $e->getMessage());
+        }
     }
 
     public function isDeliveryAccount(int $userId): bool
@@ -1216,6 +1245,44 @@ class MallCommerceService
         $this->createMallNotification((int)$order['seller_id'], (int)$order['buyer_id'], 'mall_order_paid', 'You received a new paid order: ' . $order['order_code'] . '.', ['order_id' => $orderId]);
         $this->createMallNotification((int)$order['buyer_id'], null, 'mall_order_paid', 'Your order ' . $order['order_code'] . ' has been paid successfully.', ['order_id' => $orderId]);
         $this->emailSellerPaidOrder($orderId);
+
+        // Enhanced purchase notifications: per-seller bell + FCM + email
+        try {
+            $pushService = new MallPushService($this->db);
+            $buyer = $this->db->get('users', ['id', 'fullname', 'username', 'email'], ['id' => (int)$order['buyer_id']]);
+            $buyerName = trim(($buyer['fullname'] ?? '') ?: ($buyer['username'] ?? 'Buyer'));
+            $totalAmount = number_format((float)($order['buyer_total_amount'] ?? 0), 2);
+
+            // Notify buyer about successful purchase
+            $pushService->notifyBuyerPurchaseSuccess((int)$order['buyer_id'], $orderId, $totalAmount);
+
+            // Group items by seller and notify each seller
+            $itemsBySeller = [];
+            foreach ($items as $item) {
+                $sid = (int)($item['seller_id'] ?? $order['seller_id']);
+                $itemsBySeller[$sid][] = $item;
+            }
+            $pushService->notifySellerPurchase($itemsBySeller, [
+                'order_id' => $orderId,
+                'buyer_name' => $buyerName,
+            ]);
+
+            // Admin notification for ledgering
+            $pushService->notifyAdminPurchase($orderId, (int)$order['buyer_id'], $buyerName, (float)($order['buyer_total_amount'] ?? 0), count($items));
+
+            // Admin activity log
+            $this->logAdminActivity('purchase_completed', (int)$order['buyer_id'], (int)$order['seller_id'], $orderId, null, [
+                'buyer_name' => $buyerName,
+                'total_amount' => (float)($order['buyer_total_amount'] ?? 0),
+                'item_count' => count($items),
+                'payment_method' => $paymentMethod,
+            ]);
+
+            // Email to owner about successful purchase
+            $this->emailPurchaseNotification($orderId);
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] markOrderPaid notification error: ' . $e->getMessage());
+        }
     }
 
     private function hydrateOrders(array $orders): array
@@ -1429,6 +1496,235 @@ class MallCommerceService
             . '<p><strong>Order:</strong> ' . htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8') . '</p>'
             . ($message !== '' ? '<p>' . nl2br(htmlspecialchars($message, ENT_QUOTES, 'UTF-8')) . '</p>' : '');
         MailHelper::send((string)$user['email'], 'Ginto Mall order update', $body);
+    }
+
+    /** Email to oliverbob.lagumen@gmail.com about every successful purchase. */
+    private function emailPurchaseNotification(int $orderId): void
+    {
+        try {
+            $orders = $this->hydrateOrders([$this->db->get('mall_orders', '*', ['id' => $orderId])]);
+            $order = $orders[0] ?? null;
+            if (!$order) return;
+
+            $buyerName = htmlspecialchars(trim(($order['buyer']['fullname'] ?? '') ?: ($order['buyer']['username'] ?? 'Buyer')), ENT_QUOTES, 'UTF-8');
+            $sellerName = htmlspecialchars(trim(($order['seller']['fullname'] ?? '') ?: ($order['seller']['username'] ?? 'Seller')), ENT_QUOTES, 'UTF-8');
+            $itemsHtml = '';
+            foreach ($order['items'] as $item) {
+                $itemsHtml .= '<li>' . htmlspecialchars((string)$item['title_snapshot'], ENT_QUOTES, 'UTF-8') . ' x' . (int)$item['quantity']
+                    . ' — ₱' . number_format((float)$item['line_subtotal'], 2) . '</li>';
+            }
+            $total = number_format((float)$order['buyer_total_amount'], 2);
+            $orderCode = htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8');
+
+            $body = "<h2>🛒 New Purchase on Ginto Mall</h2>"
+                . "<p><strong>Order:</strong> {$orderCode}</p>"
+                . "<p><strong>Buyer:</strong> {$buyerName}</p>"
+                . "<p><strong>Seller:</strong> {$sellerName}</p>"
+                . "<p><strong>Total:</strong> ₱{$total}</p>"
+                . "<p><strong>Items:</strong></p><ul>{$itemsHtml}</ul>"
+                . "<p><strong>Payment:</strong> " . htmlspecialchars((string)$order['payment_method'], ENT_QUOTES, 'UTF-8') . "</p>"
+                . "<p><em>Paid at: " . htmlspecialchars((string)($order['paid_at'] ?? date('Y-m-d H:i:s')), ENT_QUOTES, 'UTF-8') . "</em></p>";
+
+            MailHelper::send('oliverbob.lagumen@gmail.com', "Ginto Purchase: {$orderCode} by {$buyerName}", $body);
+
+            // Also email the buyer
+            if (!empty($order['buyer']['email'])) {
+                $buyerBody = "<h2>✅ Your Ginto Mall Purchase Confirmed!</h2>"
+                    . "<p>Thank you for your purchase, {$buyerName}!</p>"
+                    . "<p><strong>Order:</strong> {$orderCode}</p>"
+                    . "<p><strong>Total:</strong> ₱{$total}</p>"
+                    . "<p><strong>Items:</strong></p><ul>{$itemsHtml}</ul>"
+                    . "<p>Track your delivery status at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                    . "<p>— Ginto Mall Team</p>";
+                MailHelper::send((string)$order['buyer']['email'], "Ginto: Purchase Confirmed — {$orderCode}", $buyerBody);
+            }
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] emailPurchaseNotification error: ' . $e->getMessage());
+        }
+    }
+
+    /** Email notification when seller ships an order. */
+    public function emailShipmentOnTheWay(int $orderId): void
+    {
+        try {
+            $orders = $this->hydrateOrders([$this->db->get('mall_orders', '*', ['id' => $orderId])]);
+            $order = $orders[0] ?? null;
+            if (!$order) return;
+
+            $buyerName = htmlspecialchars(trim(($order['buyer']['fullname'] ?? '') ?: ($order['buyer']['username'] ?? 'Buyer')), ENT_QUOTES, 'UTF-8');
+            $orderCode = htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8');
+            $body = "<h2>🚚 Your Order is On the Way!</h2>"
+                . "<p>Hi {$buyerName}, your order <strong>{$orderCode}</strong> is now on its way to you.</p>"
+                . "<p>Track delivery at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                . "<p>— Ginto Mall Team</p>";
+
+            if (!empty($order['buyer']['email'])) {
+                MailHelper::send((string)$order['buyer']['email'], "Ginto: Your order {$orderCode} is on the way!", $body);
+            }
+            MailHelper::send('oliverbob.lagumen@gmail.com', "Ginto Shipping: {$orderCode} is on the way", $body);
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] emailShipmentOnTheWay error: ' . $e->getMessage());
+        }
+    }
+
+    /** Email notification when item is delivered. */
+    public function emailDeliveryCompleted(int $orderId): void
+    {
+        try {
+            $orders = $this->hydrateOrders([$this->db->get('mall_orders', '*', ['id' => $orderId])]);
+            $order = $orders[0] ?? null;
+            if (!$order) return;
+
+            $buyerName = htmlspecialchars(trim(($order['buyer']['fullname'] ?? '') ?: ($order['buyer']['username'] ?? 'Buyer')), ENT_QUOTES, 'UTF-8');
+            $orderCode = htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8');
+            $body = "<h2>✅ Order Delivered!</h2>"
+                . "<p>Hi {$buyerName}, your order <strong>{$orderCode}</strong> has been delivered.</p>"
+                . "<p>Please take a photo of the received product and rate your experience at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                . "<p>— Ginto Mall Team</p>";
+
+            if (!empty($order['buyer']['email'])) {
+                MailHelper::send((string)$order['buyer']['email'], "Ginto: Order {$orderCode} Delivered!", $body);
+            }
+            MailHelper::send('oliverbob.lagumen@gmail.com', "Ginto Delivered: {$orderCode}", $body);
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] emailDeliveryCompleted error: ' . $e->getMessage());
+        }
+    }
+
+    /** Log admin activity for ledgering. */
+    public function logAdminActivity(string $eventType, ?int $actorUserId, ?int $targetUserId, ?int $orderId, ?int $shipmentId, array $details = []): void
+    {
+        try {
+            $this->db->insert('mall_admin_activity_log', [
+                'event_type' => $eventType,
+                'actor_user_id' => $actorUserId,
+                'target_user_id' => $targetUserId,
+                'order_id' => $orderId,
+                'shipment_id' => $shipmentId,
+                'details' => !empty($details) ? json_encode($details) : null,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[MallCommerceService] logAdminActivity error: ' . $e->getMessage());
+        }
+    }
+
+    /** Upload delivery proof photo. Returns the URL. */
+    public function uploadDeliveryProof(int $orderId, int $userId, string $role, array $file, ?string $conditionRating = null, ?string $notes = null, ?float $lat = null, ?float $lng = null, string $photoType = 'product_arrival'): array
+    {
+        $allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+        $mime = $file['type'] ?? '';
+        if (!in_array($mime, $allowedTypes, true)) {
+            throw new \RuntimeException('Invalid image type. Allowed: JPEG, PNG, WebP, HEIC.');
+        }
+        if (($file['size'] ?? 0) > 10 * 1024 * 1024) {
+            throw new \RuntimeException('Image too large. Max 10MB.');
+        }
+
+        $name = preg_replace('/[^a-zA-Z0-9._-]/', '-', basename($file['name']));
+        $useB2 = \Ginto\Helpers\B2Helper::isEnabled();
+        $storagePath = defined('STORAGE_PATH') ? STORAGE_PATH : dirname(__DIR__, 2) . '/../storage';
+        $url = '';
+
+        if ($useB2) {
+            try {
+                $fileData = file_get_contents($file['tmp_name']);
+                $remotePath = 'mall/customer_proof/' . $orderId . '/' . uniqid() . '_' . $name;
+                $url = \Ginto\Helpers\B2Helper::upload($fileData, $remotePath, $mime);
+            } catch (\Throwable $e) {
+                // Fallback to local
+                $useB2 = false;
+            }
+        }
+        if (!$useB2) {
+            $uploadDir = $storagePath . '/mall/customer_proof/' . $orderId . '/';
+            if (!is_dir($uploadDir)) mkdir($uploadDir, 0750, true);
+            $target = $uploadDir . uniqid() . '_' . $name;
+            if (!move_uploaded_file($file['tmp_name'], $target)) {
+                throw new \RuntimeException('Failed to save photo.');
+            }
+            chmod($target, 0640);
+            $url = str_replace($storagePath, '/storage', $target);
+        }
+
+        // Find shipment if exists
+        $shipmentId = null;
+        $shipment = $this->db->get('delivery_shipments', ['id'], ['order_id' => $orderId]);
+        if ($shipment) $shipmentId = (int)$shipment['id'];
+
+        $this->db->insert('delivery_proofs', [
+            'order_id' => $orderId,
+            'shipment_id' => $shipmentId,
+            'uploaded_by_user_id' => $userId,
+            'role' => $role,
+            'photo_url' => $url,
+            'photo_type' => $photoType,
+            'condition_rating' => $conditionRating,
+            'notes' => $notes ? strip_tags($notes) : null,
+            'lat' => $lat,
+            'lng' => $lng,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return ['url' => $url, 'id' => (int)$this->db->id()];
+    }
+
+    /** Submit product + seller rating for an order item. */
+    public function submitRating(int $orderId, int $productId, int $buyerId, int $productRating, int $sellerRating, ?string $reviewText = null): array
+    {
+        $order = $this->db->get('mall_orders', ['id', 'buyer_id', 'seller_id', 'status'], ['id' => $orderId]);
+        if (!$order || (int)$order['buyer_id'] !== $buyerId) {
+            throw new \RuntimeException('You can only rate orders you purchased.');
+        }
+
+        $productRating = max(1, min(5, $productRating));
+        $sellerRating = max(1, min(5, $sellerRating));
+
+        $existing = $this->db->get('product_ratings', ['id'], [
+            'order_id' => $orderId,
+            'product_id' => $productId,
+            'buyer_id' => $buyerId,
+        ]);
+        if ($existing) {
+            $this->db->update('product_ratings', [
+                'product_rating' => $productRating,
+                'seller_rating' => $sellerRating,
+                'review_text' => $reviewText ? strip_tags($reviewText) : null,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ], ['id' => (int)$existing['id']]);
+            return ['id' => (int)$existing['id'], 'updated' => true];
+        }
+
+        $this->db->insert('product_ratings', [
+            'product_id' => $productId,
+            'order_id' => $orderId,
+            'buyer_id' => $buyerId,
+            'seller_id' => (int)$order['seller_id'],
+            'product_rating' => $productRating,
+            'seller_rating' => $sellerRating,
+            'review_text' => $reviewText ? strip_tags($reviewText) : null,
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        // Update product average rating
+        $avgRating = $this->db->avg('product_ratings', 'product_rating', ['product_id' => $productId]);
+        if ($avgRating !== null) {
+            $this->db->update('products', ['rating' => round((float)$avgRating, 1)], ['id' => $productId]);
+        }
+
+        // Notify seller about new review
+        try {
+            $pushService = new MallPushService($this->db);
+            $productTitle = $this->db->get('products', ['title'], ['id' => $productId])['title'] ?? 'a product';
+            $pushService->notify(
+                [(int)$order['seller_id']],
+                "New {$productRating}⭐ review on \"{$productTitle}\"",
+                'product_rating',
+                ['product_id' => $productId, 'url' => '/marketplace/sellers/products', 'event_key' => 'product_rating']
+            );
+        } catch (\Throwable $e) {}
+
+        return ['id' => (int)$this->db->id(), 'updated' => false];
     }
 
     private function sanitizeSlug(string $value): string

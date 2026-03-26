@@ -716,5 +716,6 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
 }());
 </script>
 
+<?php include __DIR__ . '/parts/bottom_nav.php'; ?>
 </body>
 </html>

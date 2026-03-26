@@ -434,6 +434,9 @@ class SellerController extends \Core\Controller
         }
 
         $productModel = new Product();
+        $maxQtyPerBuyer = isset($_POST['max_qty_per_buyer']) && $_POST['max_qty_per_buyer'] !== '' ? max(0, (int)$_POST['max_qty_per_buyer']) : null;
+        $requestMoreEnabled = (int)($_POST['request_more_enabled'] ?? 0) ? 1 : 0;
+
         $data = [
             'seller_id'    => $userId,
             'product_type' => $productType,
@@ -447,6 +450,8 @@ class SellerController extends \Core\Controller
             'pricing_rate' => $pricingRate,
             'markup_rate'  => $markupRate,
             'quantity'     => $qty,
+            'max_qty_per_buyer' => $maxQtyPerBuyer,
+            'request_more_enabled' => $requestMoreEnabled,
             'category_id'  => $category,
             'images'       => $imagesArray,
             'status'       => 'draft',
@@ -728,6 +733,9 @@ class SellerController extends \Core\Controller
             }
         }
 
+        $maxQtyPerBuyer = isset($_POST['max_qty_per_buyer']) && $_POST['max_qty_per_buyer'] !== '' ? max(0, (int)$_POST['max_qty_per_buyer']) : null;
+        $requestMoreEnabled = (int)($_POST['request_more_enabled'] ?? 0) ? 1 : 0;
+
         $this->db->update('products', [
             'product_type'      => $productType,
             'title'             => $title,
@@ -737,6 +745,8 @@ class SellerController extends \Core\Controller
             'price'             => $price,
             'currency'          => $currency,
             'quantity'          => $qty,
+            'max_qty_per_buyer' => $maxQtyPerBuyer,
+            'request_more_enabled' => $requestMoreEnabled,
             'category_id'       => $category,
             'pricing_model'     => $pricingModel,
             'pricing_rate'      => $pricingRate,

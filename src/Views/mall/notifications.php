@@ -523,3 +523,4 @@ $cleanLink = static function ($v): ?string {
     }
 }());
 </script>
+<?php include __DIR__ . '/parts/bottom_nav.php'; ?>

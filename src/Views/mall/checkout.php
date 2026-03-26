@@ -949,9 +949,6 @@ body.light .co-qr-spinner {
                 Wallet funds are purchase-only and cannot be withdrawn.
             </div>
 
-            <div id="checkoutError" style="display:none;margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fecaca;"></div>
-            <div id="checkoutInfo" style="display:none;margin-top:14px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#bfdbfe;"></div>
-
             <div id="paypalButtonsWrap" style="display:none;margin-top:18px;">
                 <div id="paypalButtonsContainer"></div>
             </div>
@@ -1123,6 +1120,8 @@ body.light .co-qr-spinner {
             <div class="co-card-help">Card payments are processed securely by PayMongo. If your bank requires OTP or 3DS verification, it will open inside this checkout flow.</div>
             <div id="coCardStatus" class="co-card-status"></div>
         </div>
+        <div id="checkoutError" style="display:none;margin:0 28px 8px;padding:12px 14px;border-radius:14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.25);color:#fecaca;"></div>
+        <div id="checkoutInfo" style="display:none;margin:0 28px 8px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#bfdbfe;"></div>
         <div class="co-actions">
             <button id="coConfirm" class="co-btn-confirm">Confirm &amp; Pay</button>
             <button id="coCancel" class="co-btn-cancel">Cancel</button>

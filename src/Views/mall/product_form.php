@@ -601,6 +601,27 @@ select.pf-input    { cursor: pointer; }
                     </div>
                 </div>
 
+                <!-- Buyer Purchase Limit -->
+                <div class="pf-grid-2" style="margin-top:8px;">
+                    <div class="pf-group">
+                        <label class="pf-label" for="pf-max-qty">Max Qty Per Buyer</label>
+                        <input class="pf-input" id="pf-max-qty" type="number" min="0" name="max_qty_per_buyer"
+                            placeholder="0 = no limit"
+                            value="<?= htmlspecialchars((string)($p['max_qty_per_buyer'] ?? '')) ?>">
+                        <span class="pf-hint">Safe threshold per buyer. 0 or blank means no limit. Exceeding this triggers a "Request More" approval from you.</span>
+                    </div>
+                    <div class="pf-group" style="display:flex;align-items:center;gap:10px;padding-top:28px;">
+                        <label class="pf-switch" style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;">
+                            <input type="hidden" name="request_more_enabled" value="0">
+                            <input type="checkbox" name="request_more_enabled" value="1"
+                                <?= !empty($p['request_more_enabled']) ? 'checked' : '' ?>
+                                style="width:18px;height:18px;accent-color:var(--accent);">
+                            <span style="font-size:0.88rem;">Enable "Request More" for repeat buyers</span>
+                        </label>
+                        <span class="pf-hint" style="margin:0;font-size:0.78rem;">Allow verified buyers to request quantities above the max limit for your approval.</span>
+                    </div>
+                </div>
+
                 <!-- Colors / Variants -->
                 <div class="pf-group">
                     <label class="pf-label">Available Colors <span style="font-weight:400;color:var(--muted)">(optional)</span></label>

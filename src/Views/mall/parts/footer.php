@@ -885,6 +885,27 @@
         }
     }
 
+    // Bell sound for new notifications
+    let _lastNotifCount = parseInt(mallNotifyBadge ? mallNotifyBadge.textContent : '0', 10) || 0;
+    const _bellAudio = (function() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            return function playBell() {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(830, ctx.currentTime);
+                osc.frequency.setValueAtTime(660, ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.4);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.4);
+            };
+        } catch (_) { return function(){}; }
+    })();
+
     async function refreshNotifications() {
         try {
             const res = await fetch('/api/mall/notifications?page=1', {
@@ -895,7 +916,12 @@
             if (!res.ok) return;
             const json = await res.json();
             if (!json || json.success !== true) return;
-            updateNotificationBadge(parseInt(json.count || 0, 10) || 0);
+            const newCount = parseInt(json.count || 0, 10) || 0;
+            if (newCount > _lastNotifCount && _lastNotifCount >= 0) {
+                try { _bellAudio(); } catch(_) {}
+            }
+            _lastNotifCount = newCount;
+            updateNotificationBadge(newCount);
             renderNotificationPanel(Array.isArray(json.notifications) ? json.notifications : []);
         } catch (_) { }
     }
@@ -1494,3 +1520,4 @@
 }());
 
 </script>
+<?php include __DIR__ . '/bottom_nav.php'; ?>

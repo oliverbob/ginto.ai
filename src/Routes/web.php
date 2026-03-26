@@ -1310,7 +1310,14 @@ $router->req('/api/mall/wallet/payout-account/delete', 'MallCheckoutController@d
 $router->req('/api/mall/delivery/claim', 'MallCheckoutController@deliveryClaim', ['POST']);
 $router->req('/api/mall/orders/status', 'MallCheckoutController@orderStatusUpdate', ['POST']);
 
-// Delivery system
+// Delivery proof + rating APIs
+$router->req('/api/mall/delivery/proof/upload', 'MallCheckoutController@uploadDeliveryProof', ['POST']);
+$router->req('/api/mall/rating/submit', 'MallCheckoutController@submitRating', ['POST']);
+$router->req('/api/mall/delivery/proofs/{orderId}', 'MallCheckoutController@getDeliveryProofs', ['GET']);
+$router->req('/api/mall/product/request-more', 'MallCheckoutController@requestMoreProduct', ['POST']);
+
+// Delivery pages
+$router->req('/mall/me', 'MallCheckoutController@mePage');
 $router->req('/mall/delivery', 'MallDeliveryController@index');
 $router->req('/mall/delivery/rider', 'MallDeliveryController@riderDashboard');
 $router->req('/mall/delivery/admin', 'MallDeliveryController@adminLogistics');

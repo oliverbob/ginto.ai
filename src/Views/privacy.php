@@ -140,6 +140,8 @@
                             <li><strong>Communications:</strong> Messages, feedback, or support requests you send us.</li>
                             <li><strong>User-generated content:</strong> Prompts, code, files, and other content you create or upload while using the Services.</li>
                             <li><strong>Referral data:</strong> Referral codes used during registration to attribute network relationships.</li>
+                            <li><strong>GPS / Location data:</strong> When using the ePower Mall delivery features, we collect your precise GPS coordinates to auto-detect your barangay, verify delivery proof locations, and optimize the delivery experience. Location access is requested with your permission and is used solely for delivery and commerce purposes.</li>
+                            <li><strong>Delivery proof photographs:</strong> Buyers and sellers may upload photographs as proof of delivery, including product arrival photos, selfies with the customer, and condition documentation. These images may include embedded GPS metadata (EXIF data) and are stored securely on our servers or third-party storage providers.</li>
                         </ul>
 
                         <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-2">3.2 Information Collected Automatically</h3>
@@ -148,6 +150,7 @@
                             <li><strong>Usage data:</strong> Pages visited, features used, session duration, click paths, and interaction logs.</li>
                             <li><strong>Log data:</strong> Server access logs including timestamps, requested URLs, HTTP status codes, and referring URLs.</li>
                             <li><strong>Session identifiers:</strong> Secure cookies and session tokens used to maintain your authenticated state.</li>
+                            <li><strong>Location data (automatic):</strong> When you grant location permissions on the Ginto mobile app, we may collect your device's GPS coordinates in the background to support location-based barangay detection and delivery features. You may revoke this permission at any time through your device settings.</li>
                         </ul>
 
                         <h3 class="text-base font-semibold text-gray-800 dark:text-gray-200 mt-5 mb-2">3.3 Information from Third Parties</h3>
