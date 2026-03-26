@@ -1064,17 +1064,15 @@ select.pf-input    { cursor: pointer; }
                 }).catch(function(){});
         };
 
-        // Load existing product zones
-        if (productId) {
-            fetch('/api/barangay/product/zones?product_id=' + productId)
-                .then(function(r){ return r.json(); })
-                .then(function(d){
-                    if (d.use_custom) { customCb.checked = true; editor.style.display = ''; }
-                    if (d.zones && d.zones.length) {
-                        pzones = d.zones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province}; });
-                        renderPZones();
-                    }
-                }).catch(function(){});
+        // Load existing product zones from server-side data (pre-loaded in controller)
+        var serverZones = <?= json_encode($product_zones ?? []) ?>;
+        var serverUseCustom = <?= json_encode($use_custom_zones ?? false) ?>;
+        if (serverUseCustom) {
+            customCb.checked = true;
+            editor.style.display = '';
+        }
+        if (serverZones && serverZones.length) {
+            pzones = serverZones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province||''}; });
         }
         renderPZones();
 

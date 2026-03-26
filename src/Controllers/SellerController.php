@@ -616,6 +616,17 @@ class SellerController extends \Core\Controller
 
         $commerce = new MallCommerceService();
         $walletSummary = $commerce->getWalletSummary($userId);
+
+        // Pre-load product delivery zones so they render immediately on page load
+        $productZones = [];
+        $useCustomZones = (bool)($product['use_custom_zones'] ?? false);
+        if ($useCustomZones) {
+            $productZones = $this->db->query(
+                "SELECT b.id, b.name, b.city, b.province FROM product_delivery_zones pz JOIN barangays b ON b.id = pz.barangay_id WHERE pz.product_id = :pid AND b.is_active = 1 ORDER BY b.city ASC, b.name ASC",
+                [':pid' => $productId]
+            )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        }
+
         return $this->view('mall/product_form', [
             'csrf_token'          => $csrf,
             'categories'          => $categories,
@@ -625,6 +636,8 @@ class SellerController extends \Core\Controller
             'tos_agreed'          => $tosAgreed,
             'is_admin'            => $isAdmin,
             'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'product_zones'       => $productZones,
+            'use_custom_zones'    => $useCustomZones,
         ]);
     }
 
