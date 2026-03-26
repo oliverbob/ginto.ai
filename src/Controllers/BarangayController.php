@@ -678,15 +678,27 @@ class BarangayController extends \Core\Controller
                 $lat = $barangayData[$bid]['lat'] ?? null;
                 $lng = $barangayData[$bid]['lng'] ?? null;
                 error_log('DEBUG saveSellerZones: inserting seller_id=' . $userId . ' barangay_id=' . $bid . ' home=' . (($bid === $homeBarangayId) ? 1 : 0) . ' lat=' . $lat . ' lng=' . $lng);
-                $this->db->insert('seller_delivery_zones', [
+
+                $insertResult = $this->db->insert('seller_delivery_zones', [
                     'seller_id'   => $userId,
                     'barangay_id' => (int)$bid,
                     'is_home'     => ($bid === $homeBarangayId) ? 1 : 0,
                     'lat'         => $lat,
                     'lng'         => $lng,
                 ]);
+
+                $insertId = null;
+                if ($insertResult !== false) {
+                    try {
+                        $insertId = $this->db->id();
+                    } catch (\Throwable $e) {
+                        $insertId = null;
+                    }
+                }
+                error_log('TRACE saveSellerZones insert result: seller_id=' . $userId . ' barangay_id=' . $bid . ' status=' . ($insertResult !== false ? 'success' : 'failure') . ' inserted_id=' . ($insertId ?? 'null'));
             }
 
+            error_log('TRACE saveSellerZones end: user_id=' . $userId . ' total_inserted=' . count($barangayIds) . ' home_barangay_id=' . $homeBarangayId);
             echo json_encode(['success' => true, 'zones_saved' => count($barangayIds)]);
         } catch (\Throwable $e) {
             error_log('BarangayController::saveSellerZones error: ' . $e->getMessage());
