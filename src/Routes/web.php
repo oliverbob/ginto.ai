@@ -1347,6 +1347,7 @@ $router->req('/api/barangay/buyer/saved-address',  'BarangayController@buyerSave
 $router->req('/api/barangay/runner/register',      'BarangayController@runnerRegister',  ['POST']);
 $router->req('/api/barangay/runners',              'BarangayController@listRunners',     ['GET']);
 $router->req('/api/barangay/nearby',               'BarangayController@nearby',          ['GET']);
+$router->req('/api/barangay/register-geo',         'BarangayController@registerGeo',     ['POST']);
 $router->req('/mall/notifications', 'MallController@notificationsPage');
 $router->req('/mall/product/{slug:[a-zA-Z0-9][a-zA-Z0-9_-]*}', 'MallController@productPage');
 

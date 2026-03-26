@@ -662,6 +662,61 @@ sudo systemctl restart php8.3-fpm
 > **📖 See [docker/README.md](docker/README.md) for complete Docker documentation.**
 
 ---
+## 🌍 Geographic Database (GeoNames)
+
+Ginto AI includes a worldwide geographic database powered by [GeoNames.org](https://www.geonames.org/) (Creative Commons Attribution 4.0). This enables:
+
+- **All 42,000+ Philippine barangays** searchable in zone management
+- **International coverage** — every country, city, village, and administrative division worldwide
+- **GPS-based detection** — auto-detect buyer location from coordinates
+- **On-demand registration** — global places are auto-registered when selected as delivery zones
+
+### Importing Geographic Data
+
+After installation, import geographic data using the CLI tool:
+
+```bash
+# Import Philippines (42,000+ barangays, ~5MB download)
+php bin/geo_import.php PH
+
+# Import multiple countries
+php bin/geo_import.php PH,US,JP
+
+# Import ALL countries (~12M records, ~400MB download)
+php bin/geo_import.php all
+
+# Check import status
+php bin/geo_import.php --status
+
+# Re-import (force overwrite)
+php bin/geo_import.php PH --force
+```
+
+### How It Works
+
+1. **`geo_places` table** — Stores the complete GeoNames dataset (populated places + administrative divisions)
+2. **`barangays` table** — Active registered zones used by sellers and delivery system
+3. **Zone search** — Searches `barangays` first; if few results, falls back to `geo_places` (FULLTEXT search)
+4. **Auto-register** — When a seller selects a GeoNames place as a zone, it's automatically inserted into `barangays`
+
+### Auto-Import During Install
+
+The installer (`bin/gintoai.sh`) automatically imports PH data during setup. To configure which countries to import, set in `.env`:
+
+```env
+GEO_COUNTRIES=PH        # Default: Philippines only
+GEO_COUNTRIES=PH,US,JP  # Multiple countries
+GEO_COUNTRIES=all        # All countries (large)
+```
+
+### Data Source
+
+- **Source:** [download.geonames.org/export/dump/](https://download.geonames.org/export/dump/)
+- **License:** Creative Commons Attribution 4.0
+- **Filtered:** Only `A` (administrative) and `P` (populated place) feature classes are imported
+- **Tables:** `geo_places`, `geo_admin1`, `geo_import_log`
+
+---
 ## 🗺️ Roadmap
 
 ### Installation Modes (Coming Soon)

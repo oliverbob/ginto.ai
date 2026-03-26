@@ -726,12 +726,18 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                 return;
                             }
                             res.innerHTML = d.barangays.map(function(b) {
-                                var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
-                                return '<div onclick="' + (added ? '' : 'dzAddFromSearch(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + b.city.replace(/'/g,'\\\'') + '\',\'' + b.province.replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')') + '" '
+                                var isGeo = String(b.id).indexOf('geo_') === 0;
+                                var numId = isGeo ? 0 : parseInt(b.id);
+                                var added = !isGeo && selectedZones.some(function(z){ return z.id === numId; });
+                                var badge = isGeo ? ' <span style="color:#6366f1;font-size:0.68rem;background:rgba(99,102,241,0.12);padding:1px 5px;border-radius:3px;margin-left:4px;">🌍 GeoNames</span>' : '';
+                                var onclick = added ? '' : (isGeo
+                                    ? 'dzAddGeo(' + JSON.stringify(b.id).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.name).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.city||'').replace(/"/g,'&quot;') + ',' + JSON.stringify(b.province||'').replace(/"/g,'&quot;') + ',' + (b.lat||0) + ',' + (b.lng||0) + ')'
+                                    : 'dzAddFromSearch(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')');
+                                return '<div onclick="' + onclick + '" '
                                     + 'style="padding:12px 16px;cursor:' + (added ? 'default' : 'pointer') + ';border-bottom:1px solid var(--border);font-size:0.87rem;display:flex;justify-content:space-between;align-items:center;'
                                     + (added ? 'opacity:0.4;' : '') + 'transition:background 0.1s;" '
                                     + (added ? '' : 'onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'"') + '>'
-                                    + '<span>' + htmlesc(b.name + ', ' + b.city) + ' <span style="color:var(--muted);font-size:0.76rem;">' + htmlesc(b.province) + '</span></span>'
+                                    + '<span>' + htmlesc(b.name + ', ' + (b.city||'')) + ' <span style="color:var(--muted);font-size:0.76rem;">' + htmlesc(b.province||b.region||'') + '</span>' + badge + '</span>'
                                     + (added ? '<span style="color:#22c55e;font-size:0.78rem;">✓ Added</span>' : '<span style="color:var(--accent);font-size:0.78rem;font-weight:600;">+ Add</span>')
                                     + '</div>';
                             }).join('');
@@ -739,6 +745,20 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                         }).catch(function(){});
                 }, 250);
             });
+
+            // Register a GeoNames place into barangays, then add as zone
+            window.dzAddGeo = function(geoId, name, city, province, lat, lng) {
+                var numericGeoId = parseInt(String(geoId).replace('geo_', ''));
+                var body = new URLSearchParams();
+                body.append('geoname_id', numericGeoId);
+                fetch('/api/barangay/register-geo', {method:'POST', body:body})
+                    .then(function(r){ return r.json(); })
+                    .then(function(d) {
+                        if (d.success && d.barangay) {
+                            dzAddFromSearch(d.barangay.id, d.barangay.name, d.barangay.city||city, d.barangay.province||province, d.barangay.lat||lat, d.barangay.lng||lng);
+                        }
+                    }).catch(function(){});
+            };
 
             window.dzAddFromSearch = function(id, name, city, province, lat, lng) {
                 if (addZoneObj({id:id, name:name, city:city, province:province, lat:lat, lng:lng})) {

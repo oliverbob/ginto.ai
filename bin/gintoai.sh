@@ -67,6 +67,7 @@ INSTALL_STEPS_NATIVE=(
     "configure_firewall"
     "install_dependencies"
     "setup_env"
+    "import_geonames"
     "start_services"
     "print_summary"
 )
@@ -2295,6 +2296,40 @@ setup_env() {
     fi
     
     log_success "Database configuration written to .env"
+}
+
+# Import GeoNames geographic data for zone search
+import_geonames() {
+    log_step "Importing geographic data (GeoNames)..."
+
+    local geo_import="$PROJECT_DIR/bin/geo_import.php"
+    if [ ! -f "$geo_import" ]; then
+        log_warn "geo_import.php not found, skipping"
+        return 0
+    fi
+
+    # Check if already imported
+    local count
+    count=$(sudo -u "$INSTALL_USER" php "$geo_import" --status 2>/dev/null | grep -c "PH" || true)
+    if [ "$count" -gt 0 ]; then
+        log_info "GeoNames PH data already imported, skipping"
+        return 0
+    fi
+
+    # Read GEO_COUNTRIES from .env (default: PH)
+    local countries="PH"
+    if [ -f "$PROJECT_DIR/.env" ]; then
+        local env_countries
+        env_countries=$(grep -E "^GEO_COUNTRIES=" "$PROJECT_DIR/.env" 2>/dev/null | cut -d= -f2 | tr -d '"' | tr -d "'" || true)
+        if [ -n "$env_countries" ]; then
+            countries="$env_countries"
+        fi
+    fi
+
+    log_info "Importing geographic data for: $countries"
+    sudo -u "$INSTALL_USER" php "$geo_import" "$countries" 2>&1 | tail -20
+
+    log_success "Geographic data import complete"
 }
 
 # Start services

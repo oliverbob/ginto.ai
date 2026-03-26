@@ -1345,7 +1345,6 @@ body.light .co-qr-spinner {
             buyer_notes: document.getElementById('shipBuyerNotes').value,
             remember_address: document.getElementById('coRememberAddress') ? document.getElementById('coRememberAddress').checked : false,
         };
-        };
     }
 
     function setError(message) {

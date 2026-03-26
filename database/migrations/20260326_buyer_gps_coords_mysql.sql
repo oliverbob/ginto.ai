@@ -1,17 +1,16 @@
 -- Add buyer GPS coordinates to users table for precise location persistence
--- Safe to re-run: uses stored procedure for idempotent column addition
+-- Safe to re-run: checks if columns exist before adding
 
-DELIMITER //
-DROP PROCEDURE IF EXISTS safe_add_col//
-CREATE PROCEDURE safe_add_col(IN tbl VARCHAR(64), IN col VARCHAR(64), IN col_def VARCHAR(255), IN after_col VARCHAR(64))
-BEGIN
-    SET @q = CONCAT('ALTER TABLE `', tbl, '` ADD COLUMN `', col, '` ', col_def, ' AFTER `', after_col, '`');
-    SET @c = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = tbl AND column_name = col);
-    IF @c = 0 THEN PREPARE stmt FROM @q; EXECUTE stmt; DEALLOCATE PREPARE stmt; END IF;
-END//
-DELIMITER ;
+SET @db = DATABASE();
 
-CALL safe_add_col('users', 'buyer_lat', 'DECIMAL(10,7) DEFAULT NULL', 'buyer_barangay_id');
-CALL safe_add_col('users', 'buyer_lng', 'DECIMAL(10,7) DEFAULT NULL', 'buyer_lat');
+SET @has_lat = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = @db AND table_name = 'users' AND column_name = 'buyer_lat');
+SET @sql_lat = IF(@has_lat = 0, 'ALTER TABLE `users` ADD COLUMN `buyer_lat` DECIMAL(10,7) DEFAULT NULL AFTER `buyer_barangay_id`', 'SELECT 1');
+PREPARE stmt FROM @sql_lat;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-DROP PROCEDURE IF EXISTS safe_add_col;
+SET @has_lng = (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = @db AND table_name = 'users' AND column_name = 'buyer_lng');
+SET @sql_lng = IF(@has_lng = 0, 'ALTER TABLE `users` ADD COLUMN `buyer_lng` DECIMAL(10,7) DEFAULT NULL AFTER `buyer_lat`', 'SELECT 1');
+PREPARE stmt FROM @sql_lng;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;

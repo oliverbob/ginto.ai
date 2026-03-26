@@ -1050,6 +1050,20 @@ select.pf-input    { cursor: pointer; }
             renderPZones();
         };
 
+        // Register a GeoNames place then add as zone
+        window.pfAddGeo = function(geoId, name, city, province){
+            var numericGeoId = parseInt(String(geoId).replace('geo_', ''));
+            var body = new URLSearchParams();
+            body.append('geoname_id', numericGeoId);
+            fetch('/api/barangay/register-geo', {method:'POST', body:body})
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    if (d.success && d.barangay) {
+                        pfAddZone(d.barangay.id, d.barangay.name, d.barangay.city||city, d.barangay.province||province);
+                    }
+                }).catch(function(){});
+        };
+
         // Load existing product zones
         if (productId) {
             fetch('/api/barangay/product/zones?product_id=' + productId)
@@ -1075,9 +1089,15 @@ select.pf-input    { cursor: pointer; }
                     .then(function(d){
                         if (!d.barangays||!d.barangays.length) { resultsEl.innerHTML='<div style="padding:10px 14px;color:var(--muted);font-size:0.84rem;">No results</div>'; resultsEl.style.display='block'; return; }
                         resultsEl.innerHTML = d.barangays.map(function(b){
-                            var added = pzones.some(function(z){ return z.id===parseInt(b.id); });
-                            return '<div onclick="'+(added?'':'pfAddZone('+b.id+',\''+b.name.replace(/'/g,'\\\'')+'\',\''+b.city.replace(/'/g,'\\\'')+'\',\''+b.province.replace(/'/g,'\\\'')+'\')')+'" style="padding:8px 14px;cursor:'+(added?'default':'pointer')+';border-bottom:1px solid var(--border);font-size:0.85rem;'+(added?'opacity:0.35;':'')+'">'
-                                + htmlesc(b.name+', '+b.city) + ' <span style="color:var(--muted);font-size:0.76rem;">'+htmlesc(b.province)+'</span>'
+                            var isGeo = String(b.id).indexOf('geo_') === 0;
+                            var numId = isGeo ? 0 : parseInt(b.id);
+                            var added = !isGeo && pzones.some(function(z){ return z.id===numId; });
+                            var badge = isGeo ? ' <span style="color:#6366f1;font-size:0.68rem;background:rgba(99,102,241,0.12);padding:1px 5px;border-radius:3px;margin-left:4px;">🌍</span>' : '';
+                            var onclick = added ? '' : (isGeo
+                                ? 'pfAddGeo('+JSON.stringify(b.id)+','+JSON.stringify(b.name)+','+JSON.stringify(b.city||'')+','+JSON.stringify(b.province||'')+')'
+                                : 'pfAddZone('+b.id+',\''+b.name.replace(/'/g,'\\\'')+'\',\''+(b.city||'').replace(/'/g,'\\\'')+'\',\''+(b.province||'').replace(/'/g,'\\\'')+'\')');
+                            return '<div onclick="'+onclick+'" style="padding:8px 14px;cursor:'+(added?'default':'pointer')+';border-bottom:1px solid var(--border);font-size:0.85rem;'+(added?'opacity:0.35;':'')+'">'
+                                + htmlesc(b.name+', '+(b.city||'')) + ' <span style="color:var(--muted);font-size:0.76rem;">'+htmlesc(b.province||b.region||'')+'</span>' + badge
                                 + (added?' <span style="color:#22c55e;font-size:0.76rem;">✓</span>':' <span style="color:var(--accent);font-size:0.76rem;">+ Add</span>')
                                 + '</div>';
                         }).join('');

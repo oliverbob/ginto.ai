@@ -189,21 +189,26 @@ class BarangayController extends \Core\Controller
     // ── GET /api/barangay/list ──────────────────────────────────────────────
     /**
      * Returns a searchable list of active barangays.
-     * Query params: q (search text), city, limit (max 100), page
+     * Searches local barangays first, then falls back to geo_places (GeoNames)
+     * for worldwide coverage including all 42,000+ Philippine barangays.
+     *
+     * Query params: q (search text), city, country (ISO 2-letter), limit (max 100), page
      */
     public function list(): void
     {
         header('Content-Type: application/json');
 
-        $q      = trim(strip_tags($_GET['q'] ?? ''));
-        $city   = trim(strip_tags($_GET['city'] ?? ''));
-        $limit  = min(100, max(10, (int)($_GET['limit'] ?? 50)));
-        $page   = max(1, (int)($_GET['page'] ?? 1));
-        $offset = ($page - 1) * $limit;
+        $q       = trim(strip_tags($_GET['q'] ?? ''));
+        $city    = trim(strip_tags($_GET['city'] ?? ''));
+        $country = strtoupper(trim(strip_tags($_GET['country'] ?? '')));
+        $limit   = min(100, max(10, (int)($_GET['limit'] ?? 50)));
+        $page    = max(1, (int)($_GET['page'] ?? 1));
+        $offset  = ($page - 1) * $limit;
 
         try {
+            // 1. Search registered barangays first
             $where = ['is_active' => 1];
-            if ($q !== '')   $where['OR'] = ['name[~]' => $q, 'city[~]' => $q, 'province[~]' => $q];
+            if ($q !== '')    $where['OR'] = ['name[~]' => $q, 'city[~]' => $q, 'province[~]' => $q];
             if ($city !== '') $where['city'] = $city;
             $where['ORDER'] = ['city' => 'ASC', 'name' => 'ASC'];
             $where['LIMIT'] = [$offset, $limit];
@@ -212,10 +217,229 @@ class BarangayController extends \Core\Controller
                 'id', 'name', 'city', 'province', 'region', 'lat', 'lng'
             ], $where) ?: [];
 
+            // 2. If we have few results and geo_places table exists, search there too
+            if (count($rows) < $limit && $q !== '' && $this->geoPlacesAvailable()) {
+                $needed = $limit - count($rows);
+                $registeredGeoIds = [];
+                foreach ($rows as $r) {
+                    // Collect IDs to exclude from geo search
+                    $registeredGeoIds[] = (int)$r['id'];
+                }
+
+                $geoRows = $this->searchGeoPlaces($q, $country, $needed, $offset > 0 ? 0 : $offset, $registeredGeoIds);
+
+                foreach ($geoRows as $g) {
+                    $rows[] = [
+                        'id'       => 'geo_' . $g['geoname_id'],
+                        'name'     => $g['name'],
+                        'city'     => $g['admin2_name'] ?: $g['admin2_code'],
+                        'province' => $g['admin1_name'] ?: $g['admin1_code'],
+                        'region'   => $g['country_code'],
+                        'lat'      => $g['latitude'],
+                        'lng'      => $g['longitude'],
+                        'source'   => 'geo',
+                    ];
+                }
+            }
+
             echo json_encode(['barangays' => $rows, 'page' => $page]);
         } catch (\Throwable $e) {
             error_log('BarangayController::list error: ' . $e->getMessage());
             echo json_encode(['barangays' => [], 'page' => 1]);
+        }
+    }
+
+    /**
+     * Check if the geo_places table exists and has data.
+     */
+    private function geoPlacesAvailable(): bool
+    {
+        static $available = null;
+        if ($available !== null) return $available;
+        try {
+            $result = $this->db->query("SELECT 1 FROM geo_places LIMIT 1")->fetch();
+            $available = $result !== false;
+        } catch (\Throwable $e) {
+            $available = false;
+        }
+        return $available;
+    }
+
+    /**
+     * Search the geo_places table using FULLTEXT or LIKE matching.
+     * Returns array of geo place rows with resolved admin names.
+     */
+    private function searchGeoPlaces(string $q, string $country, int $limit, int $offset, array $excludeBarangayIds): array
+    {
+        $pdo = $this->db->pdo;
+
+        // Build WHERE clauses
+        $params = [];
+        $whereParts = ["g.feature_class IN ('A','P')"];
+
+        if ($country !== '' && preg_match('/^[A-Z]{2}$/', $country)) {
+            $whereParts[] = "g.country_code = :country";
+            $params[':country'] = $country;
+        }
+
+        // Exclude geo_places already registered in barangays (by geoname_id)
+        $excludeGeoSql = '';
+        if (!empty($excludeBarangayIds)) {
+            $excludeGeoSql = "AND g.geoname_id NOT IN (SELECT COALESCE(geoname_id, 0) FROM barangays WHERE geoname_id IS NOT NULL)";
+        }
+
+        // Try FULLTEXT first (more relevant results for multi-word queries)
+        $safeQ = preg_replace('/[^\p{L}\p{N}\s]/u', '', $q);
+        // Use MATCH ... AGAINST in boolean mode for partial matching
+        $ftQuery = '+' . implode('* +', explode(' ', trim($safeQ))) . '*';
+
+        $sql = "
+            SELECT g.geoname_id, g.name, g.ascii_name, g.latitude, g.longitude,
+                   g.feature_class, g.feature_code, g.country_code,
+                   g.admin1_code, g.admin2_code, g.population,
+                   COALESCE(a1.name, g.admin1_code) AS admin1_name,
+                   COALESCE(a1.name, g.admin2_code) AS admin2_name,
+                   MATCH(g.name, g.ascii_name) AGAINST(:ft_q IN BOOLEAN MODE) AS relevance
+            FROM geo_places g
+            LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(g.country_code, '.', g.admin1_code)
+            WHERE " . implode(' AND ', $whereParts) . "
+              AND MATCH(g.name, g.ascii_name) AGAINST(:ft_q2 IN BOOLEAN MODE)
+              $excludeGeoSql
+            ORDER BY relevance DESC, g.population DESC
+            LIMIT :lim OFFSET :off
+        ";
+
+        $params[':ft_q']  = $ftQuery;
+        $params[':ft_q2'] = $ftQuery;
+        $params[':lim']   = $limit;
+        $params[':off']   = $offset;
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            foreach ($params as $k => $v) {
+                $stmt->bindValue($k, $v, is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            }
+            $stmt->execute();
+            $results = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+            if (!empty($results)) return $results;
+        } catch (\Throwable $e) {
+            error_log('searchGeoPlaces FULLTEXT error: ' . $e->getMessage());
+        }
+
+        // Fallback: LIKE search if FULLTEXT returned nothing
+        $likeParts = $whereParts;
+        $likeParams = $params;
+        unset($likeParams[':ft_q'], $likeParams[':ft_q2']);
+        $likeParts[] = "(g.name LIKE :like_q OR g.ascii_name LIKE :like_q2)";
+        $likeParams[':like_q']  = '%' . $safeQ . '%';
+        $likeParams[':like_q2'] = '%' . $safeQ . '%';
+
+        $sql = "
+            SELECT g.geoname_id, g.name, g.ascii_name, g.latitude, g.longitude,
+                   g.feature_class, g.feature_code, g.country_code,
+                   g.admin1_code, g.admin2_code, g.population,
+                   COALESCE(a1.name, g.admin1_code) AS admin1_name,
+                   COALESCE(a1.name, g.admin2_code) AS admin2_name
+            FROM geo_places g
+            LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(g.country_code, '.', g.admin1_code)
+            WHERE " . implode(' AND ', $likeParts) . "
+              $excludeGeoSql
+            ORDER BY g.population DESC
+            LIMIT :lim OFFSET :off
+        ";
+
+        try {
+            $stmt = $pdo->prepare($sql);
+            foreach ($likeParams as $k => $v) {
+                $stmt->bindValue($k, $v, is_int($v) ? \PDO::PARAM_INT : \PDO::PARAM_STR);
+            }
+            $stmt->execute();
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('searchGeoPlaces LIKE error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    // ── POST /api/barangay/register-geo ─────────────────────────────────────
+    /**
+     * Registers a geo_place into the barangays table (auto-creates a barangay
+     * record from GeoNames data when a seller selects a zone from global search).
+     * Body: geoname_id (int)
+     * Returns: { success, barangay: { id, name, city, province, ... } }
+     */
+    public function registerGeo(): void
+    {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'POST required']);
+            return;
+        }
+
+        $geonameId = (int)($_POST['geoname_id'] ?? 0);
+        if ($geonameId <= 0) {
+            echo json_encode(['success' => false, 'error' => 'Invalid geoname_id']);
+            return;
+        }
+
+        try {
+            // Check if already registered
+            $existing = $this->db->get('barangays', ['id', 'name', 'city', 'province', 'region', 'lat [Number]', 'lng [Number]'], [
+                'geoname_id' => $geonameId
+            ]);
+            if ($existing) {
+                echo json_encode(['success' => true, 'barangay' => $existing]);
+                return;
+            }
+
+            // Fetch from geo_places
+            $pdo = $this->db->pdo;
+            $stmt = $pdo->prepare("
+                SELECT g.geoname_id, g.name, g.latitude, g.longitude,
+                       g.country_code, g.admin1_code, g.admin2_code,
+                       COALESCE(a1.name, g.admin1_code) AS admin1_name
+                FROM geo_places g
+                LEFT JOIN geo_admin1 a1 ON a1.code = CONCAT(g.country_code, '.', g.admin1_code)
+                WHERE g.geoname_id = ?
+            ");
+            $stmt->execute([$geonameId]);
+            $geo = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$geo) {
+                echo json_encode(['success' => false, 'error' => 'GeoName place not found']);
+                return;
+            }
+
+            // Insert into barangays
+            $this->db->insert('barangays', [
+                'geoname_id' => $geonameId,
+                'name'       => $geo['name'],
+                'city'       => $geo['admin2_code'] ?: '',
+                'province'   => $geo['admin1_name'] ?: '',
+                'region'     => $geo['country_code'],
+                'lat'        => $geo['latitude'],
+                'lng'        => $geo['longitude'],
+                'radius_m'   => 1500,
+                'is_active'  => 1,
+            ]);
+            $newId = (int)$this->db->id();
+
+            $barangay = [
+                'id'       => $newId,
+                'name'     => $geo['name'],
+                'city'     => $geo['admin2_code'] ?: '',
+                'province' => $geo['admin1_name'] ?: '',
+                'region'   => $geo['country_code'],
+                'lat'      => (float)$geo['latitude'],
+                'lng'      => (float)$geo['longitude'],
+            ];
+
+            echo json_encode(['success' => true, 'barangay' => $barangay]);
+        } catch (\Throwable $e) {
+            error_log('BarangayController::registerGeo error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Failed to register place']);
         }
     }
 
