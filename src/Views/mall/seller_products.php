@@ -732,8 +732,11 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                 var badge = isGeo ? ' <span style="color:#6366f1;font-size:0.68rem;background:rgba(99,102,241,0.12);padding:1px 5px;border-radius:3px;margin-left:4px;">🌍 GeoNames</span>' : '';
                                 var onclick = added ? '' : (isGeo
                                     ? 'dzAddGeo(' + JSON.stringify(b.id).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.name).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.city||'').replace(/"/g,'&quot;') + ',' + JSON.stringify(b.province||'').replace(/"/g,'&quot;') + ',' + (b.lat||0) + ',' + (b.lng||0) + ')'
-                                    : 'dzAddFromSearch(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')');
-                                return '<div onclick="' + onclick + '" '
+                                    : 'dzAddFromSearch(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')'); 
+                                var onclickWithMap = added ? '' : (isGeo
+                                    ? 'dzAddGeo(' + JSON.stringify(b.id).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.name).replace(/"/g,'&quot;') + ',' + JSON.stringify(b.city||'').replace(/"/g,'&quot;') + ',' + JSON.stringify(b.province||'').replace(/"/g,'&quot;') + ',' + (b.lat||0) + ',' + (b.lng||0) + '); initMap(' + (b.lat||0) + ',' + (b.lng||0) + ')' 
+                                    : 'dzAddFromSearch(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + '); initMap(' + (b.lat||0) + ',' + (b.lng||0) + ')' );
+                                return '<div onclick="' + onclickWithMap + '" '
                                     + 'style="padding:12px 16px;cursor:' + (added ? 'default' : 'pointer') + ';border-bottom:1px solid var(--border);font-size:0.87rem;display:flex;justify-content:space-between;align-items:center;'
                                     + (added ? 'opacity:0.4;' : '') + 'transition:background 0.1s;" '
                                     + (added ? '' : 'onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'"') + '>'
@@ -766,6 +769,36 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     document.getElementById('dz-results').style.display = 'none';
                     document.getElementById('dz-search').value = '';
                     renderZones();
+                    // show map for selected search location
+                    if (!_map) {
+                        initMap(lat, lng);
+                    } else {
+                        _map.setView([lat, lng], 14);
+                        updateMapMarkers();
+                    }
+                    // now show nearby candidate barangays around map point
+                    fetch('/api/barangay/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng) + '&limit=15')
+                        .then(function(r){ return r.json(); })
+                        .then(function(d) {
+                            var sugWrap = document.getElementById('dz-suggestions');
+                            var sugList = document.getElementById('dz-suggested-list');
+                            if (!d.barangays || !d.barangays.length) {
+                                sugWrap.style.display = 'none';
+                                return;
+                            }
+                            sugWrap.style.display = 'block';
+                            sugList.innerHTML = d.barangays.map(function(b){
+                                var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
+                                return '<button onclick="dzAddSuggested(this,' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')" '
+                                    + 'style="padding:6px 12px;border-radius:20px;border:1px solid ' + (added ? 'rgba(34,197,94,0.3)' : 'var(--border)') + ';'
+                                    + 'background:' + (added ? 'rgba(34,197,94,0.08)' : 'var(--surface)') + ';color:var(--text);font-size:0.8rem;cursor:pointer;transition:all 0.15s;" '
+                                    + (added ? 'disabled' : '') + '>'
+                                    + (added ? '✓ ' : '+ ') + htmlesc(b.name) + ' <span style="color:var(--muted);font-size:0.72rem;">(' + (b.dist_m<1000 ? (b.dist_m + 'm') : ((b.dist_m/1000).toFixed(1) + 'km')) + ')</span>'
+                                    + '</button>';
+                            }).join('');
+                        }).catch(function(){
+                            // ignore nearby load failures
+                        });
                 }
             };
 
