@@ -665,26 +665,21 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     var clickedLat = e.latlng.lat;
                     var clickedLng = e.latlng.lng;
 
-                    fetch('/api/barangay/nearby?lat=' + clickedLat + '&lng=' + clickedLng + '&limit=5')
+                    fetch('/api/barangay/nearby?lat=' + clickedLat + '&lng=' + clickedLng + '&limit=8')
                         .then(function(r){ return r.json(); })
                         .then(function(d) {
                             if (!d.barangays || !d.barangays.length) {
-                                alert('No barangay found at this location. Try a nearby point.');
                                 return;
                             }
 
-                            // Prefer nearest not already selected and within a small click-radius tolerance.
+                            // Prefer a nearby barangay that is not yet selected; fallback to nearest.
                             var candidate = d.barangays.find(function(b){
                                 return !selectedZones.some(function(z){ return z.id === parseInt(b.id); }) && b.dist_m <= 2200;
                             }) || d.barangays[0];
 
-                            var inZones = selectedZones.some(function(z){ return z.id === parseInt(candidate.id); });
-                            if (inZones) {
-                                alert('Location detected: ' + candidate.name + ' (already in your zones). Showing nearby suggestions.');
-                            } else {
+                            if (!selectedZones.some(function(z){ return z.id === parseInt(candidate.id); })) {
                                 addZoneObj(candidate);
                                 renderZones();
-                                alert('Location detected: ' + candidate.name + ' (' + (candidate.dist_m < 1000 ? candidate.dist_m + 'm' : (candidate.dist_m/1000).toFixed(1) + 'km') + ') added to zones.');
                             }
 
                             if (candidate.lat && candidate.lng) {
@@ -692,10 +687,11 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                             } else {
                                 _map.setView([clickedLat, clickedLng], 14);
                             }
+
                             loadNearbySuggestions(clickedLat, clickedLng);
                         })
                         .catch(function() {
-                            alert('Unable to determine barangay from clicked map location.');
+                            // ignore map click failures
                         });
                 });
 
