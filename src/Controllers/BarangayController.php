@@ -658,6 +658,12 @@ class BarangayController extends \Core\Controller
                 $barangayIds = array_values(array_filter($barangayIds, fn($id) => in_array($id, $validIds)));
             }
 
+            if (empty($barangayIds)) {
+                error_log('TRACE saveSellerZones: user_id=' . $userId . ' after validation no valid barangay IDs (requested raw_ids=' . json_encode($rawIds) . ')');
+                echo json_encode(['success' => false, 'error' => 'No valid active barangays selected']);
+                return;
+            }
+
             // Replace all zones for this seller
             $this->db->delete('seller_delivery_zones', ['seller_id' => $userId]);
 
