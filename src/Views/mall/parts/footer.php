@@ -1024,9 +1024,14 @@
                 refreshSearchResultsFromServer();
             }, 220);
         });
-        // Prevent form submit reload
+        // Prevent form submit reload; trigger search immediately on Enter
         var searchForm = document.getElementById('searchForm');
-        if (searchForm) searchForm.addEventListener('submit', function (e) { e.preventDefault(); });
+        if (searchForm) searchForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            state.filters.search = searchInput.value;
+            if (state.searchInputDebounce) clearTimeout(state.searchInputDebounce);
+            refreshSearchResultsFromServer();
+        });
     }
 
     /* ============================
