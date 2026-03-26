@@ -625,8 +625,16 @@ class BarangayController extends \Core\Controller
             error_log('DEBUG saveSellerZones: CSRF bypass for user_id=' . $userId);
         }
 
-        $rawIds = $input['barangay_ids'] ?? [];        if (!is_array($rawIds)) $rawIds = [];
-        $barangayIds    = array_filter(array_map('intval', $rawIds), fn($v) => $v > 0);
+        $rawIds = $input['barangay_ids'] ?? [];
+        if (!is_array($rawIds)) {
+            if (is_string($rawIds)) {
+                $rawIds = array_filter(array_map('trim', explode(',', $rawIds)), fn($v) => $v !== '');
+            } else {
+                $rawIds = [];
+            }
+        }
+
+        $barangayIds = array_filter(array_map('intval', $rawIds), fn($v) => $v > 0);
         $homeBarangayId = (int)($input['home_barangay_id'] ?? ($barangayIds[0] ?? 0));
 
         error_log('DEBUG saveSellerZones: user_id=' . $userId . ' raw_ids=' . json_encode($rawIds) . ' parsed_ids=' . json_encode($barangayIds) . ' home_id=' . $homeBarangayId);
