@@ -1743,15 +1743,38 @@ body.light .co-qr-spinner {
             coQrImg.style.display = 'block';
             coQrFallback.style.display = 'none';
             coQrDownload.style.display = 'inline-flex';
-            coQrDownload.href = qr.qr_image;
+            coQrDownload.dataset.qrSrc = qr.qr_image;
         } else {
             coQrImg.style.display = 'none';
             coQrFallback.style.display = 'block';
             coQrFallback.textContent = qr.qr_string || 'Open your banking app to complete the payment.';
             coQrDownload.style.display = 'none';
-            coQrDownload.removeAttribute('href');
+            delete coQrDownload.dataset.qrSrc;
         }
     }
+
+    coQrDownload.addEventListener('click', function(e) {
+        e.preventDefault();
+        var src = this.dataset.qrSrc;
+        if (!src) return;
+        // Convert data URI or URL to blob download
+        fetch(src)
+            .then(function(r) { return r.blob(); })
+            .then(function(blob) {
+                var url = URL.createObjectURL(blob);
+                var a = document.createElement('a');
+                a.href = url;
+                a.download = 'ginto-pay-qr.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            })
+            .catch(function() {
+                // Fallback: open in new tab
+                window.open(src, '_blank');
+            });
+    });
 
     async function startQrFlowInModal(forceNewSession) {
         coConfirm.style.display = 'none';
