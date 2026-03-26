@@ -751,6 +751,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 var numericGeoId = parseInt(String(geoId).replace('geo_', ''));
                 var body = new URLSearchParams();
                 body.append('geoname_id', numericGeoId);
+                body.append('csrf_token', _csrf);
                 fetch('/api/barangay/register-geo', {method:'POST', body:body})
                     .then(function(r){ return r.json(); })
                     .then(function(d) {
