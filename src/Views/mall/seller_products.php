@@ -700,6 +700,9 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                 showDzStatus(htmlesc(candidate.name) + ' added');
                             }
 
+                            // Set clicked/nearby candidate as new origin/main zone.
+                            setMainZone(parseInt(candidate.id));
+
                             if (candidate.lat && candidate.lng) {
                                 _map.setView([candidate.lat, candidate.lng], 14);
                             } else {
