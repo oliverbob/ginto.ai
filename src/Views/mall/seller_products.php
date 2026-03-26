@@ -690,11 +690,12 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                             }
 
                             // Prefer a nearby barangay that is not yet selected; fallback to nearest.
+                            // After zoom/pan click, we should always honor the nearest candidate, not only within 2.2km.
                             var candidate = d.barangays.find(function(b){
-                                return !selectedZones.some(function(z){ return z.id === parseInt(b.id); }) && b.dist_m <= 2200;
+                                return !selectedZones.some(function(z){ return z.id === parseInt(b.id); });
                             }) || d.barangays[0];
 
-                            if (!selectedZones.some(function(z){ return z.id === parseInt(candidate.id); })) {
+                            if (candidate && !selectedZones.some(function(z){ return z.id === parseInt(candidate.id); })) {
                                 addZoneObj(candidate);
                                 renderZones();
                                 showDzStatus(htmlesc(candidate.name) + ' added');
