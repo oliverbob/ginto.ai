@@ -1468,11 +1468,17 @@
             .then(r => r.json())
             .then(function(d) {
                 if (!d.success || !d.barangay) { _setBarangayPillText('📍', 'Set location'); return; }
-                const body = new URLSearchParams({ barangay_id: d.barangay.id, _token: CSRF_TOKEN });
+                const params = { barangay_id: d.barangay.id, _token: CSRF_TOKEN };
+                if (lat !== null && lng !== null) { params.lat = lat; params.lng = lng; }
+                const body = new URLSearchParams(params);
                 fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
                     .then(function() {
                         currentBarangayId = d.barangay.id;
                         localStorage.setItem('ginto_barangay_id', currentBarangayId);
+                        if (lat !== null && lng !== null) {
+                            localStorage.setItem('ginto_buyer_lat', lat);
+                            localStorage.setItem('ginto_buyer_lng', lng);
+                        }
                         const label = source === 'ip'
                             ? d.barangay.name + ', ' + d.barangay.city + ' (approx.)'
                             : d.barangay.name + ', ' + d.barangay.city;

@@ -234,13 +234,19 @@ class BarangayController extends \Core\Controller
         }
 
         $barangayId = (int)($_POST['barangay_id'] ?? -1);
+        $buyerLat = isset($_POST['lat']) ? (float)$_POST['lat'] : null;
+        $buyerLng = isset($_POST['lng']) ? (float)$_POST['lng'] : null;
+
+        // Validate GPS coords if provided
+        if ($buyerLat !== null && ($buyerLat < -90 || $buyerLat > 90)) $buyerLat = null;
+        if ($buyerLng !== null && ($buyerLng < -180 || $buyerLng > 180)) $buyerLng = null;
 
         // barangay_id = 0 means clear the pinned barangay
         if ($barangayId === 0) {
             unset($_SESSION['buyer_barangay_id']);
             $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
             if ($userId > 0) {
-                try { $this->db->update('users', ['buyer_barangay_id' => null], ['id' => $userId]); }
+                try { $this->db->update('users', ['buyer_barangay_id' => null, 'buyer_lat' => null, 'buyer_lng' => null], ['id' => $userId]); }
                 catch (\Throwable $ignored) {}
             }
             echo json_encode(['success' => true, 'barangay' => null]);
@@ -263,12 +269,17 @@ class BarangayController extends \Core\Controller
 
         // Store in session (works for both logged-in and guests)
         $_SESSION['buyer_barangay_id'] = $barangayId;
+        if ($buyerLat !== null) $_SESSION['buyer_lat'] = $buyerLat;
+        if ($buyerLng !== null) $_SESSION['buyer_lng'] = $buyerLng;
 
         // Persist to DB if logged in
         $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
         if ($userId > 0) {
             try {
-                $this->db->update('users', ['buyer_barangay_id' => $barangayId], ['id' => $userId]);
+                $update = ['buyer_barangay_id' => $barangayId];
+                if ($buyerLat !== null) $update['buyer_lat'] = $buyerLat;
+                if ($buyerLng !== null) $update['buyer_lng'] = $buyerLng;
+                $this->db->update('users', $update, ['id' => $userId]);
             } catch (\Throwable $ignored) {}
         }
 
