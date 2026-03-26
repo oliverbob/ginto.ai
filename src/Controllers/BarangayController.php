@@ -637,4 +637,56 @@ class BarangayController extends \Core\Controller
             echo json_encode(['runners' => []]);
         }
     }
+
+    // ── GET /api/barangay/nearby ───────────────────────────────────────────
+    /**
+     * Returns several nearby barangays to the supplied GPS coordinates.
+     * Query params: lat, lng, limit (default 15, max 30)
+     */
+    public function nearby(): void
+    {
+        header('Content-Type: application/json');
+
+        $lat = isset($_GET['lat']) ? (float)$_GET['lat'] : null;
+        $lng = isset($_GET['lng']) ? (float)$_GET['lng'] : null;
+
+        if ($lat === null || $lng === null || $lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            echo json_encode(['barangays' => []]);
+            return;
+        }
+
+        $limit = min(30, max(5, (int)($_GET['limit'] ?? 15)));
+        $radiusKm = 30;
+
+        try {
+            $rows = $this->db->query("
+                SELECT id, name, city, province, region, lat, lng,
+                       ROUND(6371000 * 2 * ASIN(SQRT(
+                           POWER(SIN(RADIANS(:lat - lat) / 2), 2) +
+                           COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *
+                           POWER(SIN(RADIANS(:lng - lng) / 2), 2)
+                       ))) AS dist_m
+                FROM barangays
+                WHERE is_active = 1
+                  AND lat BETWEEN :lat_min AND :lat_max
+                  AND lng BETWEEN :lng_min AND :lng_max
+                ORDER BY dist_m ASC
+                LIMIT :lim
+            ", [
+                ':lat'     => $lat,
+                ':lat2'    => $lat,
+                ':lng'     => $lng,
+                ':lat_min' => $lat - $radiusKm / 111.0,
+                ':lat_max' => $lat + $radiusKm / 111.0,
+                ':lng_min' => $lng - $radiusKm / (111.0 * cos(deg2rad($lat))),
+                ':lng_max' => $lng + $radiusKm / (111.0 * cos(deg2rad($lat))),
+                ':lim'     => $limit,
+            ])->fetchAll(\PDO::FETCH_ASSOC);
+
+            echo json_encode(['barangays' => $rows ?: []]);
+        } catch (\Throwable $e) {
+            error_log('BarangayController::nearby error: ' . $e->getMessage());
+            echo json_encode(['barangays' => []]);
+        }
+    }
 }

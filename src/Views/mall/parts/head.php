@@ -1013,12 +1013,15 @@ input[type="file"].form-input { padding: 7px 12px; }
 /* ========== TOAST ========== */
 .toast-container {
     position: fixed;
-    bottom: 24px; right: 24px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     z-index: 1500;
     display: flex;
     flex-direction: column;
     gap: 8px;
     pointer-events: none;
+    max-width: 90vw;
 }
 .toast {
     background: var(--surface);
@@ -1026,18 +1029,19 @@ input[type="file"].form-input { padding: 7px 12px; }
     border: 1px solid var(--border);
     border-left: 4px solid var(--accent);
     border-radius: var(--radius-sm);
-    padding: 11px 16px;
-    font-size: 0.875rem;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
-    animation: toastSlide 0.3s ease forwards;
+    padding: 14px 20px;
+    font-size: 0.9rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    animation: toastPop 0.3s ease forwards;
     pointer-events: all;
-    max-width: 300px;
+    max-width: 340px;
     word-break: break-word;
+    text-align: center;
 }
 .toast.toast-error { border-left-color: var(--danger); }
-@keyframes toastSlide {
-    from { transform: translateX(20px); opacity: 0; }
-    to   { transform: translateX(0);    opacity: 1; }
+@keyframes toastPop {
+    from { transform: scale(0.9); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
 }
 
 /* ========== MOBILE <= 767px ========== */

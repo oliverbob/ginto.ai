@@ -63,7 +63,7 @@ $isSeller = $is_seller ?? false;
                         <div style="font-weight:700;margin-bottom:4px;">📬 Seller Delivery Dashboard</div>
                         <div style="color:var(--muted);font-size:0.84rem;">Manage your orders ready for pickup.</div>
                     </div>
-                    <a href="/mall/seller-orders" style="background:var(--accent);color:#fff;padding:10px 20px;border-radius:12px;font-weight:700;font-size:0.85rem;text-decoration:none;">View Orders</a>
+                    <a href="/marketplace/sellers/orders" style="background:var(--accent);color:#fff;padding:10px 20px;border-radius:12px;font-weight:700;font-size:0.85rem;text-decoration:none;">View Orders</a>
                 </div>
             </div>
             <?php elseif (!$isLoggedIn): ?>

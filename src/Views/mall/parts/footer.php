@@ -1030,6 +1030,8 @@
             e.preventDefault();
             state.filters.search = searchInput.value;
             if (state.searchInputDebounce) clearTimeout(state.searchInputDebounce);
+            searchInput.blur();
+            closeSearch();
             refreshSearchResultsFromServer();
         });
     }
