@@ -943,7 +943,51 @@ class BarangayController extends \Core\Controller
                 ':lim'     => $limit,
             ])->fetchAll(\PDO::FETCH_ASSOC);
 
-            echo json_encode(['barangays' => $rows ?: []]);
+            if (!empty($rows)) {
+                echo json_encode(['barangays' => $rows]);
+                return;
+            }
+
+            // Fallback: if no local barangay matches, search geo_places (GeoNames) for coverage
+            if ($this->geoPlacesAvailable()) {
+                $pdo = $this->db->pdo;
+                $stmt = $pdo->prepare("SELECT 
+                        CONCAT('geo_', g.geoname_id) AS id,
+                        g.name,
+                        COALESCE(g.admin2_code, '') AS city,
+                        COALESCE(g.admin1_code, '') AS province,
+                        g.country_code AS region,
+                        g.latitude AS lat,
+                        g.longitude AS lng,
+                        ROUND(6371000 * 2 * ASIN(SQRT(
+                            POWER(SIN(RADIANS(:lat - g.latitude) / 2), 2) +
+                            COS(RADIANS(g.latitude)) * COS(RADIANS(:lat)) *
+                            POWER(SIN(RADIANS(:lng - g.longitude) / 2), 2)
+                        ))) AS dist_m
+                    FROM geo_places g
+                    WHERE g.feature_class IN ('A','P')
+                      AND g.latitude BETWEEN :lat_min AND :lat_max
+                      AND g.longitude BETWEEN :lng_min AND :lng_max
+                    ORDER BY dist_m ASC
+                    LIMIT :lim");
+
+                $stmt->bindValue(':lat', $lat);
+                $stmt->bindValue(':lng', $lng);
+                $stmt->bindValue(':lat_min', $lat - $radiusKm / 111.0);
+                $stmt->bindValue(':lat_max', $lat + $radiusKm / 111.0);
+                $stmt->bindValue(':lng_min', $lng - $radiusKm / (111.0 * cos(deg2rad($lat))));
+                $stmt->bindValue(':lng_max', $lng + $radiusKm / (111.0 * cos(deg2rad($lat))));
+                $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
+                $stmt->execute();
+                $geoRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+                if (!empty($geoRows)) {
+                    echo json_encode(['barangays' => $geoRows]);
+                    return;
+                }
+            }
+
+            echo json_encode(['barangays' => []]);
         } catch (\Throwable $e) {
             error_log('BarangayController::nearby error: ' . $e->getMessage());
             echo json_encode(['barangays' => []]);
