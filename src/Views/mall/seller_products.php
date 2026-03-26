@@ -590,8 +590,15 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                             document.getElementById('dz-home-id').value = homeId;
                             renderZones();
 
-                            // Show remaining as suggestions
-                            sugList.innerHTML = d.barangays.slice(1).map(function(b) {
+                            // Show remaining as suggestions (dedupe by id)
+                            var seenIds = {};
+                            sugList.innerHTML = d.barangays.slice(1).filter(function(b){
+                                if (!b.id) return false;
+                                var key = String(b.id);
+                                if (seenIds[key]) return false;
+                                seenIds[key] = true;
+                                return true;
+                            }).map(function(b) {
                                 var dist = b.dist_m < 1000 ? (b.dist_m + 'm') : ((b.dist_m/1000).toFixed(1) + 'km');
                                 var already = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
                                 return '<button onclick="dzAddSuggested(this,' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + b.city.replace(/'/g,'\\\'') + '\',\'' + b.province.replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')" '
@@ -792,8 +799,15 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                             return;
                         }
 
-                        sugWrap.style.display = 'block';
-                        sugList.innerHTML = d.barangays.map(function(b){
+                                sugWrap.style.display = 'block';
+                        var seenIds = {};
+                        sugList.innerHTML = d.barangays.filter(function(b){
+                            if (!b.id) return false;
+                            var key = String(b.id);
+                            if (seenIds[key]) return false;
+                            seenIds[key] = true;
+                            return true;
+                        }).map(function(b){
                             var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
                             return '<button onclick="dzAddSuggested(this,' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')" '
                                 + 'style="padding:6px 12px;border-radius:20px;border:1px solid ' + (added ? 'rgba(34,197,94,0.3)' : 'var(--border)') + ';'
