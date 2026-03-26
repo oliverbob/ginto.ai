@@ -790,6 +790,39 @@ select.pf-input    { cursor: pointer; }
             </div>
         </div>
 
+        <!-- Delivery Zones — only for physical/liquid products -->
+        <div class="pf-section" id="pf-zone-section" style="display:none;">
+            <div class="pf-section-header">
+                <div class="pf-section-icon">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </div>
+                <h2 class="pf-section-title">Delivery Zones</h2>
+            </div>
+            <div class="pf-section-body">
+                <div class="pf-hint" style="margin-bottom:14px;line-height:1.6;">
+                    By default this product uses your <strong>seller delivery zones</strong>.
+                    Enable custom zones below to restrict/expand delivery for just this product.
+                </div>
+                <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:14px;">
+                    <input type="checkbox" id="pf-zone-custom" value="1" style="width:18px;height:18px;accent-color:var(--accent);">
+                    <span style="font-size:0.9rem;font-weight:600;">Use custom zones for this product</span>
+                </label>
+                <div id="pf-zone-editor" style="display:none;">
+                    <div id="pf-zone-current" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:28px;"></div>
+                    <div style="display:flex;gap:8px;">
+                        <div style="flex:1;position:relative;">
+                            <input id="pf-zone-search" type="text" placeholder="Search barangay…" class="pf-input" style="padding-left:32px;">
+                            <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                        </div>
+                    </div>
+                    <div id="pf-zone-results" style="margin-top:6px;max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;display:none;background:var(--bg);"></div>
+                    <div style="margin-top:8px;font-size:0.76rem;color:var(--muted);">
+                        Zones auto-save when you save the product.
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Images -->
         <div class="pf-section">
             <div class="pf-section-header">
@@ -942,6 +975,7 @@ select.pf-input    { cursor: pointer; }
     // ── Product type toggle ───────────────────────────────────────────────
     var ptypeHidden      = document.getElementById('pf-product-type');
     var shippingSection  = document.getElementById('pf-shipping-section');
+    var zoneSection      = document.getElementById('pf-zone-section');
     var qtyHint          = document.getElementById('pf-qty-hint');
     var liquidVolumeGroup = document.getElementById('pf-liquid-volume-group');
 
@@ -953,6 +987,9 @@ select.pf-input    { cursor: pointer; }
         var requiresShipping = (type === 'physical' || type === 'liquid');
         if (shippingSection) {
             shippingSection.style.display = requiresShipping ? '' : 'none';
+        }
+        if (zoneSection) {
+            zoneSection.style.display = requiresShipping ? '' : 'none';
         }
         if (qtyHint) {
             qtyHint.style.display = requiresShipping ? 'none' : '';
@@ -968,6 +1005,100 @@ select.pf-input    { cursor: pointer; }
 
     // init
     applyProductType(ptypeHidden ? ptypeHidden.value : 'physical');
+
+    // ── Product-level zone editor ─────────────────────────────────────────
+    (function(){
+        var productId = <?= (int)($p['id'] ?? 0) ?>;
+        var customCb = document.getElementById('pf-zone-custom');
+        var editor = document.getElementById('pf-zone-editor');
+        var currentEl = document.getElementById('pf-zone-current');
+        var searchEl = document.getElementById('pf-zone-search');
+        var resultsEl = document.getElementById('pf-zone-results');
+        if (!customCb || !editor) return;
+        var pzones = [];
+
+        customCb.addEventListener('change', function(){
+            editor.style.display = this.checked ? '' : 'none';
+        });
+
+        function htmlesc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+        function renderPZones() {
+            if (!pzones.length) {
+                currentEl.innerHTML = '<span style="font-size:0.82rem;color:var(--muted);">No custom zones — using seller zones.</span>';
+                return;
+            }
+            currentEl.innerHTML = pzones.map(function(z){
+                return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:20px;padding:4px 10px;font-size:0.8rem;">'
+                    + '📦 ' + htmlesc(z.name+', '+z.city)
+                    + '<button type="button" onclick="pfRemoveZone('+z.id+')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:0.95rem;padding:0 0 0 4px;">×</button>'
+                    + '</span>';
+            }).join('');
+        }
+
+        window.pfRemoveZone = function(id){
+            pzones = pzones.filter(function(z){ return z.id !== id; });
+            renderPZones();
+        };
+
+        window.pfAddZone = function(id, name, city, province){
+            id = parseInt(id);
+            if (pzones.some(function(z){ return z.id === id; })) return;
+            if (pzones.length >= 50) { alert('Maximum 50 zones'); return; }
+            pzones.push({id:id, name:name, city:city, province:province});
+            resultsEl.style.display = 'none'; searchEl.value = '';
+            renderPZones();
+        };
+
+        // Load existing product zones
+        if (productId) {
+            fetch('/api/barangay/product/zones?product_id=' + productId)
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    if (d.use_custom) { customCb.checked = true; editor.style.display = ''; }
+                    if (d.zones && d.zones.length) {
+                        pzones = d.zones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province}; });
+                        renderPZones();
+                    }
+                }).catch(function(){});
+        }
+        renderPZones();
+
+        // Search
+        var _st;
+        searchEl.addEventListener('input', function(){
+            var q = this.value.trim(); clearTimeout(_st);
+            if (q.length < 2) { resultsEl.style.display = 'none'; return; }
+            _st = setTimeout(function(){
+                fetch('/api/barangay/list?q='+encodeURIComponent(q)+'&limit=20')
+                    .then(function(r){ return r.json(); })
+                    .then(function(d){
+                        if (!d.barangays||!d.barangays.length) { resultsEl.innerHTML='<div style="padding:10px 14px;color:var(--muted);font-size:0.84rem;">No results</div>'; resultsEl.style.display='block'; return; }
+                        resultsEl.innerHTML = d.barangays.map(function(b){
+                            var added = pzones.some(function(z){ return z.id===parseInt(b.id); });
+                            return '<div onclick="'+(added?'':'pfAddZone('+b.id+',\''+b.name.replace(/'/g,'\\\'')+'\',\''+b.city.replace(/'/g,'\\\'')+'\',\''+b.province.replace(/'/g,'\\\'')+'\')')+'" style="padding:8px 14px;cursor:'+(added?'default':'pointer')+';border-bottom:1px solid var(--border);font-size:0.85rem;'+(added?'opacity:0.35;':'')+'">'
+                                + htmlesc(b.name+', '+b.city) + ' <span style="color:var(--muted);font-size:0.76rem;">'+htmlesc(b.province)+'</span>'
+                                + (added?' <span style="color:#22c55e;font-size:0.76rem;">✓</span>':' <span style="color:var(--accent);font-size:0.76rem;">+ Add</span>')
+                                + '</div>';
+                        }).join('');
+                        resultsEl.style.display = 'block';
+                    }).catch(function(){});
+            }, 250);
+        });
+
+        // Hook into the product form submit to save zones
+        var form = document.querySelector('form[action]');
+        if (form) {
+            form.addEventListener('submit', function(){
+                // Inject hidden fields for zone data
+                var existing = form.querySelectorAll('.pf-zone-hidden'); existing.forEach(function(e){ e.remove(); });
+                var h = document.createElement('input'); h.type='hidden'; h.name='use_custom_zones'; h.value=customCb.checked?'1':'0'; h.className='pf-zone-hidden'; form.appendChild(h);
+                pzones.forEach(function(z){
+                    var inp = document.createElement('input'); inp.type='hidden'; inp.name='product_zone_ids[]'; inp.value=z.id; inp.className='pf-zone-hidden'; form.appendChild(inp);
+                });
+            });
+        }
+    })();
 
     // ── Fee plan radio cards ──────────────────────────────────────────────
     var pricingModelHidden = document.getElementById('pf-pricing-model');

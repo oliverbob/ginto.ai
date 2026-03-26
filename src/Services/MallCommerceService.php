@@ -14,6 +14,22 @@ class MallCommerceService
     private const MIN_TOPUP_FEE_PHP = 25.00;
     private const PAYPAL_TOPUP_SERVICE_FEE_PERCENT = 0.07;
 
+    // ── Order constraints ────────────────────────────────────────────────
+    /** Minimum order subtotal in PHP */
+    private const MIN_ORDER_SUBTOTAL_PHP = 50.00;
+
+    // ── Gateway processing fees ──────────────────────────────────────────
+    private const PROCESSING_FEE_PAYMONGO   = 25.00;  // flat fee for QR / Card
+    private const PROCESSING_FEE_PAYPAL     = 50.00;  // flat fee
+    private const PROCESSING_FEE_PAYPAL_PCT = 0.07;   // 7% on total (double conversion + bank)
+
+    // ── Grab-style delivery fee constants ────────────────────────────────
+    private const DELIVERY_BASE_FEE         = 49.00;  // base fare (first 2 km included)
+    private const DELIVERY_PER_KM           = 15.00;  // per-km rate
+    private const DELIVERY_FREE_KM          = 2.0;    // included in base
+    private const DELIVERY_PLATFORM_MARKUP  = 0.05;   // +5% on top
+    private const DELIVERY_PER_KM_SURCHARGE = 0.01;   // +1% per km extra
+
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off'        => 12.00,   // standard listing, minimal promotion
         'active_discovery' => 25.00,   // active platform promotion
@@ -1040,6 +1056,15 @@ class MallCommerceService
             throw new \RuntimeException('Shipping full name, phone, address, and city are required.');
         }
 
+        // -- Minimum order check -------------------------------------------
+        $grandSubtotal = array_sum(array_column($grouped, 'subtotal'));
+        if ($grandSubtotal < self::MIN_ORDER_SUBTOTAL_PHP && $currency === 'PHP') {
+            throw new \RuntimeException('Minimum order amount is ₱' . number_format(self::MIN_ORDER_SUBTOTAL_PHP, 2) . '. Your subtotal is ₱' . number_format($grandSubtotal, 2) . '.');
+        }
+
+        // -- Buyer's barangay for delivery fee (from session or address) ---
+        $buyerBarangayId = !empty($_SESSION['buyer_barangay_id']) ? (int)$_SESSION['buyer_barangay_id'] : null;
+
         // -- Shipping fee estimation ----------------------------------------
         // Infer delivery zone from buyer address; no logistics partner yet so
         // we use the conservative safe divisor (3,500) to protect sellers from
@@ -1062,8 +1087,20 @@ class MallCommerceService
             $grouped[$sellerId]['shipping_zone']      = $shippingResult['zone'];
             $grouped[$sellerId]['chargeable_weight']  = $shippingResult['chargeable_weight_kg'];
             $grouped[$sellerId]['shipping_dimensions_json'] = json_encode($shippingResult);
-            // Buyer pays product subtotal + shipping fee
-            $grouped[$sellerId]['buyer_total'] += $shippingResult['estimated_fee'];
+
+            // Grab-style delivery fee based on seller→buyer distance
+            $deliveryFee = $this->calculateDeliveryFee($sellerId, $buyerBarangayId);
+            // Digital/virtual products don't need delivery
+            $hasPhysical = false;
+            foreach ($group['items'] as $gi) {
+                $pt = $this->db->get('products', 'product_type', ['id' => $gi['product_id']]);
+                if (in_array($pt, ['physical', 'liquid', null, ''], true)) { $hasPhysical = true; break; }
+            }
+            if (!$hasPhysical) $deliveryFee = 0.00;
+            $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
+
+            // Buyer pays product subtotal + shipping fee + delivery fee
+            $grouped[$sellerId]['buyer_total'] += $shippingResult['estimated_fee'] + $deliveryFee;
         }
 
         $now = date('Y-m-d H:i:s');
@@ -1074,6 +1111,11 @@ class MallCommerceService
         $this->db->pdo->beginTransaction();
         try {
             foreach ($grouped as $sellerId => $group) {
+                // Processing fee depends on buyer total before this fee is added
+                $processingFee = $this->calculateProcessingFee($paymentMethod, $group['buyer_total']);
+                $buyerTotalWithFees = round($group['buyer_total'] + $processingFee, 2);
+                $payoutEta = $this->sellerPayoutEta($paymentMethod);
+
                 $orderCode = $this->generateOrderCode();
                 $this->db->insert('mall_orders', [
                     'order_code' => $orderCode,
@@ -1084,12 +1126,15 @@ class MallCommerceService
                     'currency' => $currency ?: 'PHP',
                     'subtotal_amount' => round($group['subtotal'], 2),
                     'platform_fee_amount' => round($group['platform_fee'], 2),
+                    'processing_fee_amount' => $processingFee,
+                    'delivery_fee_amount' => round($group['delivery_fee'] ?? 0.00, 2),
                     'seller_net_amount' => round($group['seller_net'], 2),
-                    'buyer_total_amount' => round($group['buyer_total'], 2),
+                    'buyer_total_amount' => $buyerTotalWithFees,
                     'shipping_fee_estimated' => round($group['shipping_fee'] ?? 0.00, 2),
                     'shipping_zone' => $group['shipping_zone'] ?? null,
                     'chargeable_weight_kg' => $group['chargeable_weight'] ?? null,
                     'shipping_dimensions_json' => $group['shipping_dimensions_json'] ?? null,
+                    'seller_payout_eta' => $payoutEta,
                     'payment_status' => 'pending',
                     'status' => 'pending_payment',
                     'payment_method' => $this->normalizePaymentMethod($paymentMethod),
@@ -1132,10 +1177,13 @@ class MallCommerceService
                     'order_code' => $orderCode,
                     'seller_id' => $sellerId,
                     'storefront_slug' => $group['storefront_slug'],
-                    'buyer_total' => round($group['buyer_total'], 2),
+                    'buyer_total' => $buyerTotalWithFees,
                     'shipping_fee' => round($group['shipping_fee'] ?? 0.00, 2),
+                    'delivery_fee' => round($group['delivery_fee'] ?? 0.00, 2),
+                    'processing_fee' => $processingFee,
                     'shipping_zone' => $group['shipping_zone'] ?? null,
                     'chargeable_weight_kg' => $group['chargeable_weight'] ?? null,
+                    'seller_payout_eta' => $payoutEta,
                     'items' => $group['items'],
                 ];
             }
@@ -1280,6 +1328,12 @@ class MallCommerceService
 
             // Email to owner about successful purchase
             $this->emailPurchaseNotification($orderId);
+
+            // Save buyer's address for future checkouts
+            $shippingData = json_decode($order['shipping_address_json'] ?? '{}', true);
+            if (is_array($shippingData) && !empty($shippingData['full_name'])) {
+                $this->saveBuyerAddress((int)$order['buyer_id'], $shippingData, $paymentMethod);
+            }
         } catch (\Throwable $e) {
             error_log('[MallCommerceService] markOrderPaid notification error: ' . $e->getMessage());
         }
@@ -1477,11 +1531,16 @@ class MallCommerceService
         foreach ($order['items'] as $item) {
             $itemsHtml .= '<li>' . htmlspecialchars((string)$item['title_snapshot'], ENT_QUOTES, 'UTF-8') . ' x ' . (int)$item['quantity'] . '</li>';
         }
+        $payoutEtaHtml = '';
+        if (!empty($order['seller_payout_eta'])) {
+            $payoutEtaHtml = '<p><strong>Payout timing:</strong> ' . htmlspecialchars((string)$order['seller_payout_eta'], ENT_QUOTES, 'UTF-8') . '</p>';
+        }
         $body = '<p>You received a new paid order on Ginto Mall.</p>'
             . '<p><strong>Order:</strong> ' . htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8') . '</p>'
             . '<p><strong>Total:</strong> ' . number_format((float)$order['buyer_total_amount'], 2) . ' ' . htmlspecialchars((string)$order['currency'], ENT_QUOTES, 'UTF-8') . '</p>'
             . '<p><strong>Buyer:</strong> ' . htmlspecialchars((string)($order['buyer']['fullname'] ?: $order['buyer']['username']), ENT_QUOTES, 'UTF-8') . '</p>'
             . '<ul>' . $itemsHtml . '</ul>'
+            . $payoutEtaHtml
             . '<p>Open your seller orders dashboard to prepare this shipment.</p>';
         MailHelper::send((string)$order['seller']['email'], $subject, $body);
     }
@@ -1759,6 +1818,136 @@ class MallCommerceService
             'country' => strtoupper(trim(strip_tags((string)($shipping['country'] ?? 'PH')))),
             'buyer_notes' => trim(strip_tags((string)($shipping['buyer_notes'] ?? ''))),
         ];
+    }
+
+    /**
+     * Compute gateway processing fee by payment method.
+     * - PayMongo (QR / Card): flat P25
+     * - PayPal: P50 + 7% of order total
+     * - Wallet: free
+     */
+    private function calculateProcessingFee(string $paymentMethod, float $orderTotal): float
+    {
+        return match ($paymentMethod) {
+            'ginto_pay_qr', 'ginto_pay_card' => self::PROCESSING_FEE_PAYMONGO,
+            'paypal' => round(self::PROCESSING_FEE_PAYPAL + ($orderTotal * self::PROCESSING_FEE_PAYPAL_PCT), 2),
+            default => 0.00,
+        };
+    }
+
+    /**
+     * Grab-style delivery fee estimate based on haversine distance
+     * between seller's main-zone barangay and buyer's barangay.
+     *
+     * Formula: base_fare + per_km * max(0, distance - free_km)
+     *          + 5% platform markup + 1% per extra km surcharge
+     *
+     * Returns 0 if distance cannot be determined (e.g. no GPS data).
+     */
+    private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId): float
+    {
+        if (!$buyerBarangayId) return 0.00;
+
+        // Get seller main zone (is_home = 1)
+        $sellerZone = $this->db->get('seller_delivery_zones', ['barangay_id'], [
+            'seller_id' => $sellerId,
+            'is_home' => 1,
+        ]);
+        if (!$sellerZone) return 0.00;
+        $sellerBarangayId = (int)$sellerZone['barangay_id'];
+        if ($sellerBarangayId === $buyerBarangayId) return self::DELIVERY_BASE_FEE;
+
+        // Get lat/lng for both barangays
+        $ids = [$sellerBarangayId, $buyerBarangayId];
+        $rows = $this->db->select('barangays', ['id', 'lat', 'lng'], ['id' => $ids]);
+        $coords = [];
+        foreach ($rows ?: [] as $r) {
+            $coords[(int)$r['id']] = [(float)$r['lat'], (float)$r['lng']];
+        }
+
+        $sCoord = $coords[$sellerBarangayId] ?? null;
+        $bCoord = $coords[$buyerBarangayId] ?? null;
+        if (!$sCoord || !$bCoord || ($sCoord[0] == 0 && $sCoord[1] == 0) || ($bCoord[0] == 0 && $bCoord[1] == 0)) {
+            return self::DELIVERY_BASE_FEE; // fallback: base fee only
+        }
+
+        $distKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
+
+        // Base fare + per-km for extra distance
+        $extraKm = max(0.0, $distKm - self::DELIVERY_FREE_KM);
+        $rawFee  = self::DELIVERY_BASE_FEE + ($extraKm * self::DELIVERY_PER_KM);
+
+        // +5% platform markup
+        $rawFee *= (1 + self::DELIVERY_PLATFORM_MARKUP);
+
+        // +1% per extra km surcharge
+        $rawFee *= (1 + ($extraKm * self::DELIVERY_PER_KM_SURCHARGE));
+
+        return round(max($rawFee, self::DELIVERY_BASE_FEE), 2);
+    }
+
+    /**
+     * Haversine distance between two lat/lng points in km.
+     */
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $R = 6371.0;
+        $dLat = deg2rad($lat2 - $lat1);
+        $dLng = deg2rad($lng2 - $lng1);
+        $a = sin($dLat / 2) ** 2 + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLng / 2) ** 2;
+        return $R * 2 * atan2(sqrt($a), sqrt(1 - $a));
+    }
+
+    /**
+     * Payout ETA string based on payment method.
+     * PayMongo: 7-12 days; PayPal: 9-12 days; Wallet: 3-5 days.
+     */
+    private function sellerPayoutEta(string $paymentMethod): string
+    {
+        return match ($paymentMethod) {
+            'ginto_pay_qr', 'ginto_pay_card' => '7-12 business days after delivery',
+            'paypal' => '9-12 business days after delivery',
+            default => '3-5 business days after delivery',
+        };
+    }
+
+    /**
+     * Save or update the buyer's default address from checkout.
+     */
+    public function saveBuyerAddress(int $userId, array $shipping, string $paymentMethod): void
+    {
+        $existing = $this->db->get('buyer_saved_addresses', 'id', [
+            'user_id' => $userId,
+            'is_default' => 1,
+        ]);
+
+        $data = [
+            'user_id' => $userId,
+            'label' => 'Home',
+            'is_default' => 1,
+            'full_name' => trim(strip_tags((string)($shipping['full_name'] ?? ''))),
+            'phone' => preg_replace('/[^0-9+\-\s]/', '', (string)($shipping['phone'] ?? '')),
+            'address_line1' => trim(strip_tags((string)($shipping['address_line1'] ?? ''))),
+            'address_line2' => trim(strip_tags((string)($shipping['address_line2'] ?? ''))),
+            'city' => trim(strip_tags((string)($shipping['city'] ?? ''))),
+            'province' => trim(strip_tags((string)($shipping['province'] ?? ''))),
+            'postal_code' => preg_replace('/[^0-9A-Za-z\-\s]/', '', (string)($shipping['postal_code'] ?? '')),
+            'country' => strtoupper(trim(strip_tags((string)($shipping['country'] ?? 'PH')))),
+            'payment_method' => $paymentMethod,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ];
+
+        if ($existing) {
+            $this->db->update('buyer_saved_addresses', $data, ['id' => $existing]);
+        } else {
+            $data['created_at'] = date('Y-m-d H:i:s');
+            $this->db->insert('buyer_saved_addresses', $data);
+        }
+
+        // Also update users table for backwards compatibility
+        $this->db->update('users', [
+            'shipping_address_json' => json_encode($shipping),
+        ], ['id' => $userId]);
     }
 
     private function firstProductImage(array $product): ?string

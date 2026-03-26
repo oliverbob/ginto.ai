@@ -1341,6 +1341,9 @@ $router->req('/api/barangay/set',                  'BarangayController@set',    
 $router->req('/api/barangay/current',              'BarangayController@current',         ['GET']);
 $router->req('/api/barangay/seller/zones',         'BarangayController@sellerZones',     ['GET']);
 $router->req('/api/barangay/seller/zones/save',    'BarangayController@saveSellerZones', ['POST']);
+$router->req('/api/barangay/product/zones',        'BarangayController@productZones',    ['GET']);
+$router->req('/api/barangay/product/zones/save',   'BarangayController@saveProductZones',['POST']);
+$router->req('/api/barangay/buyer/saved-address',  'BarangayController@buyerSavedAddress',['GET']);
 $router->req('/api/barangay/runner/register',      'BarangayController@runnerRegister',  ['POST']);
 $router->req('/api/barangay/runners',              'BarangayController@listRunners',     ['GET']);
 $router->req('/mall/notifications', 'MallController@notificationsPage');

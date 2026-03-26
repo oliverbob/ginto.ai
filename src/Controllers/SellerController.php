@@ -477,6 +477,23 @@ class SellerController extends \Core\Controller
             // Non-blocking: product listing should still succeed.
         }
 
+        // Save per-product delivery zones if custom zones were selected
+        $useCustomZones = (int)($_POST['use_custom_zones'] ?? 0);
+        $productZoneIds = $_POST['product_zone_ids'] ?? [];
+        if ($useCustomZones && !empty($productZoneIds) && is_array($productZoneIds)) {
+            $productId = (int)$created['id'];
+            $this->db->update('products', ['use_custom_zones' => 1], ['id' => $productId]);
+            foreach ($productZoneIds as $bzId) {
+                $bzId = (int)$bzId;
+                if ($bzId > 0) {
+                    $this->db->insert('product_delivery_zones', [
+                        'product_id'  => $productId,
+                        'barangay_id' => $bzId,
+                    ]);
+                }
+            }
+        }
+
         // Push notification to seller confirming product was listed.
         try {
             $pushService = new \Ginto\Services\MallPushService($this->db);
@@ -760,6 +777,23 @@ class SellerController extends \Core\Controller
             'colors'            => $colorsJson,
             'updated_at'        => date('Y-m-d H:i:s'),
         ], ['id' => $productId]);
+
+        // Save per-product delivery zones
+        $useCustomZones = (int)($_POST['use_custom_zones'] ?? 0);
+        $productZoneIds = $_POST['product_zone_ids'] ?? [];
+        $this->db->update('products', ['use_custom_zones' => $useCustomZones ? 1 : 0], ['id' => $productId]);
+        $this->db->delete('product_delivery_zones', ['product_id' => $productId]);
+        if ($useCustomZones && is_array($productZoneIds)) {
+            foreach ($productZoneIds as $bzId) {
+                $bzId = (int)$bzId;
+                if ($bzId > 0) {
+                    $this->db->insert('product_delivery_zones', [
+                        'product_id'  => $productId,
+                        'barangay_id' => $bzId,
+                    ]);
+                }
+            }
+        }
 
         header('Location: ' . $this->productsUrl()); exit;
     }

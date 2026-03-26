@@ -894,7 +894,14 @@ body.light .co-qr-spinner {
                     <span class="pf-label">Delivery Notes <span style="font-weight:500;opacity:0.6;">(optional)</span></span>
                     <textarea id="shipBuyerNotes" class="pf-input" rows="3" placeholder="Special instructions or landmark notes for the delivery crew"></textarea>
                 </label>
+                <label style="display:flex;align-items:center;gap:10px;grid-column:1 / -1;cursor:pointer;padding:4px 0;">
+                    <input type="checkbox" id="coRememberAddress" checked style="width:18px;height:18px;accent-color:var(--accent);">
+                    <span style="font-size:0.88rem;">Remember my shipping address for next time</span>
+                </label>
             </form>
+            <div id="coMinOrderNotice" style="display:none;margin-top:12px;padding:10px 14px;border-radius:12px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);font-size:0.84rem;color:#fca5a5;line-height:1.5;">
+                ⚠ Minimum order is ₱50.00. Add more items to proceed.
+            </div>
         </div>
 
         <!-- Payment Method -->
@@ -985,6 +992,14 @@ body.light .co-qr-spinner {
                 ⚠ Shipping is estimated from seller-declared packed dimensions. If the courier measures a higher weight, the difference is deducted from the seller — not charged to you again.
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Delivery fee</span>
+                <span id="checkoutDeliveryFee" style="font-size:0.85rem;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Processing fee</span>
+                <span id="checkoutProcessingFee" style="font-size:0.85rem;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Stores in this checkout</span>
                 <span id="checkoutStoreCount">0</span>
             </div>
@@ -993,7 +1008,7 @@ body.light .co-qr-spinner {
                     <div style="font-size:0.84rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:700;">Total due</div>
                     <div id="checkoutTotal" style="font-size:2rem;font-weight:800;line-height:1;">₱0.00</div>
                 </div>
-                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Platform fees and markups are already reflected in the checkout total according to the seller’s chosen plan.</div>
+                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Includes shipping, delivery, and processing fees for your selected payment method.</div>
             </div>
         </div>
 
@@ -1005,6 +1020,10 @@ body.light .co-qr-spinner {
                 <li>Seller and delivery crew update the order timeline like Lazada or Shopee.</li>
                 <li>You receive in-app mall notifications whenever delivery status changes.</li>
             </ol>
+        </div>
+        <div id="coPayoutEtaCard" class="aside-card" style="display:none;border:1px solid rgba(214,180,75,0.2);background:rgba(214,180,75,0.04);border-radius:24px;padding:20px;">
+            <div style="font-size:0.88rem;font-weight:700;margin-bottom:6px;">ℹ️ Seller payout timing</div>
+            <div id="coPayoutEtaText" style="font-size:0.84rem;color:var(--muted);line-height:1.6;"></div>
         </div>
     </aside>
 </section>
@@ -1263,6 +1282,9 @@ body.light .co-qr-spinner {
         checkoutSubtotal.textContent = formatPrice(summary.total, summary.currency);
         checkoutTotal.textContent = formatPrice(summary.total, summary.currency);
         checkoutStoreCount.textContent = String(summary.stores || 1);
+        // Min order notice
+        const minNotice = document.getElementById('coMinOrderNotice');
+        if (minNotice) minNotice.style.display = (summary.total < 50 && summary.cart.length) ? '' : 'none';
         // Shipping fee is server-computed; reset to pending until session is created
         const sfEl   = document.getElementById('checkoutShippingFee');
         const sfNote = document.getElementById('checkoutShippingNote');
@@ -1273,13 +1295,38 @@ body.light .co-qr-spinner {
     function updateShippingFromSession(session) {
         const sfEl   = document.getElementById('checkoutShippingFee');
         const sfNote = document.getElementById('checkoutShippingNote');
+        const dfEl   = document.getElementById('checkoutDeliveryFee');
+        const pfEl   = document.getElementById('checkoutProcessingFee');
+        const etaCard = document.getElementById('coPayoutEtaCard');
+        const etaText = document.getElementById('coPayoutEtaText');
         if (!sfEl || !session || !session.orders) return;
-        let totalShipping = 0;
+        let totalShipping = 0, totalDelivery = 0, totalProcessing = 0;
+        let payoutEta = '';
         const currency = session.currency || 'PHP';
-        session.orders.forEach(function (o) { totalShipping += Number(o.shipping_fee || 0); });
+        session.orders.forEach(function (o) {
+            totalShipping += Number(o.shipping_fee || 0);
+            totalDelivery += Number(o.delivery_fee || 0);
+            totalProcessing += Number(o.processing_fee || 0);
+            if (o.seller_payout_eta) payoutEta = o.seller_payout_eta;
+        });
         sfEl.textContent = formatPrice(totalShipping, currency);
         sfEl.style.color = totalShipping > 0 ? 'var(--text)' : 'var(--muted)';
         if (sfNote) sfNote.style.display = totalShipping > 0 ? 'block' : 'none';
+        // Delivery fee
+        if (dfEl) {
+            dfEl.textContent = totalDelivery > 0 ? formatPrice(totalDelivery, currency) : 'Free';
+            dfEl.style.color = totalDelivery > 0 ? 'var(--text)' : 'var(--muted)';
+        }
+        // Processing fee
+        if (pfEl) {
+            pfEl.textContent = totalProcessing > 0 ? formatPrice(totalProcessing, currency) : 'Free';
+            pfEl.style.color = totalProcessing > 0 ? 'var(--text)' : 'var(--muted)';
+        }
+        // Payout ETA
+        if (etaCard && etaText && payoutEta) {
+            etaText.textContent = 'Sellers receive their payout ' + payoutEta + '.';
+            etaCard.style.display = '';
+        }
         // Grand total from server already includes shipping
         const ctEl = document.getElementById('checkoutTotal');
         if (ctEl && session.total) ctEl.textContent = formatPrice(session.total, currency);
@@ -1296,6 +1343,8 @@ body.light .co-qr-spinner {
             postal_code: document.getElementById('shipPostalCode').value,
             country: document.getElementById('shipCountry').value,
             buyer_notes: document.getElementById('shipBuyerNotes').value,
+            remember_address: document.getElementById('coRememberAddress') ? document.getElementById('coRememberAddress').checked : false,
+        };
         };
     }
 
@@ -1585,6 +1634,28 @@ body.light .co-qr-spinner {
             var el = document.getElementById(id);
             if (el && !el.value) el.value = map[id];
         });
+        // Also try fetching buyer saved address (overrides profile if available)
+        fetch('/api/barangay/buyer/saved-address')
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                if (!d.address) return;
+                var a = d.address;
+                var m2 = {
+                    shipFullName: a.full_name,
+                    shipPhone: a.phone,
+                    shipAddress1: a.address_line1,
+                    shipAddress2: a.address_line2,
+                    shipCity: a.city,
+                    shipProvince: a.province,
+                    shipPostalCode: a.postal_code,
+                    shipCountry: a.country,
+                };
+                Object.keys(m2).forEach(function(id){
+                    if (!m2[id]) return;
+                    var el = document.getElementById(id);
+                    if (el) el.value = m2[id];
+                });
+            }).catch(function(){});
     })();
 
     function billingPayloadFromShipping() {

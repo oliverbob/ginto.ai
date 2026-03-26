@@ -250,17 +250,24 @@ class Product
                     -- Digital / virtual / subscription: no delivery zone required
                     p.product_type IN ('digital', 'virtual', 'subscription')
                     OR
-                    -- Physical: seller must have declared this barangay as a delivery zone
-                    EXISTS (
+                    -- Physical with custom zones: check product_delivery_zones
+                    (p.use_custom_zones = 1 AND EXISTS (
+                        SELECT 1 FROM product_delivery_zones pz
+                        WHERE pz.product_id = p.id
+                          AND pz.barangay_id = :barangay_id
+                    ))
+                    OR
+                    -- Physical using seller zones: check seller_delivery_zones
+                    (COALESCE(p.use_custom_zones, 0) = 0 AND EXISTS (
                         SELECT 1 FROM seller_delivery_zones z
                         WHERE z.seller_id = p.seller_id
-                          AND z.barangay_id = :barangay_id
-                    )
+                          AND z.barangay_id = :barangay_id2
+                    ))
                 )
                 {$extraWhere}
                 ORDER BY {$orderSql}
                 LIMIT :offset, :limit
-            ", $params);
+            ", array_merge($params, [':barangay_id2' => $barangayId]));
 
             return $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
         } catch (\Throwable $e) {

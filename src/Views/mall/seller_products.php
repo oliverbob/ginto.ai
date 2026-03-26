@@ -422,21 +422,41 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 
         <!-- Delivery Zone Card -->
         <div class="sc-card" id="deliveryZoneCard" style="margin-bottom:20px;">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
-                <span style="font-size:1.4rem;">📍</span>
-                <div>
-                    <div style="font-weight:600;font-size:0.97rem;">Delivery Zones (Barangay GPS)</div>
-                    <div style="font-size:0.82rem;color:var(--muted);">Buyers in your selected barangays will see your products. Physical products are hidden from outside your zones.</div>
+            <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:16px;">
+                <div style="width:44px;height:44px;border-radius:14px;background:linear-gradient(135deg,#1e3a5f,#2563eb);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                    <svg width="22" height="22" fill="none" stroke="#fff" stroke-width="2" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:1.05rem;margin-bottom:2px;">Delivery Zones</div>
+                    <div style="font-size:0.82rem;color:var(--muted);line-height:1.4;">
+                        Set the barangays you deliver to. Physical products are only shown to buyers within your zones.
+                        Digital products are shown everywhere.
+                    </div>
                 </div>
             </div>
-            <div id="dz-current" style="margin-bottom:12px;min-height:32px;"></div>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <input id="dz-search" type="text" placeholder="Search barangay…"
-                    style="flex:1;min-width:200px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.88rem;">
-                <button id="dz-save-btn" class="btn btn-primary btn-sm" style="white-space:nowrap;">Save Zones</button>
+
+            <!-- Current zones -->
+            <div id="dz-current" style="margin-bottom:14px;min-height:36px;display:flex;flex-wrap:wrap;gap:6px;"></div>
+
+            <!-- Main zone indicator -->
+            <div id="dz-main-hint" style="display:none;font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
+                🏠 = Main zone (delivery fees are calculated from here). Click a zone badge to set it as main.
             </div>
-            <div id="dz-results" style="margin-top:8px;max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;display:none;"></div>
+
+            <!-- Search + Save row -->
+            <div style="display:flex;gap:8px;align-items:center;">
+                <div style="flex:1;position:relative;">
+                    <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.4;" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    <input id="dz-search" type="text" placeholder="Search barangay…"
+                        style="width:100%;padding:10px 12px 10px 34px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:0.88rem;">
+                </div>
+                <button id="dz-save-btn" class="btn btn-primary btn-sm" style="white-space:nowrap;padding:10px 20px;border-radius:12px;font-weight:600;">Save Zones</button>
+            </div>
+            <div id="dz-results" style="margin-top:6px;max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:12px;display:none;background:var(--bg);"></div>
             <input type="hidden" id="dz-home-id" value="">
+
+            <!-- Zone count -->
+            <div id="dz-count" style="margin-top:8px;font-size:0.76rem;color:var(--muted);text-align:right;"></div>
         </div>
 
         <script>
@@ -447,20 +467,37 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 
             function renderZones() {
                 var el = document.getElementById('dz-current');
+                var hint = document.getElementById('dz-main-hint');
+                var count = document.getElementById('dz-count');
                 if (!selectedZones.length) {
-                    el.innerHTML = '<span style="color:var(--muted);font-size:0.83rem;">No zones set — buyers outside your barangay cannot see your physical products.</span>';
+                    el.innerHTML = '<div style="padding:12px 16px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:12px;font-size:0.84rem;color:#fca5a5;display:flex;align-items:center;gap:8px;width:100%;">'
+                        + '<span style="font-size:1.1rem;">⚠️</span> No zones set — buyers cannot find your physical products. Add at least one barangay.</div>';
+                    hint.style.display = 'none';
+                    count.textContent = '';
                     return;
                 }
+                hint.style.display = 'block';
+                count.textContent = selectedZones.length + ' / 50 zones';
                 el.innerHTML = selectedZones.map(function(z) {
-                    return '<span style="display:inline-flex;align-items:center;gap:4px;background:var(--accent-bg,#1e3a5f);color:var(--accent,#3b82f6);border-radius:20px;padding:3px 10px;margin:2px;font-size:0.8rem;">'
-                        + (z.id === homeId ? '🏠 ' : '📦 ')
-                        + htmlesc(z.name + ', ' + z.city)
-                        + '<button onclick="removeZone(' + z.id + ')" style="background:none;border:none;cursor:pointer;color:inherit;font-size:0.95rem;padding:0 0 0 4px;line-height:1;">×</button>'
+                    var isHome = z.id === homeId;
+                    return '<span onclick="setMainZone(' + z.id + ')" style="display:inline-flex;align-items:center;gap:5px;'
+                        + 'background:' + (isHome ? 'linear-gradient(135deg,rgba(214,180,75,0.15),rgba(214,180,75,0.08))' : 'rgba(255,255,255,0.04)') + ';'
+                        + 'border:1px solid ' + (isHome ? 'rgba(214,180,75,0.4)' : 'rgba(255,255,255,0.08)') + ';'
+                        + 'border-radius:20px;padding:5px 12px;font-size:0.82rem;cursor:pointer;transition:all 0.15s;">'
+                        + (isHome ? '<span title="Main zone">🏠</span> ' : '<span style="opacity:0.3;">📦</span> ')
+                        + '<span>' + htmlesc(z.name) + ', <span style="color:var(--muted);font-size:0.76rem;">' + htmlesc(z.city) + '</span></span>'
+                        + '<button onclick="event.stopPropagation();removeZone(' + z.id + ')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:1rem;padding:0 0 0 4px;line-height:1;" title="Remove">×</button>'
                         + '</span>';
                 }).join('');
             }
 
             function htmlesc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+            window.setMainZone = function(id) {
+                homeId = id;
+                document.getElementById('dz-home-id').value = homeId;
+                renderZones();
+            };
 
             window.removeZone = function(id) {
                 selectedZones = selectedZones.filter(function(z){ return z.id !== id; });
@@ -489,14 +526,15 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     fetch('/api/barangay/list?q=' + encodeURIComponent(q) + '&limit=20')
                         .then(r=>r.json()).then(function(d){
                             var res = document.getElementById('dz-results');
-                            if (!d.barangays || !d.barangays.length) { res.style.display='none'; return; }
+                            if (!d.barangays || !d.barangays.length) { res.innerHTML='<div style="padding:12px 16px;color:var(--muted);font-size:0.84rem;">No barangays found</div>'; res.style.display='block'; return; }
                             res.innerHTML = d.barangays.map(function(b){
                                 var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
-                                return '<div onclick="addZone(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + b.city.replace(/'/g,'\\\'') + '\',\'' + b.province.replace(/'/g,'\\\'') + '\')" '
-                                    + 'style="padding:8px 14px;cursor:pointer;border-bottom:1px solid var(--border);font-size:0.87rem;display:flex;justify-content:space-between;align-items:center;'
-                                    + (added ? 'opacity:0.4;pointer-events:none;' : '') + '">'
-                                    + '<span>' + htmlesc(b.name + ', ' + b.city) + ' <span style="color:var(--muted);font-size:0.78rem;">' + htmlesc(b.province) + '</span></span>'
-                                    + (added ? '<span style="color:#22c55e;font-size:0.78rem;">Added</span>' : '<span style="color:var(--accent);font-size:0.78rem;">+ Add</span>')
+                                return '<div onclick="' + (added ? '' : 'addZone(' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + b.city.replace(/'/g,'\\\'') + '\',\'' + b.province.replace(/'/g,'\\\'') + '\')') + '" '
+                                    + 'style="padding:10px 16px;cursor:' + (added ? 'default' : 'pointer') + ';border-bottom:1px solid var(--border);font-size:0.87rem;display:flex;justify-content:space-between;align-items:center;'
+                                    + (added ? 'opacity:0.35;' : '') + 'transition:background 0.1s;" '
+                                    + (added ? '' : 'onmouseover="this.style.background=\'rgba(255,255,255,0.04)\'" onmouseout="this.style.background=\'\'"') + '>'
+                                    + '<span>' + htmlesc(b.name + ', ' + b.city) + ' <span style="color:var(--muted);font-size:0.76rem;">' + htmlesc(b.province) + '</span></span>'
+                                    + (added ? '<span style="color:#22c55e;font-size:0.76rem;">✓ Added</span>' : '<span style="color:var(--accent);font-size:0.76rem;font-weight:600;">+ Add</span>')
                                     + '</div>';
                             }).join('');
                             res.style.display = 'block';
@@ -507,7 +545,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             window.addZone = function(id, name, city, province) {
                 id = parseInt(id);
                 if (selectedZones.some(function(z){ return z.id === id; })) return;
-                if (selectedZones.length >= 10) { alert('Maximum 10 delivery zones'); return; }
+                if (selectedZones.length >= 50) { alert('Maximum 50 delivery zones'); return; }
                 selectedZones.push({id:id, name:name, city:city, province:province});
                 if (!homeId) { homeId = id; document.getElementById('dz-home-id').value = homeId; }
                 document.getElementById('dz-results').style.display = 'none';
@@ -525,8 +563,9 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                     .then(r=>r.json()).then(function(d){
                         btn.disabled = false;
                         if (d.success) {
-                            btn.textContent = 'Saved ✓';
-                            setTimeout(function(){ btn.textContent = 'Save Zones'; }, 2000);
+                            btn.textContent = '✓ Saved';
+                            btn.style.background = '#16a34a';
+                            setTimeout(function(){ btn.textContent = 'Save Zones'; btn.style.background = ''; }, 2500);
                         } else {
                             btn.textContent = 'Save Zones';
                             alert('Error: ' + (d.error || 'Failed'));

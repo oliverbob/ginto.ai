@@ -51,8 +51,17 @@ $pageTitle = $pageKind === 'seller' ? 'Seller Orders' : ($pageKind === 'delivery
                 <div style="text-align:right;min-width:190px;">
                     <div style="font-size:0.8rem;color:var(--muted);">Buyer total</div>
                     <div style="font-size:1.5rem;font-weight:800;line-height:1.1;">₱<?= number_format((float)($order['buyer_total_amount'] ?? 0), 2) ?></div>
+                    <?php if ((float)($order['delivery_fee_amount'] ?? 0) > 0 || (float)($order['processing_fee_amount'] ?? 0) > 0): ?>
+                    <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">
+                        <?php if ((float)($order['delivery_fee_amount'] ?? 0) > 0): ?>Delivery ₱<?= number_format((float)$order['delivery_fee_amount'], 2) ?><?php endif; ?>
+                        <?php if ((float)($order['processing_fee_amount'] ?? 0) > 0): ?> · Processing ₱<?= number_format((float)$order['processing_fee_amount'], 2) ?><?php endif; ?>
+                    </div>
+                    <?php endif; ?>
                     <?php if ($pageKind === 'seller'): ?>
                     <div style="font-size:0.78rem;color:#86efac;margin-top:6px;">Seller net ₱<?= number_format((float)($order['seller_net_amount'] ?? 0), 2) ?></div>
+                    <?php if (!empty($order['seller_payout_eta'])): ?>
+                    <div style="font-size:0.72rem;color:var(--muted);margin-top:4px;">💰 Payout: <?= htmlspecialchars($order['seller_payout_eta'], ENT_QUOTES, 'UTF-8') ?></div>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             </div>

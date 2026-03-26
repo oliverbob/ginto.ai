@@ -381,8 +381,8 @@ class BarangayController extends \Core\Controller
         $barangayIds    = array_filter(array_map('intval', $rawIds), fn($v) => $v > 0);
         $homeBarangayId = (int)($input['home_barangay_id'] ?? ($barangayIds[0] ?? 0));
 
-        if (count($barangayIds) > 10) {
-            echo json_encode(['success' => false, 'error' => 'Maximum 10 delivery zones allowed']);
+        if (count($barangayIds) > 50) {
+            echo json_encode(['success' => false, 'error' => 'Maximum 50 delivery zones allowed']);
             return;
         }
 
@@ -410,6 +410,128 @@ class BarangayController extends \Core\Controller
             error_log('BarangayController::saveSellerZones error: ' . $e->getMessage());
             echo json_encode(['success' => false, 'error' => 'Failed to save zones']);
         }
+    }
+
+    // ── GET /api/barangay/product/zones?product_id=... ─────────────────────
+    public function productZones(): void
+    {
+        header('Content-Type: application/json');
+        $productId = (int)($_GET['product_id'] ?? 0);
+        if ($productId <= 0) {
+            echo json_encode(['zones' => [], 'use_custom' => false]);
+            return;
+        }
+
+        try {
+            $product = $this->db->get('products', ['seller_id', 'use_custom_zones', 'product_type'], ['id' => $productId]);
+            $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+            if (!$product || (int)$product['seller_id'] !== $userId) {
+                echo json_encode(['zones' => [], 'use_custom' => false]);
+                return;
+            }
+
+            $useCustom = (bool)($product['use_custom_zones'] ?? false);
+            $zones = [];
+
+            if ($useCustom) {
+                $zones = $this->db->query("
+                    SELECT b.id, b.name, b.city, b.province
+                    FROM product_delivery_zones pz
+                    JOIN barangays b ON b.id = pz.barangay_id
+                    WHERE pz.product_id = :pid AND b.is_active = 1
+                    ORDER BY b.city ASC, b.name ASC
+                ", [':pid' => $productId])->fetchAll(\PDO::FETCH_ASSOC);
+            }
+
+            echo json_encode(['zones' => $zones ?: [], 'use_custom' => $useCustom]);
+        } catch (\Throwable $e) {
+            error_log('BarangayController::productZones error: ' . $e->getMessage());
+            echo json_encode(['zones' => [], 'use_custom' => false]);
+        }
+    }
+
+    // ── POST /api/barangay/product/zones/save ──────────────────────────────
+    public function saveProductZones(): void
+    {
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'POST required']);
+            return;
+        }
+
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Login required']);
+            return;
+        }
+
+        $input = [];
+        $rawBody = file_get_contents('php://input');
+        if ($rawBody) {
+            $decoded = json_decode($rawBody, true);
+            if (is_array($decoded)) $input = $decoded;
+        }
+        if (empty($input)) $input = $_POST;
+
+        $token = $input['csrf_token'] ?? '';
+        if (!validateCsrfToken($token)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            return;
+        }
+
+        $productId = (int)($input['product_id'] ?? 0);
+        $useCustom = !empty($input['use_custom_zones']);
+        $rawIds = $input['barangay_ids'] ?? [];
+        if (!is_array($rawIds)) $rawIds = [];
+        $barangayIds = array_filter(array_map('intval', $rawIds), fn($v) => $v > 0);
+
+        // Verify the product belongs to this seller
+        $product = $this->db->get('products', ['id', 'seller_id'], ['id' => $productId]);
+        if (!$product || (int)$product['seller_id'] !== $userId) {
+            echo json_encode(['success' => false, 'error' => 'Product not found']);
+            return;
+        }
+
+        try {
+            $this->db->update('products', ['use_custom_zones' => $useCustom ? 1 : 0], ['id' => $productId]);
+
+            $this->db->delete('product_delivery_zones', ['product_id' => $productId]);
+
+            if ($useCustom && !empty($barangayIds)) {
+                $valid = $this->db->select('barangays', 'id', ['id' => $barangayIds, 'is_active' => 1]) ?: [];
+                $validIds = array_column($valid, 'id');
+                foreach ($barangayIds as $bid) {
+                    if (!in_array($bid, $validIds)) continue;
+                    $this->db->insert('product_delivery_zones', [
+                        'product_id' => $productId,
+                        'barangay_id' => (int)$bid,
+                    ]);
+                }
+            }
+
+            echo json_encode(['success' => true]);
+        } catch (\Throwable $e) {
+            error_log('BarangayController::saveProductZones error: ' . $e->getMessage());
+            echo json_encode(['success' => false, 'error' => 'Failed to save zones']);
+        }
+    }
+
+    // ── GET /api/barangay/buyer/saved-address ──────────────────────────────
+    public function buyerSavedAddress(): void
+    {
+        header('Content-Type: application/json');
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            echo json_encode(['address' => null]);
+            return;
+        }
+
+        $addr = $this->db->get('buyer_saved_addresses', '*', ['user_id' => $userId, 'is_default' => 1]);
+        echo json_encode(['address' => $addr ?: null]);
     }
 
     // ── POST /api/barangay/runner/register ─────────────────────────────────
