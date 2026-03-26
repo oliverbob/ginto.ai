@@ -567,7 +567,7 @@ class BarangayController extends \Core\Controller
         try {
             $zones = $this->db->query("
                 SELECT b.id, b.name, b.city, b.province, b.region,
-                       z.is_home, z.created_at
+                       z.is_home, z.lat, z.lng, z.created_at
                 FROM seller_delivery_zones z
                 JOIN barangays b ON b.id = z.barangay_id
                 WHERE z.seller_id = :sid AND b.is_active = 1
@@ -623,6 +623,12 @@ class BarangayController extends \Core\Controller
         }
         if ($csrfBypass) {
             error_log('DEBUG saveSellerZones: CSRF bypass for user_id=' . $userId);
+        }
+
+        // DEBUG TEMP: inspect incoming payload and parsed params
+        if (isset($input['debug']) && $input['debug'] === '1') {
+            echo json_encode(['debug' => ['input' => $input]]);
+            return;
         }
 
         $rawIds = $input['barangay_ids'] ?? [];

@@ -702,7 +702,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 .then(function(r){ return r.json(); })
                 .then(function(d) {
                     if (!d.zones || !d.zones.length) return;
-                    selectedZones = d.zones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province, lat:0, lng:0}; });
+                    selectedZones = d.zones.map(function(z){ return {id:parseInt(z.id), name:z.name, city:z.city, province:z.province, lat:parseFloat(z.lat)||0, lng:parseFloat(z.lng)||0}; });
                     homeId = d.zones.find(function(z){ return z.is_home==1 || z.is_home===true; });
                     homeId = homeId ? parseInt(homeId.id) : (selectedZones[0] ? selectedZones[0].id : 0);
                     document.getElementById('dz-home-id').value = homeId;
