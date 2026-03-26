@@ -550,7 +550,12 @@ class BarangayController extends \Core\Controller
     {
         header('Content-Type: application/json');
 
+
+        // Use seller_id from query, or fallback to logged-in user
         $sellerId = isset($_GET['seller_id']) ? (int)$_GET['seller_id'] : 0;
+        if ($sellerId <= 0 && !empty($_SESSION['user_id'])) {
+            $sellerId = (int)$_SESSION['user_id'];
+        }
         if ($sellerId <= 0) {
             echo json_encode(['zones' => []]);
             return;
