@@ -491,6 +491,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             var _map = null;
             var _markers = [];
             var _sellerLat = null, _sellerLng = null;
+            var mapCandidate = null;
 
             function htmlesc(s){ var d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
 
@@ -498,24 +499,40 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 var el = document.getElementById('dz-current');
                 var hint = document.getElementById('dz-main-hint');
                 var count = document.getElementById('dz-count');
-                if (!selectedZones.length) {
+                if (!selectedZones.length && !mapCandidate) {
                     el.innerHTML = '<div style="padding:14px 16px;background:rgba(37,99,235,0.06);border:1px dashed var(--accent);border-radius:14px;font-size:0.85rem;color:var(--accent);display:flex;align-items:center;gap:10px;width:100%;box-sizing:border-box;">'
                         + '<span style="font-size:1.2rem;">📍</span> Use the button above to detect your location, or search for barangays below.</div>';
                     hint.style.display = 'none';
                     count.textContent = '';
                     return;
                 }
+
                 hint.style.display = 'block';
-                count.textContent = selectedZones.length + ' / 50 zones';
-                el.innerHTML = selectedZones.map(function(z) {
+                count.textContent = (selectedZones.length ? (selectedZones.length + ' / 50 zones') : '0 / 50 zones');
+
+                var items = selectedZones.slice();
+                if (mapCandidate && !selectedZones.some(function(z){ return z.id === parseInt(mapCandidate.id); })) {
+                    items.push({
+                        id: mapCandidate.id,
+                        name: mapCandidate.name,
+                        city: mapCandidate.city,
+                        province: mapCandidate.province,
+                        lat: mapCandidate.lat,
+                        lng: mapCandidate.lng,
+                        isCandidate: true
+                    });
+                }
+
+                el.innerHTML = items.map(function(z) {
                     var isHome = z.id === homeId;
-                    return '<span onclick="setMainZone(' + z.id + ')" style="display:inline-flex;align-items:center;gap:5px;'
-                        + 'background:' + (isHome ? 'linear-gradient(135deg,rgba(214,180,75,0.18),rgba(214,180,75,0.08))' : 'rgba(255,255,255,0.05)') + ';'
-                        + 'border:1px solid ' + (isHome ? 'rgba(214,180,75,0.45)' : 'rgba(255,255,255,0.1)') + ';'
+                    var isCandidate = z.isCandidate;
+                    return '<span onclick="' + (isCandidate ? 'null' : 'setMainZone(' + z.id + ')') + '" style="display:inline-flex;align-items:center;gap:5px;'
+                        + 'background:' + (isHome ? 'linear-gradient(135deg,rgba(214,180,75,0.18),rgba(214,180,75,0.08))' : (isCandidate ? 'rgba(59,130,246,0.12)' : 'rgba(255,255,255,0.05)')) + ';'
+                        + 'border:1px solid ' + (isHome ? 'rgba(214,180,75,0.45)' : (isCandidate ? 'rgba(59,130,246,0.45)' : 'rgba(255,255,255,0.1)')) + ';'
                         + 'border-radius:20px;padding:6px 12px;font-size:0.82rem;cursor:pointer;transition:all 0.15s;">'
-                        + (isHome ? '<span title="Main zone">🏠</span> ' : '<span style="opacity:0.35;">📦</span> ')
+                        + (isHome ? '<span title="Main zone">🏠</span> ' : (isCandidate ? '<span title="Map candidate">📍</span> ' : '<span style="opacity:0.35;">📦</span> '))
                         + '<span>' + htmlesc(z.name) + ', <span style="color:var(--muted);font-size:0.76rem;">' + htmlesc(z.city) + '</span></span>'
-                        + '<button onclick="event.stopPropagation();removeZone(' + z.id + ')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1.05rem;padding:0 0 0 6px;line-height:1;" title="Remove zone">✕</button>'
+                        + (isCandidate || isHome ? '' : '<button onclick="event.stopPropagation();removeZone(' + z.id + ')" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:1.05rem;padding:0 0 0 6px;line-height:1;" title="Remove zone">✕</button>')
                         + '</span>';
                 }).join('');
                 updateMapMarkers();
@@ -633,6 +650,11 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 
             window.dzAddSuggested = function(el, id, name, city, province, lat, lng) {
                 if (addZoneObj({id:id, name:name, city:city, province:province, lat:lat, lng:lng})) {
+                    setMainZone(parseInt(id));
+                    if (mapCandidate && mapCandidate.id === id) {
+                        mapCandidate = null;
+                    }
+
                     el.disabled = true;
                     el.style.borderColor = 'rgba(34,197,94,0.3)';
                     el.style.background = 'rgba(34,197,94,0.08)';
@@ -689,21 +711,20 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                 return;
                             }
 
-                            // Prefer a nearby barangay that is not yet selected; fallback to nearest.
-                            // After zoom/pan click, we should always honor the nearest candidate, not only within 2.2km.
+                            // Prefer a nearby barangay candidate; do not auto-add to selected zones.
                             var candidate = d.barangays.find(function(b){
                                 return !selectedZones.some(function(z){ return z.id === parseInt(b.id); });
                             }) || d.barangays[0];
 
-                            if (candidate && !selectedZones.some(function(z){ return z.id === parseInt(candidate.id); })) {
-                                addZoneObj(candidate);
-                                renderZones();
-                                showDzStatus(htmlesc(candidate.name) + ' added');
+                            if (!candidate) {
+                                return;
                             }
 
-                            // Set clicked/nearby candidate as new origin/main zone.
-                            setMainZone(parseInt(candidate.id));
+                            mapCandidate = candidate;
+                            renderZones();
+                            showDzStatus('Candidate: ' + htmlesc(candidate.name) + ' (tap + above to add)');
 
+                            // Center map on candidate location
                             if (candidate.lat && candidate.lng) {
                                 _map.setView([candidate.lat, candidate.lng], 14);
                             } else {
