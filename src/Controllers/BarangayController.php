@@ -640,11 +640,28 @@ class BarangayController extends \Core\Controller
             // Replace all zones for this seller
             $this->db->delete('seller_delivery_zones', ['seller_id' => $userId]);
 
+
+            // Fetch lat/lng for each barangay
+            $barangayData = [];
+            if (!empty($barangayIds)) {
+                $rows = $this->db->select('barangays', ['id', 'lat', 'lng'], ['id' => $barangayIds]);
+                foreach ($rows as $row) {
+                    $barangayData[(int)$row['id']] = [
+                        'lat' => isset($row['lat']) ? (float)$row['lat'] : null,
+                        'lng' => isset($row['lng']) ? (float)$row['lng'] : null,
+                    ];
+                }
+            }
+
             foreach ($barangayIds as $bid) {
+                $lat = $barangayData[$bid]['lat'] ?? null;
+                $lng = $barangayData[$bid]['lng'] ?? null;
                 $this->db->insert('seller_delivery_zones', [
                     'seller_id'   => $userId,
                     'barangay_id' => (int)$bid,
                     'is_home'     => ($bid === $homeBarangayId) ? 1 : 0,
+                    'lat'         => $lat,
+                    'lng'         => $lng,
                 ]);
             }
 
