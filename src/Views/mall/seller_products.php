@@ -846,20 +846,27 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             };
 
             window.dzAddFromSearch = function(id, name, city, province, lat, lng) {
-                if (addZoneObj({id:id, name:name, city:city, province:province, lat:lat, lng:lng})) {
+                var added = addZoneObj({id:id, name:name, city:city, province:province, lat:lat, lng:lng});
+
+                // always set click target as main origin in this context
+                setMainZone(parseInt(id));
+
+                if (added) {
                     document.getElementById('dz-results').style.display = 'none';
                     document.getElementById('dz-search').value = '';
-                    renderZones();
-                    // show map for selected search location
-                    if (!_map) {
-                        initMap(lat, lng);
-                    } else {
-                        _map.setView([lat, lng], 14);
-                        updateMapMarkers();
-                    }
-                    // now show nearby candidate barangays around map point
-                    loadNearbySuggestions(lat, lng);
                 }
+
+                renderZones();
+
+                // show map for selected search location
+                if (!_map) {
+                    initMap(lat, lng);
+                } else {
+                    _map.setView([lat, lng], 14);
+                    updateMapMarkers();
+                }
+                // now show nearby candidate barangays around map point
+                loadNearbySuggestions(lat, lng);
             };
 
             // ── Save ────────────────────────────────────────────────────────
