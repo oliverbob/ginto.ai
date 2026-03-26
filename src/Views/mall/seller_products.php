@@ -451,6 +451,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             <!-- Map container -->
             <div id="dz-map-wrap" style="display:none;margin-bottom:14px;border-radius:14px;overflow:hidden;border:1px solid var(--border);position:relative;">
                 <div id="dz-map" style="width:100%;height:240px;"></div>
+                <div id="dz-status" style="position:absolute;top:8px;left:8px;right:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.75rem;padding:6px 10px;border-radius:8px;text-align:center;display:none;z-index:600;"></div>
                 <div style="position:absolute;bottom:8px;left:8px;right:8px;background:rgba(0,0,0,0.6);color:#fff;font-size:0.75rem;padding:6px 10px;border-radius:8px;text-align:center;">
                     Tap the map to add a zone at that location
                 </div>
@@ -532,6 +533,15 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 document.getElementById('dz-home-id').value = homeId;
                 renderZones();
             };
+
+            function showDzStatus(msg) {
+                var status = document.getElementById('dz-status');
+                if (!status) return;
+                status.textContent = msg;
+                status.style.display = 'block';
+                clearTimeout(status._timer);
+                status._timer = setTimeout(function(){ status.style.display = 'none'; }, 2800);
+            }
 
             function addZoneObj(z) {
                 var id = parseInt(z.id);
@@ -680,6 +690,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                             if (!selectedZones.some(function(z){ return z.id === parseInt(candidate.id); })) {
                                 addZoneObj(candidate);
                                 renderZones();
+                                showDzStatus(htmlesc(candidate.name) + ' added');
                             }
 
                             if (candidate.lat && candidate.lng) {
