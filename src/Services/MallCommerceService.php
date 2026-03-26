@@ -20,15 +20,19 @@ class MallCommerceService
 
     // ── Gateway processing fees ──────────────────────────────────────────
     private const PROCESSING_FEE_PAYMONGO   = 25.00;  // flat fee for QR / Card
-    private const PROCESSING_FEE_PAYPAL     = 50.00;  // flat fee
-    private const PROCESSING_FEE_PAYPAL_PCT = 0.07;   // 7% on total (double conversion + bank)
+    private const PROCESSING_FEE_PAYPAL_BASE = 100.00; // flat fee per PayPal sale
+    private const PROCESSING_FEE_PAYPAL_SMALL = 50.00; // extra charge if order < ₱500
+    private const PROCESSING_FEE_PAYPAL_SMALL_THRESHOLD = 500.00;
+    private const PROCESSING_FEE_PAYPAL_LARGE_PCT = 0.10; // 10% if order > ₱1,000
+    private const PROCESSING_FEE_PAYPAL_LARGE_THRESHOLD = 1000.00;
 
-    // ── Grab-style delivery fee constants ────────────────────────────────
-    private const DELIVERY_BASE_FEE         = 49.00;  // base fare (first 2 km included)
-    private const DELIVERY_PER_KM           = 15.00;  // per-km rate
-    private const DELIVERY_FREE_KM          = 2.0;    // included in base
-    private const DELIVERY_PLATFORM_MARKUP  = 0.05;   // +5% on top
-    private const DELIVERY_PER_KM_SURCHARGE = 0.01;   // +1% per km extra
+    // ── Delivery fee constants (Grab premium-style) ──────────────────────
+    private const DELIVERY_BASE_FEE         = 49.00;  // base fare (same barangay)
+    private const DELIVERY_PER_KM_PER_ITEM  = 50.00;  // ₱50 per km per item
+    private const DELIVERY_PLATFORM_MARKUP  = 0.50;   // +50% platform fee on delivery
+
+    // ── Compulsory platform markup ────────────────────────────────────────
+    private const COMPULSORY_MARKUP_RATE    = 15.00;   // 15% on all products
 
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off'        => 12.00,   // standard listing, minimal promotion
@@ -1088,15 +1092,17 @@ class MallCommerceService
             $grouped[$sellerId]['chargeable_weight']  = $shippingResult['chargeable_weight_kg'];
             $grouped[$sellerId]['shipping_dimensions_json'] = json_encode($shippingResult);
 
-            // Grab-style delivery fee based on seller→buyer distance
-            $deliveryFee = $this->calculateDeliveryFee($sellerId, $buyerBarangayId);
-            // Digital/virtual products don't need delivery
-            $hasPhysical = false;
+            // Grab-style delivery fee based on seller→buyer distance (per item)
+            $physicalItemCount = 0;
             foreach ($group['items'] as $gi) {
                 $pt = $this->db->get('products', 'product_type', ['id' => $gi['product_id']]);
-                if (in_array($pt, ['physical', 'liquid', null, ''], true)) { $hasPhysical = true; break; }
+                if (in_array($pt, ['physical', 'liquid', null, ''], true)) {
+                    $physicalItemCount += (int)($gi['quantity'] ?? 1);
+                }
             }
-            if (!$hasPhysical) $deliveryFee = 0.00;
+            $deliveryFee = $physicalItemCount > 0
+                ? $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $physicalItemCount)
+                : 0.00;
             $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
 
             // Buyer pays product subtotal + shipping fee + delivery fee
@@ -1224,21 +1230,22 @@ class MallCommerceService
         $pricingRate = isset($product['pricing_rate']) ? (float)$product['pricing_rate'] : self::PRODUCT_PRICING_DEFAULTS[$pricingModel];
         $markupRate  = isset($product['markup_rate'])  ? (float)$product['markup_rate']  : 0.00;
 
+        // Compulsory 15% platform markup on ALL products
+        $compulsoryMarkup = self::COMPULSORY_MARKUP_RATE;
+        $effectiveMarkup = max($markupRate, $compulsoryMarkup);
+
         if ($pricingModel === 'markup') {
             // Legacy markup mode: buyer price = base * (1 + markup%)
-            $markupRate = min(200.00, max(0.00, $markupRate ?: 10.00));
-            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($markupRate / 100)), 2);
+            $effectiveMarkup = min(200.00, max($compulsoryMarkup, $markupRate ?: $compulsoryMarkup));
+            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($effectiveMarkup / 100)), 2);
             $platformFeePerUnit = round($chargedUnitPrice - $baseUnitPrice, 2);
             $sellerNetPerUnit   = $baseUnitPrice;
             $pricingRate = 0.00;
         } else {
-            // standard / referral: fee is taken from the buyer's (marked-up) price
+            // standard / referral: apply compulsory markup first, then platform fee
             $pricingRate = max(0.00, min(100.00, $pricingRate ?: self::PRODUCT_PRICING_DEFAULTS[$pricingModel]));
-            // Apply markup if set, then deduct platform fee
-            $markupRate = min(200.00, max(0.00, $markupRate));
-            $chargedUnitPrice   = $markupRate > 0
-                ? round($baseUnitPrice * (1 + ($markupRate / 100)), 2)
-                : $baseUnitPrice;
+            $effectiveMarkup = min(200.00, max($compulsoryMarkup, $markupRate));
+            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($effectiveMarkup / 100)), 2);
             $platformFeePerUnit = round($chargedUnitPrice * ($pricingRate / 100), 2);
             $sellerNetPerUnit   = round($chargedUnitPrice - $platformFeePerUnit, 2);
         }
@@ -1246,7 +1253,7 @@ class MallCommerceService
         return [
             'pricing_model' => $pricingModel,
             'pricing_rate' => $pricingRate,
-            'markup_rate' => $markupRate,
+            'markup_rate' => $effectiveMarkup,
             'quantity' => $quantity,
             'base_unit_price' => $baseUnitPrice,
             'charged_unit_price' => $chargedUnitPrice,
@@ -1828,11 +1835,20 @@ class MallCommerceService
      */
     private function calculateProcessingFee(string $paymentMethod, float $orderTotal): float
     {
-        return match ($paymentMethod) {
-            'ginto_pay_qr', 'ginto_pay_card' => self::PROCESSING_FEE_PAYMONGO,
-            'paypal' => round(self::PROCESSING_FEE_PAYPAL + ($orderTotal * self::PROCESSING_FEE_PAYPAL_PCT), 2),
-            default => 0.00,
-        };
+        if (in_array($paymentMethod, ['ginto_pay_qr', 'ginto_pay_card'], true)) {
+            return self::PROCESSING_FEE_PAYMONGO; // ₱25 flat
+        }
+        if ($paymentMethod === 'paypal') {
+            $fee = self::PROCESSING_FEE_PAYPAL_BASE; // ₱100 base
+            if ($orderTotal < self::PROCESSING_FEE_PAYPAL_SMALL_THRESHOLD) {
+                $fee += self::PROCESSING_FEE_PAYPAL_SMALL; // +₱50 for small orders
+            }
+            if ($orderTotal > self::PROCESSING_FEE_PAYPAL_LARGE_THRESHOLD) {
+                $fee += round($orderTotal * self::PROCESSING_FEE_PAYPAL_LARGE_PCT, 2); // +10% for large orders
+            }
+            return round($fee, 2);
+        }
+        return 0.00; // wallet = free
     }
 
     /**
@@ -1844,9 +1860,9 @@ class MallCommerceService
      *
      * Returns 0 if distance cannot be determined (e.g. no GPS data).
      */
-    private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId): float
+    private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId, int $itemCount = 1): float
     {
-        if (!$buyerBarangayId) return 0.00;
+        if (!$buyerBarangayId || $itemCount <= 0) return 0.00;
 
         // Get seller main zone (is_home = 1)
         $sellerZone = $this->db->get('seller_delivery_zones', ['barangay_id'], [
@@ -1873,15 +1889,11 @@ class MallCommerceService
 
         $distKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
 
-        // Base fare + per-km for extra distance
-        $extraKm = max(0.0, $distKm - self::DELIVERY_FREE_KM);
-        $rawFee  = self::DELIVERY_BASE_FEE + ($extraKm * self::DELIVERY_PER_KM);
+        // ₱50 per km per item
+        $rawFee = $distKm * self::DELIVERY_PER_KM_PER_ITEM * $itemCount;
 
-        // +5% platform markup
+        // +50% platform fee on delivery
         $rawFee *= (1 + self::DELIVERY_PLATFORM_MARKUP);
-
-        // +1% per extra km surcharge
-        $rawFee *= (1 + ($extraKm * self::DELIVERY_PER_KM_SURCHARGE));
 
         return round(max($rawFee, self::DELIVERY_BASE_FEE), 2);
     }
