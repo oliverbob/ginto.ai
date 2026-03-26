@@ -1757,23 +1757,40 @@ body.light .co-qr-spinner {
         e.preventDefault();
         var src = this.dataset.qrSrc;
         if (!src) return;
-        // Convert data URI or URL to blob download
-        fetch(src)
-            .then(function(r) { return r.blob(); })
-            .then(function(blob) {
+
+        try {
+            // Handle base64 data URI directly (no fetch needed)
+            if (src.indexOf('data:') === 0) {
+                var parts = src.split(',');
+                var mime = parts[0].match(/:(.*?);/)[1];
+                var b64 = atob(parts[1]);
+                var arr = new Uint8Array(b64.length);
+                for (var i = 0; i < b64.length; i++) arr[i] = b64.charCodeAt(i);
+                var blob = new Blob([arr], {type: mime});
                 var url = URL.createObjectURL(blob);
                 var a = document.createElement('a');
                 a.href = url;
                 a.download = 'ginto-pay-qr.png';
+                a.style.display = 'none';
                 document.body.appendChild(a);
                 a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-            })
-            .catch(function() {
-                // Fallback: open in new tab
-                window.open(src, '_blank');
-            });
+                setTimeout(function() {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 200);
+                return;
+            }
+            // Regular URL fallback
+            var a = document.createElement('a');
+            a.href = src;
+            a.download = 'ginto-pay-qr.png';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (ex) {
+            window.open(src, '_blank');
+        }
     });
 
     async function startQrFlowInModal(forceNewSession) {
