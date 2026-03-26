@@ -625,7 +625,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
             };
 
             // ── Map (Leaflet from CDN) ──────────────────────────────────────
-            function initMap(lat, lng) {
+            window.initMap = function(lat, lng) {
                 var wrap = document.getElementById('dz-map-wrap');
                 wrap.style.display = 'block';
 
@@ -662,17 +662,32 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 
                 // Click map to add zone
                 _map.on('click', function(e) {
-                    fetch('/api/barangay/nearby?lat=' + e.latlng.lat + '&lng=' + e.latlng.lng + '&limit=1')
+                    var clickedLat = e.latlng.lat;
+                    var clickedLng = e.latlng.lng;
+
+                    fetch('/api/barangay/nearby?lat=' + clickedLat + '&lng=' + clickedLng + '&limit=1')
                         .then(function(r){ return r.json(); })
                         .then(function(d) {
                             if (d.barangays && d.barangays.length) {
                                 var b = d.barangays[0];
                                 if (addZoneObj(b)) {
                                     renderZones();
+                                    // center the map on the detected barangay location and show candidates around that spot
+                                    if (b.lat && b.lng) {
+                                        _map.setView([b.lat, b.lng], 14);
+                                    } else {
+                                        _map.setView([clickedLat, clickedLng], 14);
+                                    }
+                                    loadNearbySuggestions(clickedLat, clickedLng);
                                 } else {
                                     alert(b.name + ' is already in your zones.');
                                 }
+                            } else {
+                                alert('No barangay found at this location. Try elsewhere.');
                             }
+                        })
+                        .catch(function() {
+                            alert('Unable to determine barangay from clicked map location.');
                         });
                 });
 
@@ -749,7 +764,34 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                 }, 250);
             });
 
-            // Register a GeoNames place into barangays, then add as zone
+            function loadNearbySuggestions(lat, lng) {
+                var sugWrap = document.getElementById('dz-suggestions');
+                var sugList = document.getElementById('dz-suggested-list');
+                if (!sugWrap || !sugList) return;
+
+                fetch('/api/barangay/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng) + '&limit=15')
+                    .then(function(r){ return r.json(); })
+                    .then(function(d) {
+                        if (!d.barangays || !d.barangays.length) {
+                            sugWrap.style.display = 'none';
+                            return;
+                        }
+
+                        sugWrap.style.display = 'block';
+                        sugList.innerHTML = d.barangays.map(function(b){
+                            var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
+                            return '<button onclick="dzAddSuggested(this,' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')" '
+                                + 'style="padding:6px 12px;border-radius:20px;border:1px solid ' + (added ? 'rgba(34,197,94,0.3)' : 'var(--border)') + ';'
+                                + 'background:' + (added ? 'rgba(34,197,94,0.08)' : 'var(--surface)') + ';color:var(--text);font-size:0.8rem;cursor:pointer;transition:all 0.15s;" '
+                                + (added ? 'disabled' : '') + '>'
+                                + (added ? '✓ ' : '+ ') + htmlesc(b.name) + ' <span style="color:var(--muted);font-size:0.72rem;">(' + (b.dist_m<1000 ? (b.dist_m + 'm') : ((b.dist_m/1000).toFixed(1) + 'km')) + ')</span>'
+                                + '</button>';
+                        }).join('');
+                    }).catch(function() {
+                        // ignore nearby load failures
+                    });
+            }
+
             window.dzAddGeo = function(geoId, name, city, province, lat, lng) {
                 var numericGeoId = parseInt(String(geoId).replace('geo_', ''));
                 var body = new URLSearchParams();
@@ -777,28 +819,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                         updateMapMarkers();
                     }
                     // now show nearby candidate barangays around map point
-                    fetch('/api/barangay/nearby?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng) + '&limit=15')
-                        .then(function(r){ return r.json(); })
-                        .then(function(d) {
-                            var sugWrap = document.getElementById('dz-suggestions');
-                            var sugList = document.getElementById('dz-suggested-list');
-                            if (!d.barangays || !d.barangays.length) {
-                                sugWrap.style.display = 'none';
-                                return;
-                            }
-                            sugWrap.style.display = 'block';
-                            sugList.innerHTML = d.barangays.map(function(b){
-                                var added = selectedZones.some(function(z){ return z.id === parseInt(b.id); });
-                                return '<button onclick="dzAddSuggested(this,' + b.id + ',\'' + b.name.replace(/'/g,'\\\'') + '\',\'' + (b.city||'').replace(/'/g,'\\\'') + '\',\'' + (b.province||'').replace(/'/g,'\\\'') + '\',' + (b.lat||0) + ',' + (b.lng||0) + ')" '
-                                    + 'style="padding:6px 12px;border-radius:20px;border:1px solid ' + (added ? 'rgba(34,197,94,0.3)' : 'var(--border)') + ';'
-                                    + 'background:' + (added ? 'rgba(34,197,94,0.08)' : 'var(--surface)') + ';color:var(--text);font-size:0.8rem;cursor:pointer;transition:all 0.15s;" '
-                                    + (added ? 'disabled' : '') + '>'
-                                    + (added ? '✓ ' : '+ ') + htmlesc(b.name) + ' <span style="color:var(--muted);font-size:0.72rem;">(' + (b.dist_m<1000 ? (b.dist_m + 'm') : ((b.dist_m/1000).toFixed(1) + 'km')) + ')</span>'
-                                    + '</button>';
-                            }).join('');
-                        }).catch(function(){
-                            // ignore nearby load failures
-                        });
+                    loadNearbySuggestions(lat, lng);
                 }
             };
 
