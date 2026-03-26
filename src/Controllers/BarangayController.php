@@ -948,11 +948,12 @@ class BarangayController extends \Core\Controller
                 return;
             }
 
-            // Fallback: if no local barangay matches, search geo_places (GeoNames) for coverage
+            // Fallback: if no local barangay matches, search geo_places (GeoNames) for coverage.
+            // Ensure we return local numeric barangay IDs by registering geo records if needed.
             if ($this->geoPlacesAvailable()) {
                 $pdo = $this->db->pdo;
                 $stmt = $pdo->prepare("SELECT 
-                        CONCAT('geo_', g.geoname_id) AS id,
+                        g.geoname_id,
                         g.name,
                         COALESCE(g.admin2_code, '') AS city,
                         COALESCE(g.admin1_code, '') AS province,
@@ -982,8 +983,47 @@ class BarangayController extends \Core\Controller
                 $geoRows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
 
                 if (!empty($geoRows)) {
-                    echo json_encode(['barangays' => $geoRows]);
-                    return;
+                    $barangayRows = [];
+                    foreach ($geoRows as $g) {
+                        $geoId = (int)($g['geoname_id'] ?? 0);
+                        if ($geoId <= 0) continue;
+
+                        $existing = $this->db->get('barangays', ['id', 'name', 'city', 'province', 'region', 'lat', 'lng'], [
+                            'geoname_id' => $geoId,
+                            'is_active' => 1
+                        ]);
+
+                        if (!$existing) {
+                            $this->db->insert('barangays', [
+                                'geoname_id' => $geoId,
+                                'name'       => $g['name'],
+                                'city'       => $g['city'],
+                                'province'   => $g['province'],
+                                'region'     => $g['region'],
+                                'lat'        => $g['lat'],
+                                'lng'        => $g['lng'],
+                                'radius_m'   => 1500,
+                                'is_active'  => 1,
+                            ]);
+                            $existing = ['id' => (int)$this->db->id()];
+                        }
+
+                        $barangayRows[] = [
+                            'id'       => (int)$existing['id'],
+                            'name'     => $g['name'],
+                            'city'     => $g['city'],
+                            'province' => $g['province'],
+                            'region'   => $g['region'],
+                            'lat'      => $g['lat'],
+                            'lng'      => $g['lng'],
+                            'dist_m'   => $g['dist_m'],
+                        ];
+                    }
+
+                    if (!empty($barangayRows)) {
+                        echo json_encode(['barangays' => $barangayRows]);
+                        return;
+                    }
                 }
             }
 
