@@ -13,7 +13,7 @@ $isLoggedIn    = !empty($_SESSION['user_id']);
 
 $pid           = (int)($product['id'] ?? 0);
 $title         = htmlspecialchars($product['title'] ?? 'Product', ENT_QUOTES, 'UTF-8');
-$price         = (float)($product['price'] ?? 0);
+$price         = round((float)($product['price'] ?? 0) * 1.15, 2);
 $currency      = $product['currency'] ?? 'PHP';
 $desc          = htmlspecialchars($product['description'] ?? $product['short_description'] ?? '', ENT_QUOTES, 'UTF-8');
 $shortDesc     = htmlspecialchars($product['short_description'] ?? '', ENT_QUOTES, 'UTF-8');
@@ -338,7 +338,7 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
                 onerror="this.src='/assets/images/placeholder_ceramic.svg'">
             <div class="prod-related-info">
                 <div class="prod-related-name"><?= htmlspecialchars($r['title'] ?? '', ENT_QUOTES, 'UTF-8') ?></div>
-                <div class="prod-related-price"><?= $rCur . number_format((float)($r['price'] ?? 0), 2) ?></div>
+                <div class="prod-related-price"><?= $rCur . number_format(round((float)($r['price'] ?? 0) * 1.15, 2), 2) ?></div>
             </div>
         </a>
         <?php endforeach; ?>

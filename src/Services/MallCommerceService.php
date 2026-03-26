@@ -27,7 +27,7 @@ class MallCommerceService
     private const PROCESSING_FEE_PAYPAL_LARGE_THRESHOLD = 1000.00;
 
     // ── Delivery fee constants (Grab premium-style) ──────────────────────
-    private const DELIVERY_BASE_FEE         = 49.00;  // base fare (same barangay)
+    private const DELIVERY_BASE_FEE         = 100.00; // minimum delivery fee (even same barangay)
     private const DELIVERY_PER_KM_PER_ITEM  = 50.00;  // ₱50 per km per item
     private const DELIVERY_PLATFORM_MARKUP  = 0.50;   // +50% platform fee on delivery
 

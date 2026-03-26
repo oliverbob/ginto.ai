@@ -23,7 +23,7 @@
         return [
             'id'       => (int)($p['id'] ?? 0),
             'title'    => $p['title'] ?? '',
-            'price'    => (float)($p['price'] ?? $p['price_amount'] ?? 0),
+            'price'    => round((float)($p['price'] ?? $p['price_amount'] ?? 0) * 1.15, 2),
             'currency' => $p['currency'] ?? $p['price_currency'] ?? 'USD',
             'cat'      => isset($p['category_id']) ? (int)$p['category_id'] : null,
             'rating'   => (float)($p['rating'] ?? 0),
