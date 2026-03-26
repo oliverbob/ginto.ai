@@ -553,10 +553,13 @@ class BarangayController extends \Core\Controller
 
         // Use seller_id from query, or fallback to logged-in user
         $sellerId = isset($_GET['seller_id']) ? (int)$_GET['seller_id'] : 0;
-        if ($sellerId <= 0 && !empty($_SESSION['user_id'])) {
-            $sellerId = (int)$_SESSION['user_id'];
+        $sessionUserId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        error_log('DEBUG sellerZones: seller_id param=' . $sellerId . ' session_user_id=' . $sessionUserId);
+        if ($sellerId <= 0 && $sessionUserId) {
+            $sellerId = $sessionUserId;
         }
         if ($sellerId <= 0) {
+            error_log('DEBUG sellerZones: No valid seller_id, returning empty zones');
             echo json_encode(['zones' => []]);
             return;
         }
