@@ -713,6 +713,12 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                         });
                 });
 
+                // After dragging/panning map, refresh nearby candidates automatically, using center point
+                _map.on('moveend', function() {
+                    var center = _map.getCenter();
+                    loadNearbySuggestions(center.lat, center.lng);
+                });
+
                 updateMapMarkers();
             }
 
