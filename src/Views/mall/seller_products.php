@@ -711,10 +711,8 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
                                 return;
                             }
 
-                            // Prefer a nearby barangay candidate; do not auto-add to selected zones.
-                            var candidate = d.barangays.find(function(b){
-                                return !selectedZones.some(function(z){ return z.id === parseInt(b.id); });
-                            }) || d.barangays[0];
+                            // Prefer the nearest barangay candidate from click location (first returned). Do not auto-add.
+                            var candidate = d.barangays[0];
 
                             if (!candidate) {
                                 return;
