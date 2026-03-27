@@ -1399,11 +1399,14 @@ body.light .co-qr-spinner {
 
     async function createSession() {
         await refreshCartFromServer();
-        return api('/api/mall/checkout/create', {
+        const session = await api('/api/mall/checkout/create', {
             payment_method: selectedMethod,
             cart: readCart(),
             shipping: shippingPayload(),
         });
+        updateShippingFromSession(session);
+        console.info('checkout session', session);
+        return session;
     }
 
     async function startPayment() {
