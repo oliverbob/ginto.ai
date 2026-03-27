@@ -1014,7 +1014,7 @@ body.light .co-qr-spinner {
                     <div style="font-size:0.84rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:700;">Total due</div>
                     <div id="checkoutTotal" style="font-size:2rem;font-weight:800;line-height:1;">₱0.00</div>
                 </div>
-                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Buyer total is item price + delivery fee. Platform and processing adjustments are internal. I need to add extra charge called platform fee plus delivery since they are not added yet!</div>
+                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Buyer total includes item price, delivery, shipping, platform fee (8%), fixed fee (₱25), and processing fee.</div>
             </div>
         </div>
 
