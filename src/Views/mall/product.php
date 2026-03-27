@@ -483,7 +483,7 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
         cart.forEach(function(item) {
             const s = sym[item.currency] || (item.currency + ' ');
             total += item.price * item.qty;
-            const imageUrl = esc(item.img || '/assets/images/placeholder_ceramic.svg');
+            const imageUrl = esc(item.img || item.image || item.image_path || item.image_url || '');
             html += '<div class="cart-item"><img class="cart-item-img" src="' + imageUrl + '" alt="' + esc(item.title) + '" style="width:58px;height:58px;border-radius:12px;object-fit:cover;border:1px solid var(--border);" onerror="this.src=\'/assets/images/placeholder_ceramic.svg\'">'
                 + '<div class="cart-item-info"><div class="cart-item-name">' + esc(item.title) + '</div>'
                 + '<div class="cart-item-price">' + s + Number(item.price).toFixed(2) + '</div>'

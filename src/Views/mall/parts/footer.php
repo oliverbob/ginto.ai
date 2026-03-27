@@ -501,7 +501,7 @@
                         qty: item.qty,
                         price: item.price,
                         currency: item.currency,
-                        img: item.img || (existing ? existing.img : '/assets/images/placeholder_ceramic.svg'),
+                        img: item.img || item.image || item.image_path || item.image_url || (existing ? existing.img : ''),
                         seller_id: item.seller_id || (existing ? existing.seller_id : null),
                     };
                 });
