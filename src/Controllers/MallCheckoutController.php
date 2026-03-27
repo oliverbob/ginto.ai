@@ -749,8 +749,23 @@ class MallCheckoutController extends Controller
 
     private function validateCsrfFromPayload(array $input): void
     {
-        $token = (string)($input['csrf_token'] ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? ''));
+        $headerToken = '';
+        if (!empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+            $headerToken = (string)$_SERVER['HTTP_X_CSRF_TOKEN'];
+        } elseif (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            foreach ($headers as $name => $value) {
+                if (strtolower($name) === 'x-csrf-token') {
+                    $headerToken = (string)$value;
+                    break;
+                }
+            }
+        }
+
+        $token = (string)($input['csrf_token'] ?? $headerToken);
         if (!validateCsrfToken($token)) {
+            // Log details for debugging but avoid exposing tokens in output
+            error_log('CSRF invalid in MallCheckoutController: token_provided=' . ($token === '' ? '<empty>' : substr($token, 0, 8) . '...') . ' uri=' . ($_SERVER['REQUEST_URI'] ?? 'unknown'));
             $this->jsonError('Invalid CSRF token.', 403);
             exit;
         }

@@ -1158,7 +1158,12 @@ body.light .co-qr-spinner {
 
 <script>
 (function () {
-    const csrfToken = <?= json_encode($csrf_token ?? '') ?>;
+    const csrfToken = (
+        <?= json_encode($csrf_token ?? '') ?> ||
+        document.querySelector('meta[name="csrf-token"]')?.content ||
+        document.getElementById('global-csrf-token')?.value ||
+        ''
+    );
     const walletBalance = <?= json_encode((float)($wallet['balance'] ?? 0)) ?>;
     const cartKey = 'epower_cart';
     const query = new URLSearchParams(window.location.search);
@@ -1386,10 +1391,13 @@ body.light .co-qr-spinner {
 
     async function api(url, body, method) {
         const response = await fetch(url, {
+            credentials: 'same-origin',
             method: method || 'POST',
             headers: {
+                'Accept': 'application/json',
                 'Content-Type': 'application/json',
                 'X-CSRF-Token': csrfToken,
+                'X-Requested-With': 'XMLHttpRequest',
             },
             body: body ? JSON.stringify(Object.assign({ csrf_token: csrfToken }, body)) : undefined,
         });
