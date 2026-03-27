@@ -220,6 +220,69 @@ class MallController extends \Core\Controller
     }
 
     /**
+     * POST /api/mall/cart/refresh — refresh cart items from authoritative product DB.
+     * Request: { cart: [{id, qty}] }
+     * Returns updated cart items with current price, available flag, and subtotal.
+     */
+    public function apiCartRefresh(): void
+    {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405); echo json_encode(['ok' => false, 'error' => 'POST required']); return;
+        }
+
+        $body  = (string)file_get_contents('php://input');
+        $input = $body ? json_decode($body, true) : [];
+        $cart  = is_array($input['cart'] ?? null) ? $input['cart'] : [];
+
+        if (empty($cart)) {
+            echo json_encode(['ok' => true, 'cart' => [], 'total' => '0.00']);
+            return;
+        }
+
+        $productIds = array_values(array_unique(array_filter(array_map(function($item){ return isset($item['id']) ? (int)$item['id'] : 0; }, $cart))));
+        if (empty($productIds)) {
+            echo json_encode(['ok' => true, 'cart' => [], 'total' => '0.00']);
+            return;
+        }
+
+        $products = $this->db->select('products', ['id','title','price','currency','status','is_visible','quantity'], ['id' => $productIds]) ?: [];
+        $productMap = [];
+        foreach ($products as $p) {
+            $productMap[(int)$p['id']] = $p;
+        }
+
+        $updatedCart = [];
+        $total = 0.00;
+        foreach ($cart as $item) {
+            $id = isset($item['id']) ? (int)$item['id'] : 0;
+            $qty = max(1, (int)($item['qty'] ?? $item['quantity'] ?? 1));
+            if (!$id || !isset($productMap[$id])) {
+                continue;
+            }
+            $p = $productMap[$id];
+            $available = ($p['status'] ?? '') === 'published' && ((int)($p['is_visible'] ?? 0) === 1);
+            if (!$available) continue;
+
+            $unitPrice = round((float)($p['price'] ?? 0), 2);
+            $lineTotal = $unitPrice * $qty;
+            $total += $lineTotal;
+
+            $updatedCart[] = [
+                'id' => $id,
+                'title' => (string)($p['title'] ?? ''),
+                'qty' => $qty,
+                'price' => $unitPrice,
+                'currency' => $p['currency'] ?? 'PHP',
+                'available' => true,
+                'line_total' => round($lineTotal, 2),
+            ];
+        }
+
+        echo json_encode(['ok' => true, 'cart' => $updatedCart, 'total' => number_format($total, 2, '.', ''), 'currency' => 'PHP']);
+    }
+
+    /**
      * GET /api/mall/products — paginated product list for infinite scroll + typeahead
      * Query params: page, limit, cat (category_id), search, sort, seller_id
      */

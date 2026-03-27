@@ -478,7 +478,27 @@
         if (item.qty <= 0) state.cart = state.cart.filter(i => i.id !== id);
         saveCart();
     }
-    function saveCart() {
+    async function refreshCartFromServer() {
+        if (!state.cart.length) return;
+        try {
+            const res = await fetch('/api/mall/cart/refresh', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ cart: state.cart }),
+            });
+            const data = await res.json();
+            if (data && data.ok && Array.isArray(data.cart)) {
+                state.cart = data.cart.map(function(item) {
+                    return { id: item.id, title: item.title, qty: item.qty, price: item.price, currency: item.currency };
+                });
+                saveCart(false);
+            }
+        } catch (err) {
+            console.warn('Unable to sync cart from server', err);
+        }
+    }
+
+    function saveCart(shouldSync = true) {
         try { localStorage.setItem('epower_cart', JSON.stringify(state.cart)); } catch (e) {}
         updateCartUI();
         try {
@@ -491,6 +511,10 @@
                 }).catch(function(){});
             }
         } catch(e) {}
+
+        if (shouldSync) {
+            refreshCartFromServer();
+        }
     }
     function updateCartUI() {
         const total = state.cart.reduce((s, i) => s + i.qty, 0);

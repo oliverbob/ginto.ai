@@ -1214,6 +1214,26 @@ body.light .co-qr-spinner {
         });
     }
 
+    async function refreshCartFromServer() {
+        const currentCart = readCart();
+        if (!currentCart.length) return;
+        try {
+            const res = await fetch('/api/mall/cart/refresh', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({cart: currentCart}),
+            });
+            const data = await res.json();
+            if (data && data.ok && Array.isArray(data.cart)) {
+                localStorage.setItem(cartKey, JSON.stringify(data.cart));
+                renderSummary();
+                setInfo('Cart prices refreshed from server.');
+            }
+        } catch (err) {
+            console.warn('Cart refresh failed', err);
+        }
+    }
+
     function readCart() {
         try {
             return JSON.parse(localStorage.getItem(cartKey) || '[]');
@@ -1378,6 +1398,7 @@ body.light .co-qr-spinner {
     }
 
     async function createSession() {
+        await refreshCartFromServer();
         return api('/api/mall/checkout/create', {
             payment_method: selectedMethod,
             cart: readCart(),
@@ -1981,7 +2002,7 @@ body.light .co-qr-spinner {
         }).render('#coPpContainer');
     }
 
-    renderSummary();
+    refreshCartFromServer().then(function(){ renderSummary(); }).catch(function(){ renderSummary(); });
     repaintAutofillForTheme();
     setTimeout(repaintAutofillForTheme, 80);
     setTimeout(repaintAutofillForTheme, 320);

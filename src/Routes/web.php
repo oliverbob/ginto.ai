@@ -1332,6 +1332,7 @@ $router->req('/api/mall/push/vapid-public-key', 'MallDeliveryController@apiVapid
 $router->req('/api/mall/push/register-fcm', 'MallDeliveryController@apiRegisterFcm', ['POST']);
 $router->req('/api/mall/header-data', 'MallController@apiHeaderData', ['GET']);
 $router->req('/api/mall/cart/sync', 'MallController@apiCartSync', ['POST']);
+$router->req('/api/mall/cart/refresh', 'MallController@apiCartRefresh', ['POST']);
 $router->req('/api/mall/products', 'MallController@apiProducts', ['GET']);
 
 // Barangay GPS geofencing API
