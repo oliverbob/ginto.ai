@@ -264,7 +264,7 @@ class MallController extends \Core\Controller
             $available = ($p['status'] ?? '') === 'published' && ((int)($p['is_visible'] ?? 0) === 1);
             if (!$available) continue;
 
-            $unitPrice = round((float)($p['price'] ?? 0), 2);
+            $unitPrice = round((float)($p['price'] ?? 0) * 1.15, 2);
             $lineTotal = $unitPrice * $qty;
             $total += $lineTotal;
 
