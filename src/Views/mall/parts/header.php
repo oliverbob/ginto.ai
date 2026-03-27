@@ -51,8 +51,8 @@ $mallWalletBalance = isset($mall_wallet_balance) ? (float)$mall_wallet_balance :
 
         <!-- Search overlay (expands over header when open) -->
         <div class="search-overlay" id="searchOverlay" role="search" aria-label="Search products">
-            <form class="search-form" id="searchForm">
-                <input id="searchInput" type="search" placeholder="Search products…" aria-label="Search products" autocomplete="off">
+            <form class="search-form" id="searchForm" action="/mall" method="get">
+                <input id="searchInput" name="q" type="search" placeholder="Search products…" aria-label="Search products" autocomplete="off">
                 <button class="search-btn" type="submit" aria-label="Submit search">
                     <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
