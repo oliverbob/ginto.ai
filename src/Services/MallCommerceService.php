@@ -1112,9 +1112,12 @@ class MallCommerceService
                     $physicalItemCount += (int)($gi['quantity'] ?? 1);
                 }
             }
-            $deliveryFee = $physicalItemCount > 0
-                ? $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $physicalItemCount)
-                : 0.00;
+            $deliveryFee = $this->calculateDeliveryFee(
+                $sellerId,
+                $buyerBarangayId,
+                $group['items'],
+                $group['subtotal']
+            );
             $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
 
             // Platform processing cost deduction from seller payout (internal; buyer does not see as separate fee)
@@ -1198,6 +1201,7 @@ class MallCommerceService
                 }
 
                 $this->addOrderHistory($orderId, $buyerId, 'buyer', null, 'pending_payment', 'Order created and awaiting payment.');
+                $deliveryDetails = $this->lastDeliveryCalculation ?? null;
                 $orders[] = [
                     'order_id' => $orderId,
                     'order_code' => $orderCode,
@@ -1206,6 +1210,7 @@ class MallCommerceService
                     'buyer_total' => $buyerTotalWithFees,
                     'shipping_fee' => round($group['shipping_fee'] ?? 0.00, 2),
                     'delivery_fee' => round($group['delivery_fee'] ?? 0.00, 2),
+                    'delivery_fee_details' => $deliveryDetails,
                     'processing_fee' => $processingFee,
                     'shipping_zone' => $group['shipping_zone'] ?? null,
                     'chargeable_weight_kg' => $group['chargeable_weight'] ?? null,
@@ -1854,57 +1859,122 @@ class MallCommerceService
      *
      * Returns 0 if distance cannot be determined (e.g. no GPS data).
      */
-    private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId, int $itemCount = 1): float
+    private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId, array $items, float $groupSubtotal = 0.00): float
     {
+        $itemCount = count($items);
         if ($itemCount <= 0) return 0.00;
 
-        // Fallback: if buyer barangay is missing, charge elite base fee per item
+        // Compute base distance fee per trip
+        // first km = ₱100, succeeding km = ₱50
         if (!$buyerBarangayId) {
+            // fallback no location -> per-item flat (safe default)
             return round(self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount, 2);
         }
 
-        // Get seller main zone (is_home = 1)
         $sellerZone = $this->db->get('seller_delivery_zones', ['barangay_id'], [
             'seller_id' => $sellerId,
             'is_home' => 1,
         ]);
-        if (!$sellerZone) return 0.00;
-        $sellerBarangayId = (int)$sellerZone['barangay_id'];
-        if ($sellerBarangayId === $buyerBarangayId) {
+        if (!$sellerZone) {
             return round(self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount, 2);
         }
 
-        // Get lat/lng for both barangays
-        $ids = [$sellerBarangayId, $buyerBarangayId];
-        $rows = $this->db->select('barangays', ['id', 'lat', 'lng'], ['id' => $ids]);
-        $coords = [];
-        foreach ($rows ?: [] as $r) {
-            $coords[(int)$r['id']] = [(float)$r['lat'], (float)$r['lng']];
+        $sellerBarangayId = (int)$sellerZone['barangay_id'];
+
+        if ($sellerBarangayId === $buyerBarangayId) {
+            // same barangay: first km base only
+            $distanceKm = 0.0;
+        } else {
+            $rows = $this->db->select('barangays', ['id', 'lat', 'lng'], ['id' => [$sellerBarangayId, $buyerBarangayId]]);
+            $coords = [];
+            foreach ($rows ?: [] as $r) {
+                $coords[(int)$r['id']] = [(float)$r['lat'], (float)$r['lng']];
+            }
+            $sCoord = $coords[$sellerBarangayId] ?? null;
+            $bCoord = $coords[$buyerBarangayId] ?? null;
+            if (!$sCoord || !$bCoord || ($sCoord[0]==0 && $sCoord[1]==0) || ($bCoord[0]==0 && $bCoord[1]==0)) {
+                $distanceKm = 0.0;
+            } else {
+                $distanceKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
+            }
         }
 
-        $sCoord = $coords[$sellerBarangayId] ?? null;
-        $bCoord = $coords[$buyerBarangayId] ?? null;
-        if (!$sCoord || !$bCoord || ($sCoord[0] == 0 && $sCoord[1] == 0) || ($bCoord[0] == 0 && $bCoord[1] == 0)) {
-            return self::DELIVERY_BASE_FEE; // fallback: base fee only
+        $distanceKm = max(0.0, $distanceKm);
+        $distanceBase = 100.00;
+        if ($distanceKm > 1.0) {
+            $distanceBase += 50.00 * ($distanceKm - 1.0);
         }
 
-        $distKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
+        $totalDelivery = 0.00;
+        $bestItemMultiplier = 1.0;
 
-        // Elite delivery:
-        //   - initial charge per item (P100 each)
-        //   - succeeding kilometer rate P50 per km
-        //   - optional long-distance risk markup
-        $baseFee = self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount;
-        $distanceFee = self::DELIVERY_ELITE_PER_KM * $distKm;
-        $rawFee = $baseFee + $distanceFee;
-
-        if ($distKm > self::DELIVERY_DISTANCE_RISK_KM) {
-            $rawFee *= (1 + self::DELIVERY_DISTANCE_RISK_RATE);
+        foreach ($items as $item) {
+            $itemMultiplier = $this->getItemDeliveryMultiplier($item);
+            $itemMultiplier = min($itemMultiplier, 2.2); // safety cap
+            $bestItemMultiplier = max($bestItemMultiplier, $itemMultiplier);
+            $totalDelivery += round($distanceBase * $itemMultiplier, 2);
         }
 
-        return round(max($rawFee, $baseFee), 2);
+        // Safety cap: avoid delivery exceeding item subtotal too aggressively.
+        if ($groupSubtotal > 0 && $totalDelivery > $groupSubtotal * 2.0) {
+            $totalDelivery = round($groupSubtotal * 2.0, 2);
+        }
+
+        // Expose some diagnostics in memory for logging if needed.
+        $this->lastDeliveryCalculation = [
+            'seller_id' => $sellerId,
+            'buyer_barangay_id' => $buyerBarangayId,
+            'distance_km' => round($distanceKm, 2),
+            'distance_base' => round($distanceBase, 2),
+            'item_count' => $itemCount,
+            'best_item_multiplier' => round($bestItemMultiplier, 2),
+            'total_delivery' => round($totalDelivery, 2),
+            'group_subtotal' => round($groupSubtotal, 2),
+        ];
+
+        return round($totalDelivery, 2);
     }
 
+    private function getItemDeliveryMultiplier(array $item): float
+    {
+        $weight = max(0.0, (float)($item['weight_kg'] ?? 0));
+        $length = max(0.0, (float)($item['length_cm'] ?? 0));
+        $width  = max(0.0, (float)($item['width_cm']  ?? 0));
+        $height = max(0.0, (float)($item['height_cm'] ?? 0));
+
+        // weight-based multiplier
+        if ($weight <= 1.0) {
+            $w = 1.0;
+        } elseif ($weight <= 3.0) {
+            $w = 1.15;
+        } elseif ($weight <= 7.0) {
+            $w = 1.3;
+        } elseif ($weight <= 15.0) {
+            $w = 1.55;
+        } else {
+            $w = 1.9;
+        }
+
+        // size/volume multiplier
+        $volume = $length * $width * $height;
+        if ($volume <= 20000) {
+            $s = 1.0;
+        } elseif ($volume <= 60000) {
+            $s = 1.2;
+        } elseif ($volume <= 150000) {
+            $s = 1.4;
+        } elseif ($volume <= 300000) {
+            $s = 1.6;
+        } else {
+            $s = 1.95;
+        }
+
+        // heavy vs bulky: use higher multiplier only
+        $multiplier = max($w, $s);
+
+        // do not exceed 2.2 unless product-level flag (furniture/appliance) -- no flag exists now, so hard cap
+        return min($multiplier, 2.2);
+    }
     /**
      * Infer buyer barangay by shipping fields (first from address line then by city/province).
      */
