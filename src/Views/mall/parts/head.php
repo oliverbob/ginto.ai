@@ -801,7 +801,7 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .cart-info { flex: 1; min-width: 0; }
 .cart-name { font-size: 0.85rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cart-price-line { font-size: 0.775rem; color: var(--muted); }
-.cart-qty-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.cart-qty-row, .cart-item-qty-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .qty-btn {
     width: 30px; height: 30px;
     border-radius: 8px;
