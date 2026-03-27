@@ -1120,16 +1120,18 @@ class MallCommerceService
             );
             $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
 
-            // Platform processing cost deduction from seller payout (internal; buyer does not see as separate fee)
+            // Platform processing cost deduction from seller payout (internal; shown as platform fee)
             $grouped[$sellerId]['seller_net'] = round($grouped[$sellerId]['seller_net'] - self::SELLER_PROCESSING_COST_PHP, 2);
             $grouped[$sellerId]['platform_fee'] = round($grouped[$sellerId]['platform_fee'] + self::SELLER_PROCESSING_COST_PHP, 2);
+            $grouped[$sellerId]['platform_commission'] = round($grouped[$sellerId]['platform_fee'] - self::SELLER_PROCESSING_COST_PHP, 2);
+            $grouped[$sellerId]['platform_fixed_fee'] = self::SELLER_PROCESSING_COST_PHP;
 
             if ($grouped[$sellerId]['seller_net'] <= 0) {
                 throw new \RuntimeException('One or more seller payouts would be zero or negative. Adjust prices or quantities and try again.');
             }
 
-            // Buyer pays product subtotal + delivery fee
-            $grouped[$sellerId]['buyer_total'] += $deliveryFee;
+            // Buyer pays product subtotal + shipping + delivery + platform fees
+            $grouped[$sellerId]['buyer_total'] += $deliveryFee + ($grouped[$sellerId]['shipping_fee'] ?? 0.00) + $grouped[$sellerId]['platform_fee'];
         }
 
         $now = date('Y-m-d H:i:s');
@@ -1210,6 +1212,9 @@ class MallCommerceService
                     'buyer_total' => $buyerTotalWithFees,
                     'shipping_fee' => round($group['shipping_fee'] ?? 0.00, 2),
                     'delivery_fee' => round($group['delivery_fee'] ?? 0.00, 2),
+                    'platform_fee' => round($group['platform_fee'] ?? 0.00, 2),
+                    'platform_commission' => round($group['platform_commission'] ?? 0.00, 2),
+                    'platform_fixed_fee' => round($group['platform_fixed_fee'] ?? 0.00, 2),
                     'delivery_fee_details' => $deliveryDetails,
                     'processing_fee' => $processingFee,
                     'shipping_zone' => $group['shipping_zone'] ?? null,

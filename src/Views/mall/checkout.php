@@ -985,10 +985,22 @@ body.light .co-qr-spinner {
                 <span id="checkoutSubtotal">₱0.00</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Shipping fee</span>
+                <span id="checkoutShippingFee" style="font-size:0.85rem;">—</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Delivery fee</span>
                 <span id="checkoutDeliveryFee" style="font-size:0.85rem;">—</span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;display:none;">
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Platform fee (8%)</span>
+                <span id="checkoutPlatformFee" style="font-size:0.85rem;">₱0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Fixed fee</span>
+                <span id="checkoutFixedFee" style="font-size:0.85rem;">₱25.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Processing fee</span>
                 <span id="checkoutProcessingFee" style="font-size:0.85rem;">—</span>
             </div>
@@ -1184,6 +1196,11 @@ body.light .co-qr-spinner {
     const qrStatus = document.getElementById('qrStatus');
     const checkoutItems = document.getElementById('checkoutItems');
     const checkoutSubtotal = document.getElementById('checkoutSubtotal');
+    const checkoutShippingFee = document.getElementById('checkoutShippingFee');
+    const checkoutDeliveryFee = document.getElementById('checkoutDeliveryFee');
+    const checkoutPlatformFee = document.getElementById('checkoutPlatformFee');
+    const checkoutFixedFee = document.getElementById('checkoutFixedFee');
+    const checkoutProcessingFee = document.getElementById('checkoutProcessingFee');
     const checkoutTotal = document.getElementById('checkoutTotal');
     const checkoutStoreCount = document.getElementById('checkoutStoreCount');
 
@@ -1307,16 +1324,31 @@ body.light .co-qr-spinner {
                 + '</div>';
         }).join('');
         checkoutSubtotal.textContent = formatPrice(summary.total, summary.currency);
-        checkoutTotal.textContent = formatPrice(summary.total, summary.currency);
+
+        const platformFee = Math.round(summary.total * 0.08 * 100) / 100;
+        const fixedFee = 25.00;
+        const approxTotal = summary.total + platformFee + fixedFee;
+
+        if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(platformFee, summary.currency);
+        if (checkoutFixedFee) checkoutFixedFee.textContent = formatPrice(fixedFee, summary.currency);
+        if (checkoutShippingFee) {
+            checkoutShippingFee.textContent = 'calculated at checkout';
+            checkoutShippingFee.style.color = 'var(--muted)';
+        }
+        if (checkoutDeliveryFee) {
+            checkoutDeliveryFee.textContent = 'calculated at checkout';
+            checkoutDeliveryFee.style.color = 'var(--muted)';
+        }
+        if (checkoutProcessingFee) {
+            checkoutProcessingFee.textContent = 'not selected';
+            checkoutProcessingFee.style.color = 'var(--muted)';
+        }
+
+        checkoutTotal.textContent = formatPrice(approxTotal, summary.currency);
         checkoutStoreCount.textContent = String(summary.stores || 1);
         // Min order notice
         const minNotice = document.getElementById('coMinOrderNotice');
         if (minNotice) minNotice.style.display = (summary.total < 50 && summary.cart.length) ? '' : 'none';
-        // Shipping fee is server-computed; reset to pending until session is created
-        const sfEl   = document.getElementById('checkoutShippingFee');
-        const sfNote = document.getElementById('checkoutShippingNote');
-        if (sfEl)  { sfEl.textContent   = 'calculated at checkout'; sfEl.style.color = ''; }
-        if (sfNote) sfNote.style.display = 'none';
     }
 
     function updateShippingFromSession(session) {
@@ -1328,13 +1360,15 @@ body.light .co-qr-spinner {
         const etaCard = document.getElementById('coPayoutEtaCard');
         const etaText = document.getElementById('coPayoutEtaText');
         if (!sfEl || !session || !session.orders) return;
-        let totalShipping = 0, totalDelivery = 0, totalProcessing = 0;
+        let totalShipping = 0, totalDelivery = 0, totalProcessing = 0, totalPlatform = 0, totalFixed = 0;
         let payoutEta = '';
         const currency = session.currency || 'PHP';
         session.orders.forEach(function (o) {
             totalShipping += Number(o.shipping_fee || 0);
             totalDelivery += Number(o.delivery_fee || 0);
             totalProcessing += Number(o.processing_fee || 0);
+            totalPlatform += Number(o.platform_fee || 0);
+            totalFixed += Number(o.platform_fixed_fee || 25);
             if (o.seller_payout_eta) payoutEta = o.seller_payout_eta;
         });
         sfEl.textContent = formatPrice(totalShipping, currency);
@@ -1344,6 +1378,16 @@ body.light .co-qr-spinner {
         if (dfEl) {
             dfEl.textContent = totalDelivery > 0 ? formatPrice(totalDelivery, currency) : 'Free';
             dfEl.style.color = totalDelivery > 0 ? 'var(--text)' : 'var(--muted)';
+        }
+        // Platform fee
+        if (checkoutPlatformFee) {
+            checkoutPlatformFee.textContent = totalPlatform > 0 ? formatPrice(totalPlatform, currency) : formatPrice(0, currency);
+            checkoutPlatformFee.style.color = totalPlatform > 0 ? 'var(--text)' : 'var(--muted)';
+        }
+        // Fixed fee
+        if (checkoutFixedFee) {
+            checkoutFixedFee.textContent = formatPrice(totalFixed, currency);
+            checkoutFixedFee.style.color = 'var(--text)';
         }
         // Processing fee
         if (pfEl) {
