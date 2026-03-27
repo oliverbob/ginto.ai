@@ -26,9 +26,11 @@ class CsrfMiddleware
         '/crypto-payments', // Crypto USDT registration - validates CSRF internally in handler
         '/api/payments/crypto-info', // Crypto info API - AJAX only, no mutation
         '/api/mall/wallet/topup/create', // Wallet top-up session create - validated by MallCheckoutController
-        '/debug/session-set', // Debug helper: allow localhost POST to set session for testing
-        '/login-m',           // Mobile app JSON login — authenticates via credentials, no CSRF session
-        '/logout-m',          // Mobile app JSON logout — kills session, CSRF not applicable
+        '/api/mall/cart/sync',            // Cart sync call from frontend localStorage
+        '/api/mall/cart/refresh',         // Cart refresh call from frontend localStorage
+        '/debug/session-set',             // Debug helper: allow localhost POST to set session for testing
+        '/login-m',                       // Mobile app JSON login — authenticates via credentials, no CSRF session
+        '/logout-m',                      // Mobile app JSON logout — kills session, CSRF not applicable
     ];
 
     /**

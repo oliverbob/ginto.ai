@@ -1226,8 +1226,12 @@ body.light .co-qr-spinner {
         try {
             const res = await fetch('/api/mall/cart/refresh', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({cart: currentCart}),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken,
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({ cart: currentCart, csrf_token: csrfToken }),
             });
             const data = await res.json();
             console.log('refreshCartFromServer response', data);

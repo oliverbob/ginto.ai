@@ -483,8 +483,12 @@
         try {
             const res = await fetch('/api/mall/cart/refresh', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ cart: state.cart }),
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': CSRF_TOKEN,
+                },
+                body: JSON.stringify({ cart: state.cart, csrf_token: CSRF_TOKEN }),
+                credentials: 'same-origin',
             });
             const data = await res.json();
             if (data && data.ok && Array.isArray(data.cart)) {
