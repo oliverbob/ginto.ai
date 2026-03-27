@@ -1295,8 +1295,9 @@ body.light .co-qr-spinner {
         startBtn.disabled = false;
         checkoutItems.innerHTML = summary.cart.map(function (item) {
             const qty = Number(item.qty || item.quantity || 1);
+            const imageUrl = esc(item.img || item.image_path || '/assets/images/placeholder_ceramic.svg');
             return '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;background:var(--surface2);border:1px solid var(--border);">'
-                + '<img src="' + esc(item.img || '/assets/images/placeholder_ceramic.svg') + '" alt="' + esc(item.title) + '" style="width:58px;height:58px;border-radius:14px;object-fit:cover;border:1px solid var(--border);">'
+                + '<img src="' + imageUrl + '" alt="' + esc(item.title) + '" style="width:58px;height:58px;border-radius:14px;object-fit:cover;border:1px solid var(--border);">'
                 + '<div style="flex:1;min-width:0;">'
                 + '<div style="font-weight:700;font-size:0.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + esc(item.title) + '</div>'
                 + '<div style="font-size:0.78rem;color:var(--muted);">Qty ' + qty + '</div>'

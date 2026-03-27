@@ -274,13 +274,31 @@ class MallController extends \Core\Controller
                 'qty' => $qty,
                 'price' => $unitPrice,
                 'currency' => $p['currency'] ?? 'PHP',
-                'img' => (string)($p['image_path'] ?? ''),
+                'img' => $this->getProductMainImage($p),
                 'available' => true,
                 'line_total' => round($lineTotal, 2),
             ];
         }
 
         echo json_encode(['ok' => true, 'cart' => $updatedCart, 'total' => number_format($total, 2, '.', ''), 'currency' => 'PHP']);
+    }
+
+    private function getProductMainImage(array $product): string
+    {
+        $img = '';
+        if (!empty($product['images'])) {
+            $decoded = json_decode((string)$product['images'], true);
+            if (is_array($decoded)) {
+                $imgsArr = array_values(array_filter($decoded));
+                if (!empty($imgsArr)) {
+                    $img = (string)$imgsArr[0];
+                }
+            }
+        }
+        if (!$img && !empty($product['image_path'])) {
+            $img = (string)$product['image_path'];
+        }
+        return trim($img);
     }
 
     /**
