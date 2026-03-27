@@ -246,7 +246,7 @@ class MallController extends \Core\Controller
             return;
         }
 
-        $products = $this->db->select('products', ['id','title','price','currency','status','is_visible','quantity'], ['id' => $productIds]) ?: [];
+        $products = $this->db->select('products', ['id','title','price','currency','status','is_visible','quantity','image_path'], ['id' => $productIds]) ?: [];
         $productMap = [];
         foreach ($products as $p) {
             $productMap[(int)$p['id']] = $p;
@@ -274,6 +274,7 @@ class MallController extends \Core\Controller
                 'qty' => $qty,
                 'price' => $unitPrice,
                 'currency' => $p['currency'] ?? 'PHP',
+                'img' => (string)($p['image_path'] ?? ''),
                 'available' => true,
                 'line_total' => round($lineTotal, 2),
             ];
