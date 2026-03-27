@@ -132,13 +132,13 @@ $jsonLd = array_filter($jsonLd, fn($v) => $v !== null);
 .prod-actions { display:flex; flex-direction:column; gap:10px; }
 .prod-qty-row { display:flex; align-items:center; gap:10px; }
 .prod-qty-btn {
-    width:36px; height:36px; border-radius:8px; border:1px solid var(--border);
-    background:var(--surface2); color:var(--text); font-size:1.2rem; cursor:pointer;
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--border);
+    background:var(--surface2); color:var(--text); font-size:1.1rem; cursor:pointer;
     display:flex; align-items:center; justify-content:center; font-weight:700;
     transition:background .15s;
 }
 .prod-qty-btn:hover { background:var(--border); }
-.prod-qty-val { font-size:1rem; font-weight:700; min-width:24px; text-align:center; }
+.prod-qty-val { font-size:1rem; font-weight:700; min-width:20px; text-align:center; }
 .prod-add-btn { flex:1; }
 .prod-buy-btn { width:100%; padding:13px; border-radius:12px; font-size:0.95rem; font-weight:700; }
 
