@@ -1001,7 +1001,7 @@ body.light .co-qr-spinner {
                 <span id="checkoutFixedFee" style="font-size:0.85rem;">₱25.00</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
-                <span>Processing fee</span>
+                <span>Processing fee (gateway + ₱5 checkout fee)</span>
                 <span id="checkoutProcessingFee" style="font-size:0.85rem;">—</span>
             </div>
 

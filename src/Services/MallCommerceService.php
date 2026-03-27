@@ -29,6 +29,7 @@ class MallCommerceService
     // ── Marketplace item pricing [new policy] ────────────────────────────
     private const PLATFORM_COMMISSION_PERCENT = 8.00;   // 8% platform takes from item price
     private const SELLER_PROCESSING_COST_PHP   = 25.00;  // fixed processing cost internal
+    private const CHECKOUT_PROCESSING_FEE_PHP  = 5.00;   // extra fixed processing fee at checkout
 
     // ── Delivery fee constants (Elite delivery service) ────────────────
     private const DELIVERY_SERVICE_NAME            = 'Elite Delivery Service';
@@ -1143,7 +1144,9 @@ class MallCommerceService
         try {
             foreach ($grouped as $sellerId => $group) {
                 // Processing fee depends on buyer total before this fee is added
-                $processingFee = $this->calculateProcessingFee($paymentMethod, $group['buyer_total']);
+                $gatewayFee      = $this->calculateProcessingFee($paymentMethod, $group['buyer_total']);
+                $extraCheckoutFee= self::CHECKOUT_PROCESSING_FEE_PHP;
+                $processingFee   = round($gatewayFee + $extraCheckoutFee, 2);
                 $buyerTotalWithFees = round($group['buyer_total'] + $processingFee, 2);
                 $payoutEta = $this->sellerPayoutEta($paymentMethod);
 
@@ -1158,6 +1161,7 @@ class MallCommerceService
                     'subtotal_amount' => round($group['subtotal'], 2),
                     'platform_fee_amount' => round($group['platform_fee'], 2),
                     'processing_fee_amount' => $processingFee,
+                    'checkout_processing_fee' => self::CHECKOUT_PROCESSING_FEE_PHP,
                     'delivery_fee_amount' => round($group['delivery_fee'] ?? 0.00, 2),
                     'seller_net_amount' => round($group['seller_net'], 2),
                     'buyer_total_amount' => $buyerTotalWithFees,
@@ -1213,6 +1217,7 @@ class MallCommerceService
                     'shipping_fee' => round($group['shipping_fee'] ?? 0.00, 2),
                     'delivery_fee' => round($group['delivery_fee'] ?? 0.00, 2),
                     'platform_fee' => round($group['platform_fee'] ?? 0.00, 2),
+                    'checkout_processing_fee' => self::CHECKOUT_PROCESSING_FEE_PHP,
                     'platform_commission' => round($group['platform_commission'] ?? 0.00, 2),
                     'platform_fixed_fee' => round($group['platform_fixed_fee'] ?? 0.00, 2),
                     'delivery_fee_details' => $deliveryDetails,
