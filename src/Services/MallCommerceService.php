@@ -26,13 +26,17 @@ class MallCommerceService
     private const PROCESSING_FEE_PAYPAL_LARGE_PCT = 0.10; // 10% if order > ₱1,000
     private const PROCESSING_FEE_PAYPAL_LARGE_THRESHOLD = 1000.00;
 
-    // ── Delivery fee constants (Grab premium-style) ──────────────────────
-    private const DELIVERY_BASE_FEE         = 100.00; // minimum delivery fee (even same barangay)
-    private const DELIVERY_PER_KM_PER_ITEM  = 50.00;  // ₱50 per km per item
-    private const DELIVERY_PLATFORM_MARKUP  = 0.50;   // +50% platform fee on delivery
+    // ── Marketplace item pricing [new policy] ────────────────────────────
+    private const PLATFORM_COMMISSION_PERCENT = 8.00;   // 8% platform takes from item price
+    private const SELLER_PROCESSING_COST_PHP   = 25.00;  // fixed processing cost internal
+
+    // ── Delivery fee constants (Grab-like) ───────────────────────────────
+    private const DELIVERY_BASE_FEE            = 25.00;  // minimum pickup+dropoff base fare
+    private const DELIVERY_PER_KM             = 10.00;  // nominal per km rate
+    private const DELIVERY_RATE_MULTIPLIER    = 2.00;   // doubled per requirement
 
     // ── Compulsory platform markup ────────────────────────────────────────
-    private const COMPULSORY_MARKUP_RATE    = 15.00;   // 15% on all products
+    private const COMPULSORY_MARKUP_RATE      = 15.00;   // 15% on all products
 
     private const PRODUCT_PRICING_DEFAULTS = [
         'hands_off'        => 12.00,   // standard listing, minimal promotion
@@ -1092,7 +1096,7 @@ class MallCommerceService
             $grouped[$sellerId]['chargeable_weight']  = $shippingResult['chargeable_weight_kg'];
             $grouped[$sellerId]['shipping_dimensions_json'] = json_encode($shippingResult);
 
-            // Grab-style delivery fee based on seller→buyer distance (per item)
+            // Grab-like delivery fee based on seller→buyer distance (per trip)
             $physicalItemCount = 0;
             foreach ($group['items'] as $gi) {
                 $pt = $this->db->get('products', 'product_type', ['id' => $gi['product_id']]);
@@ -1105,8 +1109,16 @@ class MallCommerceService
                 : 0.00;
             $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
 
-            // Buyer pays product subtotal + shipping fee + delivery fee
-            $grouped[$sellerId]['buyer_total'] += $shippingResult['estimated_fee'] + $deliveryFee;
+            // Platform processing cost deduction from seller payout (internal; buyer does not see as separate fee)
+            $grouped[$sellerId]['seller_net'] = round($grouped[$sellerId]['seller_net'] - self::SELLER_PROCESSING_COST_PHP, 2);
+            $grouped[$sellerId]['platform_fee'] = round($grouped[$sellerId]['platform_fee'] + self::SELLER_PROCESSING_COST_PHP, 2);
+
+            if ($grouped[$sellerId]['seller_net'] <= 0) {
+                throw new \RuntimeException('One or more seller payouts would be zero or negative. Adjust prices or quantities and try again.');
+            }
+
+            // Buyer pays product subtotal + delivery fee
+            $grouped[$sellerId]['buyer_total'] += $deliveryFee;
         }
 
         $now = date('Y-m-d H:i:s');
@@ -1217,43 +1229,17 @@ class MallCommerceService
 
     private function calculatePricing(array $product, int $quantity): array
     {
+        // New item pricing model: customer sees listed item price; platform takes 8% of item value.
         $baseUnitPrice = round((float)($product['price'] ?? 0), 2);
-        $pricingModel = (string)($product['pricing_model'] ?? 'standard');
-        // Normalise legacy values
-        if (in_array($pricingModel, ['hands_off', 'active_discovery', 'full_service'], true)) {
-            $pricingModel = 'standard';
-        }
-        if (!array_key_exists($pricingModel, self::PRODUCT_PRICING_DEFAULTS)) {
-            $pricingModel = 'standard';
-        }
+        $chargedUnitPrice = $baseUnitPrice; // buyer-facing price stays as product price
 
-        $pricingRate = isset($product['pricing_rate']) ? (float)$product['pricing_rate'] : self::PRODUCT_PRICING_DEFAULTS[$pricingModel];
-        $markupRate  = isset($product['markup_rate'])  ? (float)$product['markup_rate']  : 0.00;
-
-        // Compulsory 15% platform markup on ALL products
-        $compulsoryMarkup = self::COMPULSORY_MARKUP_RATE;
-        $effectiveMarkup = max($markupRate, $compulsoryMarkup);
-
-        if ($pricingModel === 'markup') {
-            // Legacy markup mode: buyer price = base * (1 + markup%)
-            $effectiveMarkup = min(200.00, max($compulsoryMarkup, $markupRate ?: $compulsoryMarkup));
-            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($effectiveMarkup / 100)), 2);
-            $platformFeePerUnit = round($chargedUnitPrice - $baseUnitPrice, 2);
-            $sellerNetPerUnit   = $baseUnitPrice;
-            $pricingRate = 0.00;
-        } else {
-            // standard / referral: apply compulsory markup first, then platform fee
-            $pricingRate = max(0.00, min(100.00, $pricingRate ?: self::PRODUCT_PRICING_DEFAULTS[$pricingModel]));
-            $effectiveMarkup = min(200.00, max($compulsoryMarkup, $markupRate));
-            $chargedUnitPrice   = round($baseUnitPrice * (1 + ($effectiveMarkup / 100)), 2);
-            $platformFeePerUnit = round($chargedUnitPrice * ($pricingRate / 100), 2);
-            $sellerNetPerUnit   = round($chargedUnitPrice - $platformFeePerUnit, 2);
-        }
+        $platformFeePerUnit = round($baseUnitPrice * (self::PLATFORM_COMMISSION_PERCENT / 100), 2);
+        $sellerNetPerUnit = round($baseUnitPrice - $platformFeePerUnit, 2);
 
         return [
-            'pricing_model' => $pricingModel,
-            'pricing_rate' => $pricingRate,
-            'markup_rate' => $effectiveMarkup,
+            'pricing_model' => (string)($product['pricing_model'] ?? 'standard'),
+            'pricing_rate' => self::PLATFORM_COMMISSION_PERCENT,
+            'markup_rate' => 0.00,
             'quantity' => $quantity,
             'base_unit_price' => $baseUnitPrice,
             'charged_unit_price' => $chargedUnitPrice,
@@ -1889,11 +1875,14 @@ class MallCommerceService
 
         $distKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
 
-        // ₱50 per km per item
-        $rawFee = $distKm * self::DELIVERY_PER_KM_PER_ITEM * $itemCount;
+        // Base fare + doubled per-km rate. per-item qty is not part of core formula (distance-based trip cost).
+        $perKmRate = self::DELIVERY_PER_KM * self::DELIVERY_RATE_MULTIPLIER;
+        $rawFee = self::DELIVERY_BASE_FEE + ($distKm * $perKmRate);
 
-        // +50% platform fee on delivery
-        $rawFee *= (1 + self::DELIVERY_PLATFORM_MARKUP);
+        // Risk adjustment for long distances: add 2% when very far.
+        if ($distKm > 20.0) {
+            $rawFee *= 1.02;
+        }
 
         return round(max($rawFee, self::DELIVERY_BASE_FEE), 2);
     }

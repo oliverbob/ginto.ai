@@ -985,20 +985,14 @@ body.light .co-qr-spinner {
                 <span id="checkoutSubtotal">₱0.00</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
-                <span>Estimated shipping</span>
-                <span id="checkoutShippingFee" title="Calculated after you proceed to checkout">calculated at checkout</span>
-            </div>
-            <div id="checkoutShippingNote" style="display:none;font-size:0.75rem;color:var(--muted);margin-bottom:8px;padding:8px 10px;background:rgba(214,180,75,0.07);border:1px solid rgba(214,180,75,0.18);border-radius:8px;line-height:1.5;">
-                ⚠ Shipping is estimated from seller-declared packed dimensions. If the courier measures a higher weight, the difference is deducted from the seller — not charged to you again.
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Delivery fee</span>
                 <span id="checkoutDeliveryFee" style="font-size:0.85rem;">—</span>
             </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;display:none;">
                 <span>Processing fee</span>
                 <span id="checkoutProcessingFee" style="font-size:0.85rem;">—</span>
             </div>
+
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Stores in this checkout</span>
                 <span id="checkoutStoreCount">0</span>
@@ -1008,7 +1002,7 @@ body.light .co-qr-spinner {
                     <div style="font-size:0.84rem;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);font-weight:700;">Total due</div>
                     <div id="checkoutTotal" style="font-size:2rem;font-weight:800;line-height:1;">₱0.00</div>
                 </div>
-                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Includes shipping, delivery, and processing fees for your selected payment method.</div>
+                <div style="font-size:0.9rem;color:var(--muted);text-align:right;max-width:220px;line-height:1.55;">Buyer total is item price + delivery fee. Platform and processing adjustments are internal.</div>
             </div>
         </div>
 
