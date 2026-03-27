@@ -803,8 +803,8 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .cart-price-line { font-size: 0.775rem; color: var(--muted); }
 .cart-qty-row { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
 .qty-btn {
-    width: 26px; height: 26px;
-    border-radius: 6px;
+    width: 30px; height: 30px;
+    border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text);
@@ -812,11 +812,12 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     align-items: center;
     justify-content: center;
     font-weight: 700;
-    font-size: 0.9rem;
+    font-size: 1rem;
     transition: background var(--trans);
     font-family: inherit;
 }
 .qty-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
+.prod-qty-btn { width: 30px; height: 30px; font-size: 1rem; }
 .cart-empty-msg { text-align: center; color: var(--muted); padding: 40px 0; font-size: 0.9rem; }
 
 /* ========== QUICK VIEW MODAL ========== */
