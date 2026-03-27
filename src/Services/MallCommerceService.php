@@ -1070,8 +1070,14 @@ class MallCommerceService
             throw new \RuntimeException('Minimum order amount is ₱' . number_format(self::MIN_ORDER_SUBTOTAL_PHP, 2) . '. Your subtotal is ₱' . number_format($grandSubtotal, 2) . '.');
         }
 
-        // -- Buyer's barangay for delivery fee (from session or address) ---
+        // -- Buyer's barangay for delivery fee (from session or inferred from shipping address) ---
         $buyerBarangayId = !empty($_SESSION['buyer_barangay_id']) ? (int)$_SESSION['buyer_barangay_id'] : null;
+        if (!$buyerBarangayId) {
+            $buyerBarangayId = $this->inferBuyerBarangayIdFromShipping($sanitizedShipping);
+            if ($buyerBarangayId) {
+                $_SESSION['buyer_barangay_id'] = $buyerBarangayId;
+            }
+        }
 
         // -- Shipping fee estimation ----------------------------------------
         // Infer delivery zone from buyer address; no logistics partner yet so
@@ -1848,7 +1854,12 @@ class MallCommerceService
      */
     private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId, int $itemCount = 1): float
     {
-        if (!$buyerBarangayId || $itemCount <= 0) return 0.00;
+        if ($itemCount <= 0) return 0.00;
+
+        // Fallback: if buyer barangay is missing, charge base fee (still allows checkout to proceed)
+        if (!$buyerBarangayId) {
+            return round(self::DELIVERY_BASE_FEE, 2);
+        }
 
         // Get seller main zone (is_home = 1)
         $sellerZone = $this->db->get('seller_delivery_zones', ['barangay_id'], [
@@ -1885,6 +1896,59 @@ class MallCommerceService
         }
 
         return round(max($rawFee, self::DELIVERY_BASE_FEE), 2);
+    }
+
+    /**
+     * Infer buyer barangay by shipping fields (first from address line then by city/province).
+     */
+    private function inferBuyerBarangayIdFromShipping(array $shipping): ?int
+    {
+        $address = trim((string)($shipping['address_line1'] ?? '')) . ' ' . trim((string)($shipping['address_line2'] ?? ''));
+        $city = trim((string)($shipping['city'] ?? ''));
+        $province = trim((string)($shipping['province'] ?? ''));
+
+        if ($address !== '') {
+            $where = [
+                'AND' => [
+                    'is_active' => 1,
+                    'OR' => [
+                        'name[~]' => $address,
+                        'city[~]' => $address,
+                        'province[~]' => $address,
+                    ],
+                ],
+                'LIMIT' => 1,
+            ];
+            $row = $this->db->get('barangays', ['id'], $where);
+            if (!empty($row['id'])) {
+                return (int)$row['id'];
+            }
+        }
+
+        if ($city !== '' && $province !== '') {
+            $row = $this->db->get('barangays', ['id'], [
+                'city' => $city,
+                'province' => $province,
+                'is_active' => 1,
+                'ORDER' => ['name' => 'ASC'],
+            ]);
+            if (!empty($row['id'])) {
+                return (int)$row['id'];
+            }
+        }
+
+        if ($city !== '') {
+            $row = $this->db->get('barangays', ['id'], [
+                'city' => $city,
+                'is_active' => 1,
+                'ORDER' => ['name' => 'ASC'],
+            ]);
+            if (!empty($row['id'])) {
+                return (int)$row['id'];
+            }
+        }
+
+        return null;
     }
 
     /**
