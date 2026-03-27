@@ -492,8 +492,18 @@
             });
             const data = await res.json();
             if (data && data.ok && Array.isArray(data.cart)) {
+                const previousCart = state.cart.slice();
                 state.cart = data.cart.map(function(item) {
-                    return { id: item.id, title: item.title, qty: item.qty, price: item.price, currency: item.currency };
+                    const existing = previousCart.find(function(i) { return i.id === item.id; });
+                    return {
+                        id: item.id,
+                        title: item.title,
+                        qty: item.qty,
+                        price: item.price,
+                        currency: item.currency,
+                        img: item.img || (existing ? existing.img : '/assets/images/placeholder_ceramic.svg'),
+                        seller_id: item.seller_id || (existing ? existing.seller_id : null),
+                    };
                 });
                 saveCart(false);
             }
