@@ -1216,6 +1216,7 @@ body.light .co-qr-spinner {
 
     async function refreshCartFromServer() {
         const currentCart = readCart();
+        console.log('refreshCartFromServer - currentCart', currentCart);
         if (!currentCart.length) return;
         try {
             const res = await fetch('/api/mall/cart/refresh', {
@@ -1224,6 +1225,7 @@ body.light .co-qr-spinner {
                 body: JSON.stringify({cart: currentCart}),
             });
             const data = await res.json();
+            console.log('refreshCartFromServer response', data);
             if (data && data.ok && Array.isArray(data.cart)) {
                 localStorage.setItem(cartKey, JSON.stringify(data.cart));
                 renderSummary();
@@ -1307,6 +1309,7 @@ body.light .co-qr-spinner {
     }
 
     function updateShippingFromSession(session) {
+        console.log('updateShippingFromSession', session);
         const sfEl   = document.getElementById('checkoutShippingFee');
         const sfNote = document.getElementById('checkoutShippingNote');
         const dfEl   = document.getElementById('checkoutDeliveryFee');
