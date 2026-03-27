@@ -1340,11 +1340,11 @@ body.light .co-qr-spinner {
             checkoutDeliveryFee.style.color = 'var(--muted)';
         }
         if (checkoutProcessingFee) {
-            checkoutProcessingFee.textContent = 'not selected';
-            checkoutProcessingFee.style.color = 'var(--muted)';
+            checkoutProcessingFee.textContent = formatPrice(5.00, summary.currency);
+            checkoutProcessingFee.style.color = 'var(--text)';
         }
 
-        checkoutTotal.textContent = formatPrice(approxTotal, summary.currency);
+        checkoutTotal.textContent = formatPrice(approxTotal + 5.00, summary.currency);
         checkoutStoreCount.textContent = String(summary.stores || 1);
         // Min order notice
         const minNotice = document.getElementById('coMinOrderNotice');
