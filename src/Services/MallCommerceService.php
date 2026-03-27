@@ -30,10 +30,12 @@ class MallCommerceService
     private const PLATFORM_COMMISSION_PERCENT = 8.00;   // 8% platform takes from item price
     private const SELLER_PROCESSING_COST_PHP   = 25.00;  // fixed processing cost internal
 
-    // ── Delivery fee constants (Grab-like) ───────────────────────────────
-    private const DELIVERY_BASE_FEE            = 25.00;  // minimum pickup+dropoff base fare
-    private const DELIVERY_PER_KM             = 10.00;  // nominal per km rate
-    private const DELIVERY_RATE_MULTIPLIER    = 2.00;   // doubled per requirement
+    // ── Delivery fee constants (Elite delivery service) ────────────────
+    private const DELIVERY_SERVICE_NAME            = 'Elite Delivery Service';
+    private const DELIVERY_ELITE_BASE_FEE_PER_ITEM = 100.00; // initial charge per item
+    private const DELIVERY_ELITE_PER_KM            = 50.00;  // succeeding distance cost per km
+    private const DELIVERY_DISTANCE_RISK_KM        = 20.00;  // long-distance risk threshold
+    private const DELIVERY_DISTANCE_RISK_RATE      = 0.02;   // +2% for very long trips
 
     // ── Compulsory platform markup ────────────────────────────────────────
     private const COMPULSORY_MARKUP_RATE      = 15.00;   // 15% on all products
@@ -1856,9 +1858,9 @@ class MallCommerceService
     {
         if ($itemCount <= 0) return 0.00;
 
-        // Fallback: if buyer barangay is missing, charge base fee (still allows checkout to proceed)
+        // Fallback: if buyer barangay is missing, charge elite base fee per item
         if (!$buyerBarangayId) {
-            return round(self::DELIVERY_BASE_FEE, 2);
+            return round(self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount, 2);
         }
 
         // Get seller main zone (is_home = 1)
@@ -1868,7 +1870,9 @@ class MallCommerceService
         ]);
         if (!$sellerZone) return 0.00;
         $sellerBarangayId = (int)$sellerZone['barangay_id'];
-        if ($sellerBarangayId === $buyerBarangayId) return self::DELIVERY_BASE_FEE;
+        if ($sellerBarangayId === $buyerBarangayId) {
+            return round(self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount, 2);
+        }
 
         // Get lat/lng for both barangays
         $ids = [$sellerBarangayId, $buyerBarangayId];
@@ -1886,16 +1890,19 @@ class MallCommerceService
 
         $distKm = $this->haversineKm($sCoord[0], $sCoord[1], $bCoord[0], $bCoord[1]);
 
-        // Base fare + doubled per-km rate. per-item qty is not part of core formula (distance-based trip cost).
-        $perKmRate = self::DELIVERY_PER_KM * self::DELIVERY_RATE_MULTIPLIER;
-        $rawFee = self::DELIVERY_BASE_FEE + ($distKm * $perKmRate);
+        // Elite delivery:
+        //   - initial charge per item (P100 each)
+        //   - succeeding kilometer rate P50 per km
+        //   - optional long-distance risk markup
+        $baseFee = self::DELIVERY_ELITE_BASE_FEE_PER_ITEM * $itemCount;
+        $distanceFee = self::DELIVERY_ELITE_PER_KM * $distKm;
+        $rawFee = $baseFee + $distanceFee;
 
-        // Risk adjustment for long distances: add 2% when very far.
-        if ($distKm > 20.0) {
-            $rawFee *= 1.02;
+        if ($distKm > self::DELIVERY_DISTANCE_RISK_KM) {
+            $rawFee *= (1 + self::DELIVERY_DISTANCE_RISK_RATE);
         }
 
-        return round(max($rawFee, self::DELIVERY_BASE_FEE), 2);
+        return round(max($rawFee, $baseFee), 2);
     }
 
     /**
