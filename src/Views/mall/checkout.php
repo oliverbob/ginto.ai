@@ -835,7 +835,7 @@ body.light .co-qr-spinner {
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
 
-<section style="max-width:1320px;margin:32px auto 80px;padding:0 18px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,0.7fr);gap:22px;align-items:start;">
+<section class="checkout-layout" style="max-width:1320px;margin:32px auto 80px;padding:0 18px;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(320px,0.7fr);gap:22px;align-items:start;">
     <div style="display:flex;flex-direction:column;gap:20px;">
 
         <!-- Hero bar -->
