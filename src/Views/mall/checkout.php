@@ -1087,10 +1087,10 @@ body.light .co-qr-spinner {
             <div class="co-method-name">Pin your current location</div>
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
-        <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:calc(100vh - 150px);max-height:calc(100vh - 150px);">
+        <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:calc(100vh - 150px);max-height:calc(100vh - 150px);position:relative;">
             <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:1px solid var(--border);border-radius:0;"></div>
-            <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div id="locationPickerControls" style="position:sticky;bottom:0;display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;background:var(--bg);padding-top:10px;padding-bottom:6px;border-top:1px solid var(--border);z-index:2;">
+            <div id="locationPickerHint" style="position:absolute;left:12px;right:12px;bottom:72px;margin:0;font-size:0.85rem;color:var(--muted);background:rgba(15,23,42,0.75);padding:8px 10px;border-radius:8px;z-index:11;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
+            <div id="locationPickerControls" style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(8,15,27,0.9);padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);z-index:12;">
                 <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
                 <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Satellite</button>
                 <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Confirm</button>
@@ -1105,9 +1105,16 @@ body.light .co-qr-spinner {
                         height: calc(100vh - 150px);
                     }
                     #locationPickerModal #locationPickerMap {
-                        height: auto;
+                        height: 100%;
+                    }
+                    #locationPickerModal #locationPickerHint {
+                        bottom: 86px !important;
                     }
                     #locationPickerModal #locationPickerControls {
+                        position: absolute;
+                        bottom: 12px;
+                        left: 12px;
+                        right: 12px;
                         padding-bottom: calc(env(safe-area-inset-bottom, 0) + 8px);
                     }
                     #locationPickerModal #locationPickerControls button {
