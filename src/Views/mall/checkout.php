@@ -1057,6 +1057,24 @@ body.light .co-qr-spinner {
 </section>
 
 <!-- ── Checkout Confirmation Modal ── -->
+<div id="locationPickerModal" class="co-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Pin your location">
+    <div class="co-card co-card-is-open" style="max-width:520px;">
+        <button type="button" class="co-close-btn" aria-label="Close" onclick="closeLocationPicker()">✕</button>
+        <div class="co-head">
+            <div class="co-method-name">Pin your current location</div>
+            <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
+        </div>
+        <div class="co-card-box" style="padding:12px;">
+            <div id="locationPickerMap" style="width:100%;height:280px;border:1px solid var(--border);border-radius:12px;"></div>
+            <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1;">Confirm location</button>
+                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;">Auto detect GPS</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="coModal" class="co-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Payment confirmation">
     <div class="co-card">
         <button id="coClose" class="co-close-btn" aria-label="Close">&times;</button>
@@ -1209,6 +1227,13 @@ body.light .co-qr-spinner {
     const methods = Array.from(document.querySelectorAll('.pm-card'));
     const startBtn = document.getElementById('startCheckoutBtn');
     const errorBox = document.getElementById('checkoutError');
+    const locationPickerModal = document.getElementById('locationPickerModal');
+    const locationConfirmBtn = document.getElementById('locationConfirmBtn');
+    const locationDetectBtn = document.getElementById('locationDetectBtn');
+    const locationPickerHint = document.getElementById('locationPickerHint');
+    let locationMap = null;
+    let locationMarker = null;
+    let selectedLocation = null;
     const infoBox = document.getElementById('checkoutInfo');
     const paypalWrap = document.getElementById('paypalButtonsWrap');
     const paypalButtonsContainer = document.getElementById('paypalButtonsContainer');
@@ -2175,7 +2200,7 @@ body.light .co-qr-spinner {
             });
             setError('');
             setInfo('');
-            // Validate shipping before showing modal
+            // Validate shipping before showing location picker
             const missing = validateShipping();
             if (missing.length) {
                 setError('Please fill in: ' + missing.join(', ') + '.');
@@ -2186,11 +2211,135 @@ body.light .co-qr-spinner {
                 setError('Your Mall Credit balance is ₱0.00. Please add credits first.');
                 return;
             }
-            openModal();
-            if (selectedMethod === 'ginto_pay_qr') {
-                startQrFlowInModal(true);
-            }
+            openLocationPicker();
         });
+    });
+
+    function resetLocationPicker() {
+        selectedLocation = null;
+        if (locationMarker && locationMap) {
+            locationMap.removeLayer(locationMarker); locationMarker = null;
+        }
+        locationPickerHint.textContent = 'Click on the map to pick your location or use auto detect.';
+    }
+
+    function closeLocationPicker() {
+        if (locationPickerModal) locationPickerModal.style.display = 'none';
+    }
+
+    function openLocationPicker() {
+        if (locationPickerModal) locationPickerModal.style.display = 'flex';
+        resetLocationPicker();
+        initLocationMap();
+    }
+
+    async function initLocationMap() {
+        if (!locationMap) {
+            await loadLeafletAssets();
+            locationMap = L.map('locationPickerMap', { zoomControl: true, attributionControl: false }).setView([14.5995, 120.9842], 12);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(locationMap);
+            locationMap.on('click', function (e) {
+                if (locationMarker) locationMap.removeLayer(locationMarker);
+                locationMarker = L.marker([e.latlng.lat, e.latlng.lng], { draggable: true }).addTo(locationMap);
+                selectedLocation = { lat: e.latlng.lat, lng: e.latlng.lng };
+                locationPickerHint.textContent = 'Location selected. Drag marker to fine-tune, then press Confirm.';
+                locationMarker.on('dragend', function (evt) {
+                    const p = evt.target.getLatLng();
+                    selectedLocation = { lat: p.lat, lng: p.lng };
+                });
+            });
+        }
+
+        // Auto center on browser location first
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                locationMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
+            }, function () {
+                // ignore errors
+            }, { timeout: 10000 });
+        }
+    }
+
+    async function loadLeafletAssets() {
+        if (window.L) return;
+        if (!document.getElementById('leaflet-css')) {
+            const lnk = document.createElement('link');
+            lnk.id = 'leaflet-css';
+            lnk.rel = 'stylesheet';
+            lnk.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(lnk);
+        }
+        if (!document.getElementById('leaflet-script')) {
+            const sc = document.createElement('script');
+            sc.id = 'leaflet-script';
+            sc.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            document.body.appendChild(sc);
+            await new Promise((resolve) => sc.onload = resolve);
+        }
+    }
+
+    locationDetectBtn.addEventListener('click', async function () {
+        if (!navigator.geolocation) {
+            locationPickerHint.textContent = 'Geolocation not supported by your browser.';
+            return;
+        }
+        locationPickerHint.textContent = 'Detecting current location...';
+        navigator.geolocation.getCurrentPosition(function (pos) {
+            if (locationMap) {
+                locationMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
+                if (locationMarker) locationMap.removeLayer(locationMarker);
+                locationMarker = L.marker([pos.coords.latitude, pos.coords.longitude], { draggable: true }).addTo(locationMap);
+                selectedLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                locationPickerHint.textContent = 'Pinned at detected location. Drag marker if needed, then press Confirm.';
+                locationMarker.on('dragend', function (evt) {
+                    const p = evt.target.getLatLng();
+                    selectedLocation = { lat: p.lat, lng: p.lng };
+                });
+            }
+        }, function (err) {
+            locationPickerHint.textContent = 'Could not get GPS location: ' + (err.message || 'permission denied');
+        }, { timeout: 15000 });
+    });
+
+    locationConfirmBtn.addEventListener('click', async function () {
+        if (!selectedLocation) {
+            locationPickerHint.textContent = 'Please select a point on the map first.';
+            return;
+        }
+
+        try {
+            const r = await fetch('/api/barangay/detect?lat=' + encodeURIComponent(selectedLocation.lat) + '&lng=' + encodeURIComponent(selectedLocation.lng), {
+                credentials: 'same-origin', headers: { 'Accept': 'application/json' }
+            });
+            const d = await r.json();
+            if (d && d.barangay) {
+                const b = d.barangay;
+                document.getElementById('shipAddress1').value = b.name ? b.name + ', ' + (b.city || '') : '';
+                document.getElementById('shipCity').value = b.city || '';
+                document.getElementById('shipProvince').value = b.province || '';
+                document.getElementById('shipCountry').value = b.region || 'PH';
+                await fetch('/api/barangay/set', {
+                    method: 'POST', credentials: 'same-origin', headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrfToken,
+                    },
+                    body: 'barangay_id=' + encodeURIComponent(b.id) + '&lat=' + encodeURIComponent(selectedLocation.lat) + '&lng=' + encodeURIComponent(selectedLocation.lng)
+                });
+            }
+        } catch (e) {
+            console.warn('Location detect fallback error', e);
+        }
+
+        estimateCheckoutFees();
+        closeLocationPicker();
+
+        openModal();
+        if (selectedMethod === 'ginto_pay_qr') {
+            startQrFlowInModal(true);
+        }
     });
 
     startBtn.addEventListener('click', startPayment);
