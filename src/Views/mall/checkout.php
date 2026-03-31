@@ -1205,7 +1205,7 @@ body.light .co-qr-spinner {
         <div class="co-card-box" style="padding:12px;">
             <button type="button" class="shipping-helper-btn" onclick="detectMyLocation()">📍 Detect my location</button>
             <button type="button" class="shipping-helper-btn" onclick="prefillFromSavedAddress()">🏠 Use saved delivery address</button>
-            <button type="button" class="shipping-helper-btn" onclick="closeShippingAddressModal()">✏️ Enter address manually</button>
+            <button type="button" class="shipping-helper-btn" onclick="enterAddressManually()">✏️ Enter address manually</button>
             <button type="button" class="shipping-helper-btn primary" onclick="saveAsDefaultAddress()">⭐ Save current form as default</button>
             <p id="shippingAddressModalFeedback" class="shipping-helper-note" style="margin-top:10px;font-size:0.84rem;"></p>
         </div>
@@ -1827,6 +1827,16 @@ body.light .co-qr-spinner {
 
     window.closeShippingAddressModal = function() {
         document.getElementById('shippingAddressModal').style.display = 'none';
+    };
+
+    window.enterAddressManually = function() {
+        closeShippingAddressModal();
+        const section = document.getElementById('checkoutShippingForm');
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            const firstField = document.getElementById('shipFullName');
+            if (firstField) firstField.focus();
+        }
     };
 
     window.detectMyLocation = async function() {
