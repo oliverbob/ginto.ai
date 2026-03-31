@@ -1750,6 +1750,29 @@ $router->req('/mail', function() {
     echo '<label>Body:<br><textarea name="body" rows="6" style="width:100%;max-width:500px;">This is a test email from Ginto.</textarea></label><br><br>';
     echo '<button type="submit" style="padding:10px 14px;">Send Test Email</button>';
     echo '</form>';
+
+    // Log inspector section for quick debugging
+    $logFile = '';
+    if (defined('STORAGE_PATH') && STORAGE_PATH) {
+        $logFile = rtrim(STORAGE_PATH, '/\\') . '/logs/ginto.log';
+    } else {
+        $logFile = __DIR__ . '/../storage/logs/ginto.log';
+    }
+
+    echo '<h2 style="margin-top:24px;">Recent log entries</h2>';
+    if (is_readable($logFile)) {
+        $lines = 30;
+        $content = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($content === false) {
+            echo '<p style="color:red;">Unable to read log file.</p>';
+        } else {
+            $tail = array_slice($content, -$lines);
+            echo '<pre style="background:#111;color:#fff;padding:10px;border-radius:6px;max-height:300px;overflow:auto;">' . htmlspecialchars(implode("\n", $tail), ENT_QUOTES, 'UTF-8') . '</pre>';
+        }
+    } else {
+        echo '<p style="color:orange;">Log file not found or not readable: ' . htmlspecialchars($logFile, ENT_QUOTES, 'UTF-8') . '</p>';
+    }
+
     return;
 });
 
