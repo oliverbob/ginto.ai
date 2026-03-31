@@ -47,6 +47,43 @@
     const _savedBarangay = localStorage.getItem('ginto_barangay_id');
     if (!currentBarangayId && _savedBarangay) currentBarangayId = parseInt(_savedBarangay) || 0;
 
+    async function setCurrentBarangay(barangayId) {
+        if (!barangayId || isNaN(barangayId)) return;
+        currentBarangayId = Number(barangayId);
+        localStorage.setItem('ginto_barangay_id', currentBarangayId);
+        try {
+            await fetch('/api/barangay/set', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': CSRF_TOKEN },
+                body: 'barangay_id=' + encodeURIComponent(currentBarangayId)
+            });
+        } catch (e) {
+            console.warn('Failed to set barangay session', e);
+        }
+    }
+
+    async function autoDetectBarangayAndReload() {
+        if (currentBarangayId > 0 || !navigator.geolocation) return;
+        try {
+            const pos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 });
+            });
+            const r = await fetch('/api/barangay/detect?lat=' + encodeURIComponent(pos.coords.latitude) + '&lng=' + encodeURIComponent(pos.coords.longitude), {
+                credentials: 'same-origin', headers: { 'Accept': 'application/json' }
+            });
+            const d = await r.json();
+            if (d && d.barangay && d.barangay.id) {
+                await setCurrentBarangay(d.barangay.id);
+                refreshSearchResultsFromServer();
+            }
+        } catch (e) {
+            console.warn('Auto detect barangay failed', e);
+        }
+    }
+
+    autoDetectBarangayAndReload();
+
     function ensureMallShellElements() {
         if (!document.getElementById('sidebarBackdrop')) {
             const sidebarBackdrop = document.createElement('div');
