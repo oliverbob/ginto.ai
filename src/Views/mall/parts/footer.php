@@ -1524,8 +1524,8 @@
     }
 
     function clearBarangay() {
-        const body = new URLSearchParams({ barangay_id: 0, _token: CSRF_TOKEN });
-        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+        const body = new URLSearchParams({ barangay_id: 0, csrf_token: CSRF_TOKEN, _token: CSRF_TOKEN });
+        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN }, body })
             .then(function() {
                 currentBarangayId = 0;
                 localStorage.removeItem('ginto_barangay_id');
@@ -1591,10 +1591,14 @@
             .then(r => r.json())
             .then(function(d) {
                 if (!d.success || !d.barangay) { _setBarangayPillText('📍', 'Set location'); return; }
-                const params = { barangay_id: d.barangay.id, _token: CSRF_TOKEN };
+                const params = { barangay_id: d.barangay.id, csrf_token: CSRF_TOKEN, _token: CSRF_TOKEN };
                 if (lat !== null && lng !== null) { params.lat = lat; params.lng = lng; }
                 const body = new URLSearchParams(params);
-                fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+                fetch('/api/barangay/set', {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN },
+                    body
+                })
                     .then(function() {
                         currentBarangayId = d.barangay.id;
                         localStorage.setItem('ginto_barangay_id', currentBarangayId);
