@@ -1091,11 +1091,13 @@ body.light .co-qr-spinner {
             <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:0;border-radius:0;margin-bottom:80px;"></div>
             <div id="locationPickerHint" style="position:absolute;left:14px;right:14px;bottom:92px;margin:0;font-size:0.85rem;color:var(--muted);background:transparent;padding:10px 12px;border-radius:0;z-index:10001;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
             <div id="locationPickerControls" style="position:fixed;left:24px;right:24px;bottom:28px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,0.08);padding:6px;margin:0 16px 28px 16px;z-index:11000;border:1px solid rgba(255,255,255,0.2);box-shadow:0 2px 14px rgba(0,0,0,0.25);backdrop-filter:blur(8px);border-radius:10px;">
-                <div style="display:flex;gap:6px;">
-                    <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;height:36px;font-size:0.85rem;font-weight:700;border-radius:6px;background:rgba(15,23,42,0.75);border:1px solid rgba(255,255,255,0.25);color:#f8fafc;">Auto detect</button>
-                    <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;height:36px;font-size:0.85rem;font-weight:700;border-radius:6px;background:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.9);color:#1f2937;">Satellite</button>
+                <div id="locationPickerButtonGroup" style="display:flex;flex-direction:column;gap:6px;">
+                    <div id="locationPickerPrimaryButtons" style="display:flex;gap:6px;">
+                        <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;height:36px;font-size:0.85rem;font-weight:700;border-radius:6px;background:rgba(15,23,42,0.75);border:1px solid rgba(255,255,255,0.25);color:#f8fafc;">Auto detect</button>
+                        <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;height:36px;font-size:0.85rem;font-weight:700;border-radius:6px;background:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.9);color:#1f2937;">Satellite</button>
+                    </div>
+                    <button id="locationConfirmBtn" class="co-btn-confirm" style="width:100%;height:40px;font-size:0.92rem;font-weight:700;border-radius:6px;background:rgba(245,204,92,0.9);border:1px solid rgba(255,255,255,0.6);color:#000;">Confirm</button>
                 </div>
-                <button id="locationConfirmBtn" class="co-btn-confirm" style="width:100%;height:40px;font-size:0.92rem;font-weight:700;border-radius:6px;background:rgba(245,204,92,0.9);border:1px solid rgba(255,255,255,0.6);color:#000;">Confirm</button>
             </div>
             <style>
                 @media (max-width: 768px) {
@@ -1111,6 +1113,7 @@ body.light .co-qr-spinner {
                     }
                     #locationPickerModal #locationPickerHint {
                         bottom: 86px !important;
+                        text-align: center;
                     }
                     #locationPickerModal #locationPickerControls {
                         position: absolute;
@@ -1122,6 +1125,69 @@ body.light .co-qr-spinner {
                     }
                     #locationPickerModal #locationPickerControls button {
                         height: 48px !important;
+                        width: 100% !important;
+                    }
+                    #locationPickerModal #locationPickerPrimaryButtons {
+                        display: flex;
+                        flex-direction: row;
+                        gap: 6px;
+                    }
+                }
+
+                @media (min-width: 768px) {
+                    #locationPickerModal .co-card-box {
+                        height: calc(100vh - 160px);
+                    }
+
+                    #locationPickerModal #locationPickerHint {
+                        position: absolute;
+                        left: 24px;
+                        right: auto;
+                        bottom: 102px;
+                        max-width: calc(100% - 280px);
+                        text-align: left;
+                    }
+
+                    #locationPickerModal #locationPickerControls {
+                        position: absolute;
+                        bottom: 24px;
+                        left: 24px;
+                        right: 24px;
+                        display: flex;
+                        flex-direction: row;
+                        align-items: flex-end;
+                        justify-content: flex-start;
+                        gap: 8px;
+                        padding: 8px;
+                        background: rgba(255, 255, 255, 0.08);
+                        border: 1px solid rgba(255, 255, 255, 0.2);
+                        box-shadow: 0 2px 14px rgba(0, 0, 0, 0.25);
+                        backdrop-filter: blur(8px);
+                        border-radius: 10px;
+                    }
+
+                    #locationPickerModal #locationPickerButtonGroup {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                        max-width: 240px;
+                        width: 100%;
+                        margin-left: auto;
+                    }
+
+                    #locationPickerModal #locationPickerPrimaryButtons {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 8px;
+                    }
+
+                    #locationPickerModal #locationPickerButtonGroup button {
+                        width: 100%;
+                        min-height: 40px;
+                    }
+
+                    #locationPickerModal #locationPickerControls button {
+                        height: auto !important;
                         width: 100% !important;
                     }
                 }
