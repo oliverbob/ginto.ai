@@ -1578,9 +1578,8 @@ body.light .co-qr-spinner {
             const session = await createSession();
             currentSessionRef = session.session_ref;
             // Make checkout amount reflect the actual session total after all fees.
-            if (session && typeof session.total === 'number') {
-                coAmount.textContent = formatPrice(session.total, session.currency || 'PHP');
-                coAmountMobile.textContent = formatPrice(session.total, session.currency || 'PHP');
+            if (session && session.total !== undefined) {
+                updateCheckoutAmount(session.total, session.currency || 'PHP');
             }
             if (selectedMethod === 'wallet') {
                 clearCart();
@@ -2068,6 +2067,29 @@ body.light .co-qr-spinner {
         return card;
     }
 
+    function updateCheckoutAmount(amount, currency) {
+        const total = Number(amount);
+        if (Number.isFinite(total)) {
+            coAmount.textContent = formatPrice(total, currency || 'PHP');
+            coAmountMobile.textContent = formatPrice(total, currency || 'PHP');
+        }
+    }
+
+    async function refreshCheckoutAmountFromServer() {
+        try {
+            const estimate = await api('/api/mall/checkout/estimate', {
+                payment_method: selectedMethod,
+                cart: readCart(),
+                shipping: shippingPayload(),
+            });
+            if (estimate && (estimate.total || estimate.amount_total)) {
+                updateCheckoutAmount(estimate.total ?? estimate.amount_total, estimate.currency || 'PHP');
+            }
+        } catch (err) {
+            console.warn('checkout estimate failed', err);
+        }
+    }
+
     function openModal() {
         const meta    = pmMeta[selectedMethod] || {};
         const summary = cartSummary();
@@ -2077,6 +2099,7 @@ body.light .co-qr-spinner {
         coName.textContent      = meta.name || selectedMethod;
         coAmount.textContent    = formatPrice(summary.total, summary.currency);
         coAmountMobile.textContent = formatPrice(summary.total, summary.currency);
+        refreshCheckoutAmountFromServer();
         coShip.innerHTML = '<strong>' + esc(s.full_name) + '</strong>'
             + (s.phone ? ' &middot; ' + esc(s.phone) : '') + '<br>'
             + esc(s.address_line1) + (s.address_line2 ? ', ' + esc(s.address_line2) : '') + '<br>'
