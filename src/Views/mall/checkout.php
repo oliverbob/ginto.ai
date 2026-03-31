@@ -78,6 +78,10 @@ $savedHome      = $saved_home ?? [];
     display: none !important;
 }
 
+#coCancel {
+    display: none !important;
+}
+
 @media (max-height: 800px) {
     .co-card {
         max-height: calc(100vh - 30px);
