@@ -215,8 +215,13 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                                 onfocus="this.setAttribute('autocomplete','off');"
                                 oninput="window.handleBarangayMapTypeahead?.(this.value);"
                                 style="padding:10px 12px;border:1px solid #94a3b8;border-radius:10px;background:var(--bg, #ffffff);color:var(--text, #0f172a);font-size:0.88rem;outline:none;" />
-                            <div id="barangayMapTypeahead" style="position:absolute;top:52px;left:14px;right:80px;max-height:200px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.15);z-index:2500;display:none;"></div>
-                            <button onclick="geocodeBarangayMapLocation()" style="position:absolute;top:10px;right:14px;padding:8px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#4250ff,#34d399);color:#042f4a;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(31,41,55,0.4);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease;">Go</button>
+                            <div id="barangayMapTypeahead" style="position:absolute;top:52px;left:14px;right:60px;max-height:200px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.15);z-index:2500;display:none;"></div>
+                            <button onclick="geocodeBarangayMapLocation()" style="position:absolute;top:10px;right:14px;width:32px;height:32px;border:none;border-radius:6px;background:transparent;color:var(--text,#0f172a);cursor:pointer;display:flex;align-items:center;justify-content:center;" aria-label="Search location">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </button>
                         </div>
                         <div id="barangayMapContainer" style="height:340px;"></div>
                         <div style="padding:10px 14px;">
