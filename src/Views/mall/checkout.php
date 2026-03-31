@@ -59,6 +59,10 @@ $savedHome      = $saved_home ?? [];
     backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
     padding:16px;
 }
+.co-overlay .co-card {
+    max-height: calc(100vh - 40px);
+    overflow: auto;
+}
 .co-card {
     background:linear-gradient(155deg,#0d1117 0%,#141a2b 55%,#1b2040 100%);
     border:1px solid rgba(255,255,255,0.1);
@@ -1431,7 +1435,8 @@ body.light .co-qr-spinner {
             if (data && data.ok && Array.isArray(data.cart)) {
                 localStorage.setItem(cartKey, JSON.stringify(data.cart));
                 renderSummary();
-                setInfo('Cart prices refreshed from server.');
+                // Intentionally not showing refresh indicator to keep UI clean
+                // setInfo('Cart prices refreshed from server.');
             }
         } catch (err) {
             console.warn('Cart refresh failed', err);
