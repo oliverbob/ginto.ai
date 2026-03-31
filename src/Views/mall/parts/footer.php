@@ -1442,6 +1442,14 @@
         _bzTimer = setTimeout(function() { _doSearchBarangay(q); }, 250);
     }
 
+function escapeJsParam(value) {
+        return String(value)
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, "\\'")
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r');
+    }
+
     function _doSearchBarangay(q) {
         const res = document.getElementById('barangayResults');
         if (!res) return;
@@ -1456,9 +1464,8 @@
                 }
                 res.innerHTML = d.barangays.map(function(b) {
                     const active = (b.id === currentBarangayId) ? ' style="background:var(--primary-bg,#f0f7ff);"' : '';
-                    // Use JSON.stringify so IDs (including 'geo_...' strings) are passed safely.
-                var safeId = JSON.stringify(String(b.id));
-                return '<div onclick="selectBarangay(' + safeId + ')"' + active +
+                    const safeId = escapeJsParam(b.id);
+                    return '<div onclick="selectBarangay(\'' + safeId + '\')"' + active +
                         ' style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border,#eee);font-size:0.87rem;">' +
                         '<strong>' + b.name + '</strong>, ' + b.city +
                         ' <span style="color:var(--muted,#888);font-size:0.78rem;">' + b.province + '</span>' +
