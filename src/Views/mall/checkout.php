@@ -1351,6 +1351,7 @@ body.light .co-qr-spinner {
         <div id="checkoutInfo" style="display:none;margin:0 28px 8px;padding:12px 14px;border-radius:14px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.25);color:#bfdbfe;"></div>
         <div class="co-actions">
             <button id="coConfirm" class="co-btn-confirm">Confirm &amp; Pay</button>
+            <button id="coCancel" class="co-btn-cancel">Cancel</button>
         </div>
     </div>
 </div>
