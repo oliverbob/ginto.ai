@@ -173,9 +173,9 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Your location</div>
 
                         <!-- Current location display -->
-                        <div id="barangayCurrentDisplay" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>margin-bottom:10px;padding:10px 12px;background:var(--topcard-bg, rgba(15, 23, 42, 0.85));border:1px solid var(--border);border-radius:8px;">
-                            <div style="font-size:0.75rem;color:var(--muted, #e2e8f0);margin-bottom:2px;">Your current location is:</div>
-                            <div id="barangayCurrentName" style="font-size:0.9rem;font-weight:700;color:var(--text, #f8fafc);"><?php
+                        <div id="barangayCurrentDisplay" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>margin-bottom:10px;padding:10px 12px;background:var(--bg-secondary,#f8fafc);border:1px solid var(--border,#cbd5e1);border-radius:8px;color:var(--text,#0f172a);">
+                            <div style="font-size:0.75rem;color:var(--muted,#64748b);margin-bottom:2px;">Your current location is:</div>
+                            <div id="barangayCurrentName" style="font-size:0.9rem;font-weight:700;color:var(--text,#0f172a);"><?php
                                 if (!empty($current_barangay)):
                                     echo htmlspecialchars($current_barangay['name'] . ', ' . $current_barangay['city'], ENT_QUOTES, 'UTF-8');
                                 endif; ?></div>
@@ -210,7 +210,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         </div>
                         <div style="display:flex;gap:8px;padding:10px 14px;">
                             <input id="barangayMapSearchInput" type="text" placeholder="Search a place or address"
-                                style="flex:1;padding:10px 12px;border:1px solid rgba(148,163,184,0.4);border-radius:10px;background:rgba(15,23,42,0.95);color:#f8fafc;font-size:0.88rem;outline:none;" />
+                                style="flex:1;padding:10px 12px;border:1px solid #94a3b8;border-radius:10px;background:var(--bg, #ffffff);color:var(--text, #0f172a);font-size:0.88rem;outline:none;" />
                             <button onclick="geocodeBarangayMapLocation()" style="padding:10px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#4250ff,#34d399);color:#042f4a;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(31,41,55,0.4);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease;">Go</button>
                         </div>
                         <div id="barangayMapContainer" style="height:340px;"></div>
