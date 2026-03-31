@@ -1088,7 +1088,7 @@ body.light .co-qr-spinner {
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
         <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:100%;position:relative;">
-            <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:0;border-radius:0;"></div>
+            <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:0;border-radius:0;margin-bottom:80px;"></div>
             <div id="locationPickerHint" style="position:absolute;left:14px;right:14px;bottom:92px;margin:0;font-size:0.85rem;color:var(--muted);background:transparent;padding:10px 12px;border-radius:0;z-index:10001;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
             <div id="locationPickerControls" style="position:fixed;left:24px;right:24px;bottom:28px;display:flex;flex-direction:column;gap:6px;background:rgba(255,255,255,0.08);padding:6px;margin:0 16px 28px 16px;z-index:11000;border:1px solid rgba(255,255,255,0.2);box-shadow:0 2px 14px rgba(0,0,0,0.25);backdrop-filter:blur(8px);border-radius:10px;">
                 <div style="display:flex;gap:6px;">
