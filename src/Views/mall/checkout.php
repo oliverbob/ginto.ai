@@ -1200,7 +1200,7 @@ body.light .co-qr-spinner {
         <button type="button" class="co-close-btn" onclick="closeShippingAddressModal()">✕</button>
         <div class="co-head">
             <div class="co-method-name">Shipping Address Helper</div>
-            <div class="co-sector">Pick your preferred delivery source</div>
+            <div class="co-sector">Pick your preferred destination address</div>
         </div>
         <div class="co-card-box" style="padding:12px;">
             <button type="button" class="shipping-helper-btn" onclick="detectMyLocation()">📍 Detect my location</button>
