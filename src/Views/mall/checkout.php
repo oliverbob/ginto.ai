@@ -1170,8 +1170,8 @@ body.light .co-qr-spinner {
                         display: flex;
                         flex-direction: column;
                         gap: 8px;
-                        max-width: 240px;
-                        width: auto;
+                        max-width: 130px;
+                        width: 130px;
                         margin-left: auto;
                         background: transparent;
                         border: none;
