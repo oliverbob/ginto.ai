@@ -74,6 +74,10 @@ $savedHome      = $saved_home ?? [];
     position:relative;
 }
 
+#coClose {
+    display: none !important;
+}
+
 @media (max-height: 800px) {
     .co-card {
         max-height: calc(100vh - 30px);
