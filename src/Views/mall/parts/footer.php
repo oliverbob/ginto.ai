@@ -1436,18 +1436,26 @@
             if (dd) dd.style.display = 'none';
             _barangayDropdownOpen = false;
         }
+
+        const mapInput = document.getElementById('barangayMapSearchInput');
+        const mapTypeahead = document.getElementById('barangayMapTypeahead');
+        if (mapTypeahead && mapTypeahead.style.display === 'block') {
+            if (!mapInput.contains(e.target) && !mapTypeahead.contains(e.target)) {
+                mapTypeahead.style.display = 'none';
+            }
+        }
     });
 
     let _bzTimer = null;
-    function searchBarangay(q) {
+    function searchBarangay(q, resultContainerId = 'barangayResults') {
         clearTimeout(_bzTimer);
-        const res = document.getElementById('barangayResults');
+        const res = document.getElementById(resultContainerId);
         if (!res) return;
         if (!q || q.trim().length < 1) {
-            _doSearchBarangay('');
+            _doSearchBarangay('', resultContainerId);
             return;
         }
-        _bzTimer = setTimeout(function() { _doSearchBarangay(q); }, 250);
+        _bzTimer = setTimeout(function() { _doSearchBarangay(q, resultContainerId); }, 250);
     }
 
 function escapeJsParam(value) {
@@ -1458,8 +1466,8 @@ function escapeJsParam(value) {
             .replace(/\r/g, '\\r');
     }
 
-    function _doSearchBarangay(q) {
-        const res = document.getElementById('barangayResults');
+    function _doSearchBarangay(q, resultContainerId = 'barangayResults') {
+        const res = document.getElementById(resultContainerId);
         if (!res) return;
         const url = '/api/barangay/list?limit=20' + (q.trim() ? '&q=' + encodeURIComponent(q.trim()) : '');
         fetch(url)
@@ -1558,6 +1566,19 @@ function escapeJsParam(value) {
     function openBarangayMapModal() {
         const modal = document.getElementById('barangayMapModal');
         if (!modal) return;
+
+        const input = document.getElementById('barangayMapSearchInput');
+        const typeahead = document.getElementById('barangayMapTypeahead');
+        if (input) {
+            input.value = '';
+            input.setAttribute('autocomplete', 'off');
+            input.focus();
+        }
+        if (typeahead) {
+            typeahead.style.display = 'none';
+            typeahead.innerHTML = '';
+        }
+
         modal.style.display = 'flex';
         initBarangayMap();
     }
