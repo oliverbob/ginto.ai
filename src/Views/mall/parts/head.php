@@ -665,9 +665,9 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 /* ========== CART FAB ========== */
 .cart-fab {
     position: fixed;
-    bottom: 28px;
     right: 28px;
     z-index: 1100;
+    bottom: calc(28px + 58px + env(safe-area-inset-bottom, 0));
     width: 62px;
     height: 62px;
     border-radius: 50%;
@@ -680,6 +680,10 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
     box-shadow: 0 4px 20px rgba(0,0,0,0.35), 0 2px 8px rgba(0,0,0,0.25);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     padding: 0;
+}
+
+body.no-bottom-nav .cart-fab {
+    bottom: calc(28px + env(safe-area-inset-bottom, 0));
 }
 .cart-fab-logo {
     width: 100%;
