@@ -1179,6 +1179,7 @@ body.light .co-qr-spinner {
         <div class="co-card-box" style="padding:12px;">
             <button type="button" onclick="detectMyLocation()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">📍 Detect my location</button>
             <button type="button" onclick="prefillFromSavedAddress()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">🏠 Use saved delivery address</button>
+            <button type="button" onclick="closeShippingAddressModal()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">✏️ Enter address manually</button>
             <button type="button" onclick="saveAsDefaultAddress()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;">⭐ Save current form as default</button>
             <p id="shippingAddressModalFeedback" style="margin-top:10px;color:var(--muted);font-size:0.84rem;"></p>
         </div>
