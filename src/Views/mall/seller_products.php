@@ -99,7 +99,7 @@ $kycBadgeClass = match ($kyc_status ?? 'none') {
 .sc-nav-divider { height: 1px; background: var(--border); margin: 8px 16px; }
 
 /* Main */
-.sc-main { flex: 1; min-width: 0; padding: 28px 28px calc(58px + 32px); }
+.sc-main { flex: 1; min-width: 0; padding: 28px 28px calc(58px + 68px); }
 .sc-page-header {
     display: flex; align-items: flex-start;
     justify-content: space-between; gap: 12px;

@@ -478,7 +478,12 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .main-content {
     flex: 1;
     min-width: 0;
-    padding: 24px 20px calc(58px + 24px); /* reserve space for bottom nav */
+    padding: 24px 20px calc(58px + 32px); /* reserve space for fixed bottom nav */
+}
+
+/* Ensure mobile footer nav doesn't overlap content in all mall pages */
+body {
+    padding-bottom: calc(58px + 32px) !important;
 }
 .main-toolbar {
     display: flex;
