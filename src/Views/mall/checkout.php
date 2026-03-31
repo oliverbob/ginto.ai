@@ -1082,18 +1082,18 @@ body.light .co-qr-spinner {
 
 <!-- ── Checkout Confirmation Modal ── -->
 <div id="locationPickerModal" class="co-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);" aria-modal="true" role="dialog" aria-label="Pin your location">
-    <div class="co-card co-card-is-open" style="max-width:100%;width:100%;height:100%;border-radius:0;overflow:hidden;">        <button type="button" class="co-close-btn" aria-label="Close" onclick="closeLocationPicker()">✕</button>
+    <div class="co-card co-card-is-open" style="position:fixed; inset:0; max-width:100%; width:100%; height:100%; border-radius:0; overflow:hidden;">        <button type="button" class="co-close-btn" aria-label="Close" onclick="closeLocationPicker()">✕</button>
         <div class="co-head">
             <div class="co-method-name">Pin your current location</div>
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
-        <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:calc(100vh - 150px);max-height:calc(100vh - 150px);position:relative;">
-            <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:1px solid var(--border);border-radius:0;"></div>
-            <div id="locationPickerHint" style="position:absolute;left:12px;right:12px;bottom:72px;margin:0;font-size:0.85rem;color:var(--muted);background:rgba(15,23,42,0.75);padding:8px 10px;border-radius:8px;z-index:11;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div id="locationPickerControls" style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(8,15,27,0.9);padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);z-index:999999;">
-                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
-                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Satellite</button>
-                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Confirm</button>
+        <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:100%;position:relative;">
+            <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:0;border-radius:0;"></div>
+            <div id="locationPickerHint" style="position:absolute;left:14px;right:14px;bottom:92px;margin:0;font-size:0.85rem;color:var(--muted);background:rgba(0,0,0,0.6);padding:10px 12px;border-radius:0;z-index:10001;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
+            <div id="locationPickerControls" style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.58);padding:8px 8px 12px;margin:0;z-index:10002;">
+                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 auto;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.16);color:var(--text);min-width:90px;">Auto detect</button>
+                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 auto;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.22);color:var(--text);min-width:90px;">Satellite</button>
+                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 100%;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(212,175,55,0.95);border:1px solid rgba(255,255,255,0.2);color:#000;min-width:90px;">Confirm</button>
             </div>
             <style>
                 @media (max-width: 768px) {
@@ -2313,6 +2313,14 @@ body.light .co-qr-spinner {
     }
 
     function openLocationPicker() {
+        if (locationPickerModal) {
+            locationPickerModal.style.display = 'flex';
+            locationPickerModal.addEventListener('click', function (e) {
+                if (e.target === locationPickerModal) {
+                    closeLocationPicker();
+                }
+            }, { once: true });
+        }
         if (locationPickerModal) locationPickerModal.style.display = 'flex';
         resetLocationPicker();
         initLocationMap();
