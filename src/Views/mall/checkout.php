@@ -1153,9 +1153,9 @@ body.light .co-qr-spinner {
                         bottom: 24px;
                         left: auto;
                         right: 24px;
-                        width: 130px;
+                        min-width: 220px;
                         display: flex;
-                        flex-direction: column;
+                        flex-direction: row;
                         align-items: flex-end;
                         justify-content: flex-end;
                         gap: 8px;
@@ -1171,13 +1171,13 @@ body.light .co-qr-spinner {
                         display: flex;
                         flex-direction: column;
                         gap: 8px;
-                        max-width: 130px;
-                        width: 130px;
+                        max-width: 240px;
+                        width: 220px;
                         margin-left: auto;
-                        background: transparent;
-                        border: none;
-                        border-radius: 0;
-                        padding: 0;
+                        background: rgba(255, 255, 255, 0.95);
+                        border: 1px solid rgba(15, 23, 42, 0.12);
+                        border-radius: 10px;
+                        padding: 10px;
                     }
 
                     #locationPickerModal #locationPickerPrimaryButtons {
