@@ -986,11 +986,7 @@ body.light .co-qr-spinner {
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Shipping fee</span>
-                <span id="checkoutShippingFee" style="font-size:0.85rem;">—</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
-                <span>Delivery fee</span>
-                <span id="checkoutDeliveryFee" style="font-size:0.85rem;">—</span>
+                <span id="checkoutShippingFee" style="font-size:0.85rem;">calculated at checkout</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Platform fee (8%)</span>
@@ -1197,7 +1193,6 @@ body.light .co-qr-spinner {
     const checkoutItems = document.getElementById('checkoutItems');
     const checkoutSubtotal = document.getElementById('checkoutSubtotal');
     const checkoutShippingFee = document.getElementById('checkoutShippingFee');
-    const checkoutDeliveryFee = document.getElementById('checkoutDeliveryFee');
     const checkoutPlatformFee = document.getElementById('checkoutPlatformFee');
     const checkoutFixedFee = document.getElementById('checkoutFixedFee');
     const checkoutProcessingFee = document.getElementById('checkoutProcessingFee');
@@ -1332,12 +1327,8 @@ body.light .co-qr-spinner {
         if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(platformFee, summary.currency);
         if (checkoutFixedFee) checkoutFixedFee.textContent = formatPrice(fixedFee, summary.currency);
         if (checkoutShippingFee) {
-            checkoutShippingFee.textContent = formatPrice(0.00, summary.currency);
+            checkoutShippingFee.textContent = 'calculated at checkout';
             checkoutShippingFee.style.color = 'var(--muted)';
-        }
-        if (checkoutDeliveryFee) {
-            checkoutDeliveryFee.textContent = formatPrice(0.00, summary.currency);
-            checkoutDeliveryFee.style.color = 'var(--muted)';
         }
         if (checkoutProcessingFee) {
             checkoutProcessingFee.textContent = formatPrice(5.00, summary.currency);
@@ -1364,7 +1355,6 @@ body.light .co-qr-spinner {
                 shipping: shippingPayload(),
             });
             if (checkoutShippingFee) checkoutShippingFee.textContent = formatPrice(response.shipping_fee, response.currency);
-            if (checkoutDeliveryFee) checkoutDeliveryFee.textContent = formatPrice(response.delivery_fee, response.currency);
             if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(response.platform_fee, response.currency);
             if (checkoutProcessingFee) checkoutProcessingFee.textContent = formatPrice(response.processing_fee, response.currency);
             if (checkoutTotal) checkoutTotal.textContent = formatPrice(response.total, response.currency);
@@ -1401,7 +1391,6 @@ body.light .co-qr-spinner {
         console.log('updateShippingFromSession', session);
         const sfEl   = document.getElementById('checkoutShippingFee');
         const sfNote = document.getElementById('checkoutShippingNote');
-        const dfEl   = document.getElementById('checkoutDeliveryFee');
         const pfEl   = document.getElementById('checkoutProcessingFee');
         const etaCard = document.getElementById('coPayoutEtaCard');
         const etaText = document.getElementById('coPayoutEtaText');
@@ -1420,11 +1409,6 @@ body.light .co-qr-spinner {
         sfEl.textContent = formatPrice(totalShipping, currency);
         sfEl.style.color = totalShipping > 0 ? 'var(--text)' : 'var(--muted)';
         if (sfNote) sfNote.style.display = totalShipping > 0 ? 'block' : 'none';
-        // Delivery fee
-        if (dfEl) {
-            dfEl.textContent = totalDelivery > 0 ? formatPrice(totalDelivery, currency) : 'Free';
-            dfEl.style.color = totalDelivery > 0 ? 'var(--text)' : 'var(--muted)';
-        }
         // Platform fee
         if (checkoutPlatformFee) {
             checkoutPlatformFee.textContent = totalPlatform > 0 ? formatPrice(totalPlatform, currency) : formatPrice(0, currency);
