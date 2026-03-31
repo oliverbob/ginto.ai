@@ -1151,10 +1151,11 @@ body.light .co-qr-spinner {
                     #locationPickerModal #locationPickerControls {
                         position: absolute;
                         bottom: 24px;
-                        left: 24px;
+                        left: auto;
                         right: 24px;
+                        width: 130px;
                         display: flex;
-                        flex-direction: row;
+                        flex-direction: column;
                         align-items: flex-end;
                         justify-content: flex-end;
                         gap: 8px;
