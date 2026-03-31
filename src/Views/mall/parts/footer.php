@@ -1590,6 +1590,40 @@ function escapeJsParam(value) {
         }
     }
 
+    function geocodeBarangayMapLocation() {
+        const query = document.getElementById('barangayMapSearchInput')?.value || '';
+        const hint = document.getElementById('barangayMapHint');
+        if (!query.trim()) {
+            if (hint) hint.textContent = 'Enter an address or place to search on the map.';
+            return;
+        }
+
+        if (hint) hint.textContent = 'Searching location...';
+
+        fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(query), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (results) {
+                if (!results || !results.length) {
+                    if (hint) hint.textContent = 'Location not found. Try another query.';
+                    return;
+                }
+                const loc = results[0];
+                if (_barangayMap && loc.lat && loc.lon) {
+                    _barangayMap.setView([parseFloat(loc.lat), parseFloat(loc.lon)], 14);
+                    if (typeof window._barangayAddMarker === 'function') {
+                        window._barangayAddMarker(parseFloat(loc.lat), parseFloat(loc.lon));
+                    }
+                    _barangaySelected = { lat: parseFloat(loc.lat), lng: parseFloat(loc.lon) };
+                    if (hint) hint.textContent = 'Location found. Adjust the marker if needed then Confirm.';
+                }
+            })
+            .catch(function () {
+                if (hint) hint.textContent = 'Geocoding request failed. Check your connection.';
+            });
+    }
+
     function createBarangayMap() {
         const container = document.getElementById('barangayMapContainer');
         if (!container) return;
@@ -1608,6 +1642,8 @@ function escapeJsParam(value) {
                 _barangaySelected = { lat: p.lat, lng: p.lng };
             });
         }
+
+        window._barangayAddMarker = addMarker;
 
         _barangayMap.on('click', function (event) {
             addMarker(event.latlng.lat, event.latlng.lng);
