@@ -210,13 +210,15 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         </div>
                         <div style="display:flex;gap:8px;padding:10px 14px;">
                             <input id="barangayMapSearchInput" type="text" placeholder="Search a place or address"
-                                style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.85rem;" />
-                            <button onclick="geocodeBarangayMapLocation()" style="padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--accent);color:#000;font-weight:700;cursor:pointer;">Go</button>
+                                style="flex:1;padding:10px 12px;border:1px solid rgba(148,163,184,0.4);border-radius:10px;background:rgba(15,23,42,0.95);color:#f8fafc;font-size:0.88rem;outline:none;" />
+                            <button onclick="geocodeBarangayMapLocation()" style="padding:10px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#334155,#0f172a);color:#e2e8f0;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(15,23,42,0.35);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease;">Go</button>
                         </div>
                         <div id="barangayMapContainer" style="height:340px;"></div>
                         <div style="padding:10px 14px;">
                             <p id="barangayMapHint" style="margin:0 0 10px;font-size:0.85rem;color:var(--muted);">Tap on map to pick your location; you may drag marker and press Confirm.</p>
-                            <button id="coMapConfirm" onclick="confirmBarangayMapPin()" style="width:100%;padding:12px 16px;border-radius:10px;border:none;background:#1F2937;color:#F8FAFC;font-size:0.9rem;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,0.35);">Confirm location and show products</button>
+                            <button id="coMapConfirm" onclick="confirmBarangayMapPin()" style="width:100%;padding:12px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#0f172a,#1e293b);color:#e2e8f0;font-size:0.92rem;font-weight:700;cursor:pointer;letter-spacing:0.012em;box-shadow:0 10px 24px rgba(15,23,42,0.48);transition:transform .15s ease,box-shadow .15s ease;">
+                                Confirm location and show products
+                            </button>
                         </div>
                     </div>
                 </div>
