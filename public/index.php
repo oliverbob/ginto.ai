@@ -1774,23 +1774,32 @@ $router->req('/mail', function() {
     }
 
     // Include postfix mail delivery logs for debugging
-    $mailLogFile = '/var/log/mail.log';
-    if (!is_readable($mailLogFile)) {
-        $mailLogFile = '/var/log/maillog';
+    $possibleMailLogs = ['/var/log/mail.log', '/var/log/maillog', '/var/log/mail/mail.log'];
+    $mailLogFile = null;
+    foreach ($possibleMailLogs as $path) {
+        if (file_exists($path)) {
+            $mailLogFile = $path;
+            break;
+        }
     }
 
     echo '<h2 style="margin-top:24px;">Recent Postfix mail log entries</h2>';
-    if (is_readable($mailLogFile)) {
-        $lines = 40;
-        $mlog = file($mailLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($mlog === false) {
-            echo '<p style="color:red;">Unable to read postfix mail log file.</p>';
+    if ($mailLogFile !== null) {
+        if (is_readable($mailLogFile)) {
+            $lines = 40;
+            $mlog = file($mailLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+            if ($mlog === false) {
+                echo '<p style="color:red;">Unable to read postfix mail log file: ' . htmlspecialchars($mailLogFile, ENT_QUOTES, 'UTF-8') . '</p>';
+            } else {
+                $tail = array_slice($mlog, -$lines);
+                echo '<pre style="background:#111;color:#fff;padding:10px;border-radius:6px;max-height:300px;overflow:auto;">' . htmlspecialchars(implode("\n", $tail), ENT_QUOTES, 'UTF-8') . '</pre>';
+            }
         } else {
-            $tail = array_slice($mlog, -$lines);
-            echo '<pre style="background:#111;color:#fff;padding:10px;border-radius:6px;max-height:300px;overflow:auto;">' . htmlspecialchars(implode("\n", $tail), ENT_QUOTES, 'UTF-8') . '</pre>';
+            echo '<p style="color:orange;">Postfix mail log exists but is not readable by PHP user (www-data). Try: <code>sudo usermod -aG adm www-data</code> and restart php-fpm. Path: ' . htmlspecialchars($mailLogFile, ENT_QUOTES, 'UTF-8') . '</p>';
+            echo '<pre style="background:#fff;color:#000;padding:10px;border:1px solid #ccc;">' . htmlspecialchars(shell_exec('ls -l ' . escapeshellarg($mailLogFile)), ENT_QUOTES, 'UTF-8') . '</pre>';
         }
     } else {
-        echo '<p style="color:orange;">Postfix mail log file not found or not readable: ' . htmlspecialchars($mailLogFile, ENT_QUOTES, 'UTF-8') . '</p>';
+        echo '<p style="color:orange;">Postfix mail log file not found (checked /var/log/mail.log, /var/log/maillog, /var/log/mail/mail.log).</p>';
     }
 
     return;
