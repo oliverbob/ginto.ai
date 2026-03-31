@@ -1227,7 +1227,7 @@ input[type="file"].form-input { padding: 7px 12px; }
     <script>
     (function () {
         if (!('serviceWorker' in navigator)) return;
-        navigator.serviceWorker.register('/assets/js/mall-push-sw.js', { scope: '/mall/' })
+        navigator.serviceWorker.register('/assets/js/mall-push-sw.js', { scope: '/assets/js/' })
             .then(function (reg) {
                 window._mallSWReg = reg;
             }).catch(function () {});
