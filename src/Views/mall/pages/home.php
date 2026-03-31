@@ -173,13 +173,13 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         <div style="font-size:0.8rem;font-weight:600;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">Your location</div>
 
                         <!-- Current location display -->
-                        <div id="barangayCurrentDisplay" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>margin-bottom:10px;padding:10px 12px;background:var(--primary-bg,#f0f7ff);border:1px solid var(--primary,#3b82f6);border-radius:8px;">
-                            <div style="font-size:0.75rem;color:var(--muted);margin-bottom:2px;">Your current location is:</div>
-                            <div id="barangayCurrentName" style="font-size:0.9rem;font-weight:600;color:var(--text);"><?php
+                        <div id="barangayCurrentDisplay" style="<?= empty($current_barangay) ? 'display:none;' : '' ?>margin-bottom:10px;padding:10px 12px;background:var(--topcard-bg, rgba(15, 23, 42, 0.85));border:1px solid var(--border);border-radius:8px;">
+                            <div style="font-size:0.75rem;color:var(--muted, #e2e8f0);margin-bottom:2px;">Your current location is:</div>
+                            <div id="barangayCurrentName" style="font-size:0.9rem;font-weight:700;color:var(--text, #f8fafc);"><?php
                                 if (!empty($current_barangay)):
                                     echo htmlspecialchars($current_barangay['name'] . ', ' . $current_barangay['city'], ENT_QUOTES, 'UTF-8');
                                 endif; ?></div>
-                            <div id="barangayCurrentProvince" style="font-size:0.78rem;color:var(--muted);"><?php
+                            <div id="barangayCurrentProvince" style="font-size:0.78rem;color:var(--text, #f8fafc);opacity:0.9;"><?php
                                 if (!empty($current_barangay)):
                                     echo htmlspecialchars($current_barangay['province'] ?? '', ENT_QUOTES, 'UTF-8');
                                 endif; ?></div>
