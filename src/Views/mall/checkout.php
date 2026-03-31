@@ -1090,7 +1090,7 @@ body.light .co-qr-spinner {
         <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:calc(100vh - 150px);max-height:calc(100vh - 150px);position:relative;">
             <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="position:absolute;left:12px;right:12px;bottom:72px;margin:0;font-size:0.85rem;color:var(--muted);background:rgba(15,23,42,0.75);padding:8px 10px;border-radius:8px;z-index:11;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div id="locationPickerControls" style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(8,15,27,0.9);padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);z-index:12;">
+            <div id="locationPickerControls" style="position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:rgba(8,15,27,0.9);padding:8px;border-radius:12px;border:1px solid rgba(255,255,255,0.12);z-index:999999;">
                 <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
                 <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Satellite</button>
                 <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Confirm</button>
@@ -1116,6 +1116,7 @@ body.light .co-qr-spinner {
                         left: 12px;
                         right: 12px;
                         padding-bottom: calc(env(safe-area-inset-bottom, 0) + 8px);
+                        z-index: 999999;
                     }
                     #locationPickerModal #locationPickerControls button {
                         height: 48px !important;
