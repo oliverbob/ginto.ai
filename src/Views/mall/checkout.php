@@ -418,12 +418,28 @@ body.light .co-bill-use-home:hover { color:#92650a; }
 textarea.pf-input { resize:vertical; line-height:1.6; }
 .pf-input:-webkit-autofill,
 .pf-input:-webkit-autofill:hover,
-.pf-input:-webkit-autofill:focus {
+.pf-input:-webkit-autofill:focus,
+.pf-input:-webkit-autofill:active {
     -webkit-text-fill-color:var(--pf-autofill-text) !important;
+    color:var(--pf-autofill-text) !important;
+    background-color:var(--pf-autofill-bg) !important;
     -webkit-box-shadow:0 0 0 1000px var(--pf-autofill-bg) inset !important;
     box-shadow:0 0 0 1000px var(--pf-autofill-bg) inset !important;
-    caret-color:var(--pf-autofill-caret);
+    border-color:rgba(214,180,75,0.75) !important;
+    caret-color:var(--pf-autofill-caret) !important;
     transition:background-color 0s, color 0s;
+}
+
+body.light .pf-input:-webkit-autofill,
+body.light .pf-input:-webkit-autofill:hover,
+body.light .pf-input:-webkit-autofill:focus,
+body.light .pf-input:-webkit-autofill:active {
+    -webkit-text-fill-color: #0f172a !important;
+    color: #0f172a !important;
+    background-color: #f8fafc !important;
+    -webkit-box-shadow:0 0 0 1000px #f8fafc inset !important;
+    box-shadow:0 0 0 1000px #f8fafc inset !important;
+    border-color: rgba(148,163,184,0.75) !important;
 }
 .pf-input.field-error {
     border-color:rgba(239,68,68,0.7) !important;
