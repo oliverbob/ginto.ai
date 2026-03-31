@@ -1411,6 +1411,8 @@
     window.checkout         = checkout;
     window.openUploadModal  = openUploadModal;
     window.closeUploadModal = closeUploadModal;
+    window.openBarangayMapModal = openBarangayMapModal;
+    window.closeBarangayMapModal = closeBarangayMapModal;
 
     // ── Barangay GPS selector ─────────────────────────────────────────────
     let _barangayDropdownOpen = false;
