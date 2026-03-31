@@ -1759,7 +1759,7 @@ $router->req('/mail', function() {
         $logFile = __DIR__ . '/../storage/logs/ginto.log';
     }
 
-    echo '<h2 style="margin-top:24px;">Recent log entries</h2>';
+    echo '<h2 style="margin-top:24px;">Recent PHP app log entries</h2>';
     if (is_readable($logFile)) {
         $lines = 30;
         $content = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -1771,6 +1771,26 @@ $router->req('/mail', function() {
         }
     } else {
         echo '<p style="color:orange;">Log file not found or not readable: ' . htmlspecialchars($logFile, ENT_QUOTES, 'UTF-8') . '</p>';
+    }
+
+    // Include postfix mail delivery logs for debugging
+    $mailLogFile = '/var/log/mail.log';
+    if (!is_readable($mailLogFile)) {
+        $mailLogFile = '/var/log/maillog';
+    }
+
+    echo '<h2 style="margin-top:24px;">Recent Postfix mail log entries</h2>';
+    if (is_readable($mailLogFile)) {
+        $lines = 40;
+        $mlog = file($mailLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($mlog === false) {
+            echo '<p style="color:red;">Unable to read postfix mail log file.</p>';
+        } else {
+            $tail = array_slice($mlog, -$lines);
+            echo '<pre style="background:#111;color:#fff;padding:10px;border-radius:6px;max-height:300px;overflow:auto;">' . htmlspecialchars(implode("\n", $tail), ENT_QUOTES, 'UTF-8') . '</pre>';
+        }
+    } else {
+        echo '<p style="color:orange;">Postfix mail log file not found or not readable: ' . htmlspecialchars($mailLogFile, ENT_QUOTES, 'UTF-8') . '</p>';
     }
 
     return;
