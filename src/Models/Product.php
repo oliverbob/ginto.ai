@@ -248,7 +248,7 @@ class Product
                 FROM products p
                 WHERE (
                     -- Non-physical products are exempt from barangay delivery zoning
-                    (p.product_type IS NULL OR p.product_type = '' OR p.product_type NOT IN ('physical', 'liquid'))
+                    (p.product_type IS NULL OR p.product_type = '' OR p.product_type IN ('digital', 'virtual', 'subscription', 'service', 'non-physical') OR p.product_type NOT IN ('physical', 'liquid'))
                     OR
                     -- Physical with custom zones: check product_delivery_zones
                     (p.use_custom_zones = 1 AND EXISTS (
