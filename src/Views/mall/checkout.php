@@ -67,10 +67,38 @@ $savedHome      = $saved_home ?? [];
     background:linear-gradient(155deg,#0d1117 0%,#141a2b 55%,#1b2040 100%);
     border:1px solid rgba(255,255,255,0.1);
     border-radius:28px; width:100%; max-width:420px;
+    max-height: calc(100vh - 40px);
     box-shadow:0 40px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.04);
     animation:coIn 0.3s cubic-bezier(0.34,1.56,0.64,1) both;
-    overflow:hidden;
+    overflow:auto;
     position:relative;
+}
+
+@media (max-height: 800px) {
+    .co-card {
+        max-height: calc(100vh - 30px);
+    }
+    .co-head .co-method-name {
+        font-size:1.2rem;
+    }
+    .co-head .co-sector {
+        font-size:0.65rem;
+    }
+    .co-amount {
+        font-size:1.8rem;
+    }
+    .co-card-box {
+        padding:10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .co-head .co-method-name {
+        font-size:1.1rem;
+    }
+    .co-amount {
+        font-size:1.6rem;
+    }
 }
 .co-close-btn {
     position:absolute; top:14px; right:14px; z-index:2;
