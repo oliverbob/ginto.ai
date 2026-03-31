@@ -1149,15 +1149,14 @@ body.light .co-qr-spinner {
                     }
 
                     #locationPickerModal #locationPickerControls {
-                        position: absolute;
-                        bottom: 24px;
-                        left: auto;
+                        position: fixed;
+                        bottom: 28px;
                         right: 24px;
-                        min-width: 220px;
-                        display: flex;
-                        flex-direction: row;
+                        left: auto;
+                        display: inline-flex;
+                        flex-direction: column;
+                        width: fit-content;
                         align-items: flex-end;
-                        justify-content: flex-end;
                         gap: 8px;
                         padding: 8px;
                         background: transparent;
@@ -1165,6 +1164,10 @@ body.light .co-qr-spinner {
                         box-shadow: none;
                         backdrop-filter: none;
                         border-radius: 0;
+                    }
+
+                    #locationPickerModal #locationPickerControls button {
+                        width: auto !important;
                     }
 
                     #locationPickerModal #locationPickerButtonGroup {
