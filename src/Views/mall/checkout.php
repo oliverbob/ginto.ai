@@ -883,11 +883,7 @@ body.light .co-qr-spinner {
         <!-- Shipping Details -->
         <div class="co-section">
             <div class="co-section-title">Shipping Details</div>
-            <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
-                <button type="button" class="pm-card" style="padding:8px 12px;font-size:0.82rem;" onclick="openShippingAddressModal()">📍 Detect / Auto-fill Address</button>
-                <button type="button" class="pm-card" style="padding:8px 12px;font-size:0.82rem;" onclick="prefillFromSavedAddress()">🏠 Use Saved Address</button>
-            </div>
-            <form id="checkoutShippingForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
+                <form id="checkoutShippingForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
                 <label style="display:flex;flex-direction:column;">
                     <span class="pf-label">Full Name</span>
                     <input id="shipFullName" type="text" class="pf-input" placeholder="Juan Dela Cruz" autocomplete="name">
@@ -1191,24 +1187,6 @@ body.light .co-qr-spinner {
         </div>
         <iframe id="coOtpFrame" class="co-otp-frame" title="PayMongo OTP Verification"></iframe>
         <div id="coOtpFallback" class="co-otp-fallback">Embedded verification may be blocked by browser security headers. Use “Open in new tab”.</div>
-    </div>
-</div>
-
-<!-- Shipping address helper modal -->
-<div id="shippingAddressModal" class="co-overlay" style="display:none;">
-    <div class="co-card co-card-is-open" style="max-width:480px;">
-        <button type="button" class="co-close-btn" onclick="closeShippingAddressModal()">✕</button>
-        <div class="co-head">
-            <div class="co-method-name">Shipping Address Helper</div>
-            <div class="co-sector">Pick your preferred destination address</div>
-        </div>
-        <div class="co-card-box" style="padding:12px;">
-            <button type="button" class="shipping-helper-btn" onclick="detectMyLocation()">📍 Detect my location</button>
-            <button type="button" class="shipping-helper-btn" onclick="prefillFromSavedAddress()">🏠 Use saved delivery address</button>
-            <button type="button" class="shipping-helper-btn" onclick="enterAddressManually()">✏️ Enter address manually</button>
-            <button type="button" class="shipping-helper-btn primary" onclick="saveAsDefaultAddress()">⭐ Save current form as default</button>
-            <p id="shippingAddressModalFeedback" class="shipping-helper-note" style="margin-top:10px;font-size:0.84rem;"></p>
-        </div>
     </div>
 </div>
 
@@ -1773,8 +1751,58 @@ body.light .co-qr-spinner {
     const profileShipping = <?= json_encode($savedShipping) ?>;
     const profileHome = <?= json_encode($savedHome) ?>;
 
+    async function autoDetectLocationForShipping() {
+        if (!navigator.geolocation) {
+            return;
+        }
+        try {
+            const position = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 });
+            });
+            const lat = position.coords.latitude;
+            const lng = position.coords.longitude;
+
+            const res = await fetch('/api/barangay/detect?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng), {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            const data = await res.json();
+            if (data && data.barangay) {
+                const b = data.barangay;
+                if (!document.getElementById('shipAddress1').value) {
+                    document.getElementById('shipAddress1').value = (b.name ? b.name + ', ' : '') + (b.city || '');
+                }
+                if (!document.getElementById('shipCity').value) {
+                    document.getElementById('shipCity').value = b.city || '';
+                }
+                if (!document.getElementById('shipProvince').value) {
+                    document.getElementById('shipProvince').value = b.province || '';
+                }
+                if (!document.getElementById('shipCountry').value) {
+                    document.getElementById('shipCountry').value = 'PH';
+                }
+
+                // Persist location context for session and logged-in user.
+                await fetch('/api/barangay/set', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRF-Token': csrfToken,
+                    },
+                    body: 'barangay_id=' + encodeURIComponent(b.id) + '&lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng),
+                });
+
+                estimateCheckoutFees();
+            }
+        } catch (e) {
+            console.warn('Auto location detect failed', e);
+        }
+    }
+
     // Pre-fill shipping form from saved profile address (only empty fields)
     (function prefillShipping() {
+        autoDetectLocationForShipping();
         const map = {
             shipFullName: profileShipping.full_name,
             shipPhone: profileShipping.phone,
@@ -1815,7 +1843,7 @@ body.light .co-qr-spinner {
                 const shipAddress1 = document.getElementById('shipAddress1')?.value.trim();
                 const shipCity = document.getElementById('shipCity')?.value.trim();
                 if (!shipAddress1 && !shipCity) {
-                    openShippingAddressModal();
+                    // No prefill available yet; user can manually enter address in form.
                 }
             });
     })();
