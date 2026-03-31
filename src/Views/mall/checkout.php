@@ -1066,12 +1066,10 @@ body.light .co-qr-spinner {
         <div class="co-card-box" style="padding:12px;">
             <div id="locationPickerMap" style="width:100%;height:calc(100vh - 220px);border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;justify-content:space-between;">
-                <div style="display:flex;gap:8px;flex:1;min-width:200px;">
-                    <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;">Auto detect GPS</button>
-                    <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;">Satellite View</button>
-                </div>
-                <button id="locationConfirmBtn" class="co-btn-confirm" style="min-width:176px;">Confirm location</button>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;min-width:160px;padding:12px 14px;font-size:0.95rem;font-weight:700;">Auto detect GPS</button>
+                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;min-width:160px;padding:12px 14px;font-size:0.95rem;font-weight:700;">Satellite View</button>
+                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1;min-width:160px;padding:12px 14px;font-size:0.95rem;font-weight:700;">Confirm location</button>
             </div>
         </div>
     </div>
