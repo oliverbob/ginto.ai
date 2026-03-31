@@ -189,6 +189,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             <span>📍</span> <span>Auto-detect my location</span>
                         </button>
                         <input id="barangaySearchInput" type="text" placeholder="Or search barangay manually…"
+                            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                             style="width:100%;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:0.87rem;margin-bottom:8px;box-sizing:border-box;"
                             oninput="searchBarangay(this.value)">
                         <div id="barangayResults" style="max-height:220px;overflow-y:auto;"></div>
