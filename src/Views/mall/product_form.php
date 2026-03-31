@@ -856,7 +856,7 @@ select.pf-input    { cursor: pointer; }
             </div>
         </div>
 
-        <div class="pf-actions">
+<div class="pf-actions" style="position:sticky;bottom:74px;z-index:1200;align-items:center;gap:10px;background:var(--bg);padding:12px 0 12px;border-top:1px solid var(--border);margin-bottom:20px;">
             <button type="submit" class="btn btn-primary" style="padding:11px 28px;font-size:0.92rem">
                 <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
                 <?= $editing ? 'Save Changes' : 'Create Product' ?>
