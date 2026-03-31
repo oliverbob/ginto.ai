@@ -105,6 +105,11 @@
     autoDetectBarangayAndReload();
 
     function ensureMallShellElements() {
+        // Don't render marketplace shell controls on the dedicated checkout page.
+        if (window.location.pathname === '/mall/checkout' || window.location.pathname.startsWith('/mall/checkout')) {
+            return;
+        }
+
         if (!document.getElementById('sidebarBackdrop')) {
             const sidebarBackdrop = document.createElement('div');
             sidebarBackdrop.id = 'sidebarBackdrop';
