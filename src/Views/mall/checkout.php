@@ -1070,6 +1070,7 @@ body.light .co-qr-spinner {
             <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
                 <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1;">Confirm location</button>
                 <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;">Auto detect GPS</button>
+                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;">Satellite View</button>
             </div>
         </div>
     </div>
@@ -1230,9 +1231,13 @@ body.light .co-qr-spinner {
     const locationPickerModal = document.getElementById('locationPickerModal');
     const locationConfirmBtn = document.getElementById('locationConfirmBtn');
     const locationDetectBtn = document.getElementById('locationDetectBtn');
+    const locationToggleSatBtn = document.getElementById('locationToggleSatBtn');
     const locationPickerHint = document.getElementById('locationPickerHint');
     let locationMap = null;
     let locationMarker = null;
+    let baseMapLayer = null;
+    let satelliteMapLayer = null;
+    let isSatellite = false;
     let selectedLocation = null;
     const infoBox = document.getElementById('checkoutInfo');
     const paypalWrap = document.getElementById('paypalButtonsWrap');
@@ -2237,10 +2242,15 @@ body.light .co-qr-spinner {
         if (!locationMap) {
             await loadLeafletAssets();
             locationMap = L.map('locationPickerMap', { zoomControl: true, attributionControl: false }).setView([14.5995, 120.9842], 12);
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            baseMapLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '&copy; OpenStreetMap contributors'
             }).addTo(locationMap);
+            satelliteMapLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                maxZoom: 19,
+                attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye'
+            });
+
             locationMap.on('click', function (e) {
                 if (locationMarker) locationMap.removeLayer(locationMarker);
                 locationMarker = L.marker([e.latlng.lat, e.latlng.lng], { draggable: true }).addTo(locationMap);
@@ -2250,6 +2260,21 @@ body.light .co-qr-spinner {
                     const p = evt.target.getLatLng();
                     selectedLocation = { lat: p.lat, lng: p.lng };
                 });
+            });
+
+            locationToggleSatBtn.addEventListener('click', function () {
+                if (!locationMap) return;
+                if (isSatellite) {
+                    if (satelliteMapLayer) locationMap.removeLayer(satelliteMapLayer);
+                    if (baseMapLayer) baseMapLayer.addTo(locationMap);
+                    locationToggleSatBtn.textContent = 'Satellite View';
+                    isSatellite = false;
+                } else {
+                    if (baseMapLayer) locationMap.removeLayer(baseMapLayer);
+                    if (satelliteMapLayer) satelliteMapLayer.addTo(locationMap);
+                    locationToggleSatBtn.textContent = 'Street View';
+                    isSatellite = true;
+                }
             });
         }
 
