@@ -127,6 +127,64 @@ class BarangayController extends \Core\Controller
             ])->fetchAll(\PDO::FETCH_ASSOC);
 
             if (empty($barangays)) {
+                // Fallback: if no local barangay matches, use geo_places (GeoNames) coverage.
+                if ($this->geoPlacesAvailable()) {
+                    $pdo = $this->db->pdo;
+                    $stmt = $pdo->prepare("SELECT g.geoname_id, g.name, COALESCE(g.admin2_code, '') AS city, COALESCE(g.admin1_code, '') AS province, g.country_code AS region, g.latitude AS lat, g.longitude AS lng, ROUND(6371000 * 2 * ASIN(SQRT(POWER(SIN(RADIANS(:lat - g.latitude) / 2), 2) + COS(RADIANS(g.latitude)) * COS(RADIANS(:lat)) * POWER(SIN(RADIANS(:lng - g.longitude) / 2), 2)))) AS dist_m FROM geo_places g WHERE g.feature_class IN ('A','P') AND g.latitude BETWEEN :lat_min AND :lat_max AND g.longitude BETWEEN :lng_min AND :lng_max ORDER BY dist_m ASC LIMIT 1");
+                    $stmt->bindValue(':lat', $lat);
+                    $stmt->bindValue(':lng', $lng);
+                    $stmt->bindValue(':lat_min', $lat - $radiusKm / 111.0);
+                    $stmt->bindValue(':lat_max', $lat + $radiusKm / 111.0);
+                    $stmt->bindValue(':lng_min', $lng - $radiusKm / (111.0 * cos(deg2rad($lat))));
+                    $stmt->bindValue(':lng_max', $lng + $radiusKm / (111.0 * cos(deg2rad($lat))));
+                    $stmt->execute();
+                    $geoRow = $stmt->fetch(
+                        \PDO::FETCH_ASSOC
+                    );
+
+                    if (!empty($geoRow)) {
+                        $geoId = (int)($geoRow['geoname_id'] ?? 0);
+                        $existing = null;
+                        if ($geoId > 0) {
+                            $existing = $this->db->get('barangays', ['id', 'name', 'city', 'province', 'region', 'lat', 'lng'], [
+                                'geoname_id' => $geoId,
+                                'is_active' => 1
+                            ]);
+                        }
+
+                        if (!$existing) {
+                            $this->db->insert('barangays', [
+                                'geoname_id' => $geoId > 0 ? $geoId : null,
+                                'name'       => $geoRow['name'],
+                                'city'       => $geoRow['city'],
+                                'province'   => $geoRow['province'],
+                                'region'     => $geoRow['region'],
+                                'lat'        => $geoRow['lat'],
+                                'lng'        => $geoRow['lng'],
+                                'radius_m'   => 1500,
+                                'is_active'  => 1,
+                            ]);
+                            $existing = ['id' => (int)$this->db->id()];
+                        }
+
+                        echo json_encode([
+                            'success' => true,
+                            'source' => 'geo',
+                            'barangay' => [
+                                'id' => (int)$existing['id'],
+                                'name' => $geoRow['name'],
+                                'city' => $geoRow['city'],
+                                'province' => $geoRow['province'],
+                                'region' => $geoRow['region'],
+                                'lat' => (float)$geoRow['lat'],
+                                'lng' => (float)$geoRow['lng'],
+                                'dist_m' => (int)$geoRow['dist_m'],
+                            ],
+                        ]);
+                        return;
+                    }
+                }
+
                 echo json_encode(['success' => false, 'barangay' => null, 'message' => 'No barangay found within ' . $radiusKm . ' km', 'source' => 'none']);
                 return;
             }
