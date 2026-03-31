@@ -863,7 +863,7 @@ select.pf-input    { cursor: pointer; }
             </button>
             <a href="<?= $_pBase ?>" class="btn btn-secondary">Cancel</a>
         </div>
-        <div id="footer" style="width:200px;height:200px;visibility:hidden;"></div>
+        <div id="footer" style="width:50px;height:60px;visibility:hidden;"></div>
 
     </form>
 </div>
