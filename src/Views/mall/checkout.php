@@ -1090,10 +1090,12 @@ body.light .co-qr-spinner {
         <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:100%;position:relative;">
             <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:0;border-radius:0;"></div>
             <div id="locationPickerHint" style="position:absolute;left:14px;right:14px;bottom:92px;margin:0;font-size:0.85rem;color:var(--muted);background:rgba(0,0,0,0.6);padding:10px 12px;border-radius:0;z-index:10001;text-align:center;">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div id="locationPickerControls" style="position:absolute;left:0;right:0;bottom:0;display:flex;gap:6px;flex-wrap:wrap;align-items:center;justify-content:space-between;background:rgba(0,0,0,0.58);padding:8px 8px 12px;margin:0;z-index:10002;">
-                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 auto;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(15,23,42,0.6);border:1px solid rgba(255,255,255,0.16);color:var(--text);min-width:90px;">Auto detect</button>
-                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 auto;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.22);color:var(--text);min-width:90px;">Satellite</button>
-                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 100%;height:46px;padding:0 12px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(212,175,55,0.95);border:1px solid rgba(255,255,255,0.2);color:#000;min-width:90px;">Confirm</button>
+            <div id="locationPickerControls" style="position:absolute;left:8px;right:8px;bottom:8px;display:flex;flex-direction:column;gap:6px;background:rgba(0,0,0,0.55);padding:10px;z-index:10002;border-top:1px solid rgba(255,255,255,0.12);">
+                <div style="display:flex;gap:6px;">
+                    <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1;height:44px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(20,24,30,0.65);border:1px solid rgba(255,255,255,0.16);color:var(--text);">Auto detect</button>
+                    <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1;height:44px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(255,255,255,0.8);border:1px solid rgba(255,255,255,0.22);color:var(--text);">Satellite</button>
+                </div>
+                <button id="locationConfirmBtn" class="co-btn-confirm" style="width:100%;height:46px;font-size:0.95rem;font-weight:700;border-radius:0;background:rgba(212,175,55,0.9);border:1px solid rgba(255,255,255,0.22);color:#000;">Confirm</button>
             </div>
             <style>
                 @media (max-width: 768px) {
@@ -2325,6 +2327,14 @@ body.light .co-qr-spinner {
         resetLocationPicker();
         initLocationMap();
     }
+
+    document.querySelectorAll('.co-close-btn').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            closeLocationPicker();
+            closeModal();
+        });
+    });
 
     async function initLocationMap() {
         if (!locationMap) {
