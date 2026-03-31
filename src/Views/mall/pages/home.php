@@ -211,7 +211,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                         <div id="barangayMapContainer" style="height:360px;"></div>
                         <div style="padding:10px 14px;">
                             <p id="barangayMapHint" style="margin:0 0 10px;font-size:0.85rem;color:var(--muted);">Tap on map to pick your location; you may drag marker and press Confirm.</p>
-                            <button onclick="confirmBarangayMapPin()" style="width:100%;padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:#000;font-size:0.88rem;font-weight:700;cursor:pointer;">Confirm location and show products</button>
+                            <button id="coMapConfirm" onclick="confirmBarangayMapPin()" style="width:100%;padding:12px 16px;border-radius:10px;border:none;background:#1F2937;color:#F8FAFC;font-size:0.9rem;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,0.35);">Confirm location and show products</button>
                         </div>
                     </div>
                 </div>

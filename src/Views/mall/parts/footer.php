@@ -1413,6 +1413,7 @@
     window.closeUploadModal = closeUploadModal;
     window.openBarangayMapModal = openBarangayMapModal;
     window.closeBarangayMapModal = closeBarangayMapModal;
+    window.confirmBarangayMapPin = confirmBarangayMapPin;
 
     // ── Barangay GPS selector ─────────────────────────────────────────────
     let _barangayDropdownOpen = false;
