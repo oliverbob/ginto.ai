@@ -1646,7 +1646,7 @@ function escapeJsParam(value) {
     }
 
     let _barangayTypeaheadTimer = null;
-    function handleBarangayMapTypeahead(query) {
+    window.handleBarangayMapTypeahead = function(query) {
         const container = document.getElementById('barangayMapTypeahead');
         if (!container) return;
         if (!query.trim()) {
