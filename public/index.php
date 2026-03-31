@@ -1715,7 +1715,7 @@ $router->req('/mail', function() {
         if (!validateCsrfToken($submittedToken)) {
             echo '<p style="color:red;">Invalid CSRF token.</p>';
         } else {
-            $to = 'oliverbob.lagumen@gmail.com';
+            $to = 'aihqcorp@gmail.com';
             $subject = trim((string)($_POST['subject'] ?? 'Ginto Mail Test')) ?: 'Ginto Mail Test';
             $body = trim((string)($_POST['body'] ?? 'This is a test email from Ginto.'));
             $from = 'no-reply@ginto.ai';
