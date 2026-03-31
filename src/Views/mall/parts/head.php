@@ -478,7 +478,7 @@ body.light .search-overlay { background: rgba(255,255,255,0.98); }
 .main-content {
     flex: 1;
     min-width: 0;
-    padding: 24px 20px;
+    padding: 24px 20px calc(58px + 24px); /* reserve space for bottom nav */
 }
 .main-toolbar {
     display: flex;

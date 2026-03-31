@@ -37,7 +37,7 @@ if (empty($existingImgs) && !empty($p['image_path'])) $existingImgs = [$p['image
 <style>
 .pf-shell {
     max-width: 820px;
-    margin: 32px auto 80px;
+    margin: 32px auto calc(58px + 32px);
     padding: 0 16px;
 }
 .pf-back {
