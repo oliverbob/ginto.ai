@@ -213,6 +213,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             <input id="barangayMapSearchInput" type="search" name="barangayMapSearch" placeholder="Search a place or address"
                                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
                                 onfocus="this.setAttribute('autocomplete','off');"
+                                oninput="window.handleBarangayMapTypeahead?.(this.value);"
                                 style="padding:10px 12px;border:1px solid #94a3b8;border-radius:10px;background:var(--bg, #ffffff);color:var(--text, #0f172a);font-size:0.88rem;outline:none;" />
                             <div id="barangayMapTypeahead" style="position:absolute;top:52px;left:14px;right:80px;max-height:200px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.15);z-index:2500;display:none;"></div>
                             <button onclick="geocodeBarangayMapLocation()" style="position:absolute;top:10px;right:14px;padding:8px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#4250ff,#34d399);color:#042f4a;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(31,41,55,0.4);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease;">Go</button>
