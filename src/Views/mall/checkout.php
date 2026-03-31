@@ -797,8 +797,9 @@ body.light .co-qr-spinner {
     }
     .co-actions {
         position:sticky;
-        bottom:0;
-        padding:8px 16px 12px;
+        bottom:calc(48px + env(safe-area-inset-bottom));
+        z-index: 99;
+        padding:8px 16px calc(12px + env(safe-area-inset-bottom));
         gap:8px;
         background:linear-gradient(180deg,rgba(15,23,42,0), rgba(15,23,42,0.9) 28%, rgba(15,23,42,0.98) 100%);
         backdrop-filter:blur(10px);
