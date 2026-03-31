@@ -22,6 +22,53 @@ class MallController extends \Core\Controller
         }
     }
 
+    /**
+     * Resolve nearest known barangay ID from coordinates (falls back to session if not explicit).
+     * Helps marketplace home and API to ensure seller zone checks are accurate.
+     */
+    private function resolveBarangayFromCoords(float $lat, float $lng, float $radiusKm = 10): ?int
+    {
+        if ($lat < -90 || $lat > 90 || $lng < -180 || $lng > 180) {
+            return null;
+        }
+
+        try {
+            // First attempt: use explicit radius_m if available to improve accuracy.
+            $row = $this->db->query("\n                SELECT id, ROUND(6371000 * 2 * ASIN(SQRT(\n                        POWER(SIN(RADIANS(:lat - lat) / 2), 2) +\n                        COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *\n                        POWER(SIN(RADIANS(:lng - lng) / 2), 2)\n                    ))) AS dist_m, COALESCE(radius_m, 0) AS radius_m\n                FROM barangays\n                WHERE is_active = 1\n                  AND COALESCE(radius_m, 0) > 0\n                  AND lat BETWEEN :lat_min AND :lat_max\n                  AND lng BETWEEN :lng_min AND :lng_max\n                HAVING dist_m <= radius_m\n                ORDER BY dist_m ASC\n                LIMIT 1\n            ", [
+                ':lat'     => $lat,
+                ':lat2'    => $lat,
+                ':lng'     => $lng,
+                ':lat_min' => $lat - $radiusKm / 111.0,
+                ':lat_max' => $lat + $radiusKm / 111.0,
+                ':lng_min' => $lng - $radiusKm / (111.0 * cos(deg2rad($lat))),
+                ':lng_max' => $lng + $radiusKm / (111.0 * cos(deg2rad($lat))),
+            ])->fetch(\PDO::FETCH_ASSOC);
+
+            if (!$row) {
+                // Fallback to nearest barangay if no explicit radius match exists.
+                $row = $this->db->query("\n                    SELECT id, ROUND(6371000 * 2 * ASIN(SQRT(\n                            POWER(SIN(RADIANS(:lat - lat) / 2), 2) +\n                            COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *\n                            POWER(SIN(RADIANS(:lng - lng) / 2), 2)\n                        ))) AS dist_m\n                    FROM barangays\n                    WHERE is_active = 1\n                      AND lat BETWEEN :lat_min AND :lat_max\n                      AND lng BETWEEN :lng_min AND :lng_max\n                    ORDER BY dist_m ASC\n                    LIMIT 1\n                ", [
+                    ':lat'     => $lat,
+                    ':lat2'    => $lat,
+                    ':lng'     => $lng,
+                    ':lat_min' => $lat - $radiusKm / 111.0,
+                    ':lat_max' => $lat + $radiusKm / 111.0,
+                    ':lng_min' => $lng - $radiusKm / (111.0 * cos(deg2rad($lat))),
+                    ':lng_max' => $lng + $radiusKm / (111.0 * cos(deg2rad($lat))),
+                ])->fetch(\PDO::FETCH_ASSOC);
+            }
+
+            if (!$row) return null;
+            if (isset($row['dist_m']) && (float)$row['dist_m'] > ($radiusKm * 1000)) {
+                return null;
+            }
+
+            return (int)$row['id'];
+        } catch (\Throwable $e) {
+            error_log('MallController::resolveBarangayFromCoords error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function marketplace()
     {
         // Resolve buyer's pinned barangay (session > user profile)
@@ -32,6 +79,25 @@ class MallController extends \Core\Controller
             $userRow = $this->db->get('users', ['buyer_barangay_id'], ['id' => $userId]);
             $barangayId = (int)($userRow['buyer_barangay_id'] ?? 0);
             if ($barangayId > 0) {
+                $_SESSION['buyer_barangay_id'] = $barangayId;
+            }
+        }
+
+        // If session barangay is invalid or inactive (e.g. duplicate id 22), fall back to GPS resolve.
+        $barangayRow = null;
+        if ($barangayId > 0) {
+            $barangayRow = $this->db->get('barangays', ['id','is_active','lat','lng'], ['id' => $barangayId]);
+            if (!$barangayRow || empty($barangayRow['is_active'])) {
+                $barangayId = 0;
+                unset($_SESSION['buyer_barangay_id']);
+            }
+        }
+
+        // If user has a saved lat/lng but no valid tagged barangay, resolve nearest within 10km.
+        if ($barangayId <= 0 && !empty($_SESSION['buyer_lat']) && !empty($_SESSION['buyer_lng'])) {
+            $coordsBarangay = $this->resolveBarangayFromCoords((float)$_SESSION['buyer_lat'], (float)$_SESSION['buyer_lng'], 10);
+            if ($coordsBarangay) {
+                $barangayId = $coordsBarangay;
                 $_SESSION['buyer_barangay_id'] = $barangayId;
             }
         }
@@ -320,6 +386,24 @@ class MallController extends \Core\Controller
         // Also accept barangay from session (set by GPS detect or manual selector)
         if (!$barangayId && !empty($_SESSION['buyer_barangay_id'])) {
             $barangayId = (int)$_SESSION['buyer_barangay_id'];
+        }
+
+        // If an id is set but inactive, clear it (e.g., previously active id 22 duplicate)
+        if ($barangayId > 0) {
+            $row = $this->db->get('barangays', ['id','is_active'], ['id' => $barangayId]);
+            if (!$row || empty($row['is_active'])) {
+                $barangayId = 0;
+                unset($_SESSION['buyer_barangay_id']);
+            }
+        }
+
+        // Fallback: if user has GPS coords and no valid barangay, resolve nearest within 10km
+        if (!$barangayId && !empty($_SESSION['buyer_lat']) && !empty($_SESSION['buyer_lng'])) {
+            $coordsBarangay = $this->resolveBarangayFromCoords((float)$_SESSION['buyer_lat'], (float)$_SESSION['buyer_lng'], 10);
+            if ($coordsBarangay) {
+                $barangayId = $coordsBarangay;
+                $_SESSION['buyer_barangay_id'] = $barangayId;
+            }
         }
 
         try {

@@ -64,7 +64,7 @@
     }
 
     async function autoDetectBarangayAndReload() {
-        if (currentBarangayId > 0 || !navigator.geolocation) return;
+        if (!navigator.geolocation) return;
         try {
             const pos = await new Promise((resolve, reject) => {
                 navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 15000, maximumAge: 60000 });
@@ -74,8 +74,28 @@
             });
             const d = await r.json();
             if (d && d.barangay && d.barangay.id) {
+                // If detection chooses nearest and not containment, we may need user confirmation.
+                if (d.source && d.source !== 'containment') {
+                    console.warn('Barangay detected by nearest fallback:', d);
+                }
+
+                // Always update to latest detection even if we already had one.
+                if (currentBarangayId !== d.barangay.id) {
+                    console.info('Updating barangay from', currentBarangayId, 'to', d.barangay.id);
+                }
                 await setCurrentBarangay(d.barangay.id);
+
+                // Update badge/UI to match detected barangay as well.
+                if (typeof _setBarangayPillText === 'function') {
+                    _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
+                }
+                if (typeof _updateCurrentLocationPanel === 'function') {
+                    _updateCurrentLocationPanel(d.barangay, 'gps');
+                }
+
                 refreshSearchResultsFromServer();
+            } else {
+                console.warn('Barangay detect returned no match', d);
             }
         } catch (e) {
             console.warn('Auto detect barangay failed', e);

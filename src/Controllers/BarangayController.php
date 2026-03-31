@@ -52,10 +52,57 @@ class BarangayController extends \Core\Controller
         }
 
         // Clamp search radius – never trust client values
-        $radiusKm = min(50, max(1, (float)($_GET['radius_km'] ?? 20)));
+        // Caller expects nearby pickup within 10km for marketplace autodetect semantics.
+        $radiusKm = min(50, max(1, (float)($_GET['radius_km'] ?? 10)));
 
         try {
             // Haversine distance in metres (MySQL, only need to search nearby rows)
+            // First attempt: prefer barangays that explicitly contain this point using stored radius_m.
+            // This avoids mapping to an adjacent township when location is within master zone boundary.
+            $containRows = $this->db->query("
+                SELECT id, name, city, province, region, lat, lng,
+                       ROUND(6371000 * 2 * ASIN(SQRT(
+                           POWER(SIN(RADIANS(:lat - lat) / 2), 2) +
+                           COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *
+                           POWER(SIN(RADIANS(:lng - lng) / 2), 2)
+                       ))) AS dist_m,
+                       COALESCE(radius_m, 0) AS radius_m
+                FROM barangays
+                WHERE is_active = 1
+                  AND COALESCE(radius_m, 0) > 0
+                  AND lat BETWEEN :lat_min AND :lat_max
+                  AND lng BETWEEN :lng_min AND :lng_max
+                HAVING dist_m <= radius_m
+                ORDER BY dist_m ASC
+                LIMIT 1
+            ", [
+                ':lat'     => $lat,
+                ':lat2'    => $lat,
+                ':lng'     => $lng,
+                ':lat_min' => $lat - $radiusKm / 111.0,
+                ':lat_max' => $lat + $radiusKm / 111.0,
+                ':lng_min' => $lng - $radiusKm / (111.0 * cos(deg2rad($lat))),
+                ':lng_max' => $lng + $radiusKm / (111.0 * cos(deg2rad($lat))),
+            ])->fetchAll(\PDO::FETCH_ASSOC);
+
+            if (!empty($containRows)) {
+                $bar = $containRows[0];
+                echo json_encode([
+                    'success'  => true,
+                    'barangay' => [
+                        'id'       => (int)$bar['id'],
+                        'name'     => $bar['name'],
+                        'city'     => $bar['city'],
+                        'province' => $bar['province'],
+                        'region'   => $bar['region'],
+                        'lat'      => (float)$bar['lat'],
+                        'lng'      => (float)$bar['lng'],
+                        'dist_m'   => (int)$bar['dist_m'],
+                    ],
+                ]);
+                return;
+            }
+
             $barangays = $this->db->query("
                 SELECT id, name, city, province, region, lat, lng,
                        ROUND(6371000 * 2 * ASIN(SQRT(
@@ -80,13 +127,32 @@ class BarangayController extends \Core\Controller
             ])->fetchAll(\PDO::FETCH_ASSOC);
 
             if (empty($barangays)) {
-                echo json_encode(['barangay' => null, 'message' => 'No barangay found within ' . $radiusKm . ' km']);
+                echo json_encode(['success' => false, 'barangay' => null, 'message' => 'No barangay found within ' . $radiusKm . ' km', 'source' => 'none']);
                 return;
             }
 
-            $b = $barangays[0];
+            $contain = array_filter($barangays, function ($b) {
+                return isset($b['radius_m']) && (float)$b['radius_m'] > 0 && isset($b['dist_m']) && (float)$b['dist_m'] <= (float)$b['radius_m'];
+            });
+
+            if (!empty($contain)) {
+                usort($contain, function ($a, $b) {
+                    $da = (float)$a['dist_m']; $db = (float)$b['dist_m'];
+                    if ($da === $db) {
+                        return ((float)$a['radius_m'] <=> (float)$b['radius_m']);
+                    }
+                    return $da <=> $db;
+                });
+                $b = array_shift($contain);
+                $source = 'containment';
+            } else {
+                $b = $barangays[0];
+                $source = 'nearest';
+            }
+
             echo json_encode([
                 'success'  => true,
+                'source'   => $source,
                 'barangay' => [
                     'id'       => (int)$b['id'],
                     'name'     => $b['name'],
@@ -96,6 +162,8 @@ class BarangayController extends \Core\Controller
                     'lat'      => (float)$b['lat'],
                     'lng'      => (float)$b['lng'],
                     'dist_m'   => (int)$b['dist_m'],
+                    'radius_m' => isset($b['radius_m']) ? (int)$b['radius_m'] : null,
+                    'nearby'   => $barangays,
                 ],
             ]);
         } catch (\Throwable $e) {
@@ -1031,6 +1099,7 @@ class BarangayController extends \Core\Controller
         try {
             $rows = $this->db->query("
                 SELECT id, name, city, province, region, lat, lng,
+                       COALESCE(radius_m, 0) AS radius_m,
                        ROUND(6371000 * 2 * ASIN(SQRT(
                            POWER(SIN(RADIANS(:lat - lat) / 2), 2) +
                            COS(RADIANS(lat)) * COS(RADIANS(:lat2)) *
@@ -1052,6 +1121,20 @@ class BarangayController extends \Core\Controller
                 ':lng_max' => $lng + $radiusKm / (111.0 * cos(deg2rad($lat))),
                 ':lim'     => $limit,
             ])->fetchAll(\PDO::FETCH_ASSOC);
+
+            // Prefer barangay zone containment over simple nearest centroid to reduce boundary flips.
+            $derived = [];
+            $contain = [];
+            foreach ($rows as $r) {
+                $derived[] = $r;
+                if (isset($r['radius_m']) && $r['radius_m'] > 0 && isset($r['dist_m']) && (float)$r['dist_m'] <= (float)$r['radius_m']) {
+                    $contain[] = $r;
+                }
+            }
+            if (!empty($contain)) {
+                usort($contain, function ($a, $b) { return $a['dist_m'] <=> $b['dist_m']; });
+                $rows = $contain;
+            }
 
             if (!empty($rows)) {
                 echo json_encode(['barangays' => $rows]);
