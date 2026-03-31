@@ -111,7 +111,7 @@ body.light .co-close-btn:hover { color:#0f172a; }
     background:linear-gradient(180deg, rgba(250,223,136,0.92), rgba(184,134,11,0.96));
     background-clip:padding-box;
 }
-.co-head { padding:20px 22px 10px; text-align:center; position:relative; }
+.co-head { padding:20px 22px 10px; padding-right:60px; text-align:center; position:relative; }
 .co-glow {
     position:absolute; top:0; left:50%; transform:translateX(-50%);
     width:260px; height:130px;
