@@ -799,17 +799,18 @@ body.light .co-qr-spinner {
         position:fixed;
         left:0;
         right:0;
-        bottom:calc(56px + env(safe-area-inset-bottom));
-        z-index: 9999;
+        bottom:calc(70px + env(safe-area-inset-bottom, 0));
+        z-index: 1200;
         margin:0 auto;
         width:100%;
         max-width:760px;
-        padding:8px 16px calc(16px + env(safe-area-inset-bottom));
+        padding:8px 16px calc(16px + env(safe-area-inset-bottom, 0));
         gap:8px;
         background:linear-gradient(180deg,rgba(15,23,42,0), rgba(15,23,42,0.9) 28%, rgba(15,23,42,0.98) 100%);
         backdrop-filter:blur(10px);
         border-top:1px solid rgba(255,255,255,0.1);
     }
+    .checkout-layout { padding-bottom: calc(170px + env(safe-area-inset-bottom, 0)); }
     .co-btn-confirm { padding:11px 16px; }
     .co-btn-cancel { padding:10px 16px; }
     .co-otp-modal {
