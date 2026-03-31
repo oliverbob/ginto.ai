@@ -1163,6 +1163,8 @@ body.light .co-qr-spinner {
                     #locationPickerModal #locationPickerControls button {
                         width: auto;
                         display: inline-block;
+                        min-width: 140px;
+                        text-align: center;
                     }
 
                     #locationPickerModal #locationPickerButtonGroup {
