@@ -1497,8 +1497,8 @@
             return;
         }
 
-        const body = new URLSearchParams({ barangay_id: barangayId, _token: CSRF_TOKEN });
-        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
+        const body = new URLSearchParams({ barangay_id: barangayId, csrf_token: CSRF_TOKEN });
+        fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-Token': CSRF_TOKEN }, body })
             .then(r => r.json())
             .then(function(d) {
                 if (d.success && d.barangay) {
