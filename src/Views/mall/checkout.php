@@ -1067,10 +1067,23 @@ body.light .co-qr-spinner {
             <div id="locationPickerMap" style="width:100%;height:calc(100vh - 220px);border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
             <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
-                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="width:80px;height:80px;padding:0;font-size:0.85rem;font-weight:700;border-radius:8px;">Auto detect</button>
-                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="width:80px;height:80px;padding:0;font-size:0.85rem;font-weight:700;border-radius:8px;">Satellite</button>
-                <button id="locationConfirmBtn" class="co-btn-confirm" style="width:80px;height:80px;padding:0;font-size:0.85rem;font-weight:700;border-radius:8px;">Confirm</button>
+                <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
+                <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Satellite</button>
+                <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Confirm</button>
             </div>
+            <style>
+                @media (max-width: 768px) {
+                    #locationPickerModal .co-card-box > div:nth-child(4) {
+                        display: grid !important;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 8px;
+                    }
+                    #locationPickerModal .co-card-box button {
+                        height: 48px !important;
+                        width: 100% !important;
+                    }
+                }
+            </style>
         </div>
     </div>
 </div>
