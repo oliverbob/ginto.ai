@@ -831,6 +831,32 @@ body.light .co-qr-spinner {
     }
 }
 /* ── Shipping field error highlight ── */
+
+    .shipping-helper-btn {
+        width:100%;
+        margin-bottom:8px;
+        padding:10px;
+        border-radius:10px;
+        border:1px solid var(--border);
+        background: var(--surface2);
+        color: var(--text);
+        font-weight:700;
+        text-align:center;
+        cursor:pointer;
+        transition: background .2s, color .2s, border-color .2s;
+    }
+    .shipping-helper-btn:hover {
+        background: var(--surface3);
+    }
+    .shipping-helper-btn.primary {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+    }
+
+    .shipping-helper-note {
+        color: var(--muted);
+    }
 </style>
 <body>
 <?php include __DIR__ . '/parts/header.php'; ?>
@@ -1177,11 +1203,11 @@ body.light .co-qr-spinner {
             <div class="co-sector">Pick your preferred delivery source</div>
         </div>
         <div class="co-card-box" style="padding:12px;">
-            <button type="button" onclick="detectMyLocation()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">📍 Detect my location</button>
-            <button type="button" onclick="prefillFromSavedAddress()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">🏠 Use saved delivery address</button>
-            <button type="button" onclick="closeShippingAddressModal()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">✏️ Enter address manually</button>
-            <button type="button" onclick="saveAsDefaultAddress()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;">⭐ Save current form as default</button>
-            <p id="shippingAddressModalFeedback" style="margin-top:10px;color:var(--muted);font-size:0.84rem;"></p>
+            <button type="button" class="shipping-helper-btn" onclick="detectMyLocation()">📍 Detect my location</button>
+            <button type="button" class="shipping-helper-btn" onclick="prefillFromSavedAddress()">🏠 Use saved delivery address</button>
+            <button type="button" class="shipping-helper-btn" onclick="closeShippingAddressModal()">✏️ Enter address manually</button>
+            <button type="button" class="shipping-helper-btn primary" onclick="saveAsDefaultAddress()">⭐ Save current form as default</button>
+            <p id="shippingAddressModalFeedback" class="shipping-helper-note" style="margin-top:10px;font-size:0.84rem;"></p>
         </div>
     </div>
 </div>
