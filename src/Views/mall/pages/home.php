@@ -212,6 +212,7 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             <input type="text" autocomplete="off" name="fakeusernameremember" style="position:absolute;opacity:0;pointer-events:none;height:0;width:0;margin:0;padding:0;border:0;" />
                             <input id="barangayMapSearchInput" type="text" placeholder="Search a place or address"
                                 autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                                onfocus="this.setAttribute('autocomplete','off'); this.setAttribute('readonly','true'); setTimeout(()=>{this.removeAttribute('readonly');}, 50);"
                                 oninput="handleBarangayMapTypeahead(this.value)"
                                 style="padding:10px 12px;border:1px solid #94a3b8;border-radius:10px;background:var(--bg, #ffffff);color:var(--text, #0f172a);font-size:0.88rem;outline:none;" />
                             <div id="barangayMapTypeahead" style="position:absolute;top:52px;left:14px;right:80px;max-height:200px;overflow:auto;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,0.15);z-index:2500;display:none;"></div>
