@@ -1087,10 +1087,10 @@ body.light .co-qr-spinner {
             <div class="co-method-name">Pin your current location</div>
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
-        <div class="co-card-box" style="padding:12px;">
-            <div id="locationPickerMap" style="width:100%;height:min(58vh, calc(100vh - 240px));border:1px solid var(--border);border-radius:0;"></div>
+        <div class="co-card-box" style="padding:12px;display:flex;flex-direction:column;height:calc(100vh - 150px);max-height:calc(100vh - 150px);">
+            <div id="locationPickerMap" style="width:100%;flex:1 1 auto;min-height:0;border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
-            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
+            <div id="locationPickerControls" style="position:sticky;bottom:0;display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;background:var(--bg);padding-top:10px;padding-bottom:6px;border-top:1px solid var(--border);z-index:2;">
                 <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
                 <button id="locationToggleSatBtn" type="button" class="co-btn-secondary" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Satellite</button>
                 <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Confirm</button>
@@ -1102,18 +1102,15 @@ body.light .co-qr-spinner {
                         max-height: 100%;
                     }
                     #locationPickerModal .co-card-box {
-                        max-height: calc(100vh - 170px);
-                        overflow-y: auto;
+                        height: calc(100vh - 150px);
                     }
                     #locationPickerModal #locationPickerMap {
-                        height: min(52vh, calc(100vh - 280px));
+                        height: auto;
                     }
-                    #locationPickerModal .co-card-box > div:nth-child(4) {
-                        display: grid !important;
-                        grid-template-columns: repeat(3, 1fr);
-                        gap: 8px;
+                    #locationPickerModal #locationPickerControls {
+                        padding-bottom: calc(env(safe-area-inset-bottom, 0) + 8px);
                     }
-                    #locationPickerModal .co-card-box button {
+                    #locationPickerModal #locationPickerControls button {
                         height: 48px !important;
                         width: 100% !important;
                     }
