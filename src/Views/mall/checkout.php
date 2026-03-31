@@ -1088,7 +1088,7 @@ body.light .co-qr-spinner {
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
         <div class="co-card-box" style="padding:12px;">
-            <div id="locationPickerMap" style="width:100%;height:calc(100vh - 220px);border:1px solid var(--border);border-radius:0;"></div>
+            <div id="locationPickerMap" style="width:100%;height:min(58vh, calc(100vh - 240px));border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
             <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;">
                 <button id="locationDetectBtn" type="button" class="co-btn-cancel" style="flex:1 1 120px;height:48px;padding:0 10px;font-size:0.95rem;font-weight:700;border-radius:8px;min-width:110px;">Auto detect</button>
@@ -1097,6 +1097,17 @@ body.light .co-qr-spinner {
             </div>
             <style>
                 @media (max-width: 768px) {
+                    #locationPickerModal .co-card {
+                        height: 100%;
+                        max-height: 100%;
+                    }
+                    #locationPickerModal .co-card-box {
+                        max-height: calc(100vh - 170px);
+                        overflow-y: auto;
+                    }
+                    #locationPickerModal #locationPickerMap {
+                        height: min(52vh, calc(100vh - 280px));
+                    }
                     #locationPickerModal .co-card-box > div:nth-child(4) {
                         display: grid !important;
                         grid-template-columns: repeat(3, 1fr);
