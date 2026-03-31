@@ -1700,6 +1700,50 @@ $router->req('/marketplace', function() {
     $controller->marketplace();
 });
 
+// Admin-only mail test endpoint
+$router->req('/mail', function() {
+    if (!defined('IS_ADMIN') || !IS_ADMIN) {
+        http_response_code(403);
+        echo '<h1>403 Forbidden</h1><p>Admin access only.</p>';
+        return;
+    }
+
+    $csrfToken = generateCsrfToken();
+
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $submittedToken = $_POST['csrf_token'] ?? '';
+        if (!validateCsrfToken($submittedToken)) {
+            echo '<p style="color:red;">Invalid CSRF token.</p>';
+        } else {
+            $to = 'oliverbob.lagumen@gmail.com';
+            $subject = trim((string)($_POST['subject'] ?? 'Ginto Mail Test')) ?: 'Ginto Mail Test';
+            $body = trim((string)($_POST['body'] ?? 'This is a test email from Ginto.'));
+            $from = 'no-reply@ginto.ai';
+
+            // Ensure from is no-reply regardless of config
+            $_ENV['MAIL_FROM'] = $from;
+            putenv('MAIL_FROM=' . $from);
+
+            $sent = \Ginto\Helpers\MailHelper::send($to, $subject, nl2br(htmlspecialchars($body, ENT_QUOTES, 'UTF-8')),
+                htmlspecialchars($body, ENT_QUOTES, 'UTF-8'));
+            if ($sent) {
+                echo '<p style="color:green;">Email sent to ' . htmlspecialchars($to) . '.</p>';
+            } else {
+                echo '<p style="color:red;">Failed to send email, check mail settings and logs.</p>';
+            }
+        }
+    }
+
+    echo '<h1>Admin Mail Test</h1>';
+    echo '<form method="POST" action="/mail">';
+    echo '<input type="hidden" name="csrf_token" value="' . htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') . '">';
+    echo '<label>Subject:<br><input type="text" name="subject" value="Ginto Mail Test" style="width:100%;max-width:500px;"></label><br><br>';
+    echo '<label>Body:<br><textarea name="body" rows="6" style="width:100%;max-width:500px;">This is a test email from Ginto.</textarea></label><br><br>';
+    echo '<button type="submit" style="padding:10px 14px;">Send Test Email</button>';
+    echo '</form>';
+    return;
+});
+
 // /mall is an alias for /marketplace
 $router->req('/mall', function() {
     header('Location: /marketplace', true, 301); exit;
