@@ -1250,6 +1250,131 @@ class MallCommerceService
         ];
     }
 
+    public function estimateCheckoutFees(int $buyerId, array $cart, array $shipping, string $paymentMethod = 'ginto_pay_qr'): array
+    {
+        if (empty($cart)) {
+            return [
+                'subtotal' => 0.00,
+                'platform_fee' => 0.00,
+                'fixed_fee' => self::SELLER_PROCESSING_COST_PHP,
+                'processing_fee' => self::CHECKOUT_PROCESSING_FEE_PHP,
+                'shipping_fee' => 0.00,
+                'delivery_fee' => 0.00,
+                'total' => self::SELLER_PROCESSING_COST_PHP + self::CHECKOUT_PROCESSING_FEE_PHP,
+            ];
+        }
+
+        $productIds = [];
+        $qtyById = [];
+        foreach ($cart as $item) {
+            $productId = (int)($item['id'] ?? 0);
+            $qty = max(1, (int)($item['qty'] ?? $item['quantity'] ?? 1));
+            if ($productId <= 0) {
+                continue;
+            }
+            $productIds[] = $productId;
+            $qtyById[$productId] = $qty;
+        }
+        $productIds = array_values(array_unique($productIds));
+        if (empty($productIds)) {
+            throw new \RuntimeException('No valid products were found in your cart.');
+        }
+
+        $products = $this->db->select('products', '*', ['id' => $productIds]) ?: [];
+        if (count($products) !== count($productIds)) {
+            throw new \RuntimeException('One or more products are no longer available.');
+        }
+
+        $currency = null;
+        $grouped = [];
+        foreach ($products as $product) {
+            if (($product['status'] ?? '') !== 'published' || (int)($product['is_visible'] ?? 0) !== 1) {
+                throw new \RuntimeException('One or more products are no longer published.');
+            }
+            $productCurrency = (string)($product['currency'] ?? 'PHP');
+            if ($currency === null) {
+                $currency = $productCurrency;
+            }
+            if ($currency !== $productCurrency) {
+                throw new \RuntimeException('Mixed-currency carts are not supported yet. Please checkout one currency at a time.');
+            }
+
+            $quantity = $qtyById[(int)$product['id']] ?? 1;
+            $pricing = $this->calculatePricing($product, $quantity);
+            $sellerId = (int)$product['seller_id'];
+            $storefront = $this->ensureStorefront($sellerId);
+            if (!isset($grouped[$sellerId])) {
+                $grouped[$sellerId] = [
+                    'seller_id' => $sellerId,
+                    'items' => [],
+                    'subtotal' => 0.00,
+                    'platform_fee' => 0.00,
+                    'seller_net' => 0.00,
+                    'buyer_total' => 0.00,
+                    'shipping_fee' => 0.00,
+                    'delivery_fee' => 0.00,
+                ];
+            }
+
+            $grouped[$sellerId]['items'][] = $pricing;
+            $grouped[$sellerId]['subtotal'] += $pricing['line_subtotal'];
+            $grouped[$sellerId]['platform_fee'] += $pricing['platform_fee_amount'];
+            $grouped[$sellerId]['seller_net'] += $pricing['seller_net_amount'];
+            $grouped[$sellerId]['buyer_total'] += $pricing['line_subtotal'];
+        }
+
+        $sanitizedShipping = $this->sanitizeShipping($shipping);
+        $buyerBarangayId = !empty($_SESSION['buyer_barangay_id']) ? (int)$_SESSION['buyer_barangay_id'] : null;
+        if (!$buyerBarangayId) {
+            $buyerBarangayId = $this->inferBuyerBarangayIdFromShipping($sanitizedShipping);
+            if ($buyerBarangayId) {
+                $_SESSION['buyer_barangay_id'] = $buyerBarangayId;
+            }
+        }
+
+        $shippingCalc = new ShippingCalculator();
+        $buyerZone = ShippingCalculator::inferZone(
+            (string)($sanitizedShipping['province'] ?? ''),
+            (string)($sanitizedShipping['city'] ?? '')
+        );
+
+        $totalShipping = 0.00;
+        $totalDelivery = 0.00;
+        foreach ($grouped as $sellerId => &$group) {
+            $shippingResult = $shippingCalc->estimate(
+                $group['items'],
+                $buyerZone,
+                ShippingCalculator::DIVISOR_SAFE,
+                false
+            );
+            $group['shipping_fee'] = $shippingResult['estimated_fee'];
+            $group['delivery_fee'] = $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $group['items'], $group['subtotal']);
+            $group['buyer_total'] += $group['shipping_fee'] + $group['delivery_fee'];
+            $group['seller_net'] = round($group['seller_net'] - self::SELLER_PROCESSING_COST_PHP, 2);
+            $group['platform_fee'] = round($group['platform_fee'] + self::SELLER_PROCESSING_COST_PHP, 2);
+            $group['buyer_total'] += $group['platform_fee'];
+
+            $totalShipping += $group['shipping_fee'];
+            $totalDelivery += $group['delivery_fee'];
+        }
+        unset($group);
+
+        $subtotal = array_sum(array_column($grouped, 'subtotal'));
+        $platformFee = array_sum(array_column($grouped, 'platform_fee'));
+        $processingFee = $this->calculateProcessingFee($paymentMethod, $subtotal) + self::CHECKOUT_PROCESSING_FEE_PHP;
+        $total = $subtotal + $totalShipping + $totalDelivery + $platformFee + $processingFee;
+
+        return [
+            'subtotal' => round($subtotal,2),
+            'shipping_fee' => round($totalShipping,2),
+            'delivery_fee' => round($totalDelivery,2),
+            'platform_fee' => round($platformFee,2),
+            'processing_fee' => round($processingFee,2),
+            'total' => round($total,2),
+            'currency' => $currency ?: 'PHP',
+        ];
+    }
+
     private function calculatePricing(array $product, int $quantity): array
     {
         // New item pricing model: customer sees listed item price; platform takes 8% of item value.

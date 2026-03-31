@@ -1349,6 +1349,28 @@ body.light .co-qr-spinner {
         // Min order notice
         const minNotice = document.getElementById('coMinOrderNotice');
         if (minNotice) minNotice.style.display = (summary.total < 50 && summary.cart.length) ? '' : 'none';
+
+        // Estimated fees using backend algorithm
+        estimateCheckoutFees();
+    }
+
+    async function estimateCheckoutFees() {
+        const summary = cartSummary();
+        if (!summary.cart.length) return;
+        try {
+            const response = await api('/api/mall/checkout/estimate', {
+                payment_method: selectedMethod,
+                cart: summary.cart,
+                shipping: shippingPayload(),
+            });
+            if (checkoutShippingFee) checkoutShippingFee.textContent = formatPrice(response.shipping_fee, response.currency);
+            if (checkoutDeliveryFee) checkoutDeliveryFee.textContent = formatPrice(response.delivery_fee, response.currency);
+            if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(response.platform_fee, response.currency);
+            if (checkoutProcessingFee) checkoutProcessingFee.textContent = formatPrice(response.processing_fee, response.currency);
+            if (checkoutTotal) checkoutTotal.textContent = formatPrice(response.total, response.currency);
+        } catch (err) {
+            console.warn('Could not estimate checkout fees:', err);
+        }
     }
 
     function updateShippingFromSession(session) {

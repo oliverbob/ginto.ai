@@ -409,6 +409,25 @@ class MallCheckoutController extends Controller
         }
     }
 
+    public function checkoutEstimate()
+    {
+        $userId = $this->requireUserJson();
+        $this->requirePostJson();
+        $this->validateCsrfFromPayload($this->jsonInput());
+
+        $input = $this->jsonInput();
+        $cart = is_array($input['cart'] ?? null) ? $input['cart'] : [];
+        $shipping = is_array($input['shipping'] ?? null) ? $input['shipping'] : [];
+        $paymentMethod = (string)($input['payment_method'] ?? 'ginto_pay_qr');
+
+        try {
+            $estimate = $this->commerce->estimateCheckoutFees($userId, $cart, $shipping, $paymentMethod);
+            $this->json(['success' => true] + $estimate);
+        } catch (\Throwable $e) {
+            $this->jsonError($e->getMessage(), 422);
+        }
+    }
+
     public function checkoutPaymongoQrInit()
     {
         $userId = $this->requireUserJson();
