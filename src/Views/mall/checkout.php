@@ -796,13 +796,19 @@ body.light .co-qr-spinner {
         padding:10px 10px;
     }
     .co-actions {
-        position:sticky;
-        bottom:calc(48px + env(safe-area-inset-bottom));
-        z-index: 99;
-        padding:8px 16px calc(12px + env(safe-area-inset-bottom));
+        position:fixed;
+        left:0;
+        right:0;
+        bottom:calc(56px + env(safe-area-inset-bottom));
+        z-index: 9999;
+        margin:0 auto;
+        width:100%;
+        max-width:760px;
+        padding:8px 16px calc(16px + env(safe-area-inset-bottom));
         gap:8px;
         background:linear-gradient(180deg,rgba(15,23,42,0), rgba(15,23,42,0.9) 28%, rgba(15,23,42,0.98) 100%);
         backdrop-filter:blur(10px);
+        border-top:1px solid rgba(255,255,255,0.1);
     }
     .co-btn-confirm { padding:11px 16px; }
     .co-btn-cancel { padding:10px 16px; }
