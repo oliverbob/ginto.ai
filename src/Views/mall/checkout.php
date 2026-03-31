@@ -1793,16 +1793,16 @@ body.light .co-qr-spinner {
             });
     })();
 
-    function openShippingAddressModal() {
+    window.openShippingAddressModal = function() {
         document.getElementById('shippingAddressModal').style.display = 'flex';
         document.getElementById('shippingAddressModalFeedback').textContent = 'Choose one of the options to auto-fill your address and estimate shipping.';
-    }
+    };
 
-    function closeShippingAddressModal() {
+    window.closeShippingAddressModal = function() {
         document.getElementById('shippingAddressModal').style.display = 'none';
-    }
+    };
 
-    async function detectMyLocation() {
+    window.detectMyLocation = async function() {
         const feedback = document.getElementById('shippingAddressModalFeedback');
         feedback.textContent = 'Detecting your current location...';
         if (!navigator.geolocation) {
@@ -1850,7 +1850,7 @@ body.light .co-qr-spinner {
         }, { timeout: 15000, maximumAge: 60000 });
     }
 
-    async function prefillFromSavedAddress() {
+    window.prefillFromSavedAddress = async function() {
         const feedback = document.getElementById('shippingAddressModalFeedback');
         feedback.textContent = 'Loading saved address...';
         try {
@@ -1880,7 +1880,7 @@ body.light .co-qr-spinner {
         }
     }
 
-    async function saveAsDefaultAddress() {
+    window.saveAsDefaultAddress = async function() {
         const feedback = document.getElementById('shippingAddressModalFeedback');
         const payload = shippingPayload();
 
