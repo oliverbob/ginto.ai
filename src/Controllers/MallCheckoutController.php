@@ -912,6 +912,8 @@ class MallCheckoutController extends Controller
         }
         unset($o);
 
+        $savedShippingAddress = $this->db->get('buyer_saved_addresses', '*', ['user_id' => $userId, 'is_default' => 1]) ?: null;
+
         $this->view('mall/me', [
             'title' => 'Me — Ginto Mall',
             'csrf_token' => generateCsrfToken(),
@@ -921,6 +923,7 @@ class MallCheckoutController extends Controller
             'mall_unread_notifications' => $this->commerce->getMallUnreadNotificationCount($userId),
             'mall_notifications' => $this->commerce->getMallNotifications($userId),
             'mall_wallet_balance' => (float)($walletSummary['account']['balance'] ?? 0),
+            'saved_shipping_address' => $savedShippingAddress,
         ]);
     }
 

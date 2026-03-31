@@ -56,6 +56,21 @@ $unread = $mall_unread_notifications ?? 0;
     <h1 style="font-size:1.5rem;margin-bottom:4px;">👤 Me</h1>
     <p style="color:var(--muted);margin-bottom:20px;">Your deliveries, orders & shipment tracking</p>
 
+    <div class="me-section" style="margin-bottom:24px;padding:14px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);">
+        <div class="me-section-title">🚚 Default Shipping Address</div>
+        <?php if (!empty($saved_shipping_address)): ?>
+            <div style="font-size:.9rem;line-height:1.5;color:var(--text);">
+                <strong><?= htmlspecialchars((string)($saved_shipping_address['full_name'] ?? '')) ?></strong><br>
+                <?= htmlspecialchars((string)($saved_shipping_address['address_line1'] ?? '')) ?><?= $saved_shipping_address['address_line2'] ? ', ' . htmlspecialchars((string)$saved_shipping_address['address_line2']) : '' ?><br>
+                <?= htmlspecialchars((string)($saved_shipping_address['city'] ?? '')) ?>, <?= htmlspecialchars((string)($saved_shipping_address['province'] ?? '')) ?> <?= htmlspecialchars((string)($saved_shipping_address['postal_code'] ?? '')) ?><br>
+                <?= htmlspecialchars((string)($saved_shipping_address['country'] ?? '')) ?><br>
+                📞 <?= htmlspecialchars((string)($saved_shipping_address['phone'] ?? '')) ?>
+            </div>
+        <?php else: ?>
+            <p style="color:var(--muted);margin:0;">No saved default address yet. Set it in Checkout to autofil future orders.</p>
+        <?php endif; ?>
+    </div>
+
     <!-- Tabs -->
     <div class="me-tabs">
         <div class="me-tab active" data-tab="my-orders">🛒 My Orders</div>

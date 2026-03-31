@@ -1294,6 +1294,7 @@ $router->req('/api/mall/notifications', 'MallCheckoutController@notificationsApi
 $router->req('/api/mall/notifications/mark-read', 'MallCheckoutController@notificationsMarkRead', ['POST']);
 $router->req('/api/mall/notifications/mark-read-app', 'MallCheckoutController@notificationsMarkReadApp', ['POST']);
 $router->req('/api/mall/checkout/create', 'MallCheckoutController@checkoutCreate', ['POST']);
+$router->req('/api/mall/checkout/estimate', 'MallCheckoutController@checkoutEstimate', ['POST']);
 $router->req('/api/mall/checkout/paymongo/qr/init', 'MallCheckoutController@checkoutPaymongoQrInit', ['POST']);
 $router->req('/api/mall/checkout/paymongo/card/init', 'MallCheckoutController@checkoutPaymongoCardInit', ['POST']);
 $router->req('/api/mall/checkout/paymongo-qr-init', 'MallCheckoutController@checkoutPaymongoQrInit', ['POST']);
@@ -1345,6 +1346,7 @@ $router->req('/api/barangay/seller/zones/save',    'BarangayController@saveSelle
 $router->req('/api/barangay/product/zones',        'BarangayController@productZones',    ['GET']);
 $router->req('/api/barangay/product/zones/save',   'BarangayController@saveProductZones',['POST']);
 $router->req('/api/barangay/buyer/saved-address',  'BarangayController@buyerSavedAddress',['GET']);
+$router->req('/api/barangay/buyer/save-address',   'BarangayController@buyerSaveAddress',['POST']);
 $router->req('/api/barangay/runner/register',      'BarangayController@runnerRegister',  ['POST']);
 $router->req('/api/barangay/runners',              'BarangayController@listRunners',     ['GET']);
 $router->req('/api/barangay/nearby',               'BarangayController@nearby',          ['GET']);

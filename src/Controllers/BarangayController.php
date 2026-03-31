@@ -831,7 +831,77 @@ class BarangayController extends \Core\Controller
         }
 
         $addr = $this->db->get('buyer_saved_addresses', '*', ['user_id' => $userId, 'is_default' => 1]);
+        if (!$addr) {
+            $user = $this->db->get('users', ['shipping_address_json'], ['id' => $userId]);
+            if (!empty($user['shipping_address_json'])) {
+                $decoded = json_decode((string)$user['shipping_address_json'], true);
+                if (is_array($decoded) && !empty($decoded['full_name'])) {
+                    $addr = $decoded;
+                }
+            }
+        }
         echo json_encode(['address' => $addr ?: null]);
+    }
+
+    // ── POST /api/barangay/buyer/save-address ─────────────────────────────────
+    public function buyerSaveAddress(): void
+    {
+        header('Content-Type: application/json');
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['success' => false, 'error' => 'POST required']);
+            return;
+        }
+
+        $userId = !empty($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Login required']);
+            return;
+        }
+
+        $input = $_POST;
+        if (empty($input) && ($rawInput = file_get_contents('php://input'))) {
+            $decoded = json_decode($rawInput, true);
+            if (is_array($decoded)) {
+                $input = $decoded;
+            }
+        }
+
+        $required = ['full_name', 'phone', 'address_line1', 'city', 'province', 'postal_code', 'country'];
+        $errors = [];
+        foreach ($required as $field) {
+            if (empty(trim((string)($input[$field] ?? '')))) {
+                $errors[] = $field;
+            }
+        }
+
+        if (!empty($errors)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing required fields for address', 'fields' => $errors]);
+            return;
+        }
+
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $commerce->saveBuyerAddress($userId, [
+                'full_name' => trim((string)($input['full_name'] ?? '')),
+                'phone' => trim((string)($input['phone'] ?? '')),
+                'address_line1' => trim((string)($input['address_line1'] ?? '')),
+                'address_line2' => trim((string)($input['address_line2'] ?? '')),
+                'city' => trim((string)($input['city'] ?? '')),
+                'province' => trim((string)($input['province'] ?? '')),
+                'postal_code' => trim((string)($input['postal_code'] ?? '')),
+                'country' => trim((string)($input['country'] ?? '')),
+            ], (string)($input['payment_method'] ?? 'web'));
+
+            echo json_encode(['success' => true]);
+            return;
+        } catch (\Throwable $e) {
+            error_log('BarangayController::buyerSaveAddress error: ' . $e->getMessage());
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Could not save address']);
+        }
     }
 
     // ── POST /api/barangay/runner/register ─────────────────────────────────

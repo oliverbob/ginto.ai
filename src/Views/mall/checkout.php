@@ -857,6 +857,10 @@ body.light .co-qr-spinner {
         <!-- Shipping Details -->
         <div class="co-section">
             <div class="co-section-title">Shipping Details</div>
+            <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="pm-card" style="padding:8px 12px;font-size:0.82rem;" onclick="openShippingAddressModal()">📍 Detect / Auto-fill Address</button>
+                <button type="button" class="pm-card" style="padding:8px 12px;font-size:0.82rem;" onclick="prefillFromSavedAddress()">🏠 Use Saved Address</button>
+            </div>
             <form id="checkoutShippingForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
                 <label style="display:flex;flex-direction:column;">
                     <span class="pf-label">Full Name</span>
@@ -1161,6 +1165,23 @@ body.light .co-qr-spinner {
         </div>
         <iframe id="coOtpFrame" class="co-otp-frame" title="PayMongo OTP Verification"></iframe>
         <div id="coOtpFallback" class="co-otp-fallback">Embedded verification may be blocked by browser security headers. Use “Open in new tab”.</div>
+    </div>
+</div>
+
+<!-- Shipping address helper modal -->
+<div id="shippingAddressModal" class="co-overlay" style="display:none;">
+    <div class="co-card co-card-is-open" style="max-width:480px;">
+        <button type="button" class="co-close-btn" onclick="closeShippingAddressModal()">✕</button>
+        <div class="co-head">
+            <div class="co-method-name">Shipping Address Helper</div>
+            <div class="co-sector">Pick your preferred delivery source</div>
+        </div>
+        <div class="co-card-box" style="padding:12px;">
+            <button type="button" onclick="detectMyLocation()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">📍 Detect my location</button>
+            <button type="button" onclick="prefillFromSavedAddress()" style="width:100%;margin-bottom:8px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);">🏠 Use saved delivery address</button>
+            <button type="button" onclick="saveAsDefaultAddress()" style="width:100%;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--accent);color:#fff;">⭐ Save current form as default</button>
+            <p id="shippingAddressModalFeedback" style="margin-top:10px;color:var(--muted);font-size:0.84rem;"></p>
+        </div>
     </div>
 </div>
 
@@ -1763,8 +1784,134 @@ body.light .co-qr-spinner {
                     var el = document.getElementById(id);
                     if (el) el.value = m2[id];
                 });
-            }).catch(function(){});
+            }).catch(function(){}).finally(function(){
+                const shipAddress1 = document.getElementById('shipAddress1')?.value.trim();
+                const shipCity = document.getElementById('shipCity')?.value.trim();
+                if (!shipAddress1 && !shipCity) {
+                    openShippingAddressModal();
+                }
+            });
     })();
+
+    function openShippingAddressModal() {
+        document.getElementById('shippingAddressModal').style.display = 'flex';
+        document.getElementById('shippingAddressModalFeedback').textContent = 'Choose one of the options to auto-fill your address and estimate shipping.';
+    }
+
+    function closeShippingAddressModal() {
+        document.getElementById('shippingAddressModal').style.display = 'none';
+    }
+
+    async function detectMyLocation() {
+        const feedback = document.getElementById('shippingAddressModalFeedback');
+        feedback.textContent = 'Detecting your current location...';
+        if (!navigator.geolocation) {
+            feedback.textContent = 'Geolocation is not available in this browser.';
+            return;
+        }
+
+        navigator.geolocation.getCurrentPosition(async function (pos) {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            try {
+                const response = await fetch('/api/barangay/detect?lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng), {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                });
+                const data = await response.json();
+                if (data && data.barangay) {
+                    const b = data.barangay;
+                    document.getElementById('shipCity').value = b.city || b.name || '';
+                    document.getElementById('shipProvince').value = b.province || '';
+                    document.getElementById('shipAddress1').value = b.name ? b.name + ', ' + (b.city || '') : '';
+
+                    // pin barangay for this session and persisting for logged-in buyers too
+                    await fetch('/api/barangay/set', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                            'X-CSRF-Token': csrfToken,
+                        },
+                        body: 'barangay_id=' + encodeURIComponent(b.id) + '&lat=' + encodeURIComponent(lat) + '&lng=' + encodeURIComponent(lng),
+                    });
+
+                    feedback.textContent = 'Location detected: ' + (b.name || 'Unknown barangay') + '. You may now save as default or continue.';
+                    estimateCheckoutFees();
+                } else {
+                    feedback.textContent = 'Could not determine barangay from your location.';
+                }
+            } catch (err) {
+                console.warn('Error detecting location', err);
+                feedback.textContent = 'Failed to detect location. Please try again.';
+            }
+        }, function (err) {
+            feedback.textContent = 'Geolocation denied or unavailable: ' + (err.message || '');
+        }, { timeout: 15000, maximumAge: 60000 });
+    }
+
+    async function prefillFromSavedAddress() {
+        const feedback = document.getElementById('shippingAddressModalFeedback');
+        feedback.textContent = 'Loading saved address...';
+        try {
+            const response = await fetch('/api/barangay/buyer/saved-address', {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json' },
+            });
+            const data = await response.json();
+            if (!data.address) {
+                feedback.textContent = 'No saved address found. Please enter one in the form and save as default.';
+                return;
+            }
+            const a = data.address;
+            document.getElementById('shipFullName').value = a.full_name || '';
+            document.getElementById('shipPhone').value = a.phone || '';
+            document.getElementById('shipAddress1').value = a.address_line1 || '';
+            document.getElementById('shipAddress2').value = a.address_line2 || '';
+            document.getElementById('shipCity').value = a.city || '';
+            document.getElementById('shipProvince').value = a.province || '';
+            document.getElementById('shipPostalCode').value = a.postal_code || '';
+            document.getElementById('shipCountry').value = a.country || 'PH';
+            feedback.textContent = 'Loaded saved default address. Close the modal to continue.';
+            estimateCheckoutFees();
+        } catch (err) {
+            console.warn('Could not load saved address', err);
+            feedback.textContent = 'Failed to load saved address. Please try again.';
+        }
+    }
+
+    async function saveAsDefaultAddress() {
+        const feedback = document.getElementById('shippingAddressModalFeedback');
+        const payload = shippingPayload();
+
+        // require at least minimal fields
+        if (!payload.full_name || !payload.address_line1 || !payload.city || !payload.province) {
+            feedback.textContent = 'Please fill in your shipping form first and then press Save as default.';
+            return;
+        }
+
+        feedback.textContent = 'Saving default address...';
+        try {
+            const res = await fetch('/api/barangay/buyer/save-address', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-Token': csrfToken,
+                },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json();
+            if (data.success) {
+                feedback.textContent = 'Address saved as default. Close this modal and continue checkout.';
+            } else {
+                feedback.textContent = 'Could not save address: ' + (data.error || 'Unknown error');
+            }
+        } catch (err) {
+            console.warn('Could not save default address', err);
+            feedback.textContent = 'Failed to save address. Please try again.';
+        }
+    }
 
     function billingPayloadFromShipping() {
         const sameAsShip = document.getElementById('coCardSameAsShip');
