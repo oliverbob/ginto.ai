@@ -1469,7 +1469,33 @@
     }
 
     function selectBarangay(id) {
-        const body = new URLSearchParams({ barangay_id: id, _token: CSRF_TOKEN });
+        // Handle geo_places fallback entries from search (id = 'geo_<geoname_id>').
+        if (typeof id === 'string' && id.startsWith('geo_')) {
+            const geonameId = parseInt(id.replace('geo_', ''), 10);
+            if (!geonameId) return;
+            const body = new URLSearchParams({ geoname_id: geonameId, csrf_token: CSRF_TOKEN });
+            fetch('/api/barangay/register-geo', { method: 'POST', body })
+                .then(r => r.json())
+                .then(function(d) {
+                    if (d.success && d.barangay && d.barangay.id) {
+                        selectBarangay(d.barangay.id);
+                    } else {
+                        console.warn('Failed to register geo barangay for', id, d);
+                    }
+                })
+                .catch(function(e) {
+                    console.warn('register-geo error', e);
+                });
+            return;
+        }
+
+        const barangayId = Number(id);
+        if (!barangayId || barangayId <= 0) {
+            console.warn('Invalid barangay id selected:', id);
+            return;
+        }
+
+        const body = new URLSearchParams({ barangay_id: barangayId, _token: CSRF_TOKEN });
         fetch('/api/barangay/set', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })
             .then(r => r.json())
             .then(function(d) {
