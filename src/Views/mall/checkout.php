@@ -1057,15 +1057,14 @@ body.light .co-qr-spinner {
 </section>
 
 <!-- ── Checkout Confirmation Modal ── -->
-<div id="locationPickerModal" class="co-overlay" style="display:none;" aria-modal="true" role="dialog" aria-label="Pin your location">
-    <div class="co-card co-card-is-open" style="max-width:520px;">
-        <button type="button" class="co-close-btn" aria-label="Close" onclick="closeLocationPicker()">✕</button>
+<div id="locationPickerModal" class="co-overlay" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.75);" aria-modal="true" role="dialog" aria-label="Pin your location">
+    <div class="co-card co-card-is-open" style="max-width:100%;width:100%;height:100%;border-radius:0;overflow:hidden;">        <button type="button" class="co-close-btn" aria-label="Close" onclick="closeLocationPicker()">✕</button>
         <div class="co-head">
             <div class="co-method-name">Pin your current location</div>
             <div class="co-sector">We need a precise location to estimate shipping cost correctly.</div>
         </div>
         <div class="co-card-box" style="padding:12px;">
-            <div id="locationPickerMap" style="width:100%;height:280px;border:1px solid var(--border);border-radius:12px;"></div>
+            <div id="locationPickerMap" style="width:100%;height:calc(100vh - 220px);border:1px solid var(--border);border-radius:0;"></div>
             <div id="locationPickerHint" style="margin-top:10px;font-size:0.85rem;color:var(--muted);">Click on the map to pin your location, or use GPS auto-detect.</div>
             <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
                 <button id="locationConfirmBtn" class="co-btn-confirm" style="flex:1;">Confirm location</button>
