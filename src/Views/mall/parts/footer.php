@@ -1624,6 +1624,56 @@ function escapeJsParam(value) {
             });
     }
 
+    let _barangayTypeaheadTimer = null;
+    function handleBarangayMapTypeahead(query) {
+        const container = document.getElementById('barangayMapTypeahead');
+        if (!container) return;
+        if (!query.trim()) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+        clearTimeout(_barangayTypeaheadTimer);
+        _barangayTypeaheadTimer = setTimeout(function () {
+            fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(query), {
+                headers: { 'Accept': 'application/json' }
+            })
+            .then(r => r.json())
+            .then(function(results) {
+                if (!results || !results.length) {
+                    container.style.display = 'none';
+                    container.innerHTML = '';
+                    return;
+                }
+                container.innerHTML = results.map(function(item) {
+                    const label = item.display_name;
+                    return '<div class="barangay-typeahead-item" style="padding:8px 10px;cursor:pointer;color:var(--text,#0f172a);font-size:0.85rem;border-bottom:1px solid var(--border,#cbd5e1);">' +
+                        label + '</div>';
+                }).join('');
+                container.style.display = 'block';
+
+                Array.from(container.children).forEach(function(el, idx) {
+                    el.addEventListener('click', function() {
+                        const selected = results[idx];
+                        if (!selected) return;
+                        const input = document.getElementById('barangayMapSearchInput');
+                        input.value = selected.display_name;
+                        container.style.display = 'none';
+                        if (_barangayMap && selected.lat && selected.lon) {
+                            _barangayMap.setView([parseFloat(selected.lat), parseFloat(selected.lon)], 14);
+                            window._barangayAddMarker && window._barangayAddMarker(parseFloat(selected.lat), parseFloat(selected.lon));
+                            _barangaySelected = { lat: parseFloat(selected.lat), lng: parseFloat(selected.lon) };
+                        }
+                    });
+                });
+            })
+            .catch(function() {
+                container.style.display = 'none';
+                container.innerHTML = '';
+            });
+        }, 250);
+    }
+
     function createBarangayMap() {
         const container = document.getElementById('barangayMapContainer');
         if (!container) return;
