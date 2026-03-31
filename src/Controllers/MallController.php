@@ -333,12 +333,6 @@ class MallController extends \Core\Controller
 
             $products = $productModel->list($opts);
             $locationFallback = false;
-            if (empty($products) && $barangayId) {
-                // No products in selected location; fallback to all locations
-                unset($opts['barangay_id']);
-                $products = $productModel->list($opts);
-                $locationFallback = true;
-            }
 
             // Attach seller storefront slugs
             $sellerIds = array_values(array_unique(array_filter(array_column($products, 'seller_id'))));
@@ -381,7 +375,7 @@ class MallController extends \Core\Controller
 
             // has_more: try to fetch one more to check
             $hasMore = count($products) === $limit;
-            $resp = ['products' => $out, 'page' => $page, 'has_more' => $hasMore, 'location_fallback' => $locationFallback];
+            $resp = ['products' => $out, 'page' => $page, 'has_more' => $hasMore];
             if ($barangayId) {
                 $brow = $this->db->get('barangays', ['id','name','city','province'], ['id' => $barangayId, 'is_active' => 1]);
                 $resp['barangay'] = $brow ?: null;
