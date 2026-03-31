@@ -1456,7 +1456,9 @@
                 }
                 res.innerHTML = d.barangays.map(function(b) {
                     const active = (b.id === currentBarangayId) ? ' style="background:var(--primary-bg,#f0f7ff);"' : '';
-                    return '<div onclick="selectBarangay(' + b.id + ')"' + active +
+                    // Use JSON.stringify so IDs (including 'geo_...' strings) are passed safely.
+                var safeId = JSON.stringify(String(b.id));
+                return '<div onclick="selectBarangay(' + safeId + ')"' + active +
                         ' style="padding:9px 14px;cursor:pointer;border-bottom:1px solid var(--border,#eee);font-size:0.87rem;">' +
                         '<strong>' + b.name + '</strong>, ' + b.city +
                         ' <span style="color:var(--muted,#888);font-size:0.78rem;">' + b.province + '</span>' +
