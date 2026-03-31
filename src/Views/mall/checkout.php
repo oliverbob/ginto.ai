@@ -74,7 +74,7 @@ $savedHome      = $saved_home ?? [];
     position:relative;
 }
 
-#coClose {
+#coOtpClose {
     display: none !important;
 }
 
