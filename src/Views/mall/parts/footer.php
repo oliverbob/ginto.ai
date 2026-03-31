@@ -1614,10 +1614,8 @@
         if (textEl) textEl.textContent = text;
     }
 
-    // Auto-detect on page load if no barangay pinned yet
-    if (!currentBarangayId) {
-        autoDetectBarangay(false);
-    }
+    // Always auto-detect on page load to refresh the displayed region (avoid stale pinned state).
+    autoDetectBarangay(false);
 
     window.toggleBarangayDropdown = toggleBarangayDropdown;
     window.searchBarangay         = searchBarangay;
