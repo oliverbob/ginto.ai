@@ -209,7 +209,9 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             <button onclick="closeBarangayMapModal()" style="border:none;background:none;color:var(--muted);font-size:1.2rem;cursor:pointer;">✕</button>
                         </div>
                         <div style="display:flex;gap:8px;padding:10px 14px;">
-                            <input id="barangayMapSearchInput" type="text" placeholder="Search a place or address"
+                            <input type="text" autocomplete="off" name="fakeusernameremember" style="position:absolute;opacity:0;pointer-events:none;height:0;width:0;margin:0;padding:0;border:0;" />
+                            <input id="barangayMapSearchInput" type="search" placeholder="Search a place or address"
+                                autocomplete="street-address" autocorrect="off" autocapitalize="none" spellcheck="false"
                                 style="flex:1;padding:10px 12px;border:1px solid #94a3b8;border-radius:10px;background:var(--bg, #ffffff);color:var(--text, #0f172a);font-size:0.88rem;outline:none;" />
                             <button onclick="geocodeBarangayMapLocation()" style="padding:10px 14px;border:none;border-radius:10px;background:linear-gradient(135deg,#4250ff,#34d399);color:#042f4a;font-weight:700;letter-spacing:0.01em;box-shadow:0 8px 20px rgba(31,41,55,0.4);cursor:pointer;transition:transform .13s ease,box-shadow .13s ease;">Go</button>
                         </div>
@@ -219,6 +221,20 @@ $isLoggedIn = !empty($_SESSION['user_id']);
                             <button id="coMapConfirm" onclick="confirmBarangayMapPin()" style="width:100%;padding:12px 16px;border-radius:10px;border:none;background:linear-gradient(135deg,#38bdf8,#22d3ee);color:#0f172a;font-size:0.92rem;font-weight:700;cursor:pointer;letter-spacing:0.012em;box-shadow:0 10px 24px rgba(56,189,248,0.45);transition:transform .15s ease,box-shadow .15s ease;">
                                 Confirm location and show products
                             </button>
+                            <script>
+                                document.addEventListener('DOMContentLoaded', function() {
+                                    const inp = document.getElementById('barangayMapSearchInput');
+                                    if (!inp) return;
+                                    inp.addEventListener('focus', function() {
+                                        inp.setAttribute('autocomplete', 'street-address');
+                                    });
+                                    inp.addEventListener('blur', function() {
+                                        setTimeout(function() {
+                                            inp.value = inp.value.trim();
+                                        }, 180);
+                                    });
+                                });
+                            </script>
                         </div>
                     </div>
                 </div>
