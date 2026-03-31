@@ -1332,11 +1332,11 @@ body.light .co-qr-spinner {
         if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(platformFee, summary.currency);
         if (checkoutFixedFee) checkoutFixedFee.textContent = formatPrice(fixedFee, summary.currency);
         if (checkoutShippingFee) {
-            checkoutShippingFee.textContent = 'calculated at checkout';
+            checkoutShippingFee.textContent = formatPrice(0.00, summary.currency);
             checkoutShippingFee.style.color = 'var(--muted)';
         }
         if (checkoutDeliveryFee) {
-            checkoutDeliveryFee.textContent = 'calculated at checkout';
+            checkoutDeliveryFee.textContent = formatPrice(0.00, summary.currency);
             checkoutDeliveryFee.style.color = 'var(--muted)';
         }
         if (checkoutProcessingFee) {
@@ -1372,6 +1372,30 @@ body.light .co-qr-spinner {
             console.warn('Could not estimate checkout fees:', err);
         }
     }
+
+    function debounce(fn, wait) {
+        let timeout;
+        return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(function() {
+                fn.apply(context, args);
+            }, wait);
+        };
+    }
+
+    function attachShippingFieldListeners() {
+        const form = document.getElementById('checkoutShippingForm');
+        if (!form) return;
+        const inputs = form.querySelectorAll('input, select, textarea');
+        inputs.forEach(function (input) {
+            input.addEventListener('input', debounce(estimateCheckoutFees, 220));
+            input.addEventListener('change', debounce(estimateCheckoutFees, 220));
+        });
+    }
+
+    attachShippingFieldListeners();
 
     function updateShippingFromSession(session) {
         console.log('updateShippingFromSession', session);
