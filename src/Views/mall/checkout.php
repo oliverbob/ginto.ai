@@ -1577,6 +1577,11 @@ body.light .co-qr-spinner {
         try {
             const session = await createSession();
             currentSessionRef = session.session_ref;
+            // Make checkout amount reflect the actual session total after all fees.
+            if (session && typeof session.total === 'number') {
+                coAmount.textContent = formatPrice(session.total, session.currency || 'PHP');
+                coAmountMobile.textContent = formatPrice(session.total, session.currency || 'PHP');
+            }
             if (selectedMethod === 'wallet') {
                 clearCart();
                 window.location.href = '/mall/orders';
