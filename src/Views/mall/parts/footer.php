@@ -1546,6 +1546,116 @@ function escapeJsParam(value) {
             .catch(function() { window.location.reload(); });
     }
 
+    // ── Pin-to-map location picker for marketplace ──────────────────────────
+    let _barangayMap = null;
+    let _barangayMapMarker = null;
+    let _barangaySelected = null;
+    let _barangayMapInitialized = false;
+
+    function openBarangayMapModal() {
+        const modal = document.getElementById('barangayMapModal');
+        if (!modal) return;
+        modal.style.display = 'flex';
+        initBarangayMap();
+    }
+
+    function closeBarangayMapModal() {
+        const modal = document.getElementById('barangayMapModal');
+        if (!modal) return;
+        modal.style.display = 'none';
+    }
+
+    function initBarangayMap() {
+        if (_barangayMapInitialized) return;
+        _barangayMapInitialized = true;
+
+        if (!document.getElementById('leaflet-css')) {
+            const stylesheet = document.createElement('link');
+            stylesheet.id = 'leaflet-css';
+            stylesheet.rel = 'stylesheet';
+            stylesheet.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+            document.head.appendChild(stylesheet);
+        }
+
+        if (!window.L) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+            script.onload = function() { createBarangayMap(); };
+            document.head.appendChild(script);
+        } else {
+            createBarangayMap();
+        }
+    }
+
+    function createBarangayMap() {
+        const container = document.getElementById('barangayMapContainer');
+        if (!container) return;
+
+        _barangayMap = L.map(container, { zoomControl: true, attributionControl: false }).setView([14.5995, 120.9842], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_barangayMap);
+
+        function addMarker(lat, lng) {
+            if (_barangayMapMarker) {
+                _barangayMap.removeLayer(_barangayMapMarker);
+            }
+            _barangayMapMarker = L.marker([lat, lng], { draggable: true }).addTo(_barangayMap);
+            _barangaySelected = { lat: lat, lng: lng };
+            _barangayMapMarker.on('dragend', function (e) {
+                const p = e.target.getLatLng();
+                _barangaySelected = { lat: p.lat, lng: p.lng };
+            });
+        }
+
+        _barangayMap.on('click', function (event) {
+            addMarker(event.latlng.lat, event.latlng.lng);
+            const hint = document.getElementById('barangayMapHint');
+            if (hint) hint.textContent = 'Location selected. Drag if needed, then press Confirm.';
+        });
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (pos) {
+                _barangayMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
+                addMarker(pos.coords.latitude, pos.coords.longitude);
+            }, function () {
+                // ignore errors
+            }, { timeout: 10000 });
+        }
+    }
+
+    function confirmBarangayMapPin() {
+        if (!_barangaySelected) {
+            const hint = document.getElementById('barangayMapHint');
+            if (hint) hint.textContent = 'Please tap on the map to pick your location first.';
+            return;
+        }
+
+        fetch('/api/barangay/detect?lat=' + encodeURIComponent(_barangaySelected.lat) + '&lng=' + encodeURIComponent(_barangaySelected.lng), {
+            headers: { 'Accept': 'application/json' }
+        })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success || !d.barangay || !d.barangay.id) {
+                    const hint = document.getElementById('barangayMapHint');
+                    if (hint) hint.textContent = 'Unable to resolve barangay. Please adjust marker or search manually.';
+                    return;
+                }
+                setCurrentBarangay(d.barangay.id).then(function () {
+                    if (typeof _setBarangayPillText === 'function') {
+                        _setBarangayPillText('📍', d.barangay.name + ', ' + d.barangay.city);
+                    }
+                    if (typeof _updateCurrentLocationPanel === 'function') {
+                        _updateCurrentLocationPanel(d.barangay, 'gps');
+                    }
+                    closeBarangayMapModal();
+                    refreshSearchResultsFromServer();
+                });
+            })
+            .catch(function () {
+                const hint = document.getElementById('barangayMapHint');
+                if (hint) hint.textContent = 'Failed to detect barangay. Check your connection and try again.';
+            });
+    }
+
     // ── Auto-detect via browser Geolocation API ───────────────────────────────
     // On Android, window.AndroidLocation is a JavascriptInterface bridge.
     // The native app sets coords via FusedLocationProviderClient (requestLocationUpdates).
