@@ -1647,7 +1647,8 @@
     }
 
     // Always auto-detect on page load to refresh the displayed region (avoid stale pinned state).
-    autoDetectBarangay(false);
+    // Note: autoDetectBarangayAndReload() already performs the fetch, so avoid double-detect.
+    // autoDetectBarangay(false);
 
     window.toggleBarangayDropdown = toggleBarangayDropdown;
     window.searchBarangay         = searchBarangay;
