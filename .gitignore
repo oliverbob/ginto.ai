@@ -14,6 +14,7 @@ vendor/
 
 # Ignore nested git repos (MCP tools)
 tools/groq-mcp/
+tools/geojsonph/
 
 # Storage directory (now at ../storage, but ignore any local storage/ just in case)
 storage/
