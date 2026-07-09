@@ -433,6 +433,64 @@ req($router, '/courses', function() use ($db) {
 | `/courses` | `courses/index` | Courses listing |
 | `/editor` | `editor/index` | Code editor |
 | `/playground` | `playground/index` | AI Playground |
+| `/gtb` | `gtb/gtb` | Ginto Trading Bot dashboard |
+| `/gtb-settings` | `gtb/gtb` (page `settings`) | Binance API config form (writes `BINANCE_*` to `.env`) |
+
+---
+
+## Example: /gtb (Ginto Trading Bot)
+
+A full MVC route: controller + models + view, backed by MySQL. Renders a Binance
+Spot trading dashboard. Demonstrates the controller form of a route.
+
+### Files
+
+```
+src/Controllers/GtbController.php   # index() gathers data, renders the view
+src/Models/GtbSettings.php          # API credentials (.env default, DB override; secret encrypted)
+src/Models/GtbTrade.php             # recorded trades + realized P&L
+src/Models/GtbLog.php               # activity / trading log
+src/Support/Env.php                 # universal .env accessor (getenv → $_ENV → .env file)
+src/Support/Crypto.php              # AES-256-CBC encrypt/decrypt for the API secret
+database/gtb_schema.sql             # gtb_settings, gtb_trades, gtb_logs
+src/Views/gtb/
+├── gtb.php                         # Main view (View::view('gtb/gtb', ...))
+├── parts/{head,header,content,footer}.php
+└── pages/home.php                  # Dashboard content (controller-fed, empty states)
+```
+
+### Route Definition
+
+Registered in `src/Routes/web.php` using the controller form:
+
+```php
+$router->req('/gtb', 'GtbController@index');
+```
+
+### Configuration (.env)
+
+Binance settings are read like every other config value (via `.env`):
+
+```
+BINANCE_API_KEY=
+BINANCE_API_SECRET=
+BINANCE_TESTNET=false
+BINANCE_BASE_URL=https://api.binance.com
+GTB_ENCRYPTION_KEY=<generated 32-byte hex>   # encrypts the secret when saved to MySQL
+```
+
+### Setup & Test
+
+```bash
+mysql -u ginto -p ginto < database/gtb_schema.sql   # create the 3 tables
+```
+
+Then visit `http://localhost:8000/gtb`. The page renders even before the schema
+is loaded (models degrade to empty states).
+
+> V1 status: foundation only — dashboard shell, DB schema, encrypted-credential
+> plumbing. Live balances/holdings and trading (manual buy/sell) come in later
+> build steps.
 
 ---
 

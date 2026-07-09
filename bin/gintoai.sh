@@ -25,8 +25,19 @@ FORCE_POWERDNS="${GINTO_FORCE_POWERDNS:-false}"
 # Legacy install mode - enables /install v1 wizard instead of /chat → /live flow
 LEGACY_INSTALL="${GINTO_LEGACY_INSTALL:-false}"
 
+# Steps to skip entirely (space-separated tokens). Populated from --skip flags
+# and/or the GINTO_SKIP_STEPS env var. A token is matched as a substring of the
+# step name, so "sdcpu" skips both install_sdcpu and configure_sdcpu_service.
+SKIP_STEPS="${GINTO_SKIP_STEPS:-}"
+
 # Parse additional flags from command line
+_expect_skip=false
 for arg in "$@"; do
+    if [[ "$_expect_skip" == "true" ]]; then
+        SKIP_STEPS="$SKIP_STEPS $arg"
+        _expect_skip=false
+        continue
+    fi
     case "$arg" in
         --skip-powerdns)
             SKIP_POWERDNS=true
@@ -37,8 +48,32 @@ for arg in "$@"; do
         --legacy)
             LEGACY_INSTALL=true
             ;;
+        --skip=*)
+            # --skip=sdcpu  or  --skip=sdcpu,powerdns
+            SKIP_STEPS="$SKIP_STEPS ${arg#--skip=}"
+            ;;
+        --skip)
+            # --skip sdcpu   (value is the next argument)
+            _expect_skip=true
+            ;;
     esac
 done
+# Normalize any comma-separated tokens into space-separated
+SKIP_STEPS="${SKIP_STEPS//,/ }"
+
+# Returns 0 (true) if a step should be skipped per --skip / GINTO_SKIP_STEPS.
+# Match is a substring of the step name, so "sdcpu" skips install_sdcpu and
+# configure_sdcpu_service; a full step name like "install_powerdns" also works.
+is_step_skipped() {
+    local step="$1" token
+    for token in $SKIP_STEPS; do
+        [ -z "$token" ] && continue
+        if [[ "$step" == "$token" || "$step" == *"$token"* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
 
 # List of installation steps for NATIVE mode
 INSTALL_STEPS_NATIVE=(
@@ -306,6 +341,66 @@ update_packages() {
 }
 
 # Install PHP 8.x and required extensions
+# Required PHP extensions as "module_name:debian_package"
+# (module_name is what `php -m` reports; package is the apt suffix on Debian/Ubuntu).
+# This is the single source of truth used by both the fresh-install and
+# already-installed paths so a required extension can never be silently skipped.
+PHP_REQUIRED_EXTS=(
+    "mysqli:mysql"
+    "pdo_mysql:mysql"
+    "redis:redis"
+    "curl:curl"
+    "mbstring:mbstring"
+    "dom:xml"
+    "zip:zip"
+    "gd:gd"
+    "bcmath:bcmath"
+    "intl:intl"
+    "sqlite3:sqlite3"
+    "Zend OPcache:opcache"   # php -m reports opcache as "Zend OPcache", not "opcache"
+)
+
+# Ensure every required PHP extension is actually loaded. Installs any that are
+# missing (Debian/Ubuntu apt naming), restarts php-fpm if anything changed, and
+# warns loudly if a required extension is still absent afterwards.
+ensure_php_extensions() {
+    local php_version php_major_minor
+    php_version=$(php -v 2>/dev/null | head -1 | awk '{print $2}')
+    php_major_minor=$(echo "$php_version" | cut -d. -f1,2)
+
+    local needs_restart=false ext_spec ext_module ext_package
+    for ext_spec in "${PHP_REQUIRED_EXTS[@]}"; do
+        ext_module="${ext_spec%%:*}"
+        ext_package="${ext_spec##*:}"
+        if ! php -m | grep -qi "^${ext_module}$"; then
+            case "$OS" in
+                ubuntu|debian)
+                    log_info "Installing missing PHP extension: ${ext_module} (php${php_major_minor}-${ext_package})..."
+                    sudo apt-get install -y "php${php_major_minor}-${ext_package}" 2>/dev/null || true
+                    needs_restart=true
+                    ;;
+            esac
+        fi
+    done
+
+    if [[ "$needs_restart" == "true" ]]; then
+        sudo systemctl restart "php${php_major_minor}-fpm" 2>/dev/null || true
+    fi
+
+    # Final hard check: anything Ginto/phpMyAdmin cannot run without.
+    local missing="" ext_module2
+    for ext_spec in "${PHP_REQUIRED_EXTS[@]}"; do
+        ext_module2="${ext_spec%%:*}"
+        php -m | grep -qi "^${ext_module2}$" || missing+=" ${ext_module2}"
+    done
+    if [ -n "$missing" ]; then
+        log_warn "PHP is still missing extension(s):${missing}"
+        log_warn "Composer install may fail. Install manually: sudo apt-get install php${php_major_minor}-<ext>"
+        return 1
+    fi
+    return 0
+}
+
 install_php() {
     log_step "Installing PHP 8.x and extensions..."
     
@@ -314,13 +409,10 @@ install_php() {
         local php_version=$(php -v | head -1 | awk '{print $2}')
         if [[ "$php_version" =~ ^8\. ]]; then
             log_info "PHP already installed: $php_version"
-            # Ensure redis extension is installed for existing PHP
-            local php_major_minor=$(echo "$php_version" | cut -d. -f1,2)
-            if ! php -m | grep -qi redis; then
-                log_info "Installing missing php${php_major_minor}-redis..."
-                sudo apt-get install -y "php${php_major_minor}-redis" 2>/dev/null || true
-                sudo systemctl restart "php${php_major_minor}-fpm" 2>/dev/null || true
-            fi
+            # Guarantee all required extensions exist even if PHP was installed
+            # by something other than this script (this is exactly the case that
+            # left mysqli missing and broke composer).
+            ensure_php_extensions
             return 0
         fi
     fi
@@ -381,7 +473,11 @@ install_php() {
             exit 1
             ;;
     esac
-    
+
+    # Verify (and backfill) required extensions after a fresh install too, so a
+    # package that failed to install for any reason is caught before composer runs.
+    ensure_php_extensions
+
     log_success "PHP installed: $(php -v | head -1)"
 }
 
@@ -1830,10 +1926,14 @@ install_sdcpu() {
         return 0
     fi
     
-    # Skip if already installed
+    # Skip only if the venv exists AND its core dependencies actually import.
+    # A bare venv dir can be left behind by a failed pip install, so verify.
     if [ -d "$SDCPU_DIR/venv" ] && [ -f "$SDCPU_DIR/venv/bin/python" ]; then
-        log_info "SDCPU already installed (venv exists)"
-        return 0
+        if "$SDCPU_DIR/venv/bin/python" -c "import diffusers, fastapi, PIL" &>/dev/null; then
+            log_info "SDCPU already installed (venv verified)"
+            return 0
+        fi
+        log_warn "SDCPU venv is incomplete (deps failed to import) - reinstalling..."
     fi
     
     # In update mode (SKIP_CONFIGURED), we handle SDCPU interactively in prompt_configuration
@@ -2197,7 +2297,21 @@ install_dependencies() {
         if [ -d "$PROJECT_DIR/tools/lightpanda-mcp" ] && [ -f "$PROJECT_DIR/tools/lightpanda-mcp/package.json" ]; then
             log_info "Installing Lightpanda MCP dependencies..."
             cd "$PROJECT_DIR/tools/lightpanda-mcp"
-            sudo -u "$INSTALL_USER" npm install --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+            # Install JS deps only. --ignore-scripts skips @lightpanda/browser's
+            # postinstall, which downloads a large browser binary and can hang the
+            # installer on slow links. We fetch that binary separately, below.
+            sudo -u "$INSTALL_USER" npm install --no-audit --no-fund --ignore-scripts 2>/dev/null \
+                || npm install --no-audit --no-fund --ignore-scripts
+            # Download the Lightpanda browser binary best-effort, time-boxed so a
+            # stalled download can never block the install. Non-fatal: the MCP tool
+            # still installs and the binary retries on next run or first use.
+            log_info "Downloading Lightpanda browser binary (best-effort, up to 3 min)..."
+            if sudo -u "$INSTALL_USER" timeout 180 npx --yes @lightpanda/browser upgrade >/dev/null 2>&1; then
+                log_success "Lightpanda browser binary ready"
+            else
+                log_warn "Lightpanda browser binary not downloaded (slow/unavailable) - skipping"
+                log_info "Retry later: cd tools/lightpanda-mcp && npm run upgrade-browser"
+            fi
             cd "$PROJECT_DIR"
             log_success "Lightpanda MCP installed"
         fi
@@ -3421,6 +3535,11 @@ do_install() {
     local ALWAYS_RUN_STEPS=("setup_permissions" "install_utilities" "install_llamacpp")
     
     for step in "${INSTALL_STEPS[@]}"; do
+        # Honor --skip / GINTO_SKIP_STEPS (overrides always-run and resume)
+        if is_step_skipped "$step"; then
+            log_warn "Skipping (--skip requested): $step"
+            continue
+        fi
         # Check if step should always run
         local always_run=false
         for always_step in "${ALWAYS_RUN_STEPS[@]}"; do
@@ -3614,6 +3733,11 @@ do_docker_install() {
     
     # Run Docker steps
     for step in "${INSTALL_STEPS[@]}"; do
+        # Honor --skip / GINTO_SKIP_STEPS (overrides resume)
+        if is_step_skipped "$step"; then
+            log_warn "Skipping (--skip requested): $step"
+            continue
+        fi
         if should_run_step "$step" "$last_checkpoint"; then
             $step
             save_checkpoint "$step"

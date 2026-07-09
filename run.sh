@@ -40,14 +40,21 @@ show_help() {
     echo "  novnc-local Install/update local noVNC and configure novnc.service"
     echo "  help       Show this help message"
     echo ""
+    echo "Install options:"
+    echo "  --skip <step>   Skip one or more install steps (repeatable; comma-separated ok)"
+    echo "                  Token is matched as a substring, e.g. 'sdcpu' skips install_sdcpu"
+    echo "                  and configure_sdcpu_service. Also via GINTO_SKIP_STEPS env var."
+    echo ""
     echo "Examples:"
-    echo "  sudo ./run.sh install    # First-time setup"
-    echo "  ./run.sh start           # Start the application"
+    echo "  sudo ./run.sh install                  # First-time setup"
+    echo "  sudo ./run.sh install --skip sdcpu     # Install but skip SDCPU image gen"
+    echo "  sudo ./run.sh install --skip sdcpu,powerdns"
+    echo "  ./run.sh start                         # Start the application"
 }
 
 cmd_install() {
     log_info "Running installation via bin/gintoai.sh..."
-    bash "$SCRIPT_DIR/bin/gintoai.sh" install
+    bash "$SCRIPT_DIR/bin/gintoai.sh" install "$@"
 }
 
 cmd_start() {
@@ -159,7 +166,8 @@ EOF
 # Main command dispatcher
 case "${1:-help}" in
     install)
-        cmd_install
+        shift
+        cmd_install "$@"
         ;;
     start)
         cmd_start

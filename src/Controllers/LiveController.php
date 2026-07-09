@@ -308,25 +308,46 @@ class LiveController
             return !in_array($migrationName, $executedMigrations);
         });
         
-        // Run pending migrations
-        foreach ($pendingFiles as $file) {
-            $migrationName = pathinfo($file, PATHINFO_FILENAME);
-            $sql = file_get_contents($file);
-            if ($sql === false) {
-                throw new \Exception("Failed to read migration file: {$file}");
+        // Run pending migrations with retry passes. Some same-day migrations have
+        // ordering dependencies that a plain alphabetical sort gets wrong (e.g. an
+        // ALTER that sorts before the CREATE that makes its table -- "add_*" < "create_*").
+        // A single hard-stopping pass would stall the whole run on the first such
+        // migration. Instead we keep retrying deferred migrations until a full pass
+        // makes no progress, then surface the remaining error.
+        $pending = array_values($pendingFiles);
+        $insertStmt = $pdo->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)");
+        while (!empty($pending)) {
+            $progressed = false;
+            $deferred = [];
+            $lastError = '';
+            foreach ($pending as $file) {
+                $migrationName = pathinfo($file, PATHINFO_FILENAME);
+                $sql = file_get_contents($file);
+                if ($sql === false) {
+                    throw new \Exception("Failed to read migration file: {$file}");
+                }
+
+                // Normalize SQL - remove DELIMITER directives
+                $normalizedSql = preg_replace('/^\s*DELIMITER\s+\S+\s*$/mi', '', $sql);
+                $normalizedSql = preg_replace('/END\s*;?\/\//i', 'END;', $normalizedSql);
+                $normalizedSql = preg_replace('/END\s*;?\$\$/i', 'END;', $normalizedSql);
+                $normalizedSql = str_replace(["END;//", "END//", "END$$", "END $$"], 'END;', $normalizedSql);
+
+                try {
+                    $pdo->exec($normalizedSql);
+                    $insertStmt->execute([$migrationName, $nextBatch]);
+                    $progressed = true;
+                } catch (\PDOException $e) {
+                    // Likely a not-yet-created dependency; defer and retry next pass.
+                    $lastError = $migrationName . ': ' . $e->getMessage();
+                    $deferred[] = $file;
+                }
             }
-            
-            // Normalize SQL - remove DELIMITER directives
-            $normalizedSql = preg_replace('/^\s*DELIMITER\s+\S+\s*$/mi', '', $sql);
-            $normalizedSql = preg_replace('/END\s*;?\/\//i', 'END;', $normalizedSql);
-            $normalizedSql = preg_replace('/END\s*;?\$\$/i', 'END;', $normalizedSql);
-            $normalizedSql = str_replace(["END;//", "END//", "END$$", "END $$"], 'END;', $normalizedSql);
-            
-            $pdo->exec($normalizedSql);
-            
-            // Record migration
-            $insertStmt = $pdo->prepare("INSERT INTO migrations (migration, batch) VALUES (?, ?)");
-            $insertStmt->execute([$migrationName, $nextBatch]);
+            if (!$progressed) {
+                // A whole pass resolved nothing -> genuine failure, not just ordering.
+                throw new \Exception('Database migration failed (unresolved dependency): ' . $lastError);
+            }
+            $pending = $deferred;
         }
         
         // Verify users table was created

@@ -163,3 +163,23 @@ elif [ -f "tools/tunnel/tunnel_server.php" ]; then
 fi
 
 echo "start_services complete"
+
+# ---------------------------------------------------------------------------
+# Keep the foreground process alive when launched by systemd (Type=simple).
+#
+# start_web.sh and this script start their daemons with `nohup ... &` and then
+# return. Under the ginto.service unit (ExecStart runs start_web.sh &&
+# start_services.sh), that means the ExecStart process exits immediately, which
+# systemd treats as the service dying -> Restart=always + ExecStop=pkill tears
+# down the :8000 web server and restarts 5s later, forever (observed 1500+
+# restarts). Blocking here keeps the unit "active" and stops the flap.
+#
+# Only do this under systemd (INVOCATION_ID is set for service processes); a
+# manual `./run.sh start` still returns normally.
+# ---------------------------------------------------------------------------
+if [ -n "${INVOCATION_ID:-}" ]; then
+  echo "Running under systemd; holding foreground (tailing web log to stay alive)."
+  # Ensure the file exists so tail -F has something to follow immediately.
+  : > /dev/null
+  exec tail -n 0 -F /tmp/ginto-web.log
+fi

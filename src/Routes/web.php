@@ -1745,3 +1745,12 @@ $router->req('/playground/console/environment', 'PlaygroundController@consoleEnv
 $router->req('/playground/console/exec', 'PlaygroundController@consoleExec', ['POST']);
 $router->req('/playground/console/logs', 'PlaygroundController@consoleLogs', ['GET']);
 $router->req('/playground/{tool}', 'PlaygroundController@tool'); // Catch-all must be last
+
+// ============================================================================
+// Ginto Trading Bot (GTB) - Binance Spot trading dashboard
+// Controller: src/Controllers/GtbController.php
+// View:       src/Views/gtb/ (parts/ + pages/ per docs/routes.md)
+// ============================================================================
+$router->req('/gtb', 'GtbController@index');
+$router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
+$router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env
