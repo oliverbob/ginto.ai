@@ -18,6 +18,8 @@ $gtbInstructions   = $gtbInstructions ?? '';
 $gtbProfiles       = $gtbProfiles ?? ['conservative', 'aggressive'];
 $gtbCapitalMode    = $gtbCapitalMode ?? 'staked';
 $gtbPaperWallet    = $gtbPaperWallet ?? 35;
+$gtbMaxHoldMin     = $gtbMaxHoldMin ?? 0;
+$gtbSessionHours   = $gtbSessionHours ?? 0;
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -215,11 +217,31 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </label>
         </div>
 
+        <!-- Session & time-boxing -->
+        <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-hourglass-half text-primary mr-1.5"></i>Session &amp; time-boxing</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Hard time limits the bot enforces itself (not just AI guidance). These free up the slot so it keeps cycling within your window.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="max_hold_min" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Max hold per trade (min)</label>
+                    <input type="number" id="max_hold_min" min="0" step="5" value="<?= (int) $gtbMaxHoldMin ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Auto-closes any trade older than this. 0 = off.</p>
+                </div>
+                <div>
+                    <label for="session_hours" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Session length (hours)</label>
+                    <input type="number" id="session_hours" min="0" step="0.5" value="<?= rtrim(rtrim(number_format((float) $gtbSessionHours, 2, '.', ''), '0'), '.') ?: '0' ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">After this long, it flattens &amp; stops opening. Resets on Start. 0 = off.</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Operator instructions -->
         <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-wand-magic-sparkles text-primary mr-1.5"></i>Operator instructions <span class="text-xs font-normal text-gray-400">(optional)</span></h3>
             <p class="text-xs text-gray-500 dark:text-gray-400">Plain-English steering fed into <em>every</em> AI trade decision — e.g. focus/avoid certain coins, be more or less aggressive, cap what you'll chase. The bot follows these <strong>within</strong> the hard risk rules (capital cap, per-trade size, mandatory stop-loss) — they can tighten behavior but never loosen a safety rule.</p>
-            <textarea id="custom_instructions" rows="4" maxlength="600"
+            <textarea id="custom_instructions" rows="5" maxlength="2000"
                       class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2 focus:ring-primary focus:border-primary"
                       placeholder="e.g. Only trade BTC, ETH and SOL. Skip anything already up more than 15% today. Prefer breakouts over dip-buys. Be conservative — when unsure, skip."><?= htmlspecialchars($gtbInstructions, ENT_QUOTES) ?></textarea>
             <p class="text-xs text-gray-400 dark:text-gray-500">Applied on the next decision after saving. Leave blank to remove.</p>
@@ -277,6 +299,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             decision_model: document.getElementById('decision_model').value,
             capital_mode: (document.querySelector('.gtb-cap:checked') || {}).value || 'staked',
             paper_wallet: parseFloat(document.getElementById('paper_wallet').value) || 0,
+            max_hold_min: parseInt(document.getElementById('max_hold_min').value) || 0,
+            session_hours: parseFloat(document.getElementById('session_hours').value) || 0,
             profiles: Array.from(document.querySelectorAll('.gtb-prof:checked')).map(c => c.value),
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,

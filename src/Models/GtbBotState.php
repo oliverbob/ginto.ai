@@ -31,14 +31,27 @@ class GtbBotState
     public function isEnabled(): bool { return (int) ($this->row()['enabled'] ?? 0) === 1; }
     public function isArmLive(): bool { return (int) ($this->row()['arm_live'] ?? 0) === 1; }
 
+    /** When the current trading session began (set on each Start). Null if never started. */
+    public function sessionStartedAt(): ?string
+    {
+        $v = $this->row()['session_started_at'] ?? null;
+        return $v ?: null;
+    }
+
     public function set(bool $enabled, bool $armLive): void
     {
         try {
-            $data = ['id' => 1, 'enabled' => $enabled ? 1 : 0, 'arm_live' => $armLive ? 1 : 0];
+            // Pressing Start begins a fresh session clock; stopping leaves it untouched.
+            $now = date('Y-m-d H:i:s');
             if ($this->db->has($this->table, ['id' => 1])) {
-                $this->db->update($this->table, ['enabled' => $data['enabled'], 'arm_live' => $data['arm_live']], ['id' => 1]);
+                $upd = ['enabled' => $enabled ? 1 : 0, 'arm_live' => $armLive ? 1 : 0];
+                if ($enabled) $upd['session_started_at'] = $now;
+                $this->db->update($this->table, $upd, ['id' => 1]);
             } else {
-                $this->db->insert($this->table, $data);
+                $this->db->insert($this->table, [
+                    'id' => 1, 'enabled' => $enabled ? 1 : 0, 'arm_live' => $armLive ? 1 : 0,
+                    'session_started_at' => $enabled ? $now : null,
+                ]);
             }
         } catch (\Throwable $e) {}
     }

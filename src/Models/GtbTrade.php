@@ -136,11 +136,15 @@ class GtbTrade
         }
     }
 
-    /** Sum of realized P&L across all recorded trades. */
-    public function totalRealizedPnl(): float
+    /**
+     * Sum of realized P&L. When $mode is given, counts only that mode's trades so
+     * paper profits never inflate live capital sizing (and vice-versa).
+     */
+    public function totalRealizedPnl(?string $mode = null): float
     {
         try {
-            $sum = $this->db->sum($this->table, 'realized_pnl');
+            $where = $mode !== null ? ['mode' => $mode] : [];
+            $sum = $this->db->sum($this->table, 'realized_pnl', $where);
             return $sum !== null ? (float)$sum : 0.0;
         } catch (\Throwable $e) {
             return 0.0;

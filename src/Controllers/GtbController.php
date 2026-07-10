@@ -111,6 +111,8 @@ class GtbController
         $gtbCapitalMode = strtolower((string) (\Ginto\Support\Env::get('GTB_CAPITAL_MODE', 'staked') ?? 'staked'));
         if (!in_array($gtbCapitalMode, ['staked', 'full', 'ai'], true)) $gtbCapitalMode = 'staked';
         $gtbPaperWallet = (float) (\Ginto\Support\Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
+        $gtbMaxHoldMin  = (int) (\Ginto\Support\Env::get('GTB_MAX_HOLD_MIN', '0') ?? 0);
+        $gtbSessionHours= (float) (\Ginto\Support\Env::get('GTB_SESSION_HOURS', '0') ?? 0);
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -136,6 +138,8 @@ class GtbController
             'gtbProfiles'       => $gtbProfiles,
             'gtbCapitalMode'    => $gtbCapitalMode,
             'gtbPaperWallet'    => $gtbPaperWallet,
+            'gtbMaxHoldMin'     => $gtbMaxHoldMin,
+            'gtbSessionHours'   => $gtbSessionHours,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -221,8 +225,13 @@ class GtbController
             $instr = preg_replace('/[\r\n]+/', ' ', $instr);      // no newlines in .env
             $instr = str_replace(['"', '\\'], '', $instr);        // keep envQuote wrapping safe
             $instr = trim(preg_replace('/\s{2,}/', ' ', $instr));
-            if (mb_strlen($instr) > 600) $instr = mb_substr($instr, 0, 600);
+            if (mb_strlen($instr) > 2000) $instr = mb_substr($instr, 0, 2000);
             $pairs['GTB_CUSTOM_INSTRUCTIONS'] = $instr;           // always write (blank clears it)
+
+            // Time-boxing (deterministic): max hold per trade + session window (0 = off).
+            $pairs['GTB_MAX_HOLD_MIN'] = (string) max(0, (int) ($input['max_hold_min'] ?? 0));
+            $sessH = (float) ($input['session_hours'] ?? 0);
+            $pairs['GTB_SESSION_HOURS'] = rtrim(rtrim(number_format(max(0.0, $sessH), 2, '.', ''), '0'), '.') ?: '0';
 
             $this->updateEnvKeys($pairs);
 

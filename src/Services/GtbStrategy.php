@@ -5,6 +5,7 @@ use Ginto\Support\Env;
 use Ginto\Models\GtbSettings;
 use Ginto\Models\GtbTrade;
 use Ginto\Models\GtbThought;
+use Ginto\Models\GtbBotState;
 use Ginto\Services\Strategies\GtbTemplate;
 use Ginto\Services\Strategies\ScalpMomentum;
 use Ginto\Services\Strategies\Breakout;
@@ -49,9 +50,19 @@ class GtbStrategy
         $trades   = new GtbTrade();
         $thoughts = new GtbThought();
         $cap      = new GtbCapital();
-        $realized = $trades->totalRealizedPnl();
+        $realized = $trades->totalRealizedPnl($mode);
         $tickers  = $this->liquidTickers($client);
         $this->configureCapital($cap, $client, $trades, $mode, $realized, $tickers);
+
+        // Time-boxing: max hold per trade + optional session window (both deterministic).
+        $maxHoldMin   = (int) (Env::get('GTB_MAX_HOLD_MIN', 0) ?? 0);
+        $sessionHours = (float) (Env::get('GTB_SESSION_HOURS', 0) ?? 0);
+        $sessionOver  = false;
+        if ($sessionHours > 0) {
+            $start = (new GtbBotState())->sessionStartedAt();
+            if ($start) $sessionOver = (time() - strtotime($start)) >= $sessionHours * 3600;
+        }
+
         $priceOf  = function (string $sym) use ($tickers, $client) {
             return isset($tickers[$sym]) ? $tickers[$sym]['price'] : $client->price($sym);
         };
@@ -65,6 +76,19 @@ class GtbStrategy
         foreach ($trades->openPositions() as $pos) {
             $price = $priceOf($pos['symbol']);
             if ($price === null || $price <= 0) continue;
+
+            // Time-box first: session end or max-hold force an exit regardless of stop/target.
+            if ($sessionOver) {
+                $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'SESSION-END');
+                continue;
+            }
+            if ($maxHoldMin > 0) {
+                $age = $this->ageMinutes($pos['created_at'] ?? null);
+                if ($age !== null && $age >= $maxHoldMin) {
+                    $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'MAX-HOLD');
+                    continue;
+                }
+            }
 
             if (($pos['mode'] ?? $mode) === 'live') {
                 $realized += $this->reconcileLive($client, $trades, $thoughts, $pos, (float) $price);
@@ -88,6 +112,11 @@ class GtbStrategy
         }
 
         // ---- 2) open ONE new position if a slot is free ----
+        // Session over: stay flat, take nothing new until the next Start resets the clock.
+        if ($sessionOver) {
+            return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                'session ended — flat, no new trades', $tickers);
+        }
         $open  = $trades->openPositions();
         $slots = $cap->slots($realized);
         $free  = $slots - count($open);
@@ -213,7 +242,7 @@ class GtbStrategy
         $client   = new BinanceClient();
         $trades   = new GtbTrade();
         $mode     = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
-        $realized = $trades->totalRealizedPnl();
+        $realized = $trades->totalRealizedPnl($mode);
         $cap      = new GtbCapital();
         $this->configureCapital($cap, $client, $trades, $mode, $realized);
         return $cap->summary($realized);
@@ -258,7 +287,7 @@ class GtbStrategy
         $client = $client ?? new BinanceClient();
         $trades = $trades ?? new GtbTrade();
         if ($mode === null)     $mode = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
-        if ($realized === null) $realized = $trades->totalRealizedPnl();
+        if ($realized === null) $realized = $trades->totalRealizedPnl($mode);
         // If called fresh (e.g. from the dashboard), teach a new capital object about the wallet.
         if ($cap === null) {
             $cap = new GtbCapital();
@@ -531,6 +560,36 @@ class GtbStrategy
             }
         }
         return 0.0;
+    }
+
+    /** Force-close a position now (time-box / session end), paper or live. Returns realized P&L. */
+    private function forceClose(BinanceClient $client, GtbTrade $trades, GtbThought $thoughts, array $pos, float $price, string $mode, string $reason): float
+    {
+        $sym = $pos['symbol'];
+        $id  = (int) $pos['id'];
+        if (($pos['mode'] ?? $mode) === 'live') {
+            // Cancel the resting protective order before we market-sell.
+            $type = $pos['protect_type'] ?? null; $pid = $pos['protect_id'] ?? null;
+            if ($type === 'oco' && $pid)  $client->cancelOco($sym, (string) $pid);
+            elseif ($type === 'stop' && $pid) $client->cancelOrder($sym, (string) $pid);
+            $client->marketSell($sym, $this->floorToStep($client, $sym, (float) $pos['qty'] * 0.999));
+        }
+        $pnl = ($price - (float) $pos['price']) * (float) $pos['qty'];
+        $trades->closeTrade($id, $price, $pnl);
+        $trades->setProtection($id, null, null);
+        $thoughts->add(sprintf('Closed %s at $%s (%s) [%s] · P&L %s$%.4f.',
+            $sym, $this->fmt($price), $reason, $pos['template'] ?? 'scalp',
+            $pnl >= 0 ? '+' : '-', abs($pnl)),
+            'bot', 'trade', $sym, $reason, ['mode' => ($pos['mode'] ?? $mode), 'pnl' => round($pnl, 6)]);
+        return $pnl;
+    }
+
+    /** Whole minutes a position has been open (from its created_at), or null. */
+    private function ageMinutes(?string $createdAt): ?int
+    {
+        if (!$createdAt) return null;
+        $ts = strtotime($createdAt);
+        return $ts ? (int) floor((time() - $ts) / 60) : null;
     }
 
     /** Find the filled leg of a completed OCO and return [avgPrice, filledQty]. */
