@@ -316,14 +316,35 @@ class GtbController
             $balances = [];
             $portfolioUsdt = 0.0;
             $freeUsdt = 0.0;
+            $earnUsdt = 0.0;
             foreach (($acct['balances'] ?? []) as $b) {
                 $free = (float) $b['free'];
                 $locked = (float) $b['locked'];
                 $total = $free + $locked;
                 if ($total <= 0) continue;
                 $asset = $b['asset'];
-                $usdt = $asset === 'USDT' ? $total : (($priceMap[$asset . 'USDT'] ?? 0.0) * $total);
-                if ($asset === 'USDT') $freeUsdt = $free;
+
+                // Per-unit USDT price. Simple Earn Flexible positions appear as
+                // LD-prefixed tokens (LDUSDT ~ USDT, LDBTC ~ BTC). We only strip the
+                // LD prefix when the token has no pair of its own, so real tokens
+                // like LDO (which has LDOUSDT) are still valued directly.
+                $isEarn = false;
+                if ($asset === 'USDT') {
+                    $unit = 1.0;
+                } elseif (isset($priceMap[$asset . 'USDT'])) {
+                    $unit = $priceMap[$asset . 'USDT'];
+                } elseif (str_starts_with($asset, 'LD')) {
+                    $u = substr($asset, 2);
+                    $unit = $u === 'USDT' ? 1.0 : ($priceMap[$u . 'USDT'] ?? 0.0);
+                    $isEarn = $unit > 0.0;
+                } else {
+                    $unit = 0.0;
+                }
+                $usdt = $unit * $total;
+
+                if ($asset === 'USDT') $freeUsdt = $free;   // free USDT available for spot trading
+                if ($isEarn) $earnUsdt += $usdt;            // value parked in Flexible Earn
+
                 $portfolioUsdt += $usdt;
                 $balances[] = ['asset' => $asset, 'free' => $free, 'locked' => $locked, 'usdt' => $usdt];
             }
@@ -336,6 +357,7 @@ class GtbController
                 'canTrade'      => $acct['canTrade'] ?? null,
                 'portfolioUsdt' => $portfolioUsdt,
                 'freeUsdt'      => $freeUsdt,
+                'earnUsdt'      => $earnUsdt,
                 'holdingsCount' => count($balances),
                 'balances'      => array_slice($balances, 0, 25),
             ]);

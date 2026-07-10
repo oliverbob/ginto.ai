@@ -437,11 +437,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             const pv = document.getElementById('gtb-portfolio-value');
             const pvn = document.getElementById('gtb-portfolio-note');
             const bv = document.getElementById('gtb-balance-value');
+            const bvn = document.getElementById('gtb-balance-note');
             const hv = document.getElementById('gtb-holdings-value');
             if (!d.ok) { pvn.textContent = d.error || 'Not connected'; return; }
             pv.textContent = gtbFmtUsd(d.portfolioUsdt); pv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
-            pvn.textContent = (d.testnet ? 'Testnet' : 'Mainnet') + ' · est. USDT';
+            pvn.textContent = (d.testnet ? 'Testnet' : 'Mainnet') + ' · est. USDT (incl. Earn)';
             bv.textContent = gtbFmtUsd(d.freeUsdt); bv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            bvn.textContent = (+d.earnUsdt > 0)
+                ? `Free to trade · ${gtbFmtUsd(d.earnUsdt)} in Earn`
+                : 'Free USDT (spot)';
             hv.textContent = d.holdingsCount; hv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
         } catch (e) { /* leave placeholders */ }
     }
