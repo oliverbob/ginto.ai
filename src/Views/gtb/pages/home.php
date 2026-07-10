@@ -76,22 +76,30 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
 <!-- Stat cards -->
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-    <?php
-    $cards = [
-        ['label' => 'Portfolio Value', 'icon' => 'fa-wallet',      'value' => '—', 'note' => 'Live data next build'],
-        ['label' => 'Available Balance','icon' => 'fa-money-bill-wave','value' => '—', 'note' => 'Live data next build'],
-        ['label' => 'Open Holdings',   'icon' => 'fa-layer-group', 'value' => '—', 'note' => 'Live data next build'],
-    ];
-    foreach ($cards as $c): ?>
-        <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-            <div class="flex items-center justify-between">
-                <span class="text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars($c['label']) ?></span>
-                <i class="fas <?= htmlspecialchars($c['icon']) ?> text-primary"></i>
-            </div>
-            <div class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500"><?= htmlspecialchars($c['value']) ?></div>
-            <div class="mt-1 text-xs text-gray-400 dark:text-gray-500"><?= htmlspecialchars($c['note']) ?></div>
+    <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Portfolio Value</span>
+            <i class="fas fa-wallet text-primary"></i>
         </div>
-    <?php endforeach; ?>
+        <div id="gtb-portfolio-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
+        <div id="gtb-portfolio-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Connect API to load</div>
+    </div>
+    <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Available Balance</span>
+            <i class="fas fa-money-bill-wave text-primary"></i>
+        </div>
+        <div id="gtb-balance-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
+        <div id="gtb-balance-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Free USDT</div>
+    </div>
+    <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+        <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-500 dark:text-gray-400">Open Holdings</span>
+            <i class="fas fa-layer-group text-primary"></i>
+        </div>
+        <div id="gtb-holdings-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
+        <div id="gtb-holdings-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Non-zero assets</div>
+    </div>
 
     <!-- Realized P&L (real, from DB) -->
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
@@ -133,24 +141,44 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     endforeach; ?>
 </section>
 
-<!-- Markets (live, from Binance public data) -->
+<!-- Markets + candlestick chart (live, Binance public data) -->
 <section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-    <div class="flex items-center justify-between mb-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
             <i class="fas fa-chart-line text-primary mr-2"></i>Markets
-            <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">live · 24h</span>
+            <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">live</span>
         </h3>
-        <button type="button" onclick="gtbLoadMarkets()" class="text-xs text-gray-500 dark:text-gray-400 hover:text-primary">
-            <i class="fas fa-rotate"></i> Refresh
-        </button>
+        <div id="gtb-intervals" class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
+            <?php foreach (['1m','5m','15m','1h','4h','1d'] as $iv): ?>
+                <button type="button" data-interval="<?= $iv ?>"
+                        class="gtb-iv px-3 py-1.5 <?= $iv==='1h' ? 'bg-primary text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' ?>"><?= $iv ?></button>
+            <?php endforeach; ?>
+        </div>
     </div>
-    <div id="gtb-markets" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        <div class="col-span-full py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
-            <i class="fas fa-spinner fa-spin mr-1"></i> Loading live markets…
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+        <!-- Chart -->
+        <div class="lg:col-span-3 order-1">
+            <div class="flex items-baseline justify-between mb-2">
+                <div class="flex items-baseline gap-2">
+                    <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
+                    <span id="gtb-chart-price" class="text-lg font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
+                </div>
+                <span id="gtb-chart-change" class="text-sm font-semibold"></span>
+            </div>
+            <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
+        </div>
+        <!-- Pair list -->
+        <div class="lg:col-span-1 order-2">
+            <div id="gtb-pairs" class="space-y-1 lg:max-h-[392px] overflow-y-auto pr-1">
+                <div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm">
+                    <i class="fas fa-spinner fa-spin mr-1"></i> Loading…
+                </div>
+            </div>
         </div>
     </div>
     <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-        Prices from Binance public market data (mainnet). Charts are real regardless of your testnet setting.
+        Prices &amp; candles from Binance public market data (mainnet) — real regardless of your testnet setting. Click a pair to chart it.
     </p>
 </section>
 
@@ -236,57 +264,124 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 </div>
 
 <script>
-    // ---- Live markets + sparklines --------------------------------------------
-    function gtbSparkline(closes, up) {
-        if (!closes || closes.length < 2) return '';
-        const w = 120, h = 32, pad = 2;
-        const min = Math.min(...closes), max = Math.max(...closes);
-        const range = (max - min) || 1;
-        const stepX = (w - pad * 2) / (closes.length - 1);
-        const pts = closes.map((c, i) =>
-            `${(pad + i * stepX).toFixed(1)},${(h - pad - ((c - min) / range) * (h - pad * 2)).toFixed(1)}`).join(' ');
-        const stroke = up ? '#16a34a' : '#ef4444';
-        return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" class="block">` +
-               `<polyline fill="none" stroke="${stroke}" stroke-width="1.5" points="${pts}" /></svg>`;
-    }
+    const GTB_API_CONFIGURED = <?= $apiConfigured ? 'true' : 'false' ?>;
+    const GTB = { symbol: 'BTCUSDT', base: 'BTC', interval: '1h', chart: null, series: null };
 
+    function gtbIsDark() { return document.documentElement.classList.contains('dark'); }
     function gtbFmtPrice(p) {
+        p = +p;
         if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 });
         if (p >= 1) return p.toFixed(3);
         return p.toPrecision(4);
     }
+    function gtbFmtUsd(n) { return '$' + (+n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function gtbChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
-    async function gtbLoadMarkets() {
-        const box = document.getElementById('gtb-markets');
-        box.innerHTML = '<div class="col-span-full py-8 text-center text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i> Loading live markets…</div>';
+    // ---- Candlestick chart ----------------------------------------------------
+    function gtbInitChart() {
+        const el = document.getElementById('gtb-chart');
+        if (!el || typeof LightweightCharts === 'undefined') return;
+        const dark = gtbIsDark();
+        const grid = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+        GTB.chart = LightweightCharts.createChart(el, {
+            width: el.clientWidth,
+            height: 360,
+            layout: { background: { color: 'transparent' }, textColor: dark ? '#9ca3af' : '#374151', fontSize: 11 },
+            grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+            rightPriceScale: { borderColor: grid },
+            timeScale: { borderColor: grid, timeVisible: true, secondsVisible: false },
+            crosshair: { mode: LightweightCharts.CrosshairMode ? LightweightCharts.CrosshairMode.Normal : 0 },
+            handleScale: true, handleScroll: true,
+        });
+        GTB.series = GTB.chart.addCandlestickSeries({
+            upColor: '#16a34a', downColor: '#ef4444', borderVisible: false,
+            wickUpColor: '#16a34a', wickDownColor: '#ef4444',
+        });
+        new ResizeObserver(() => { if (GTB.chart) GTB.chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+    }
+
+    async function gtbLoadChart() {
+        if (!GTB.series) return;
+        try {
+            const res = await fetch(`/gtb/klines?symbol=${encodeURIComponent(GTB.symbol)}&interval=${GTB.interval}`);
+            const d = await res.json();
+            if (!d.ok || !Array.isArray(d.candles)) return;
+            GTB.series.setData(d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+            GTB.chart.timeScale().fitContent();
+        } catch (e) { /* leave prior chart */ }
+    }
+
+    function gtbSelectSymbol(symbol, base, price, changePct) {
+        GTB.symbol = symbol; GTB.base = base;
+        document.getElementById('gtb-chart-symbol').textContent = base + '/USDT';
+        if (price != null) document.getElementById('gtb-chart-price').textContent = '$' + gtbFmtPrice(price);
+        const up = (+changePct) >= 0;
+        const chgEl = document.getElementById('gtb-chart-change');
+        chgEl.textContent = (up ? '+' : '') + (+changePct).toFixed(2) + '%';
+        chgEl.className = 'text-sm font-semibold ' + gtbChgClass(up);
+        document.querySelectorAll('.gtb-pair').forEach(b =>
+            b.classList.toggle('gtb-pair-active', b.dataset.symbol === symbol));
+        gtbLoadChart();
+    }
+
+    // ---- Pair list ------------------------------------------------------------
+    async function gtbLoadPairs() {
+        const box = document.getElementById('gtb-pairs');
         try {
             const res = await fetch('/gtb/markets');
             const d = await res.json();
-            if (!d.ok) { box.innerHTML = `<div class="col-span-full py-6 text-center text-red-500 text-sm">✗ ${d.error || 'Failed to load markets'}</div>`; return; }
+            if (!d.ok) { box.innerHTML = `<div class="py-4 text-center text-red-500 text-xs">✗ ${d.error || 'Failed'}</div>`; return; }
             box.innerHTML = d.markets.map(m => {
                 const up = m.changePct >= 0;
-                const chg = (up ? '+' : '') + m.changePct.toFixed(2) + '%';
-                const chgCls = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
-                return `
-                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-4">
-                    <div class="flex items-center justify-between">
-                        <div class="font-semibold text-gray-900 dark:text-white">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></div>
-                        <div class="text-xs font-semibold ${chgCls}">${chg}</div>
-                    </div>
-                    <div class="mt-1 text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">$${gtbFmtPrice(m.price)}</div>
-                    <div class="mt-2">${gtbSparkline(m.closes, up)}</div>
-                    <div class="mt-2 flex justify-between text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
-                        <span>H $${gtbFmtPrice(m.high)}</span>
-                        <span>L $${gtbFmtPrice(m.low)}</span>
-                    </div>
-                </div>`;
+                return `<button type="button" class="gtb-pair w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
+                          data-symbol="${m.symbol}" data-base="${m.base}" data-price="${m.price}" data-change="${m.changePct}">
+                        <span class="font-medium text-gray-800 dark:text-gray-200">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
+                        <span class="text-right leading-tight">
+                            <span class="block text-sm tabular-nums text-gray-800 dark:text-gray-100">$${gtbFmtPrice(m.price)}</span>
+                            <span class="block text-[11px] ${gtbChgClass(up)}">${up ? '+' : ''}${m.changePct.toFixed(2)}%</span>
+                        </span></button>`;
             }).join('');
+            box.querySelectorAll('.gtb-pair').forEach(btn => btn.addEventListener('click', () =>
+                gtbSelectSymbol(btn.dataset.symbol, btn.dataset.base, btn.dataset.price, btn.dataset.change)));
+            const first = d.markets[0];
+            if (first) gtbSelectSymbol(first.symbol, first.base, first.price, first.changePct);
         } catch (e) {
-            box.innerHTML = `<div class="col-span-full py-6 text-center text-red-500 text-sm">✗ ${e.message}</div>`;
+            box.innerHTML = `<div class="py-4 text-center text-red-500 text-xs">✗ ${e.message}</div>`;
         }
     }
 
-    // ---- Test connection (signed account probe) -------------------------------
+    // ---- Interval buttons -----------------------------------------------------
+    function gtbInitIntervals() {
+        document.querySelectorAll('.gtb-iv').forEach(btn => btn.addEventListener('click', () => {
+            GTB.interval = btn.dataset.interval;
+            document.querySelectorAll('.gtb-iv').forEach(b => {
+                const on = b === btn;
+                b.classList.toggle('bg-primary', on);
+                b.classList.toggle('text-white', on);
+                b.classList.toggle('text-gray-600', !on);
+                b.classList.toggle('dark:text-gray-300', !on);
+            });
+            gtbLoadChart();
+        }));
+    }
+
+    // ---- Live account: portfolio, balance, holdings ---------------------------
+    async function gtbLoadAccount() {
+        try {
+            const res = await fetch('/gtb/account');
+            const d = await res.json();
+            const pv = document.getElementById('gtb-portfolio-value');
+            const pvn = document.getElementById('gtb-portfolio-note');
+            const bv = document.getElementById('gtb-balance-value');
+            const hv = document.getElementById('gtb-holdings-value');
+            if (!d.ok) { pvn.textContent = d.error || 'Not connected'; return; }
+            pv.textContent = gtbFmtUsd(d.portfolioUsdt); pv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            pvn.textContent = (d.testnet ? 'Testnet' : 'Mainnet') + ' · est. USDT';
+            bv.textContent = gtbFmtUsd(d.freeUsdt); bv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            hv.textContent = d.holdingsCount; hv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+        } catch (e) { /* leave placeholders */ }
+    }
+
     async function gtbTestConnection() {
         const btn = document.getElementById('gtb-test-btn');
         const boxEl = document.getElementById('gtb-test-result');
@@ -295,18 +390,19 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         boxEl.classList.remove('hidden');
         boxEl.innerHTML = '<span class="text-gray-500">Contacting Binance…</span>';
         try {
-            const res = await fetch('/gtb/test-connection');
+            const res = await fetch('/gtb/account');
             const d = await res.json();
             if (d.ok) {
                 const rows = (d.balances || []).map(b =>
                     `<tr><td class="pr-4 font-medium">${b.asset}</td>` +
                     `<td class="pr-4 text-right tabular-nums">${(+b.free).toLocaleString(undefined,{maximumFractionDigits:8})}</td>` +
-                    `<td class="text-right tabular-nums text-gray-400">${(+b.locked).toLocaleString(undefined,{maximumFractionDigits:8})}</td></tr>`).join('');
+                    `<td class="pr-4 text-right tabular-nums text-gray-400">${(+b.locked).toLocaleString(undefined,{maximumFractionDigits:8})}</td>` +
+                    `<td class="text-right tabular-nums">${gtbFmtUsd(b.usdt)}</td></tr>`).join('');
                 boxEl.innerHTML =
-                    `<div class="text-green-600 dark:text-green-400 font-semibold mb-1"><i class="fas fa-circle-check"></i> Connected</div>` +
+                    `<div class="text-green-600 dark:text-green-400 font-semibold mb-1"><i class="fas fa-circle-check"></i> Connected — ${gtbFmtUsd(d.portfolioUsdt)} est. portfolio</div>` +
                     `<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">${d.testnet ? 'Testnet' : 'Mainnet'} · ${d.endpoint} · canTrade: ${d.canTrade}</div>` +
                     (rows
-                        ? `<table class="w-full text-xs"><thead><tr class="text-gray-400 text-left"><th class="pr-4">Asset</th><th class="pr-4 text-right">Free</th><th class="text-right">Locked</th></tr></thead><tbody>${rows}</tbody></table>`
+                        ? `<div class="overflow-x-auto"><table class="w-full text-xs"><thead><tr class="text-gray-400 text-left"><th class="pr-4">Asset</th><th class="pr-4 text-right">Free</th><th class="pr-4 text-right">Locked</th><th class="text-right">≈USDT</th></tr></thead><tbody>${rows}</tbody></table></div>`
                         : `<div class="text-xs text-gray-400">No non-zero balances (empty wallet — normal for a fresh testnet key).</div>`);
             } else {
                 boxEl.innerHTML =
@@ -321,5 +417,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
-    document.addEventListener('DOMContentLoaded', gtbLoadMarkets);
+    document.addEventListener('DOMContentLoaded', () => {
+        gtbInitChart();
+        gtbInitIntervals();
+        gtbLoadPairs();
+        if (GTB_API_CONFIGURED) gtbLoadAccount();
+    });
 </script>
+
+<style>
+    .gtb-pair-active { background: rgba(99,102,241,0.10); box-shadow: inset 2px 0 0 #6366f1; }
+</style>

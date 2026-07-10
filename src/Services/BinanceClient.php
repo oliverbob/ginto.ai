@@ -91,6 +91,42 @@ class BinanceClient
         return $out;
     }
 
+    /** OHLC candles for one symbol (for the candlestick chart). Public mainnet data. */
+    public function klines(string $symbol, string $interval = '1h', int $limit = 300): array
+    {
+        $res = $this->httpGet($this->marketBase . '/api/v3/klines', [
+            'symbol'   => strtoupper($symbol),
+            'interval' => $interval,
+            'limit'    => $limit,
+        ]);
+        if (empty($res['ok'])) return $res;
+        $candles = [];
+        foreach ($res['data'] as $r) {
+            // [ openTime(ms), open, high, low, close, volume, closeTime, ... ]
+            $candles[] = [
+                'time'  => (int) floor(((float) $r[0]) / 1000),  // seconds, for lightweight-charts
+                'open'  => (float) $r[1],
+                'high'  => (float) $r[2],
+                'low'   => (float) $r[3],
+                'close' => (float) $r[4],
+                'volume'=> (float) $r[5],
+            ];
+        }
+        return ['ok' => true, 'data' => $candles];
+    }
+
+    /** All symbol prices as [SYMBOL => price] for portfolio valuation. Public mainnet. */
+    public function allPrices(): array
+    {
+        $res = $this->httpGet($this->marketBase . '/api/v3/ticker/price');
+        if (empty($res['ok'])) return $res;
+        $map = [];
+        foreach ($res['data'] as $row) {
+            if (isset($row['symbol'], $row['price'])) $map[$row['symbol']] = (float) $row['price'];
+        }
+        return ['ok' => true, 'data' => $map];
+    }
+
     /** Signed account info (balances, canTrade). Uses the configured endpoint. */
     public function account(): array
     {

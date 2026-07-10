@@ -43,6 +43,9 @@
     <!-- Alpine.js for interactive components -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    <!-- TradingView Lightweight Charts (candlestick charts) -->
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+
     <style>
         .dark { color-scheme: dark; }
     </style>

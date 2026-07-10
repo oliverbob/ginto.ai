@@ -1752,7 +1752,9 @@ $router->req('/playground/{tool}', 'PlaygroundController@tool'); // Catch-all mu
 // View:       src/Views/gtb/ (parts/ + pages/ per docs/routes.md)
 // ============================================================================
 $router->req('/gtb', 'GtbController@index');
-$router->get('/gtb/markets', 'GtbController@markets');          // live market data (public) for charts
-$router->get('/gtb/test-connection', 'GtbController@testConnection'); // signed account probe
+$router->get('/gtb/markets', 'GtbController@markets');          // live market data (public) for the pair list
+$router->get('/gtb/klines', 'GtbController@klines');            // OHLC candles for the candlestick chart
+$router->get('/gtb/account', 'GtbController@account');          // signed: portfolio value, holdings, balances
+$router->get('/gtb/test-connection', 'GtbController@account');  // alias (Test connection button)
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env

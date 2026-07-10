@@ -226,8 +226,40 @@ class GtbController
         exit;
     }
 
-    /** GET /gtb/test-connection — signed account call to verify the API key works */
-    public function testConnection(): void
+    /** GET /gtb/klines?symbol=&interval= — OHLC candles for the candlestick chart */
+    public function klines(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $this->requireAdmin(true);
+
+        $symbol   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['symbol'] ?? 'BTCUSDT')));
+        $interval = preg_replace('/[^0-9a-zA-Z]/', '', (string) ($_GET['interval'] ?? '1h'));
+        if (!in_array($interval, ['1m', '5m', '15m', '1h', '4h', '1d'], true)) {
+            $interval = '1h';
+        }
+        if ($symbol === '') $symbol = 'BTCUSDT';
+
+        try {
+            $client = new \Ginto\Services\BinanceClient();
+            $res = $client->klines($symbol, $interval, 300);
+            if (empty($res['ok'])) {
+                http_response_code(502);
+                echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'klines failed']);
+                exit;
+            }
+            echo json_encode(['ok' => true, 'symbol' => $symbol, 'interval' => $interval, 'candles' => $res['data']]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** GET /gtb/account — signed account: portfolio value, free USDT, holdings, balances */
+    public function account(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         if (session_status() !== PHP_SESSION_ACTIVE) {
@@ -238,36 +270,48 @@ class GtbController
         try {
             $client = new \Ginto\Services\BinanceClient();
             if (!$client->isConfigured()) {
-                echo json_encode(['ok' => false, 'error' => 'No API key/secret saved yet.']);
+                echo json_encode(['ok' => false, 'error' => 'No API key/secret saved yet.',
+                                  'endpoint' => $client->accountEndpoint(), 'testnet' => $client->isTestnet()]);
                 exit;
             }
             $res = $client->account();
             if (empty($res['ok'])) {
-                echo json_encode([
-                    'ok'       => false,
-                    'error'    => $res['error'] ?? 'Request failed',
-                    'endpoint' => $client->accountEndpoint(),
-                    'testnet'  => $client->isTestnet(),
-                ]);
+                echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Request failed',
+                                  'endpoint' => $client->accountEndpoint(), 'testnet' => $client->isTestnet()]);
                 exit;
             }
             $acct = $res['data'];
+
+            // Price map for USDT valuation (public mainnet prices).
+            $priceMap = [];
+            $p = $client->allPrices();
+            if (!empty($p['ok'])) $priceMap = $p['data'];
+
             $balances = [];
+            $portfolioUsdt = 0.0;
+            $freeUsdt = 0.0;
             foreach (($acct['balances'] ?? []) as $b) {
                 $free = (float) $b['free'];
                 $locked = (float) $b['locked'];
-                if ($free + $locked > 0) {
-                    $balances[] = ['asset' => $b['asset'], 'free' => $free, 'locked' => $locked];
-                }
+                $total = $free + $locked;
+                if ($total <= 0) continue;
+                $asset = $b['asset'];
+                $usdt = $asset === 'USDT' ? $total : (($priceMap[$asset . 'USDT'] ?? 0.0) * $total);
+                if ($asset === 'USDT') $freeUsdt = $free;
+                $portfolioUsdt += $usdt;
+                $balances[] = ['asset' => $asset, 'free' => $free, 'locked' => $locked, 'usdt' => $usdt];
             }
-            usort($balances, static fn($a, $b) => ($b['free'] + $b['locked']) <=> ($a['free'] + $a['locked']));
+            usort($balances, static fn($a, $b) => $b['usdt'] <=> $a['usdt']);
 
             echo json_encode([
-                'ok'       => true,
-                'endpoint' => $client->accountEndpoint(),
-                'testnet'  => $client->isTestnet(),
-                'canTrade' => $acct['canTrade'] ?? null,
-                'balances' => array_slice($balances, 0, 25),
+                'ok'            => true,
+                'endpoint'      => $client->accountEndpoint(),
+                'testnet'       => $client->isTestnet(),
+                'canTrade'      => $acct['canTrade'] ?? null,
+                'portfolioUsdt' => $portfolioUsdt,
+                'freeUsdt'      => $freeUsdt,
+                'holdingsCount' => count($balances),
+                'balances'      => array_slice($balances, 0, 25),
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);
