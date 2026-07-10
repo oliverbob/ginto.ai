@@ -122,6 +122,13 @@ class GtbController
         $gtbPaperWallet = (float) (\Ginto\Support\Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
         $gtbMaxHoldMin  = (int) (\Ginto\Support\Env::get('GTB_MAX_HOLD_MIN', '0') ?? 0);
         $gtbSessionHours= (float) (\Ginto\Support\Env::get('GTB_SESSION_HOURS', '0') ?? 0);
+        $gtbStallMin    = (int) (\Ginto\Support\Env::get('GTB_STALL_MINUTES', '0') ?? 0);
+        $gtbStallGain   = (float) (\Ginto\Support\Env::get('GTB_STALL_MIN_GAIN_PCT', '0') ?? 0);
+        $gtbBaseCapital = (float) (\Ginto\Support\Env::get('GTB_BASE_CAPITAL', '7') ?? 7);
+        $gtbMinNotional = (float) (\Ginto\Support\Env::get('GTB_MIN_NOTIONAL', '5') ?? 5);
+        $gtbMaxTrade    = (float) (\Ginto\Support\Env::get('GTB_MAX_TRADE_USD', '0') ?? 0);
+        $gtbGrowthUnit  = (float) (\Ginto\Support\Env::get('GTB_GROWTH_UNIT', '5') ?? 5);
+        $gtbWalletFloor = (float) (\Ginto\Support\Env::get('GTB_WALLET_FLOOR', '0') ?? 0);
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -149,6 +156,13 @@ class GtbController
             'gtbPaperWallet'    => $gtbPaperWallet,
             'gtbMaxHoldMin'     => $gtbMaxHoldMin,
             'gtbSessionHours'   => $gtbSessionHours,
+            'gtbStallMin'       => $gtbStallMin,
+            'gtbStallGain'      => $gtbStallGain,
+            'gtbBaseCapital'    => $gtbBaseCapital,
+            'gtbMinNotional'    => $gtbMinNotional,
+            'gtbMaxTrade'       => $gtbMaxTrade,
+            'gtbGrowthUnit'     => $gtbGrowthUnit,
+            'gtbWalletFloor'    => $gtbWalletFloor,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -241,6 +255,17 @@ class GtbController
             $pairs['GTB_MAX_HOLD_MIN'] = (string) max(0, (int) ($input['max_hold_min'] ?? 0));
             $sessH = (float) ($input['session_hours'] ?? 0);
             $pairs['GTB_SESSION_HOURS'] = rtrim(rtrim(number_format(max(0.0, $sessH), 2, '.', ''), '0'), '.') ?: '0';
+
+            // Stall rotation: close a position after N min if it hasn't gained at least X%.
+            $pairs['GTB_STALL_MINUTES']      = (string) max(0, (int) ($input['stall_minutes'] ?? 0));
+            $pairs['GTB_STALL_MIN_GAIN_PCT'] = $this->numStr($input['stall_min_gain'] ?? 0, 0);
+
+            // Capital & spend limits (numeric; blank/invalid falls back to a safe default).
+            $pairs['GTB_BASE_CAPITAL'] = $this->numStr($input['base_capital'] ?? 0, 7,  0.0001);
+            $pairs['GTB_MIN_NOTIONAL'] = $this->numStr($input['min_notional'] ?? 0, 5,  0.0001);
+            $pairs['GTB_GROWTH_UNIT']  = $this->numStr($input['growth_unit'] ?? 0, 5,  0.0001);
+            $pairs['GTB_MAX_TRADE_USD']= $this->numStr($input['max_trade'] ?? 0, 0);   // 0 = no cap
+            $pairs['GTB_WALLET_FLOOR'] = $this->numStr($input['wallet_floor'] ?? 0, 0); // 0 = off
 
             $this->updateEnvKeys($pairs);
 
@@ -761,6 +786,15 @@ class GtbController
         if (file_put_contents($envPath, $new) === false) {
             throw new \Exception('Failed to write .env file');
         }
+    }
+
+    /** Normalize a numeric setting to a clean env string; blank/invalid on a required-positive field falls back to $default. */
+    private function numStr($v, float $default, float $min = 0.0): string
+    {
+        $n = is_numeric($v) ? (float) $v : $default;
+        if ($n < 0) $n = 0;
+        if ($min > 0 && $n < $min) $n = $default;
+        return rtrim(rtrim(number_format($n, 4, '.', ''), '0'), '.') ?: '0';
     }
 
     private function envQuote(string $v): string

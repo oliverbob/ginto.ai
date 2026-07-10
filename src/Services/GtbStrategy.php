@@ -31,6 +31,9 @@ class GtbStrategy
     /** Free USDT available for a live buy this step (full/ai modes cap size to it); null = no cap. */
     private ?float $liveFreeUsd = null;
 
+    /** Total wallet value (free + deployed) this step, when computed; used by the wallet-floor guard. */
+    private ?float $walletUsd = null;
+
     public function __construct()
     {
         $all = ['scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
@@ -58,6 +61,8 @@ class GtbStrategy
         $botState     = new GtbBotState();
         $openNew      = $botState->isOpeningNew();
         $maxHoldMin   = (int) (Env::get('GTB_MAX_HOLD_MIN', 0) ?? 0);
+        $stallMin     = (int) (Env::get('GTB_STALL_MINUTES', 0) ?? 0);
+        $stallMinGain = (float) (Env::get('GTB_STALL_MIN_GAIN_PCT', 0) ?? 0);
         $sessionHours = (float) (Env::get('GTB_SESSION_HOURS', 0) ?? 0);
         $sessionOver  = false;
         if ($sessionHours > 0) {
@@ -88,6 +93,15 @@ class GtbStrategy
                 $age = $this->ageMinutes($pos['created_at'] ?? null);
                 if ($age !== null && $age >= $maxHoldMin) {
                     $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'MAX-HOLD');
+                    continue;
+                }
+            }
+            // Stall rotation: after N minutes with less than the required follow-through gain, rotate out.
+            if ($stallMin > 0) {
+                $age  = $this->ageMinutes($pos['created_at'] ?? null);
+                $gain = ((float) $price - (float) $pos['price']) / (float) $pos['price'] * 100.0;
+                if ($age !== null && $age >= $stallMin && $gain < $stallMinGain) {
+                    $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'STALL');
                     continue;
                 }
             }
@@ -131,6 +145,14 @@ class GtbStrategy
             return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
                 'winding down — managing ' . count($open) . ' position(s), no new trades', $tickers);
         }
+        // Wallet floor: stop SPENDING (opening new) once the wallet drops below the floor,
+        // but keep managing open positions to their exits.
+        $floor = (float) (Env::get('GTB_WALLET_FLOOR', '0') ?? 0);
+        if ($floor > 0 && $this->walletUsd !== null && $this->walletUsd < $floor) {
+            return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                sprintf('wallet $%.2f below floor $%.2f — holding, no new trades', $this->walletUsd, $floor), $tickers);
+        }
+
         $open  = $trades->openPositions();
         $slots = $cap->slots($realized);
         $free  = $slots - count($open);
@@ -383,7 +405,11 @@ class GtbStrategy
     private function configureCapital(GtbCapital $cap, BinanceClient $client, GtbTrade $trades, string $mode, float $realized, array $tickers = []): void
     {
         $this->liveFreeUsd = null;
-        if ($cap->mode() === 'staked') return;
+        $this->walletUsd   = null;
+
+        // Compute the wallet if full/ai sizing needs it OR a wallet floor is set.
+        $floor = (float) (Env::get('GTB_WALLET_FLOOR', '0') ?? 0);
+        if ($cap->mode() === 'staked' && $floor <= 0) return;
 
         $invested = 0.0;
         foreach ($trades->openPositions() as $p) {
@@ -402,13 +428,15 @@ class GtbStrategy
                 }
             }
             $this->liveFreeUsd = $free;
-            $cap->setWallet($free + $invested);
+            $this->walletUsd   = $free + $invested;
         } else {
-            $wallet = (float) (Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
-            $cap->setWallet($wallet);
+            $this->walletUsd = (float) (Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
         }
-        if ($cap->mode() === 'ai') {
-            $cap->setAiPct($cap->autoAiPct($realized));
+
+        // Only full/ai use the wallet for SIZING; staked keeps the $7 discipline.
+        if ($cap->mode() !== 'staked') {
+            $cap->setWallet($this->walletUsd);
+            if ($cap->mode() === 'ai') $cap->setAiPct($cap->autoAiPct($realized));
         }
     }
 

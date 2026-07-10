@@ -20,6 +20,14 @@ $gtbCapitalMode    = $gtbCapitalMode ?? 'staked';
 $gtbPaperWallet    = $gtbPaperWallet ?? 35;
 $gtbMaxHoldMin     = $gtbMaxHoldMin ?? 0;
 $gtbSessionHours   = $gtbSessionHours ?? 0;
+$gtbStallMin       = $gtbStallMin ?? 0;
+$gtbStallGain      = $gtbStallGain ?? 0;
+$gtbBaseCapital    = $gtbBaseCapital ?? 7;
+$gtbMinNotional    = $gtbMinNotional ?? 5;
+$gtbMaxTrade       = $gtbMaxTrade ?? 0;
+$gtbGrowthUnit     = $gtbGrowthUnit ?? 5;
+$gtbWalletFloor    = $gtbWalletFloor ?? 0;
+$nf = fn($v) => rtrim(rtrim(number_format((float) $v, 4, '.', ''), '0'), '.') ?: '0';
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -166,6 +174,44 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </div>
         </div>
 
+        <!-- Capital & spend limits -->
+        <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-sliders text-primary mr-1.5"></i>Spend limits</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Exact dollar amounts the bot trades with. All in USDT.</p>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div>
+                    <label for="base_capital" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Base capital ($)</label>
+                    <input type="number" id="base_capital" min="1" step="1" value="<?= htmlspecialchars($nf($gtbBaseCapital), ENT_QUOTES) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">The stake it works with (staked mode).</p>
+                </div>
+                <div>
+                    <label for="min_notional" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Min per-trade ($)</label>
+                    <input type="number" id="min_notional" min="1" step="1" value="<?= htmlspecialchars($nf($gtbMinNotional), ENT_QUOTES) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Smallest order it will place (Binance min ≈ $5).</p>
+                </div>
+                <div>
+                    <label for="max_trade" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Max per-trade ($)</label>
+                    <input type="number" id="max_trade" min="0" step="1" value="<?= htmlspecialchars($nf($gtbMaxTrade), ENT_QUOTES) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Cap on one position. 0 = no cap.</p>
+                </div>
+                <div>
+                    <label for="growth_unit" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Slot step ($)</label>
+                    <input type="number" id="growth_unit" min="1" step="1" value="<?= htmlspecialchars($nf($gtbGrowthUnit), ENT_QUOTES) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Each $X of tradable unlocks a concurrent slot. Higher = more concentrated.</p>
+                </div>
+                <div>
+                    <label for="wallet_floor" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Wallet floor ($)</label>
+                    <input type="number" id="wallet_floor" min="0" step="1" value="<?= htmlspecialchars($nf($gtbWalletFloor), ENT_QUOTES) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Stop opening new trades when the wallet drops below this. 0 = off.</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Trading profiles (two bots, one wallet) -->
         <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-user-group text-primary mr-1.5"></i>Trading bots</h3>
@@ -234,6 +280,18 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
                     <p class="text-[11px] text-gray-400 mt-0.5">After this long, it flattens &amp; stops opening. Resets on Start. 0 = off.</p>
                 </div>
+                <div>
+                    <label for="stall_minutes" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Stall exit (min)</label>
+                    <input type="number" id="stall_minutes" min="0" step="1" value="<?= (int) $gtbStallMin ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Rotate out if a trade hasn't followed through after this long. 0 = off.</p>
+                </div>
+                <div>
+                    <label for="stall_min_gain" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">…unless up at least (%)</label>
+                    <input type="number" id="stall_min_gain" min="0" step="0.5" value="<?= $nf($gtbStallGain) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Keep the trade past the stall time only if it's gained this much.</p>
+                </div>
             </div>
         </div>
 
@@ -301,6 +359,13 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             paper_wallet: parseFloat(document.getElementById('paper_wallet').value) || 0,
             max_hold_min: parseInt(document.getElementById('max_hold_min').value) || 0,
             session_hours: parseFloat(document.getElementById('session_hours').value) || 0,
+            stall_minutes: parseInt(document.getElementById('stall_minutes').value) || 0,
+            stall_min_gain: parseFloat(document.getElementById('stall_min_gain').value) || 0,
+            base_capital: parseFloat(document.getElementById('base_capital').value) || 0,
+            min_notional: parseFloat(document.getElementById('min_notional').value) || 0,
+            max_trade: parseFloat(document.getElementById('max_trade').value) || 0,
+            growth_unit: parseFloat(document.getElementById('growth_unit').value) || 0,
+            wallet_floor: parseFloat(document.getElementById('wallet_floor').value) || 0,
             profiles: Array.from(document.querySelectorAll('.gtb-prof:checked')).map(c => c.value),
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,

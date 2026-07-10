@@ -86,11 +86,14 @@ class GtbCapital
         return max(1, (int) floor($t / $this->unit));
     }
 
-    /** Size per trade; profit compounds into open positions until the next slot unlocks. */
+    /** Size per trade; profit compounds into open positions until the next slot unlocks. Capped by GTB_MAX_TRADE_USD. */
     public function perTradeSize(float $realizedPnl): float
     {
         $slots = $this->slots($realizedPnl);
-        return $slots > 0 ? $this->tradable($realizedPnl) / $slots : 0.0;
+        $size  = $slots > 0 ? $this->tradable($realizedPnl) / $slots : 0.0;
+        $max   = (float) (Env::get('GTB_MAX_TRADE_USD', '0') ?? 0);
+        if ($max > 0 && $size > $max) $size = $max;
+        return $size;
     }
 
     public function canTrade(float $realizedPnl): bool
