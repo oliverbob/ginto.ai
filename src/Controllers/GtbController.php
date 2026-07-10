@@ -104,6 +104,8 @@ class GtbController
         $anthropicKeySet    = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
         $anthropicModel     = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
         $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
+        $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend') ?? ''))));
+        $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -123,6 +125,8 @@ class GtbController
             'anthropicKeySet'   => $anthropicKeySet,
             'anthropicModel'    => $anthropicModel,
             'anthropicScanModel'=> $anthropicScanModel,
+            'gtbTemplates'      => $gtbTemplates,
+            'gtbMemory'         => $gtbMemory,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -181,6 +185,14 @@ class GtbController
             $scanModel = (string) ($input['scan_model'] ?? '');
             if (in_array($decModel, $allowedModels, true))  $pairs['ANTHROPIC_MODEL'] = $decModel;
             if (in_array($scanModel, $allowedModels, true)) $pairs['ANTHROPIC_SCAN_MODEL'] = $scanModel;
+
+            // Strategy templates enable/disable (at least one required)
+            $allowedTpls = ['scalp', 'breakout', 'trend'];
+            $tpls = array_values(array_intersect($allowedTpls, (array) ($input['templates'] ?? [])));
+            if ($tpls) $pairs['GTB_TEMPLATES'] = implode(',', $tpls);
+
+            // Memory (opt-in; increases tokens per AI decision)
+            $pairs['GTB_MEMORY_ENABLED'] = !empty($input['memory_enabled']) ? 'true' : 'false';
 
             $this->updateEnvKeys($pairs);
 
@@ -444,6 +456,13 @@ class GtbController
                 'movers'   => $this->marketSnapshot(),
                 'note'     => 'Advisory reflection only — no order will be placed.',
             ];
+            if (\Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false)) {
+                $closed = (new GtbTrade())->recentClosed(8);
+                $context['memory'] = array_map(static fn($c) => [
+                    'symbol' => $c['symbol'], 'template' => $c['template'] ?? '?',
+                    'pnl' => round((float) $c['realized_pnl'], 4),
+                ], $closed);
+            }
 
             $res = $brain->reflect($context);
             if (empty($res['ok'])) {
@@ -487,19 +506,72 @@ class GtbController
         exit;
     }
 
-    /** GET /gtb/bot/positions — open positions + portfolio (for the monitoring grid) */
+    /** GET /gtb/bot/positions — open positions + portfolio + persisted bot state */
     public function positions(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         $this->requireAdmin(true);
         try {
-            echo json_encode((new \Ginto\Services\GtbStrategy())->openPositionsState());
+            $state = (new \Ginto\Services\GtbStrategy())->openPositionsState();
+            $state['bot'] = (new \Ginto\Models\GtbBotState())->status();
+            echo json_encode($state);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+
+    /** POST /gtb/bot/control — persist bot on/off (+ live arm). The server runner acts on it. */
+    public function control(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        if (!$this->checkCsrf($input)) exit;
+        try {
+            $enabled = !empty($input['enabled']);
+            $armLive = !empty($input['arm_live']);
+            $state = new \Ginto\Models\GtbBotState();
+            $state->set($enabled, $armLive);
+            echo json_encode(['ok' => true, 'bot' => $state->status()]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** POST /gtb/bot/close — manually close one open position */
+    public function closePosition(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        if (!$this->checkCsrf($input)) exit;
+        try {
+            $id = (int) ($input['id'] ?? 0);
+            echo json_encode((new \Ginto\Services\GtbStrategy())->closePosition($id));
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    private function checkCsrf(array $input): bool
+    {
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($token) || empty($sessionToken) || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+            return false;
+        }
+        return true;
     }
 
     /** Compact top-movers snapshot for the brain (top gainers/losers among liquid USDT pairs). */

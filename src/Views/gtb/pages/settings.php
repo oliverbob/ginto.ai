@@ -12,6 +12,8 @@ $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
 $anthropicKeySet   = $anthropicKeySet ?? false;
 $anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
 $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
+$gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend'];
+$gtbMemory         = $gtbMemory ?? false;
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -129,6 +131,37 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </p>
         </div>
 
+        <!-- Strategy templates -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-shapes text-primary mr-1.5"></i>Strategy templates</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Which strategies the bot may run. Each open capital slot uses one, diversified least-used-first.</p>
+            <?php
+            $tplOpts = [
+                'scalp'    => ['Scalp Momentum', 'Top gainer, tight stop-loss / take-profit'],
+                'breakout' => ['Breakout', 'Coin pressing its 24h high on volume'],
+                'trend'    => ['Trend Trailing', 'Ride momentum with a trailing stop'],
+            ];
+            foreach ($tplOpts as $k => $info): ?>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" class="gtb-tpl mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                           value="<?= $k ?>" <?= in_array($k, $gtbTemplates, true) ? 'checked' : '' ?>>
+                    <span class="text-sm"><span class="font-medium text-gray-800 dark:text-gray-200"><?= $info[0] ?></span>
+                        <span class="text-xs text-gray-400 dark:text-gray-500">— <?= $info[1] ?></span></span>
+                </label>
+            <?php endforeach; ?>
+
+            <label class="flex items-start gap-2 cursor-pointer pt-1 border-t border-gray-100 dark:border-gray-700/60 mt-1">
+                <input type="checkbox" id="memory_enabled" class="mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary" <?= $gtbMemory ? 'checked' : '' ?>>
+                <span class="text-sm">
+                    <span class="font-medium text-gray-800 dark:text-gray-200">Enable memory</span>
+                    <span class="block text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                        <i class="fas fa-triangle-exclamation mr-0.5"></i> Feeds recent trade outcomes into each AI decision so it learns.
+                        <strong>Increases tokens per decision</strong> (~+0.1–0.2¢ on Opus, ~+0.02¢ on Haiku). Off by default.
+                    </span>
+                </span>
+            </label>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3 pt-1">
             <button type="button" id="gtb-save-btn" onclick="gtbSaveSettings()"
                     class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
@@ -174,6 +207,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             anthropic_api_key: document.getElementById('anthropic_api_key').value,
             scan_model: document.getElementById('scan_model').value,
             decision_model: document.getElementById('decision_model').value,
+            templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
+            memory_enabled: document.getElementById('memory_enabled').checked,
         };
         const orig = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';

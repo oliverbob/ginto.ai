@@ -53,6 +53,17 @@ class GtbTrade
         }
     }
 
+    /** One open position by id, or null. */
+    public function getOpen(int $id): ?array
+    {
+        try {
+            $r = $this->db->get($this->table, '*', ['id' => $id, 'status' => 'OPEN']);
+            return is_array($r) ? $r : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     /** Ratchet a trailing stop (and record the running peak). */
     public function updateStop(int $id, float $stopLoss, float $peak): void
     {
@@ -98,6 +109,20 @@ class GtbTrade
                 'closed_at'    => date('Y-m-d H:i:s'),
             ], ['id' => $id]);
         } catch (\Throwable $e) {}
+    }
+
+    /** Recent CLOSED trades (for memory). */
+    public function recentClosed(int $limit = 8): array
+    {
+        try {
+            $rows = $this->db->select($this->table,
+                ['symbol', 'template', 'realized_pnl', 'created_at', 'closed_at'],
+                ['status' => 'CLOSED', 'ORDER' => ['id' => 'DESC'], 'LIMIT' => $limit]
+            );
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /** Sum of realized P&L across all recorded trades. */

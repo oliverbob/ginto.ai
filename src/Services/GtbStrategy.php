@@ -91,6 +91,7 @@ class GtbStrategy
             } else {
                 $held = array_column($open, 'symbol');
                 $size = $cap->perTradeSize($realized);
+                $memory = Env::bool('GTB_MEMORY_ENABLED', false) ? $this->buildMemory($trades) : null;
                 // template order: least-used first, to diversify
                 $counts = array_count_values(array_map(static fn($p) => $p['template'] ?? 'scalp', $open));
                 $order  = array_keys($this->templates);
@@ -103,6 +104,7 @@ class GtbStrategy
 
                     $ctx = ['env' => $mode, 'template' => $tpl->name(), 'templateRule' => $tpl->description(),
                             'capital' => $cap->summary($realized), 'perTradeSize' => round($size, 2)];
+                    if ($memory) $ctx['memory'] = $memory;
                     $res = $brain->decide($cand, $ctx, 'decision');
                     if (empty($res['ok'])) {
                         $thoughts->add('Decision failed: ' . ($res['error'] ?? ''), 'system', 'error');
@@ -148,6 +150,32 @@ class GtbStrategy
         }
 
         return $this->openPositionsState($client, $trades, $cap, $realized, $mode, $action, $tickers);
+    }
+
+    /** Manually close one open position at the current price (paper or live). */
+    public function closePosition(int $id): array
+    {
+        $trades   = new GtbTrade();
+        $client   = new BinanceClient();
+        $thoughts = new GtbThought();
+        $mode     = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
+
+        $pos = $trades->getOpen($id);
+        if (!$pos) return ['ok' => false, 'error' => 'Position not found or already closed.'];
+        $price = $client->price($pos['symbol']);
+        if ($price === null || $price <= 0) return ['ok' => false, 'error' => 'Price unavailable — try again.'];
+
+        if ($mode === 'live') {
+            $q = $this->floorToStep($client, $pos['symbol'], (float) $pos['qty']);
+            $client->marketSell($pos['symbol'], $q);
+        }
+        $pnl = ((float) $price - (float) $pos['price']) * (float) $pos['qty'];
+        $trades->closeTrade((int) $pos['id'], (float) $price, $pnl);
+        $thoughts->add(sprintf('Manually closed %s at $%s [%s] · P&L %s$%.4f.',
+            $pos['symbol'], $this->fmt((float) $price), $pos['template'] ?? 'scalp',
+            $pnl >= 0 ? '+' : '-', abs($pnl)
+        ), 'bot', 'trade', $pos['symbol'], 'MANUAL', ['mode' => $mode, 'pnl' => round($pnl, 6)]);
+        return ['ok' => true, 'pnl' => round($pnl, 4)];
     }
 
     /** Live snapshot of all open positions + portfolio totals (used by the monitoring grid). */
@@ -229,6 +257,24 @@ class GtbStrategy
             ];
         }
         return $out;
+    }
+
+    /** Compact trade memory: recent outcomes + per-template win/loss (kept small to bound tokens). */
+    private function buildMemory(GtbTrade $trades): array
+    {
+        $closed = $trades->recentClosed(8);
+        $recent = [];
+        $byTpl  = [];
+        foreach ($closed as $c) {
+            $pnl = (float) $c['realized_pnl'];
+            $recent[] = ['symbol' => $c['symbol'], 'template' => $c['template'] ?? '?',
+                         'pnl' => round($pnl, 4), 'result' => $pnl >= 0 ? 'win' : 'loss'];
+            $t = $c['template'] ?? '?';
+            $byTpl[$t] = $byTpl[$t] ?? ['wins' => 0, 'losses' => 0, 'pnl' => 0.0];
+            $byTpl[$t][$pnl >= 0 ? 'wins' : 'losses']++;
+            $byTpl[$t]['pnl'] = round($byTpl[$t]['pnl'] + $pnl, 4);
+        }
+        return ['recentTrades' => $recent, 'byTemplate' => $byTpl];
     }
 
     private function floorToStep(BinanceClient $client, string $symbol, float $qty): float

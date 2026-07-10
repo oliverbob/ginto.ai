@@ -553,7 +553,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Bot Brain: reflections + capital ------------------------------------
     const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
     const GTB_TESTNET = <?= ($isTestnet ?? false) ? 'true' : 'false' ?>;
-    const GTB_BOT = { timer: null };
+    const GTB_BOT = { enabled: false };
 
     function gtbModeBadge() {
         const b = document.getElementById('gtb-mode-badge');
@@ -610,21 +610,36 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
-    function gtbToggleBot() {
+    function gtbSetRunBtn() {
         const btn = document.getElementById('gtb-run-btn');
-        if (GTB_BOT.timer) {
-            clearInterval(GTB_BOT.timer); GTB_BOT.timer = null;
+        if (GTB_BOT.enabled) {
+            btn.innerHTML = '<i class="fas fa-stop"></i> Stop bot';
+            btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700';
+        } else {
             btn.innerHTML = '<i class="fas fa-play"></i> Start bot';
             btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700';
-            return;
         }
-        if (!GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
-            if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" and continue?')) return;
+    }
+
+    // Start/Stop toggles the PERSISTED server-side runner (survives restarts).
+    async function gtbToggleBot() {
+        const enable = !GTB_BOT.enabled;
+        if (enable && !GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
+            if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" first, then start.')) return;
         }
-        btn.innerHTML = '<i class="fas fa-stop"></i> Stop bot';
-        btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700';
-        gtbStep();
-        GTB_BOT.timer = setInterval(gtbStep, 45000);  // one cycle every 45s while running
+        const armed = !GTB_TESTNET && document.getElementById('gtb-arm-live').checked;
+        const btn = document.getElementById('gtb-run-btn');
+        btn.disabled = true;
+        try {
+            const res = await fetch('/gtb/bot/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF, enabled: enable, arm_live: armed }),
+            });
+            const d = await res.json();
+            if (d.ok) { GTB_BOT.enabled = !!d.bot.enabled; gtbSetRunBtn(); }
+            gtbLoadPositions();
+        } catch (e) { /* ignore */ } finally { btn.disabled = false; }
     }
 
 
@@ -714,6 +729,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     function gtbRenderPortfolio(d) {
+        if (d.bot) {
+            GTB_BOT.enabled = !!d.bot.enabled;
+            gtbSetRunBtn();
+            const act = document.getElementById('gtb-action');
+            if (act && d.bot.last_action) act.textContent = (d.bot.enabled ? '● running · ' : '○ stopped · ') + d.bot.last_action;
+        }
         const p = d.portfolio || {};
         const sum = document.getElementById('gtb-port-summary');
         if (sum) sum.textContent = `${p.open||0}/${p.slots||0} slots · realized $${(+(p.realized||0)).toFixed(2)}`;
@@ -771,8 +792,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                <div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>
                <div class="text-red-500">SL<br><span data-sl></span></div>
                <div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>
-             </div>`;
+             </div>
+             <button data-close class="mt-1.5 w-full text-[11px] font-medium py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500 transition-colors">
+               <i class="fas fa-xmark mr-1"></i>Close now
+             </button>`;
         grid.appendChild(root);
+        root.querySelector('[data-close]').addEventListener('click', () => gtbClosePosition(p.id, p.symbol));
         const el = root.querySelector('[data-chart]');
         const card = { root, chart: null, series: null, lastKey: '' };
         GTB_TRADES.cards[String(p.id)] = card;
@@ -804,6 +829,21 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         card.root.querySelector('[data-entry]').textContent = '$' + (+p.entry).toPrecision(6);
         card.root.querySelector('[data-sl]').textContent = '$' + (+p.stop_loss).toPrecision(6);
         card.root.querySelector('[data-tp]').textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
+    }
+
+    async function gtbClosePosition(id, symbol) {
+        if (!confirm('Close ' + symbol + ' now at market?')) return;
+        try {
+            const res = await fetch('/gtb/bot/close', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF, id }),
+            });
+            const d = await res.json();
+            if (!d.ok) alert('Close failed: ' + (d.error || 'unknown'));
+        } catch (e) { alert(e.message); }
+        gtbLoadPositions();
+        gtbLoadThoughts();
     }
 
     document.addEventListener('DOMContentLoaded', () => {

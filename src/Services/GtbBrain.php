@@ -62,8 +62,9 @@ class GtbBrain
         $system = "You are GTB, a disciplined Binance Spot momentum bot on {$env}. A deterministic pre-filter has "
             . "proposed ONE candidate to enter now, sized within the capital rules with a hard stop-loss already set. "
             . "Your job: a fast risk check. Enter only if the momentum looks real and continuation is plausible; skip if "
-            . "it's already parabolic/overextended, thin, or clearly reversing (don't buy the top). 2-3 sentences, then "
-            . "exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'.";
+            . "it's already parabolic/overextended, thin, or clearly reversing (don't buy the top). If a 'memory' of "
+            . "recent outcomes is provided, learn from it — avoid setups/templates that have been losing and lean into "
+            . "what's worked. 2-3 sentences, then exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'.";
         $user = "Candidate + account (JSON):\n" . json_encode(['candidate' => $candidate] + $context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nEnter {$sym} now, or skip?";
 
@@ -102,7 +103,8 @@ class GtbBrain
             . "quickly with a tight stop-loss. Hard rules you must respect and never rationalize away: only risk the "
             . "configured capital (perTradeSize); at most one open position per unlocked slot; every entry has a stop-loss. "
             . "Reason like a disciplined risk-first trader — momentum can reverse and chasing a coin that already pumped is "
-            . "how you buy the top. Be concise: 3-5 sentences of genuine reasoning. "
+            . "how you buy the top. If a 'memory' of recent outcomes is provided, factor it into your reasoning. "
+            . "Be concise: 3-5 sentences of genuine reasoning. "
             . "Finish with exactly one line in this format: 'DECISION: BUY <SYMBOL> | HOLD | SKIP — <the single biggest risk you're watching>'.";
 
         $user = "Snapshot (JSON):\n" . json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
