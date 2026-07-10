@@ -58,6 +58,12 @@ class GtbController
             $botStatus = (new \Ginto\Models\GtbBotState())->status();
         } catch (\Throwable $e) {}
 
+        // System-prompt picker: presets + which one (if any) is currently active.
+        $promptCards   = \Ginto\Services\Strategies\GtbPrompts::cards();
+        $activePrompt  = (string) (\Ginto\Support\Env::get('GTB_ACTIVE_PROMPT', '') ?? '');
+        $activePromptKey = \Ginto\Services\Strategies\GtbPrompts::matchKey($activePrompt);
+        $promptSource  = $activePrompt === '' ? 'default' : ($activePromptKey ?: 'custom');
+
         $isAdmin = false;
         if (class_exists('\\Ginto\\Controllers\\UserController')) {
             try {
@@ -83,6 +89,10 @@ class GtbController
             'botEnabled'    => !empty($botStatus['enabled']),
             'botOpenNew'    => !isset($botStatus['open_new']) || !empty($botStatus['open_new']),
             'botArmLive'    => !empty($botStatus['arm_live']),
+            'promptCards'      => $promptCards,
+            'activePrompt'     => $activePrompt,
+            'activePromptKey'  => $activePromptKey,
+            'promptSource'     => $promptSource,
         ]);
     }
 
@@ -243,13 +253,7 @@ class GtbController
             $pairs['GTB_MEMORY_ENABLED'] = !empty($input['memory_enabled']) ? 'true' : 'false';
 
             // Operator instructions: free-text steering fed into every AI decision.
-            // Sanitize to a single safe .env line (collapse newlines, drop quotes/backslashes, cap length).
-            $instr = (string) ($input['custom_instructions'] ?? '');
-            $instr = preg_replace('/[\r\n]+/', ' ', $instr);      // no newlines in .env
-            $instr = str_replace(['"', '\\'], '', $instr);        // keep envQuote wrapping safe
-            $instr = trim(preg_replace('/\s{2,}/', ' ', $instr));
-            if (mb_strlen($instr) > 2000) $instr = mb_substr($instr, 0, 2000);
-            $pairs['GTB_CUSTOM_INSTRUCTIONS'] = $instr;           // always write (blank clears it)
+            $pairs['GTB_CUSTOM_INSTRUCTIONS'] = $this->sanitizeInstr((string) ($input['custom_instructions'] ?? ''));
 
             // Time-boxing (deterministic): max hold per trade + session window (0 = off).
             $pairs['GTB_MAX_HOLD_MIN'] = (string) max(0, (int) ($input['max_hold_min'] ?? 0));
@@ -628,6 +632,44 @@ class GtbController
         exit;
     }
 
+    /**
+     * POST /gtb/bot/prompt — inject a preset/custom system prompt, or clear it.
+     * The active prompt (GTB_ACTIVE_PROMPT) overrides the /gtb-settings operator
+     * instructions; clearing reverts to that default.
+     */
+    public function promptControl(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        if (!$this->checkCsrf($input)) exit;
+        try {
+            $active = '';
+            if (!empty($input['clear'])) {
+                $active = '';
+            } elseif (!empty($input['preset'])) {
+                $t = \Ginto\Services\Strategies\GtbPrompts::text((string) $input['preset']);
+                if ($t === null) { http_response_code(400); echo json_encode(['ok' => false, 'error' => 'Unknown preset']); exit; }
+                $active = $this->sanitizeInstr($t);
+            } elseif (isset($input['custom'])) {
+                $active = $this->sanitizeInstr((string) $input['custom']);
+            }
+            $this->updateEnvKeys(['GTB_ACTIVE_PROMPT' => $active]);
+            $key = \Ginto\Services\Strategies\GtbPrompts::matchKey($active);
+            echo json_encode([
+                'ok'     => true,
+                'active' => $active,
+                'preset' => $key,
+                'source' => $active === '' ? 'default' : ($key ?: 'custom'),
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     /** POST /gtb/bot/close — manually close one open position */
     public function closePosition(): void
     {
@@ -786,6 +828,16 @@ class GtbController
         if (file_put_contents($envPath, $new) === false) {
             throw new \Exception('Failed to write .env file');
         }
+    }
+
+    /** Sanitize free-text instructions to a single safe .env line (no newlines/quotes, capped). */
+    private function sanitizeInstr(string $s): string
+    {
+        $s = preg_replace('/[\r\n]+/', ' ', $s);       // no newlines in .env
+        $s = str_replace(['"', '\\'], '', $s);         // keep envQuote wrapping safe
+        $s = trim(preg_replace('/\s{2,}/', ' ', $s));
+        if (mb_strlen($s) > 2000) $s = mb_substr($s, 0, 2000);
+        return $s;
     }
 
     /** Normalize a numeric setting to a clean env string; blank/invalid on a required-positive field falls back to $default. */

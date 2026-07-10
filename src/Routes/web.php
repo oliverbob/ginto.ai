@@ -1761,6 +1761,7 @@ $router->post('/gtb/bot/reflect', 'GtbController@reflect');     // ask the brain
 $router->post('/gtb/bot/step', 'GtbController@step');           // run one strategy cycle (paper/live)
 $router->get('/gtb/bot/positions', 'GtbController@positions');  // open positions + portfolio + bot state
 $router->post('/gtb/bot/control', 'GtbController@control');     // persist bot on/off (+ live arm)
+$router->post('/gtb/bot/prompt', 'GtbController@promptControl');// inject/clear the active system prompt
 $router->post('/gtb/bot/close', 'GtbController@closePosition'); // manually close one position
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env

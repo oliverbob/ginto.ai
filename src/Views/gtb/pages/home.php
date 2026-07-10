@@ -245,6 +245,35 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     </p>
 </section>
 
+<!-- AI System Prompt: inject a strategy template or your own; overrides Settings -->
+<section class="mb-6 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-5">
+    <div class="flex items-center justify-between mb-1">
+        <h2 class="font-bold text-gray-900 dark:text-white"><i class="fas fa-wand-magic-sparkles text-primary mr-2"></i>AI System Prompt</h2>
+        <span id="gtb-prompt-active" class="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-primary/10 text-primary"></span>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Click a strategy to inject it, or write your own below. The active prompt <strong>overrides</strong> the Operator instructions in <a href="/gtb-settings" class="underline">Settings</a>. Every strategy still trades only with an exchange-side stop (OCO).</p>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+        <?php foreach (($promptCards ?? []) as $c): ?>
+            <button type="button" data-prompt-key="<?= htmlspecialchars($c['key']) ?>" onclick="gtbInjectPreset('<?= htmlspecialchars($c['key']) ?>')"
+                    class="gtb-prompt-card text-left rounded-xl border p-3 transition-colors border-gray-200 dark:border-gray-700 hover:border-primary <?= (($activePromptKey ?? null) === $c['key']) ? 'ring-2 ring-primary border-primary' : '' ?>">
+                <div class="font-semibold text-sm text-gray-900 dark:text-white"><?= htmlspecialchars($c['name']) ?></div>
+                <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5"><?= htmlspecialchars($c['desc']) ?></div>
+                <div class="mt-2 text-[10px] font-bold uppercase text-primary"><i class="fas fa-bolt mr-1"></i>Inject</div>
+            </button>
+        <?php endforeach; ?>
+    </div>
+    <div class="mt-3">
+        <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Or your own custom template prompt</label>
+        <textarea id="gtb-custom-prompt" rows="3" maxlength="2000" placeholder="Describe the strategy the AI should follow this session…"
+                  class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2 focus:ring-primary focus:border-primary"><?= htmlspecialchars((($promptSource ?? '') === 'custom') ? ($activePrompt ?? '') : '', ENT_QUOTES) ?></textarea>
+        <div class="flex flex-wrap items-center gap-2 mt-2">
+            <button type="button" onclick="gtbInjectCustom()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90"><i class="fas fa-bolt"></i> Inject custom</button>
+            <button type="button" onclick="gtbClearPrompt()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary"><i class="fas fa-rotate-left"></i> Use Settings default</button>
+            <span id="gtb-prompt-status" class="text-xs"></span>
+        </div>
+    </div>
+</section>
+
 <!-- Active Trades: live monitoring grid with per-trade mini charts -->
 <section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
@@ -629,6 +658,40 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
+    // ---- AI system prompt picker (inject preset / custom, or clear to Settings default) ----
+    const GTB_PROMPT_NAMES = <?= json_encode(array_column($promptCards ?? [], 'name', 'key')) ?>;
+    function gtbPromptActiveLabel(source, key) {
+        if (source === 'default') return 'Settings default';
+        if (source === 'custom') return 'Custom';
+        return GTB_PROMPT_NAMES[key] || key;
+    }
+    function gtbSetPromptActive(source, key) {
+        const badge = document.getElementById('gtb-prompt-active');
+        if (badge) badge.textContent = 'Active: ' + gtbPromptActiveLabel(source, key);
+        document.querySelectorAll('.gtb-prompt-card').forEach(el => {
+            const on = (source !== 'default' && source !== 'custom' && el.dataset.promptKey === key);
+            el.classList.toggle('ring-2', on);
+            el.classList.toggle('ring-primary', on);
+            el.classList.toggle('border-primary', on);
+        });
+    }
+    async function gtbPromptPost(body) {
+        const s = document.getElementById('gtb-prompt-status');
+        if (s) { s.textContent = 'Saving…'; s.className = 'text-xs text-gray-400'; }
+        try {
+            const res = await fetch('/gtb/bot/prompt', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify(Object.assign({ csrf_token: GTB_CSRF }, body)),
+            });
+            const d = await res.json();
+            if (d.ok) { gtbSetPromptActive(d.source, d.preset); if (s) { s.textContent = 'Injected ✓ — applies on the next decision'; s.className = 'text-xs text-green-600 dark:text-green-400'; } }
+            else if (s) { s.textContent = d.error || 'Failed'; s.className = 'text-xs text-red-500'; }
+        } catch (e) { if (s) { s.textContent = 'Network error'; s.className = 'text-xs text-red-500'; } }
+    }
+    function gtbInjectPreset(key) { gtbPromptPost({ preset: key }); }
+    function gtbInjectCustom() { const t = document.getElementById('gtb-custom-prompt').value.trim(); if (!t) { const s = document.getElementById('gtb-prompt-status'); if (s) { s.textContent = 'Write a prompt first.'; s.className = 'text-xs text-amber-500'; } return; } gtbPromptPost({ custom: t }); }
+    function gtbClearPrompt() { gtbPromptPost({ clear: true }); }
+
     // Persist Arm-LIVE independently of Start/Stop so the state survives reloads and
     // takes effect on the next runner step (arm or disarm real-money trading live).
     async function gtbSetArmLive() {
@@ -935,6 +998,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbLoadMovers();
         gtbModeBadge();
         gtbSetRunBtn();  // paint Start/Stop from persisted state on load
+        gtbSetPromptActive(<?= json_encode($promptSource ?? 'default') ?>, <?= json_encode($activePromptKey) ?>);
         gtbLoadThoughts();
         gtbLoadPositions();
         setInterval(gtbLoadPositions, 6000);
