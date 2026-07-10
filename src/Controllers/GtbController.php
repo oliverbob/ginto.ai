@@ -101,6 +101,8 @@ class GtbController
             // env unavailable — render an empty form
         }
         $endpoint = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
+        $anthropicKeySet = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
+        $anthropicModel  = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -117,6 +119,8 @@ class GtbController
             'testnetSecretSet' => $testSecretSet,
             'binanceTestnet'   => $testnet,
             'binanceEndpoint'  => $endpoint,
+            'anthropicKeySet'  => $anthropicKeySet,
+            'anthropicModel'   => $anthropicModel,
             'csrf_token'       => $this->csrfToken(),
         ]);
     }
@@ -164,6 +168,10 @@ class GtbController
             ];
             if ($mainSecret !== '') $pairs['BINANCE_API_SECRET'] = $mainSecret;
             if ($testSecret !== '') $pairs['BINANCE_TESTNET_API_SECRET'] = $testSecret;
+
+            // AI brain key (write-only, like the Binance secrets)
+            $anthropicKey = trim((string) ($input['anthropic_api_key'] ?? ''));
+            if ($anthropicKey !== '') $pairs['ANTHROPIC_API_KEY'] = $anthropicKey;
 
             $this->updateEnvKeys($pairs);
 
@@ -366,6 +374,110 @@ class GtbController
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
+    }
+
+    /** GET /gtb/thoughts — the bot's reflection stream + capital/brain status */
+    public function thoughts(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+
+        $thoughts = [];
+        $capital = null;
+        $brainReady = false;
+        try {
+            $thoughts = (new \Ginto\Models\GtbThought())->recent(40);
+            $realized = (new GtbTrade())->totalRealizedPnl();
+            $capital = (new \Ginto\Services\GtbCapital())->summary($realized);
+            $brainReady = (new \Ginto\Services\GtbBrain())->isConfigured();
+        } catch (\Throwable $e) {}
+
+        echo json_encode(['ok' => true, 'thoughts' => $thoughts, 'capital' => $capital, 'brainReady' => $brainReady]);
+        exit;
+    }
+
+    /** POST /gtb/bot/reflect — ask the AI brain to reflect on the market (advisory, no orders) */
+    public function reflect(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+
+        // CSRF (reuse the same scheme as settings save)
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($token) || empty($sessionToken) || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+
+        try {
+            $settings = new GtbSettings();
+            $brain    = new \Ginto\Services\GtbBrain();
+            $thoughts = new \Ginto\Models\GtbThought();
+
+            if (!$brain->isConfigured()) {
+                echo json_encode(['ok' => false, 'error' => 'No Anthropic API key set. Add it on the API Settings page.']);
+                exit;
+            }
+
+            $realized = (new GtbTrade())->totalRealizedPnl();
+            $capital  = (new \Ginto\Services\GtbCapital())->summary($realized);
+            $context  = [
+                'env'      => $settings->isTestnet() ? 'testnet' : 'mainnet',
+                'capital'  => $capital,
+                'movers'   => $this->marketSnapshot(),
+                'note'     => 'Advisory reflection only — no order will be placed.',
+            ];
+
+            $res = $brain->reflect($context);
+            if (empty($res['ok'])) {
+                $thoughts->add('Reflection failed: ' . ($res['error'] ?? 'unknown'), 'system', 'error');
+                echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Reflection failed']);
+                exit;
+            }
+
+            $thoughts->add($res['text'], 'claude', 'reflect', null, $res['decision'] ?? null, ['model' => $brain->model()]);
+            echo json_encode(['ok' => true, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** Compact top-movers snapshot for the brain (top gainers/losers among liquid USDT pairs). */
+    private function marketSnapshot(): array
+    {
+        try {
+            $client = new \Ginto\Services\BinanceClient();
+            $res = $client->allTickers24hr();
+            if (empty($res['ok']) || !is_array($res['data'])) return [];
+            $stable = ['USDC','BUSD','TUSD','FDUSD','DAI','USDP','USTC','EUR','GBP','AEUR','USD1'];
+            $items = [];
+            foreach ($res['data'] as $r) {
+                $sym = $r['symbol'] ?? '';
+                if (!str_ends_with($sym, 'USDT')) continue;
+                $base = substr($sym, 0, -4);
+                if ($base === '' || preg_match('/(UP|DOWN|BULL|BEAR)$/', $base) || in_array($base, $stable, true)) continue;
+                $vol = (float) ($r['quoteVolume'] ?? 0);
+                if ($vol < 5000000.0) continue;
+                $items[] = [
+                    'symbol'    => $sym,
+                    'changePct' => round((float) ($r['priceChangePercent'] ?? 0), 2),
+                    'price'     => (float) ($r['lastPrice'] ?? 0),
+                    'quoteVol'  => (int) $vol,
+                ];
+            }
+            $g = $items; usort($g, static fn($a, $b) => $b['changePct'] <=> $a['changePct']);
+            $l = $items; usort($l, static fn($a, $b) => $a['changePct'] <=> $b['changePct']);
+            return ['topGainers' => array_slice($g, 0, 6), 'topLosers' => array_slice($l, 0, 4)];
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /**

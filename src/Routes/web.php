@@ -1756,5 +1756,7 @@ $router->get('/gtb/markets', 'GtbController@markets');          // live market d
 $router->get('/gtb/klines', 'GtbController@klines');            // OHLC candles for the candlestick chart
 $router->get('/gtb/account', 'GtbController@account');          // signed: portfolio value, holdings, balances
 $router->get('/gtb/test-connection', 'GtbController@account');  // alias (Test connection button)
+$router->get('/gtb/thoughts', 'GtbController@thoughts');        // AI brain reflection stream
+$router->post('/gtb/bot/reflect', 'GtbController@reflect');     // ask the brain to reflect (advisory)
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env

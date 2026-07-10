@@ -196,6 +196,34 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <?php endforeach; ?>
 </section>
 
+<!-- Bot Brain: the AI reflecting on the market (advisory) -->
+<section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            <i class="fas fa-robot text-primary mr-2"></i>Bot Brain
+            <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">Claude · reflections &amp; decisions</span>
+        </h3>
+        <div class="flex items-center gap-2">
+            <span id="gtb-capital-chip" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
+            <button type="button" id="gtb-reflect-btn" onclick="gtbReflect()"
+                    class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                <i class="fas fa-brain"></i> Reflect now
+            </button>
+        </div>
+    </div>
+    <div id="gtb-brain-hint" class="hidden mb-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
+        No Anthropic API key set — add it on the <a href="/gtb-settings" class="font-semibold underline">API Settings</a> page to enable the AI brain.
+    </div>
+    <div id="gtb-brain-feed" class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+        <div class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Loading…
+        </div>
+    </div>
+    <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+        Advisory only — the brain reflects and decides out loud; it does not place orders. Deterministic strategy + hard risk rules come next.
+    </p>
+</section>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
     <!-- Trading history -->
     <section class="lg:col-span-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
@@ -485,11 +513,81 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
+    // ---- Bot Brain: reflections + capital ------------------------------------
+    const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
+
+    function gtbBrainBubble(t) {
+        const isClaude = t.role === 'claude';
+        const isErr = t.phase === 'error' || t.role === 'system';
+        const icon = isClaude ? 'fa-robot text-primary' : (isErr ? 'fa-triangle-exclamation text-amber-500' : 'fa-circle-info text-gray-400');
+        const who = isClaude ? 'Claude' : (isErr ? 'system' : 'bot');
+        let dec = '';
+        if (t.decision) {
+            const buy = /^BUY/.test(t.decision);
+            dec = `<span class="ml-2 text-[10px] font-bold uppercase px-2 py-0.5 rounded ${buy ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'}">${t.decision}</span>`;
+        }
+        const body = (t.message || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+        return `<div class="flex gap-2.5">
+            <i class="fas ${icon} mt-1"></i>
+            <div class="flex-1 min-w-0">
+                <div class="text-xs text-gray-400 dark:text-gray-500">${who}${dec}<span class="ml-2">${(t.created_at||'')}</span></div>
+                <div class="mt-0.5 text-sm text-gray-700 dark:text-gray-200 leading-relaxed">${body}</div>
+            </div></div>`;
+    }
+
+    async function gtbLoadThoughts() {
+        const feed = document.getElementById('gtb-brain-feed');
+        try {
+            const res = await fetch('/gtb/thoughts');
+            const d = await res.json();
+            if (!d.ok) return;
+            document.getElementById('gtb-brain-hint').classList.toggle('hidden', !!d.brainReady);
+            if (d.capital) {
+                const c = d.capital;
+                document.getElementById('gtb-capital-chip').textContent =
+                    `tradable $${(+c.tradable).toFixed(2)} · size $${(+c.perTradeSize).toFixed(2)} · slots ${c.slots}`;
+            }
+            if (!d.thoughts.length) {
+                feed.innerHTML = '<div class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">No reflections yet — hit “Reflect now”.</div>';
+            } else {
+                feed.innerHTML = d.thoughts.map(gtbBrainBubble).join('');
+                feed.scrollTop = feed.scrollHeight;
+            }
+        } catch (e) { /* ignore */ }
+    }
+
+    async function gtbReflect() {
+        const btn = document.getElementById('gtb-reflect-btn');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking…';
+        try {
+            const res = await fetch('/gtb/bot/reflect', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF }),
+            });
+            const d = await res.json();
+            if (!d.ok) {
+                const feed = document.getElementById('gtb-brain-feed');
+                feed.insertAdjacentHTML('beforeend',
+                    `<div class="text-sm text-red-500"><i class="fas fa-triangle-exclamation"></i> ${d.error || 'Reflection failed'}</div>`);
+            }
+            await gtbLoadThoughts();
+        } catch (e) {
+            /* ignore */
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = orig;
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
         gtbInitIntervals();
         gtbInitSort();
         gtbLoadMovers();
+        gtbLoadThoughts();
         if (GTB_API_CONFIGURED) gtbLoadAccount();
     });
 </script>

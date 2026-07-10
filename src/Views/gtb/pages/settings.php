@@ -9,6 +9,8 @@ $testnetApiKey    = $testnetApiKey ?? '';
 $testnetSecretSet = $testnetSecretSet ?? false;
 $binanceTestnet   = $binanceTestnet ?? false;
 $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
+$anthropicKeySet  = $anthropicKeySet ?? false;
+$anthropicModel   = $anthropicModel ?? 'claude-opus-4-8';
 $csrf_token       = $csrf_token ?? '';
 
 function gtb_key_section(string $env, string $label, string $apiKey, bool $secretSet, string $tone): void {
@@ -80,6 +82,26 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             enable Reading + Spot, keep Withdrawals off, restrict to this server's IP.
         </div>
 
+        <!-- AI Brain (Claude) -->
+        <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
+            <div class="flex items-center justify-between">
+                <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-robot text-primary mr-1.5"></i>AI Brain (Claude)</h3>
+                <span class="text-[10px] font-mono text-gray-400 dark:text-gray-500"><?= htmlspecialchars($anthropicModel) ?></span>
+            </div>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+                A <strong>paid Anthropic API key</strong> from <code>console.anthropic.com</code> (this is <em>not</em> your Claude Pro login — Pro can't be used programmatically). Powers the bot's self-reflection chat.
+            </p>
+            <div>
+                <label for="anthropic_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anthropic API Key</label>
+                <input type="password" id="anthropic_api_key" autocomplete="new-password" spellcheck="false"
+                       class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
+                       placeholder="<?= $anthropicKeySet ? '•••••••• saved — leave blank to keep' : 'sk-ant-...' ?>">
+                <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                    <?= $anthropicKeySet ? 'A key is saved. Leave blank to keep it, or type a new one to replace it.' : 'Write-only — never shown after saving. Billed per token, separately from Claude Pro.' ?>
+                </p>
+            </div>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3 pt-1">
             <button type="button" id="gtb-save-btn" onclick="gtbSaveSettings()"
                     class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
@@ -122,6 +144,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             mainnet_api_secret: document.getElementById('mainnet_api_secret').value,
             testnet_api_key: document.getElementById('testnet_api_key').value.trim(),
             testnet_api_secret: document.getElementById('testnet_api_secret').value,
+            anthropic_api_key: document.getElementById('anthropic_api_key').value,
         };
         const orig = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
@@ -136,7 +159,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             if (res.ok && d.success) {
                 status.textContent = '✓ ' + (d.message || 'Saved') + (d.configured ? '' : ' — active env still missing key/secret');
                 status.className = 'text-sm ' + (d.configured ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400');
-                ['mainnet_api_secret', 'testnet_api_secret'].forEach(id => {
+                ['mainnet_api_secret', 'testnet_api_secret', 'anthropic_api_key'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el.value) { el.value = ''; el.placeholder = '•••••••• saved — leave blank to keep'; }
                 });
