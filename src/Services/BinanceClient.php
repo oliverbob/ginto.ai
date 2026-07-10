@@ -133,6 +133,79 @@ class BinanceClient
         return ['ok' => true, 'data' => $map];
     }
 
+    /** Last price for one symbol (public mainnet). */
+    public function price(string $symbol): ?float
+    {
+        $r = $this->httpGet($this->marketBase . '/api/v3/ticker/price', ['symbol' => strtoupper($symbol)]);
+        return (!empty($r['ok']) && isset($r['data']['price'])) ? (float) $r['data']['price'] : null;
+    }
+
+    /** LOT_SIZE step for a symbol (to round sell quantities). */
+    public function lotStep(string $symbol): ?float
+    {
+        $r = $this->httpGet($this->accountBase . '/api/v3/exchangeInfo', ['symbol' => strtoupper($symbol)]);
+        if (empty($r['ok'])) return null;
+        foreach (($r['data']['symbols'][0]['filters'] ?? []) as $f) {
+            if (($f['filterType'] ?? '') === 'LOT_SIZE') return (float) $f['stepSize'];
+        }
+        return null;
+    }
+
+    /** LIVE market BUY spending a fixed quote amount (USDT). Uses the configured endpoint. */
+    public function marketBuyQuote(string $symbol, float $quoteUsd): array
+    {
+        return $this->signedPost('/api/v3/order', [
+            'symbol' => strtoupper($symbol), 'side' => 'BUY', 'type' => 'MARKET',
+            'quoteOrderQty' => rtrim(rtrim(number_format($quoteUsd, 2, '.', ''), '0'), '.'),
+        ]);
+    }
+
+    /** LIVE market SELL a base-asset quantity. Uses the configured endpoint. */
+    public function marketSell(string $symbol, float $qty): array
+    {
+        return $this->signedPost('/api/v3/order', [
+            'symbol' => strtoupper($symbol), 'side' => 'SELL', 'type' => 'MARKET',
+            'quantity' => rtrim(rtrim(number_format($qty, 8, '.', ''), '0'), '.'),
+        ]);
+    }
+
+    private function signedPost(string $path, array $params): array
+    {
+        if (!$this->isConfigured()) {
+            return ['ok' => false, 'error' => 'API key/secret not set', 'code' => 0];
+        }
+        $params['timestamp']  = (int) round(microtime(true) * 1000);
+        $params['recvWindow'] = 5000;
+        $query = http_build_query($params);
+        $sig   = hash_hmac('sha256', $query, $this->apiSecret);
+        $url   = $this->accountBase . $path . '?' . $query . '&signature=' . $sig;
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 15,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => '',
+            CURLOPT_HTTPHEADER     => ['X-MBX-APIKEY: ' . $this->apiKey],
+        ]);
+        $body  = curl_exec($ch);
+        $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $errno = curl_errno($ch);
+        $err   = curl_error($ch);
+        curl_close($ch);
+
+        if ($body === false || $errno) {
+            return ['ok' => false, 'error' => 'Network error: ' . $err, 'code' => 0];
+        }
+        $data = json_decode($body, true);
+        if ($code < 200 || $code >= 300) {
+            $msg = (is_array($data) && isset($data['msg'])) ? $data['msg'] : ('HTTP ' . $code);
+            return ['ok' => false, 'error' => $msg, 'code' => $code];
+        }
+        return ['ok' => true, 'data' => $data, 'code' => $code];
+    }
+
     /** Signed account info (balances, canTrade). Uses the configured endpoint. */
     public function account(): array
     {

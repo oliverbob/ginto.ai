@@ -462,6 +462,31 @@ class GtbController
         exit;
     }
 
+    /** POST /gtb/bot/step — run one strategy cycle (paper on testnet, live on mainnet) */
+    public function step(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($token) || empty($sessionToken) || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+        try {
+            $armLive = !empty($input['arm_live']);
+            echo json_encode((new \Ginto\Services\GtbStrategy())->step($armLive));
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     /** Compact top-movers snapshot for the brain (top gainers/losers among liquid USDT pairs). */
     private function marketSnapshot(): array
     {

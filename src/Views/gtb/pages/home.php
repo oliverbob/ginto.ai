@@ -204,17 +204,37 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">Claude · reflections &amp; decisions</span>
         </h3>
         <div class="flex items-center gap-2 flex-wrap">
+            <span id="gtb-mode-badge" class="text-[11px] font-bold uppercase px-2.5 py-1 rounded-full"></span>
             <span id="gtb-capital-chip" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
             <span id="gtb-spend-chip" title="Estimated AI spend" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
             <button type="button" id="gtb-reflect-btn" onclick="gtbReflect()"
                     class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
-                <i class="fas fa-brain"></i> Reflect now
+                <i class="fas fa-brain"></i> Reflect
             </button>
         </div>
     </div>
+
+    <!-- Bot control row -->
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+        <button type="button" id="gtb-step-btn" onclick="gtbStep()"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary disabled:opacity-60">
+            <i class="fas fa-forward-step"></i> Step once
+        </button>
+        <button type="button" id="gtb-run-btn" onclick="gtbToggleBot()"
+                class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700">
+            <i class="fas fa-play"></i> Start bot
+        </button>
+        <label id="gtb-arm-wrap" class="hidden inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 cursor-pointer">
+            <input type="checkbox" id="gtb-arm-live" class="w-4 h-4 rounded border-red-400 text-red-600 focus:ring-red-500">
+            Arm LIVE trading (real money)
+        </label>
+        <span id="gtb-action" class="text-xs text-gray-500 dark:text-gray-400"></span>
+    </div>
+
     <div id="gtb-brain-hint" class="hidden mb-3 rounded-lg border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-200">
         No Anthropic API key set — add it on the <a href="/gtb-settings" class="font-semibold underline">API Settings</a> page to enable the AI brain.
     </div>
+    <div id="gtb-position" class="hidden mb-3 rounded-lg border border-primary/30 bg-primary/5 p-3 text-sm"></div>
     <div id="gtb-brain-feed" class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
         <div class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
             <i class="fas fa-spinner fa-spin mr-1"></i> Loading…
@@ -516,6 +536,80 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     // ---- Bot Brain: reflections + capital ------------------------------------
     const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
+    const GTB_TESTNET = <?= ($isTestnet ?? false) ? 'true' : 'false' ?>;
+    const GTB_BOT = { timer: null };
+
+    function gtbModeBadge() {
+        const b = document.getElementById('gtb-mode-badge');
+        if (GTB_TESTNET) { b.textContent = 'Paper (testnet)'; b.className = 'text-[11px] font-bold uppercase px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'; }
+        else { b.textContent = 'LIVE (real funds)'; b.className = 'text-[11px] font-bold uppercase px-2.5 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400'; }
+        document.getElementById('gtb-arm-wrap').classList.toggle('hidden', GTB_TESTNET);
+    }
+
+    function gtbRenderState(d) {
+        if (d.action) document.getElementById('gtb-action').textContent = '→ ' + d.action;
+        if (d.capital) {
+            const c = d.capital;
+            document.getElementById('gtb-capital-chip').textContent =
+                `tradable $${(+c.tradable).toFixed(2)} · size $${(+c.perTradeSize).toFixed(2)} · slots ${c.slots}`;
+        }
+        const pos = document.getElementById('gtb-position');
+        if (d.position) {
+            const p = d.position, up = (+p.unrealized) >= 0;
+            pos.classList.remove('hidden');
+            pos.innerHTML =
+                `<div class="flex flex-wrap items-center justify-between gap-2">
+                   <div><span class="font-bold text-gray-900 dark:text-white">${p.symbol}</span>
+                     <span class="ml-2 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span></div>
+                   <div class="font-semibold ${up?'text-green-600 dark:text-green-400':'text-red-500 dark:text-red-400'}">${up?'+':''}$${(+p.unrealized).toFixed(4)}</div>
+                 </div>
+                 <div class="mt-1 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+                   entry $${(+p.entry).toPrecision(6)} · mark $${(+p.mark).toPrecision(6)} · SL $${(+p.stop_loss).toPrecision(6)} · TP $${(+p.take_profit).toPrecision(6)}
+                 </div>`;
+        } else {
+            pos.classList.add('hidden');
+        }
+    }
+
+    async function gtbStep() {
+        const btn = document.getElementById('gtb-step-btn');
+        const armed = !GTB_TESTNET && document.getElementById('gtb-arm-live').checked;
+        const wasDisabled = btn.disabled;
+        btn.disabled = true;
+        try {
+            const res = await fetch('/gtb/bot/step', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF, arm_live: armed }),
+            });
+            const d = await res.json();
+            if (d.ok) gtbRenderState(d);
+            else document.getElementById('gtb-action').textContent = '✗ ' + (d.error || 'step failed');
+            await gtbLoadThoughts();
+        } catch (e) {
+            document.getElementById('gtb-action').textContent = '✗ ' + e.message;
+        } finally {
+            btn.disabled = wasDisabled;
+        }
+    }
+
+    function gtbToggleBot() {
+        const btn = document.getElementById('gtb-run-btn');
+        if (GTB_BOT.timer) {
+            clearInterval(GTB_BOT.timer); GTB_BOT.timer = null;
+            btn.innerHTML = '<i class="fas fa-play"></i> Start bot';
+            btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700';
+            return;
+        }
+        if (!GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
+            if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" and continue?')) return;
+        }
+        btn.innerHTML = '<i class="fas fa-stop"></i> Stop bot';
+        btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700';
+        gtbStep();
+        GTB_BOT.timer = setInterval(gtbStep, 45000);  // one cycle every 45s while running
+    }
+
 
     function gtbBrainBubble(t) {
         const isClaude = t.role === 'claude';
@@ -592,6 +686,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbInitIntervals();
         gtbInitSort();
         gtbLoadMovers();
+        gtbModeBadge();
         gtbLoadThoughts();
         if (GTB_API_CONFIGURED) gtbLoadAccount();
     });

@@ -1758,5 +1758,6 @@ $router->get('/gtb/account', 'GtbController@account');          // signed: portf
 $router->get('/gtb/test-connection', 'GtbController@account');  // alias (Test connection button)
 $router->get('/gtb/thoughts', 'GtbController@thoughts');        // AI brain reflection stream
 $router->post('/gtb/bot/reflect', 'GtbController@reflect');     // ask the brain to reflect (advisory)
+$router->post('/gtb/bot/step', 'GtbController@step');           // run one strategy cycle (paper/live)
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env

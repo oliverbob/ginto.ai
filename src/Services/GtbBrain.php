@@ -46,6 +46,38 @@ class GtbBrain
         return $tier === 'scan' ? $this->scanModel : $this->decisionModel;
     }
 
+    /**
+     * Decide whether to ENTER a specific candidate right now. Focused, cheaper prompt.
+     * @return array{ok:bool, text?:string, decision?:?string(BUY|SKIP), model?:string, usage?:array, error?:string}
+     */
+    public function decide(array $candidate, array $context, string $tier = 'decision'): array
+    {
+        if (!$this->isConfigured()) {
+            return ['ok' => false, 'error' => 'No Anthropic API key set.'];
+        }
+        $model = $this->model($tier);
+        $env = $context['env'] ?? 'paper';
+        $sym = $candidate['symbol'] ?? '?';
+
+        $system = "You are GTB, a disciplined Binance Spot momentum bot on {$env}. A deterministic pre-filter has "
+            . "proposed ONE candidate to enter now, sized within the capital rules with a hard stop-loss already set. "
+            . "Your job: a fast risk check. Enter only if the momentum looks real and continuation is plausible; skip if "
+            . "it's already parabolic/overextended, thin, or clearly reversing (don't buy the top). 2-3 sentences, then "
+            . "exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'.";
+        $user = "Candidate + account (JSON):\n" . json_encode(['candidate' => $candidate] + $context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+            . "\n\nEnter {$sym} now, or skip?";
+
+        $res = $this->call($model, $system, $user, 350);
+        if (empty($res['ok'])) return $res;
+
+        $decision = null;
+        if (preg_match('/DECISION:\s*(BUY|SKIP)/i', $res['text'], $m)) {
+            $decision = strtoupper($m[1]);
+        }
+        $res['decision'] = $decision;
+        return $res;
+    }
+
     /** Estimated USD cost of a call from token usage. */
     public static function costUsd(string $model, int $inputTokens, int $outputTokens): float
     {
@@ -76,13 +108,26 @@ class GtbBrain
         $user = "Snapshot (JSON):\n" . json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nGiven the capital rules and current movers, is there a momentum trade worth taking right now? Reflect, then decide.";
 
+        $res = $this->call($model, $system, $user, 600);
+        if (empty($res['ok'])) return $res;
+
+        $decision = null;
+        if (preg_match('/DECISION:\s*(BUY\s+[A-Z0-9]+|HOLD|SKIP)/i', $res['text'], $m)) {
+            $decision = strtoupper(trim($m[1]));
+        }
+        $res['decision'] = $decision;
+        return $res;
+    }
+
+    /** One Messages API call. Returns ok/text/model/usage(with cost) or ok=false/error. */
+    private function call(string $model, string $system, string $user, int $maxTokens): array
+    {
         $body = [
             'model'      => $model,
-            'max_tokens' => 600,
+            'max_tokens' => $maxTokens,
             'system'     => $system,
             'messages'   => [['role' => 'user', 'content' => $user]],
         ];
-
         $ch = curl_init('https://api.anthropic.com/v1/messages');
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
@@ -107,36 +152,22 @@ class GtbBrain
         }
         $data = json_decode($resp, true);
         if ($code < 200 || $code >= 300) {
-            $msg = $data['error']['message'] ?? ('HTTP ' . $code);
-            return ['ok' => false, 'error' => $msg];
+            return ['ok' => false, 'error' => $data['error']['message'] ?? ('HTTP ' . $code)];
         }
         if (($data['stop_reason'] ?? '') === 'refusal') {
             return ['ok' => false, 'error' => 'Claude declined to respond to this prompt.'];
         }
-
         $text = '';
         foreach (($data['content'] ?? []) as $b) {
-            if (($b['type'] ?? '') === 'text') {
-                $text .= $b['text'];
-            }
+            if (($b['type'] ?? '') === 'text') $text .= $b['text'];
         }
-        $text = trim($text);
-
-        $decision = null;
-        if (preg_match('/DECISION:\s*(BUY\s+[A-Z0-9]+|HOLD|SKIP)/i', $text, $m)) {
-            $decision = strtoupper(trim($m[1]));
-        }
-
-        $usageIn  = (int) ($data['usage']['input_tokens'] ?? 0);
-        $usageOut = (int) ($data['usage']['output_tokens'] ?? 0);
-        $cost     = self::costUsd($model, $usageIn, $usageOut);
-
+        $in  = (int) ($data['usage']['input_tokens'] ?? 0);
+        $out = (int) ($data['usage']['output_tokens'] ?? 0);
         return [
-            'ok'       => true,
-            'text'     => $text,
-            'decision' => $decision,
-            'model'    => $model,
-            'usage'    => ['input_tokens' => $usageIn, 'output_tokens' => $usageOut, 'cost_usd' => round($cost, 6)],
+            'ok'    => true,
+            'text'  => trim($text),
+            'model' => $model,
+            'usage' => ['input_tokens' => $in, 'output_tokens' => $out, 'cost_usd' => round(self::costUsd($model, $in, $out), 6)],
         ];
     }
 }
