@@ -27,12 +27,26 @@ class GtbBrain
     private string $apiKey;
     private string $decisionModel;
     private string $scanModel;
+    private string $operatorInstructions;
 
     public function __construct()
     {
         $this->apiKey        = (string) (Env::get('ANTHROPIC_API_KEY', '') ?? '');
         $this->decisionModel = (string) (Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8') ?: 'claude-opus-4-8';
         $this->scanModel     = (string) (Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5') ?: 'claude-haiku-4-5';
+        $this->operatorInstructions = trim((string) (Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? ''));
+    }
+
+    /**
+     * Free-text steering from the account owner (settings page). Obeyed as long as it
+     * doesn't loosen a hard risk rule — the risk rules always win. Empty string = none.
+     */
+    private function operatorBlock(): string
+    {
+        if ($this->operatorInstructions === '') return '';
+        return "\n\nOPERATOR INSTRUCTIONS (from the account owner — follow these unless they would violate a hard risk "
+            . "rule above; a hard rule always wins, and if they conflict say so in your reasoning): "
+            . $this->operatorInstructions;
     }
 
     public function isConfigured(): bool
@@ -64,7 +78,8 @@ class GtbBrain
             . "Your job: a fast risk check. Enter only if the momentum looks real and continuation is plausible; skip if "
             . "it's already parabolic/overextended, thin, or clearly reversing (don't buy the top). If a 'memory' of "
             . "recent outcomes is provided, learn from it — avoid setups/templates that have been losing and lean into "
-            . "what's worked. 2-3 sentences, then exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'.";
+            . "what's worked. 2-3 sentences, then exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'."
+            . $this->operatorBlock();
         $user = "Candidate + account (JSON):\n" . json_encode(['candidate' => $candidate] + $context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nEnter {$sym} now, or skip?";
 
@@ -105,7 +120,8 @@ class GtbBrain
             . "Reason like a disciplined risk-first trader — momentum can reverse and chasing a coin that already pumped is "
             . "how you buy the top. If a 'memory' of recent outcomes is provided, factor it into your reasoning. "
             . "Be concise: 3-5 sentences of genuine reasoning. "
-            . "Finish with exactly one line in this format: 'DECISION: BUY <SYMBOL> | HOLD | SKIP — <the single biggest risk you're watching>'.";
+            . "Finish with exactly one line in this format: 'DECISION: BUY <SYMBOL> | HOLD | SKIP — <the single biggest risk you're watching>'."
+            . $this->operatorBlock();
 
         $user = "Snapshot (JSON):\n" . json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nGiven the capital rules and current movers, is there a momentum trade worth taking right now? Reflect, then decide.";

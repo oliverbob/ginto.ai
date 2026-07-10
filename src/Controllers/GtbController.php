@@ -106,6 +106,7 @@ class GtbController
         $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
         $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
+        $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -127,6 +128,7 @@ class GtbController
             'anthropicScanModel'=> $anthropicScanModel,
             'gtbTemplates'      => $gtbTemplates,
             'gtbMemory'         => $gtbMemory,
+            'gtbInstructions'   => $gtbInstructions,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -193,6 +195,15 @@ class GtbController
 
             // Memory (opt-in; increases tokens per AI decision)
             $pairs['GTB_MEMORY_ENABLED'] = !empty($input['memory_enabled']) ? 'true' : 'false';
+
+            // Operator instructions: free-text steering fed into every AI decision.
+            // Sanitize to a single safe .env line (collapse newlines, drop quotes/backslashes, cap length).
+            $instr = (string) ($input['custom_instructions'] ?? '');
+            $instr = preg_replace('/[\r\n]+/', ' ', $instr);      // no newlines in .env
+            $instr = str_replace(['"', '\\'], '', $instr);        // keep envQuote wrapping safe
+            $instr = trim(preg_replace('/\s{2,}/', ' ', $instr));
+            if (mb_strlen($instr) > 600) $instr = mb_substr($instr, 0, 600);
+            $pairs['GTB_CUSTOM_INSTRUCTIONS'] = $instr;           // always write (blank clears it)
 
             $this->updateEnvKeys($pairs);
 

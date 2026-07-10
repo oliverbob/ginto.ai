@@ -14,6 +14,7 @@ $anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
 $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
 $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
+$gtbInstructions   = $gtbInstructions ?? '';
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -163,6 +164,16 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </label>
         </div>
 
+        <!-- Operator instructions -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-wand-magic-sparkles text-primary mr-1.5"></i>Operator instructions <span class="text-xs font-normal text-gray-400">(optional)</span></h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Plain-English steering fed into <em>every</em> AI trade decision — e.g. focus/avoid certain coins, be more or less aggressive, cap what you'll chase. The bot follows these <strong>within</strong> the hard risk rules (capital cap, per-trade size, mandatory stop-loss) — they can tighten behavior but never loosen a safety rule.</p>
+            <textarea id="custom_instructions" rows="4" maxlength="600"
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2 focus:ring-primary focus:border-primary"
+                      placeholder="e.g. Only trade BTC, ETH and SOL. Skip anything already up more than 15% today. Prefer breakouts over dip-buys. Be conservative — when unsure, skip."><?= htmlspecialchars($gtbInstructions, ENT_QUOTES) ?></textarea>
+            <p class="text-xs text-gray-400 dark:text-gray-500">Applied on the next decision after saving. Leave blank to remove.</p>
+        </div>
+
         <div class="flex flex-wrap items-center gap-3 pt-1">
             <button type="button" id="gtb-save-btn" onclick="gtbSaveSettings()"
                     class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
@@ -210,6 +221,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             decision_model: document.getElementById('decision_model').value,
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,
+            custom_instructions: document.getElementById('custom_instructions').value,
         };
         const orig = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
