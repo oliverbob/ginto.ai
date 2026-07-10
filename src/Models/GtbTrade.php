@@ -82,6 +82,7 @@ class GtbTrade
                 'type'             => 'MARKET',
                 'mode'             => $data['mode'] ?? 'paper',
                 'template'         => $data['template'] ?? null,
+                'profile'          => $data['profile'] ?? null,
                 'price'            => $data['price'],
                 'qty'              => $data['qty'],
                 'quote_qty'        => $data['quote_qty'] ?? null,

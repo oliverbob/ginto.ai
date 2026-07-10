@@ -716,7 +716,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Active Trades grid (per-trade mini charts) ---------------------------
     const GTB_TRADES = { cards: {} };  // id -> { root, chart, series, lastKey }
 
-    function gtbTemplLabel(k) { return ({scalp:'Scalp', breakout:'Breakout', trend:'Trend'})[k] || k; }
+    function gtbTemplLabel(k) { return ({scalp:'Scalp', breakout:'Breakout', trend:'Trend', pullback:'Pullback'})[k] || k; }
+    function gtbProfLabel(k) { return ({conservative:'Conservative', aggressive:'Aggressive'})[k] || k; }
+    function gtbProfBadge(k) {
+        const cls = k === 'aggressive'
+            ? 'bg-orange-100 text-orange-700 dark:bg-orange-500/20 dark:text-orange-400'
+            : 'bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-400';
+        return `<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${cls}">${gtbProfLabel(k)}</span>`;
+    }
 
     async function gtbLoadPositions() {
         try {
@@ -779,6 +786,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         root.innerHTML =
             `<div class="flex items-center justify-between mb-1">
                <div class="font-bold text-gray-900 dark:text-white">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span>
+                 ${gtbProfBadge(p.profile)}
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
                </div>

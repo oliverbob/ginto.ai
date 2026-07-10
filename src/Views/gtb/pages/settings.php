@@ -15,6 +15,7 @@ $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
 $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
 $gtbInstructions   = $gtbInstructions ?? '';
+$gtbProfiles       = $gtbProfiles ?? ['conservative', 'aggressive'];
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -132,6 +133,25 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </p>
         </div>
 
+        <!-- Trading profiles (two bots, one wallet) -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-user-group text-primary mr-1.5"></i>Trading bots</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Two temperaments sharing the <strong>same</strong> capital. Enable one or both — with both on, they run side by side and take turns on each free slot (least-used first, AI-confirmed).</p>
+            <?php
+            $profOpts = [
+                'conservative' => ['Conservative', 'High-conviction only · trend + pullback · tighter risk, banks profit quickly'],
+                'aggressive'   => ['Aggressive', 'Hunts fast movers · scalp + breakout · wider targets, lets winners run'],
+            ];
+            foreach ($profOpts as $k => $info): ?>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="checkbox" class="gtb-prof mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                           value="<?= $k ?>" <?= in_array($k, $gtbProfiles, true) ? 'checked' : '' ?>>
+                    <span class="text-sm"><span class="font-medium text-gray-800 dark:text-gray-200"><?= $info[0] ?></span>
+                        <span class="block text-xs text-gray-400 dark:text-gray-500"><?= $info[1] ?></span></span>
+                </label>
+            <?php endforeach; ?>
+        </div>
+
         <!-- Strategy templates -->
         <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-shapes text-primary mr-1.5"></i>Strategy templates</h3>
@@ -219,6 +239,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             anthropic_api_key: document.getElementById('anthropic_api_key').value,
             scan_model: document.getElementById('scan_model').value,
             decision_model: document.getElementById('decision_model').value,
+            profiles: Array.from(document.querySelectorAll('.gtb-prof:checked')).map(c => c.value),
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,
             custom_instructions: document.getElementById('custom_instructions').value,

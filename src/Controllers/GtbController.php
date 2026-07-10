@@ -107,6 +107,7 @@ class GtbController
         $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
         $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
+        $gtbProfiles  = \Ginto\Services\Strategies\GtbProfiles::enabled();
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -129,6 +130,7 @@ class GtbController
             'gtbTemplates'      => $gtbTemplates,
             'gtbMemory'         => $gtbMemory,
             'gtbInstructions'   => $gtbInstructions,
+            'gtbProfiles'       => $gtbProfiles,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -192,6 +194,11 @@ class GtbController
             $allowedTpls = ['scalp', 'breakout', 'trend', 'pullback'];
             $tpls = array_values(array_intersect($allowedTpls, (array) ($input['templates'] ?? [])));
             if ($tpls) $pairs['GTB_TEMPLATES'] = implode(',', $tpls);
+
+            // Trading profiles (aggressive / conservative) — at least one required
+            $allowedProfiles = ['conservative', 'aggressive'];
+            $profs = array_values(array_intersect($allowedProfiles, (array) ($input['profiles'] ?? [])));
+            if ($profs) $pairs['GTB_PROFILES'] = implode(',', $profs);
 
             // Memory (opt-in; increases tokens per AI decision)
             $pairs['GTB_MEMORY_ENABLED'] = !empty($input['memory_enabled']) ? 'true' : 'false';

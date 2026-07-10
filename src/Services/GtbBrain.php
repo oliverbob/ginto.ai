@@ -78,8 +78,11 @@ class GtbBrain
             . "Your job: a fast risk check. Enter only if the momentum looks real and continuation is plausible; skip if "
             . "it's already parabolic/overextended, thin, or clearly reversing (don't buy the top). If a 'memory' of "
             . "recent outcomes is provided, learn from it — avoid setups/templates that have been losing and lean into "
-            . "what's worked. 2-3 sentences, then exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'."
-            . $this->operatorBlock();
+            . "what's worked. 2-3 sentences, then exactly one final line: 'DECISION: BUY {$sym}' or 'DECISION: SKIP — <reason>'.";
+        if (!empty($context['posture'])) {
+            $system .= "\n\nPROFILE POSTURE (the temperament you are trading with right now): " . $context['posture'];
+        }
+        $system .= $this->operatorBlock();
         $user = "Candidate + account (JSON):\n" . json_encode(['candidate' => $candidate] + $context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nEnter {$sym} now, or skip?";
 

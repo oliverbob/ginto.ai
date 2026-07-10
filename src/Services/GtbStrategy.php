@@ -10,6 +10,7 @@ use Ginto\Services\Strategies\ScalpMomentum;
 use Ginto\Services\Strategies\Breakout;
 use Ginto\Services\Strategies\TrendTrailing;
 use Ginto\Services\Strategies\PullbackDip;
+use Ginto\Services\Strategies\GtbProfiles;
 
 /**
  * Multi-strategy, multi-position engine. One step():
@@ -93,17 +94,29 @@ class GtbStrategy
                 $held = array_column($open, 'symbol');
                 $size = $cap->perTradeSize($realized);
                 $memory = Env::bool('GTB_MEMORY_ENABLED', false) ? $this->buildMemory($trades) : null;
-                // template order: least-used first, to diversify
-                $counts = array_count_values(array_map(static fn($p) => $p['template'] ?? 'scalp', $open));
-                $order  = array_keys($this->templates);
-                usort($order, static fn($a, $b) => ($counts[$a] ?? 0) <=> ($counts[$b] ?? 0));
 
-                foreach ($order as $key) {
+                // Profile order: least-used first so the two bots share slots fairly.
+                $profiles = GtbProfiles::enabled();
+                $pCounts  = array_count_values(array_map(static fn($p) => $p['profile'] ?? 'conservative', $open));
+                usort($profiles, static fn($a, $b) => ($pCounts[$a] ?? 0) <=> ($pCounts[$b] ?? 0));
+
+                // (profile, template) attempts in priority order.
+                $attempts = [];
+                foreach ($profiles as $pk) {
+                    $cfg = GtbProfiles::config($pk);
+                    $tks = array_values(array_filter($cfg['templates'], fn($t) => isset($this->templates[$t])));
+                    if (!$tks) $tks = array_keys($this->templates);   // fall back to whatever is enabled
+                    foreach ($tks as $tk) $attempts[] = [$pk, $tk, $cfg];
+                }
+
+                $opened = false;
+                foreach ($attempts as [$pk, $key, $cfg]) {
                     $tpl  = $this->templates[$key];
                     $cand = $tpl->entryCandidate(array_values($tickers), $held);
                     if (!$cand) continue;
 
-                    $ctx = ['env' => $mode, 'template' => $tpl->name(), 'templateRule' => $tpl->description(),
+                    $ctx = ['env' => $mode, 'profile' => $cfg['name'], 'posture' => $cfg['posture'],
+                            'template' => $tpl->name(), 'templateRule' => $tpl->description(),
                             'capital' => $cap->summary($realized), 'perTradeSize' => round($size, 2)];
                     if ($memory) $ctx['memory'] = $memory;
                     $res = $brain->decide($cand, $ctx, 'decision');
@@ -112,18 +125,19 @@ class GtbStrategy
                         $action = 'brain error: ' . ($res['error'] ?? '');
                         break;
                     }
-                    $meta = array_merge(['model' => $res['model'] ?? '', 'template' => $key], $res['usage'] ?? []);
+                    $meta = array_merge(['model' => $res['model'] ?? '', 'template' => $key, 'profile' => $pk], $res['usage'] ?? []);
                     $thoughts->add($res['text'], 'claude', 'decision', $cand['symbol'], $res['decision'] ?? null, $meta);
 
                     if (($res['decision'] ?? '') !== 'BUY') {
-                        $action = '[' . $tpl->name() . '] skipped ' . $cand['symbol'];
-                        break;
+                        // This bot passed on its best idea; let the next (profile,template) try.
+                        $action = '[' . $cfg['name'] . '/' . $tpl->name() . '] skipped ' . $cand['symbol'];
+                        continue;
                     }
                     $price = $priceOf($cand['symbol']);
-                    if ($price === null || $price <= 0) { $action = 'price unavailable at entry'; break; }
+                    if ($price === null || $price <= 0) { $action = 'price unavailable at entry'; continue; }
                     $fill = (float) $price; $qty = $size / $fill; $oid = null;
                     if ($mode === 'live') {
-                        if (!$armLive) { $action = '[' . $tpl->name() . '] BUY ' . $cand['symbol'] . ' — live not armed'; break; }
+                        if (!$armLive) { $action = '[' . $cfg['name'] . '] BUY ' . $cand['symbol'] . ' — live not armed'; break; }
                         $ord = $client->marketBuyQuote($cand['symbol'], $size);
                         if (empty($ord['ok'])) {
                             $thoughts->add('Live order failed: ' . ($ord['error'] ?? ''), 'system', 'error');
@@ -133,19 +147,24 @@ class GtbStrategy
                         if ($ex > 0) { $qty = $ex; $fill = $cum / $ex; }
                         $oid = $d['orderId'] ?? null;
                     }
-                    $st = $tpl->stops($fill);
+                    $st = $this->applyRisk($tpl->stops($fill), $fill, $cfg);
                     $trades->openTrade([
-                        'symbol' => $cand['symbol'], 'mode' => $mode, 'template' => $key, 'price' => $fill, 'qty' => $qty,
-                        'quote_qty' => $size, 'stop_loss' => $st['stop_loss'], 'take_profit' => $st['take_profit'] ?? null,
+                        'symbol' => $cand['symbol'], 'mode' => $mode, 'template' => $key, 'profile' => $pk,
+                        'price' => $fill, 'qty' => $qty, 'quote_qty' => $size,
+                        'stop_loss' => $st['stop_loss'], 'take_profit' => $st['take_profit'] ?? null,
                         'peak_price' => $fill, 'trail_pct' => $st['trail_pct'] ?? null, 'binance_order_id' => $oid,
                     ]);
                     $tpTxt = (!empty($st['take_profit'])) ? ' / TP $' . $this->fmt($st['take_profit']) : ' · trailing ' . ($st['trail_pct'] ?? '') . '%';
-                    $thoughts->add(sprintf('Entered %s %s [%s] — $%.2f at $%s · SL $%s%s.',
-                        $mode === 'paper' ? '(paper)' : '(LIVE)', $cand['symbol'], $tpl->name(), $size,
+                    $thoughts->add(sprintf('Entered %s %s [%s · %s] — $%.2f at $%s · SL $%s%s.',
+                        $mode === 'paper' ? '(paper)' : '(LIVE)', $cand['symbol'], $cfg['name'], $tpl->name(), $size,
                         $this->fmt($fill), $this->fmt($st['stop_loss']), $tpTxt
-                    ), 'bot', 'trade', $cand['symbol'], 'BUY', ['mode' => $mode, 'template' => $key]);
-                    $action = 'entered ' . $cand['symbol'] . ' [' . $tpl->name() . ']';
+                    ), 'bot', 'trade', $cand['symbol'], 'BUY', ['mode' => $mode, 'template' => $key, 'profile' => $pk]);
+                    $action = 'entered ' . $cand['symbol'] . ' [' . $cfg['name'] . ']';
+                    $opened = true;
                     break;
+                }
+                if (!$opened && $action === ('managing ' . count($open) . ' position(s)')) {
+                    $action = 'no qualifying setup this cycle';
                 }
             }
         }
@@ -204,6 +223,7 @@ class GtbStrategy
                 'id'          => (int) $p['id'],
                 'symbol'      => $sym,
                 'template'    => $p['template'] ?? 'scalp',
+                'profile'     => $p['profile'] ?? 'conservative',
                 'mode'        => $p['mode'] ?? $mode,
                 'entry'       => $entry,
                 'qty'         => $qty,
@@ -217,6 +237,8 @@ class GtbStrategy
         }
         $tmplList = [];
         foreach ($this->templates as $k => $t) $tmplList[] = ['key' => $k, 'name' => $t->name()];
+        $profList = [];
+        foreach (GtbProfiles::enabled() as $pk) $profList[] = ['key' => $pk, 'name' => GtbProfiles::config($pk)['name']];
 
         return [
             'ok'        => true,
@@ -231,6 +253,7 @@ class GtbStrategy
             ],
             'capital'   => $cap->summary($realized),
             'templates' => $tmplList,
+            'profiles'  => $profList,
         ];
     }
 
@@ -276,6 +299,23 @@ class GtbStrategy
             $byTpl[$t]['pnl'] = round($byTpl[$t]['pnl'] + $pnl, 4);
         }
         return ['recentTrades' => $recent, 'byTemplate' => $byTpl];
+    }
+
+    /** Scale a template's stop/target by the profile's risk multipliers (distance from entry). */
+    private function applyRisk(array $st, float $entry, array $cfg): array
+    {
+        $slMult = (float) ($cfg['slMult'] ?? 1.0);
+        $tpMult = (float) ($cfg['tpMult'] ?? 1.0);
+        if (!empty($st['stop_loss'])) {
+            $st['stop_loss'] = $entry - ($entry - (float) $st['stop_loss']) * $slMult;
+        }
+        if (!empty($st['take_profit'])) {
+            $st['take_profit'] = $entry + ((float) $st['take_profit'] - $entry) * $tpMult;
+        }
+        if (!empty($st['trail_pct'])) {
+            $st['trail_pct'] = (float) $st['trail_pct'] * $slMult;
+        }
+        return $st;
     }
 
     private function floorToStep(BinanceClient $client, string $symbol, float $qty): float
