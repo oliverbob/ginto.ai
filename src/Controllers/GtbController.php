@@ -487,6 +487,21 @@ class GtbController
         exit;
     }
 
+    /** GET /gtb/bot/positions — open positions + portfolio (for the monitoring grid) */
+    public function positions(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+        try {
+            echo json_encode((new \Ginto\Services\GtbStrategy())->openPositionsState());
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     /** Compact top-movers snapshot for the brain (top gainers/losers among liquid USDT pairs). */
     private function marketSnapshot(): array
     {

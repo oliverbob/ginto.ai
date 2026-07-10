@@ -245,6 +245,22 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     </p>
 </section>
 
+<!-- Active Trades: live monitoring grid with per-trade mini charts -->
+<section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            <i class="fas fa-layer-group text-primary mr-2"></i>Active Trades
+            <span id="gtb-port-summary" class="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500"></span>
+        </h3>
+        <span id="gtb-port-unreal" class="text-sm font-bold"></span>
+    </div>
+    <div id="gtb-trades-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div class="col-span-full py-10 text-center text-gray-400 dark:text-gray-500 text-sm">
+            No open positions — start the bot to trade.
+        </div>
+    </div>
+</section>
+
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
     <!-- Trading history -->
     <section class="lg:col-span-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
@@ -586,6 +602,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             if (d.ok) gtbRenderState(d);
             else document.getElementById('gtb-action').textContent = '✗ ' + (d.error || 'step failed');
             await gtbLoadThoughts();
+            gtbLoadPositions();
         } catch (e) {
             document.getElementById('gtb-action').textContent = '✗ ' + e.message;
         } finally {
@@ -681,6 +698,114 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
+    // ---- Active Trades grid (per-trade mini charts) ---------------------------
+    const GTB_TRADES = { cards: {} };  // id -> { root, chart, series, lastKey }
+
+    function gtbTemplLabel(k) { return ({scalp:'Scalp', breakout:'Breakout', trend:'Trend'})[k] || k; }
+
+    async function gtbLoadPositions() {
+        try {
+            const res = await fetch('/gtb/bot/positions');
+            const d = await res.json();
+            if (!d.ok) return;
+            gtbRenderPortfolio(d);
+            gtbRenderGrid(d.positions || []);
+        } catch (e) { /* ignore */ }
+    }
+
+    function gtbRenderPortfolio(d) {
+        const p = d.portfolio || {};
+        const sum = document.getElementById('gtb-port-summary');
+        if (sum) sum.textContent = `${p.open||0}/${p.slots||0} slots · realized $${(+(p.realized||0)).toFixed(2)}`;
+        const un = document.getElementById('gtb-port-unreal');
+        if (un) {
+            const v = +(p.unrealized || 0), up = v >= 0;
+            un.textContent = `Unrealized ${up?'+':''}$${v.toFixed(4)}`;
+            un.className = 'text-sm font-bold ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+        }
+    }
+
+    function gtbRenderGrid(positions) {
+        const grid = document.getElementById('gtb-trades-grid');
+        const ids = new Set(positions.map(p => String(p.id)));
+        // remove closed
+        Object.keys(GTB_TRADES.cards).forEach(id => {
+            if (!ids.has(id)) {
+                const c = GTB_TRADES.cards[id];
+                try { c.chart && c.chart.remove(); } catch (e) {}
+                c.root && c.root.remove();
+                delete GTB_TRADES.cards[id];
+            }
+        });
+        // empty state
+        const empty = grid.querySelector('[data-empty]') || (positions.length === 0 && !Object.keys(GTB_TRADES.cards).length ? grid : null);
+        if (positions.length === 0) {
+            grid.innerHTML = '<div data-empty class="col-span-full py-10 text-center text-gray-400 dark:text-gray-500 text-sm">No open positions — start the bot to trade.</div>';
+            return;
+        }
+        const emptyEl = grid.querySelector('[data-empty]');
+        if (emptyEl) emptyEl.remove();
+        // add / update
+        positions.forEach(p => {
+            if (!GTB_TRADES.cards[String(p.id)]) gtbCreateTradeCard(grid, p);
+            gtbUpdateTradeCard(p);
+        });
+    }
+
+    function gtbCreateTradeCard(grid, p) {
+        const root = document.createElement('div');
+        root.className = 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3';
+        root.innerHTML =
+            `<div class="flex items-center justify-between mb-1">
+               <div class="font-bold text-gray-900 dark:text-white">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span>
+                 <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
+                 <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
+               </div>
+               <div class="text-right leading-tight">
+                 <span data-pnl class="block text-sm font-bold"></span>
+                 <span data-pct class="block text-[11px]"></span>
+               </div>
+             </div>
+             <div data-chart class="w-full rounded overflow-hidden" style="height:140px"></div>
+             <div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">
+               <div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>
+               <div class="text-red-500">SL<br><span data-sl></span></div>
+               <div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>
+             </div>`;
+        grid.appendChild(root);
+        const el = root.querySelector('[data-chart]');
+        const card = { root, chart: null, series: null, lastKey: '' };
+        GTB_TRADES.cards[String(p.id)] = card;
+        if (typeof LightweightCharts !== 'undefined') {
+            card.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 140,
+                crosshair: { mode: 0 }, handleScale: false, handleScroll: false,
+                rightPriceScale: { visible: true }, timeScale: { visible: false } }, gtbChartTheme()));
+            card.series = card.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
+            card.series.createPriceLine({ price: p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
+            card.series.createPriceLine({ price: p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
+            if (p.take_profit) card.series.createPriceLine({ price: p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
+            new ResizeObserver(() => { try { card.chart.applyOptions({ width: el.clientWidth }); } catch (e) {} }).observe(el);
+            fetch(`/gtb/klines?symbol=${encodeURIComponent(p.symbol)}&interval=5m`)
+                .then(r => r.json()).then(d => {
+                    if (d.ok && card.series) { card.series.setData(d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))); card.chart.timeScale().fitContent(); }
+                }).catch(() => {});
+        }
+    }
+
+    function gtbUpdateTradeCard(p) {
+        const card = GTB_TRADES.cards[String(p.id)];
+        if (!card) return;
+        const up = (+p.unrealized) >= 0;
+        const pnl = card.root.querySelector('[data-pnl]'); const pct = card.root.querySelector('[data-pct]');
+        pnl.textContent = `${up?'+':''}$${(+p.unrealized).toFixed(4)}`;
+        pnl.className = 'block text-sm font-bold ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+        pct.textContent = `${up?'+':''}${(+p.pnlPct).toFixed(2)}% · $${(+p.mark).toPrecision(6)}`;
+        pct.className = 'block text-[11px] ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+        card.root.querySelector('[data-entry]').textContent = '$' + (+p.entry).toPrecision(6);
+        card.root.querySelector('[data-sl]').textContent = '$' + (+p.stop_loss).toPrecision(6);
+        card.root.querySelector('[data-tp]').textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
         gtbInitIntervals();
@@ -688,6 +813,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbLoadMovers();
         gtbModeBadge();
         gtbLoadThoughts();
+        gtbLoadPositions();
+        setInterval(gtbLoadPositions, 6000);
         if (GTB_API_CONFIGURED) gtbLoadAccount();
     });
 </script>

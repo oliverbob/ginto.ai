@@ -42,6 +42,25 @@ class GtbTrade
         }
     }
 
+    /** All open positions (oldest first). */
+    public function openPositions(): array
+    {
+        try {
+            $rows = $this->db->select($this->table, '*', ['status' => 'OPEN', 'ORDER' => ['id' => 'ASC']]);
+            return is_array($rows) ? $rows : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    /** Ratchet a trailing stop (and record the running peak). */
+    public function updateStop(int $id, float $stopLoss, float $peak): void
+    {
+        try {
+            $this->db->update($this->table, ['stop_loss' => $stopLoss, 'peak_price' => $peak], ['id' => $id]);
+        } catch (\Throwable $e) {}
+    }
+
     /** Open a new position. Returns inserted id or null. */
     public function openTrade(array $data): ?int
     {
@@ -51,11 +70,14 @@ class GtbTrade
                 'side'             => 'BUY',
                 'type'             => 'MARKET',
                 'mode'             => $data['mode'] ?? 'paper',
+                'template'         => $data['template'] ?? null,
                 'price'            => $data['price'],
                 'qty'              => $data['qty'],
                 'quote_qty'        => $data['quote_qty'] ?? null,
                 'stop_loss'        => $data['stop_loss'] ?? null,
                 'take_profit'      => $data['take_profit'] ?? null,
+                'peak_price'       => $data['peak_price'] ?? $data['price'],
+                'trail_pct'        => $data['trail_pct'] ?? null,
                 'status'           => 'OPEN',
                 'binance_order_id' => $data['binance_order_id'] ?? null,
             ]);
