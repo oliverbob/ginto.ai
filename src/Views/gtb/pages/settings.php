@@ -12,7 +12,7 @@ $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
 $anthropicKeySet   = $anthropicKeySet ?? false;
 $anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
 $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
-$gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend'];
+$gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
 $csrf_token        = $csrf_token ?? '';
 
@@ -140,6 +140,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                 'scalp'    => ['Scalp Momentum', 'Top gainer, tight stop-loss / take-profit'],
                 'breakout' => ['Breakout', 'Coin pressing its 24h high on volume'],
                 'trend'    => ['Trend Trailing', 'Ride momentum with a trailing stop'],
+                'pullback' => ['Pullback Dip', 'Buy an uptrend that pulled back off its 24h high'],
             ];
             foreach ($tplOpts as $k => $info): ?>
                 <label class="flex items-start gap-2 cursor-pointer">

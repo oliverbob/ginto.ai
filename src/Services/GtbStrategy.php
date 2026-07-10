@@ -9,6 +9,7 @@ use Ginto\Services\Strategies\GtbTemplate;
 use Ginto\Services\Strategies\ScalpMomentum;
 use Ginto\Services\Strategies\Breakout;
 use Ginto\Services\Strategies\TrendTrailing;
+use Ginto\Services\Strategies\PullbackDip;
 
 /**
  * Multi-strategy, multi-position engine. One step():
@@ -27,8 +28,8 @@ class GtbStrategy
 
     public function __construct()
     {
-        $all = ['scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class];
-        $enabled = array_filter(array_map('trim', explode(',', (string) (Env::get('GTB_TEMPLATES', 'scalp,breakout,trend') ?? ''))));
+        $all = ['scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
+        $enabled = array_filter(array_map('trim', explode(',', (string) (Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         if (!$enabled) $enabled = array_keys($all);
         foreach ($enabled as $k) {
             if (isset($all[$k])) $this->templates[$k] = new $all[$k]();

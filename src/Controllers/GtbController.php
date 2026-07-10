@@ -104,7 +104,7 @@ class GtbController
         $anthropicKeySet    = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
         $anthropicModel     = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
         $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
-        $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend') ?? ''))));
+        $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
 
         View::view('gtb/gtb', [
@@ -187,7 +187,7 @@ class GtbController
             if (in_array($scanModel, $allowedModels, true)) $pairs['ANTHROPIC_SCAN_MODEL'] = $scanModel;
 
             // Strategy templates enable/disable (at least one required)
-            $allowedTpls = ['scalp', 'breakout', 'trend'];
+            $allowedTpls = ['scalp', 'breakout', 'trend', 'pullback'];
             $tpls = array_values(array_intersect($allowedTpls, (array) ($input['templates'] ?? [])));
             if ($tpls) $pairs['GTB_TEMPLATES'] = implode(',', $tpls);
 
