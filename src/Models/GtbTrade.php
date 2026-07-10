@@ -72,6 +72,14 @@ class GtbTrade
         } catch (\Throwable $e) {}
     }
 
+    /** Record (or clear) the exchange-side protective order reference. */
+    public function setProtection(int $id, ?string $type, ?string $protectId): void
+    {
+        try {
+            $this->db->update($this->table, ['protect_type' => $type, 'protect_id' => $protectId], ['id' => $id]);
+        } catch (\Throwable $e) {}
+    }
+
     /** Open a new position. Returns inserted id or null. */
     public function openTrade(array $data): ?int
     {
@@ -92,6 +100,8 @@ class GtbTrade
                 'trail_pct'        => $data['trail_pct'] ?? null,
                 'status'           => 'OPEN',
                 'binance_order_id' => $data['binance_order_id'] ?? null,
+                'protect_type'     => $data['protect_type'] ?? null,
+                'protect_id'       => $data['protect_id'] ?? null,
             ]);
             return (int) $this->db->id();
         } catch (\Throwable $e) {

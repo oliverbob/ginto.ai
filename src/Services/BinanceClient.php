@@ -140,15 +140,117 @@ class BinanceClient
         return (!empty($r['ok']) && isset($r['data']['price'])) ? (float) $r['data']['price'] : null;
     }
 
+    /** @var array<string,array{step:float,tick:float,minNotional:float}> per-instance filter cache */
+    private array $filterCache = [];
+
+    /** LOT_SIZE step + PRICE_FILTER tick + min notional for a symbol. Cached per instance. */
+    public function exchangeFilters(string $symbol): array
+    {
+        $symbol = strtoupper($symbol);
+        if (isset($this->filterCache[$symbol])) return $this->filterCache[$symbol];
+        $out = ['step' => 0.0, 'tick' => 0.0, 'minNotional' => 0.0];
+        $r = $this->httpGet($this->accountBase . '/api/v3/exchangeInfo', ['symbol' => $symbol]);
+        if (!empty($r['ok'])) {
+            foreach (($r['data']['symbols'][0]['filters'] ?? []) as $f) {
+                switch ($f['filterType'] ?? '') {
+                    case 'LOT_SIZE':    $out['step'] = (float) ($f['stepSize'] ?? 0); break;
+                    case 'PRICE_FILTER':$out['tick'] = (float) ($f['tickSize'] ?? 0); break;
+                    case 'NOTIONAL':    $out['minNotional'] = (float) ($f['minNotional'] ?? 0); break;
+                    case 'MIN_NOTIONAL':$out['minNotional'] = (float) ($f['minNotional'] ?? 0); break;
+                }
+            }
+            $this->filterCache[$symbol] = $out;
+        }
+        return $out;
+    }
+
     /** LOT_SIZE step for a symbol (to round sell quantities). */
     public function lotStep(string $symbol): ?float
     {
-        $r = $this->httpGet($this->accountBase . '/api/v3/exchangeInfo', ['symbol' => strtoupper($symbol)]);
-        if (empty($r['ok'])) return null;
-        foreach (($r['data']['symbols'][0]['filters'] ?? []) as $f) {
-            if (($f['filterType'] ?? '') === 'LOT_SIZE') return (float) $f['stepSize'];
-        }
-        return null;
+        $s = $this->exchangeFilters($symbol)['step'];
+        return $s > 0 ? $s : null;
+    }
+
+    /** Number of decimal places implied by a step/tick size (e.g. 0.001 -> 3). */
+    private function decimalsOf(float $step): int
+    {
+        if ($step <= 0) return 8;
+        if ($step >= 1) return 0;
+        $s = rtrim(sprintf('%.18f', $step), '0');
+        $dot = strpos($s, '.');
+        return $dot === false ? 0 : strlen($s) - $dot - 1;
+    }
+
+    /** Floor (or ceil) a value to a step and format it at the step's precision — Binance-safe. */
+    public function quantize(float $value, float $step, bool $up = false): string
+    {
+        if ($step <= 0) return rtrim(rtrim(sprintf('%.8f', $value), '0'), '.') ?: '0';
+        $n = $up ? ceil($value / $step - 1e-9) : floor($value / $step + 1e-9);
+        return number_format($n * $step, $this->decimalsOf($step), '.', '');
+    }
+
+    /**
+     * Place a resting OCO SELL to protect a long: a take-profit limit above and a
+     * stop-limit below, on the exchange. quantity/prices are quantized to the symbol
+     * filters here. @return ['ok'=>bool,'data'=>['orderListId'=>...], 'error'=>...]
+     */
+    public function placeOcoSell(string $symbol, float $qty, float $tpPrice, float $stopPrice, float $stopLimitPrice): array
+    {
+        $f = $this->exchangeFilters($symbol);
+        return $this->signedRequest('POST', '/api/v3/order/oco', [
+            'symbol'                => strtoupper($symbol),
+            'side'                  => 'SELL',
+            'quantity'              => $this->quantize($qty, $f['step']),
+            'price'                 => $this->quantize($tpPrice, $f['tick']),          // take-profit limit
+            'stopPrice'             => $this->quantize($stopPrice, $f['tick']),        // stop trigger
+            'stopLimitPrice'        => $this->quantize($stopLimitPrice, $f['tick']),   // stop execution limit
+            'stopLimitTimeInForce'  => 'GTC',
+        ]);
+    }
+
+    /** Place a resting STOP_LOSS_LIMIT SELL (for the trailing template; no fixed take-profit). */
+    public function placeStopLossSell(string $symbol, float $qty, float $stopPrice, float $stopLimitPrice): array
+    {
+        $f = $this->exchangeFilters($symbol);
+        return $this->signedRequest('POST', '/api/v3/order', [
+            'symbol'      => strtoupper($symbol),
+            'side'        => 'SELL',
+            'type'        => 'STOP_LOSS_LIMIT',
+            'timeInForce' => 'GTC',
+            'quantity'    => $this->quantize($qty, $f['step']),
+            'price'       => $this->quantize($stopLimitPrice, $f['tick']),
+            'stopPrice'   => $this->quantize($stopPrice, $f['tick']),
+        ]);
+    }
+
+    /** Cancel an OCO order list. */
+    public function cancelOco(string $symbol, string $orderListId): array
+    {
+        return $this->signedRequest('DELETE', '/api/v3/orderList', [
+            'symbol' => strtoupper($symbol), 'orderListId' => $orderListId,
+        ]);
+    }
+
+    /** Cancel a single order. */
+    public function cancelOrder(string $symbol, string $orderId): array
+    {
+        return $this->signedRequest('DELETE', '/api/v3/order', [
+            'symbol' => strtoupper($symbol), 'orderId' => $orderId,
+        ]);
+    }
+
+    /** Status of an OCO list: listOrderStatus (EXECUTING|ALL_DONE|REJECT) + its orders. */
+    public function ocoStatus(string $orderListId): array
+    {
+        return $this->signedRequest('GET', '/api/v3/orderList', ['orderListId' => $orderListId]);
+    }
+
+    /** Status of a single order (status, executedQty, cummulativeQuoteQty, ...). */
+    public function orderStatus(string $symbol, string $orderId): array
+    {
+        return $this->signedRequest('GET', '/api/v3/order', [
+            'symbol' => strtoupper($symbol), 'orderId' => $orderId,
+        ]);
     }
 
     /** LIVE market BUY spending a fixed quote amount (USDT). Uses the configured endpoint. */
@@ -171,6 +273,12 @@ class BinanceClient
 
     private function signedPost(string $path, array $params): array
     {
+        return $this->signedRequest('POST', $path, $params);
+    }
+
+    /** Signed request (GET/POST/DELETE) to the configured account endpoint. */
+    private function signedRequest(string $method, string $path, array $params): array
+    {
         if (!$this->isConfigured()) {
             return ['ok' => false, 'error' => 'API key/secret not set', 'code' => 0];
         }
@@ -185,10 +293,12 @@ class BinanceClient
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT        => 15,
             CURLOPT_CONNECTTIMEOUT => 5,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => '',
+            CURLOPT_CUSTOMREQUEST  => $method,
             CURLOPT_HTTPHEADER     => ['X-MBX-APIKEY: ' . $this->apiKey],
         ]);
+        if ($method === 'POST') {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, '');
+        }
         $body  = curl_exec($ch);
         $code  = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $errno = curl_errno($ch);

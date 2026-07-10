@@ -789,6 +789,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                  ${gtbProfBadge(p.profile)}
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
+                 ${p.mode==='live' ? (p.protected
+                    ? '<span title="Stop-loss resting on Binance" class="ml-1 text-[9px] text-green-600 dark:text-green-400"><i class="fas fa-shield-halved"></i></span>'
+                    : '<span title="No exchange stop yet" class="ml-1 text-[9px] text-red-500"><i class="fas fa-triangle-exclamation"></i></span>') : ''}
                </div>
                <div class="text-right leading-tight">
                  <span data-pnl class="block text-sm font-bold"></span>

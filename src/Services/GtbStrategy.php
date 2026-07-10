@@ -53,24 +53,31 @@ class GtbStrategy
         };
 
         // ---- 1) manage every open position ----
+        //   paper: deterministic exits are simulated here at the live mark price.
+        //   live : the stop/target rest ON THE EXCHANGE (OCO / stop-limit). We only
+        //          reconcile fills, ratchet the trailing stop, and re-protect if a
+        //          protective order goes missing — the exchange enforces the stop
+        //          even if this runner is down.
         foreach ($trades->openPositions() as $pos) {
-            $tpl = $this->templates[$pos['template']] ?? ($this->templates['scalp'] ?? new ScalpMomentum());
             $price = $priceOf($pos['symbol']);
             if ($price === null || $price <= 0) continue;
+
+            if (($pos['mode'] ?? $mode) === 'live') {
+                $realized += $this->reconcileLive($client, $trades, $thoughts, $pos, (float) $price);
+                continue;
+            }
+
+            $tpl = $this->templates[$pos['template']] ?? ($this->templates['scalp'] ?? new ScalpMomentum());
             $m = $tpl->manage($pos, (float) $price);
             if (!$m) continue;
             if (isset($m['close'])) {
-                if ($mode === 'live') {
-                    $q = $this->floorToStep($client, $pos['symbol'], (float) $pos['qty']);
-                    $client->marketSell($pos['symbol'], $q);
-                }
                 $pnl = ((float) $price - (float) $pos['price']) * (float) $pos['qty'];
                 $trades->closeTrade((int) $pos['id'], (float) $price, $pnl);
                 $realized += $pnl;
                 $thoughts->add(sprintf('Closed %s at $%s (%s) [%s] · P&L %s$%.4f.',
                     $pos['symbol'], $this->fmt((float) $price), $m['close'], $pos['template'] ?? 'scalp',
                     $pnl >= 0 ? '+' : '-', abs($pnl)
-                ), 'bot', 'trade', $pos['symbol'], $m['close'], ['mode' => $mode, 'pnl' => round($pnl, 6), 'template' => $pos['template'] ?? null]);
+                ), 'bot', 'trade', $pos['symbol'], $m['close'], ['mode' => 'paper', 'pnl' => round($pnl, 6), 'template' => $pos['template'] ?? null]);
             } elseif (isset($m['trail'])) {
                 $trades->updateStop((int) $pos['id'], (float) $m['trail']['stop_loss'], (float) $m['trail']['peak']);
             }
@@ -136,6 +143,7 @@ class GtbStrategy
                     $price = $priceOf($cand['symbol']);
                     if ($price === null || $price <= 0) { $action = 'price unavailable at entry'; continue; }
                     $fill = (float) $price; $qty = $size / $fill; $oid = null;
+                    $protType = null; $protId = null;
                     if ($mode === 'live') {
                         if (!$armLive) { $action = '[' . $cfg['name'] . '] BUY ' . $cand['symbol'] . ' — live not armed'; break; }
                         $ord = $client->marketBuyQuote($cand['symbol'], $size);
@@ -148,16 +156,31 @@ class GtbStrategy
                         $oid = $d['orderId'] ?? null;
                     }
                     $st = $this->applyRisk($tpl->stops($fill), $fill, $cfg);
+                    if ($mode === 'live') {
+                        // Put the stop (and target) ON the exchange before we consider the position held.
+                        $prot = $this->protectLive($client, $cand['symbol'], $qty, $st);
+                        if (!empty($prot['error'])) {
+                            // Never hold unprotected inventory — sell straight back out.
+                            $client->marketSell($cand['symbol'], $this->floorToStep($client, $cand['symbol'], $qty * 0.999));
+                            $thoughts->add('Aborted ' . $cand['symbol'] . ': could not place exchange stop (' . $prot['error'] . ') — sold back to stay protected.',
+                                'system', 'error', $cand['symbol'], null, ['mode' => 'live']);
+                            $action = 'aborted ' . $cand['symbol'] . ' — exchange stop rejected';
+                            break;
+                        }
+                        $protType = $prot['type']; $protId = $prot['id'];
+                    }
                     $trades->openTrade([
                         'symbol' => $cand['symbol'], 'mode' => $mode, 'template' => $key, 'profile' => $pk,
                         'price' => $fill, 'qty' => $qty, 'quote_qty' => $size,
                         'stop_loss' => $st['stop_loss'], 'take_profit' => $st['take_profit'] ?? null,
                         'peak_price' => $fill, 'trail_pct' => $st['trail_pct'] ?? null, 'binance_order_id' => $oid,
+                        'protect_type' => $protType, 'protect_id' => $protId,
                     ]);
                     $tpTxt = (!empty($st['take_profit'])) ? ' / TP $' . $this->fmt($st['take_profit']) : ' · trailing ' . ($st['trail_pct'] ?? '') . '%';
-                    $thoughts->add(sprintf('Entered %s %s [%s · %s] — $%.2f at $%s · SL $%s%s.',
+                    $thoughts->add(sprintf('Entered %s %s [%s · %s] — $%.2f at $%s · SL $%s%s%s.',
                         $mode === 'paper' ? '(paper)' : '(LIVE)', $cand['symbol'], $cfg['name'], $tpl->name(), $size,
-                        $this->fmt($fill), $this->fmt($st['stop_loss']), $tpTxt
+                        $this->fmt($fill), $this->fmt($st['stop_loss']), $tpTxt,
+                        $mode === 'live' ? ' · exchange-protected' : ''
                     ), 'bot', 'trade', $cand['symbol'], 'BUY', ['mode' => $mode, 'template' => $key, 'profile' => $pk]);
                     $action = 'entered ' . $cand['symbol'] . ' [' . $cfg['name'] . ']';
                     $opened = true;
@@ -186,11 +209,16 @@ class GtbStrategy
         if ($price === null || $price <= 0) return ['ok' => false, 'error' => 'Price unavailable — try again.'];
 
         if ($mode === 'live') {
-            $q = $this->floorToStep($client, $pos['symbol'], (float) $pos['qty']);
+            // Cancel the resting protective order first so it can't fire after we've sold.
+            $type = $pos['protect_type'] ?? null; $pid = $pos['protect_id'] ?? null;
+            if ($type === 'oco' && $pid)  $client->cancelOco($pos['symbol'], (string) $pid);
+            elseif ($type === 'stop' && $pid) $client->cancelOrder($pos['symbol'], (string) $pid);
+            $q = $this->floorToStep($client, $pos['symbol'], (float) $pos['qty'] * 0.999);
             $client->marketSell($pos['symbol'], $q);
         }
         $pnl = ((float) $price - (float) $pos['price']) * (float) $pos['qty'];
         $trades->closeTrade((int) $pos['id'], (float) $price, $pnl);
+        $trades->setProtection((int) $pos['id'], null, null);
         $thoughts->add(sprintf('Manually closed %s at $%s [%s] · P&L %s$%.4f.',
             $pos['symbol'], $this->fmt((float) $price), $pos['template'] ?? 'scalp',
             $pnl >= 0 ? '+' : '-', abs($pnl)
@@ -230,6 +258,7 @@ class GtbStrategy
                 'mark'        => $mark,
                 'stop_loss'   => (float) $p['stop_loss'],
                 'take_profit' => $p['take_profit'] !== null ? (float) $p['take_profit'] : null,
+                'protected'   => (($p['mode'] ?? $mode) === 'live') ? !empty($p['protect_id']) : true,
                 'unrealized'  => round($un, 4),
                 'pnlPct'      => $entry > 0 ? round(($mark - $entry) / $entry * 100, 2) : 0,
                 'opened_at'   => $p['created_at'] ?? null,
@@ -299,6 +328,160 @@ class GtbStrategy
             $byTpl[$t]['pnl'] = round($byTpl[$t]['pnl'] + $pnl, 4);
         }
         return ['recentTrades' => $recent, 'byTemplate' => $byTpl];
+    }
+
+    /**
+     * Place the resting protective order on the exchange for a live long.
+     * OCO (target + stop) when there's a take-profit; a stop-limit for trailing-only.
+     * @return array{type:string,id:string}|array{error:string}
+     */
+    private function protectLive(BinanceClient $client, string $symbol, float $qty, array $st): array
+    {
+        $fee     = (float) (Env::get('GTB_FEE_RATE', '0.001') ?? 0.001);          // haircut so we don't oversell after buy fee
+        $bufPct  = (float) (Env::get('GTB_STOP_LIMIT_BUFFER_PCT', '0.5') ?? 0.5); // stop-limit sits this % under the trigger
+        $sellQty = $qty * (1.0 - max(0.0, $fee));
+        $stop    = (float) ($st['stop_loss'] ?? 0);
+        if ($stop <= 0 || $sellQty <= 0) return ['error' => 'invalid stop/qty'];
+        $stopLimit = $stop * (1.0 - $bufPct / 100.0);
+
+        if (!empty($st['take_profit'])) {
+            $r = $client->placeOcoSell($symbol, $sellQty, (float) $st['take_profit'], $stop, $stopLimit);
+            if (!empty($r['ok'])) return ['type' => 'oco', 'id' => (string) ($r['data']['orderListId'] ?? '')];
+            return ['error' => $r['error'] ?? 'OCO rejected'];
+        }
+        $r = $client->placeStopLossSell($symbol, $sellQty, $stop, $stopLimit);
+        if (!empty($r['ok'])) return ['type' => 'stop', 'id' => (string) ($r['data']['orderId'] ?? '')];
+        return ['error' => $r['error'] ?? 'stop order rejected'];
+    }
+
+    /**
+     * Reconcile a LIVE position against its exchange-side protective order:
+     * close the DB row when the exchange filled it, ratchet the trailing stop
+     * (cancel + replace higher), or re-protect / flatten if protection is missing.
+     * @return float realized P&L booked this cycle (0 if still open)
+     */
+    private function reconcileLive(BinanceClient $client, GtbTrade $trades, GtbThought $thoughts, array $pos, float $price): float
+    {
+        $sym  = $pos['symbol'];
+        $id   = (int) $pos['id'];
+        $type = $pos['protect_type'] ?? null;
+        $pid  = $pos['protect_id'] ?? null;
+        $entry = (float) $pos['price'];
+        $qty   = (float) $pos['qty'];
+
+        // No protection on record (legacy row or an aborted place) — try to protect now, else flatten.
+        if (!$type || !$pid) {
+            $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $pos['stop_loss'], 'take_profit' => $pos['take_profit']]);
+            if (!empty($prot['error'])) {
+                $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
+                $pnl = ($price - $entry) * $qty;
+                $trades->closeTrade($id, $price, $pnl);
+                $thoughts->add("$sym had no exchange stop and re-protect failed — flattened to stay safe.",
+                    'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+                return $pnl;
+            }
+            $trades->setProtection($id, $prot['type'], $prot['id']);
+            return 0.0;
+        }
+
+        // OCO (target + stop).
+        if ($type === 'oco') {
+            $s = $client->ocoStatus((string) $pid);
+            if (empty($s['ok'])) return 0.0; // transient; retry next cycle
+            if (($s['data']['listOrderStatus'] ?? '') !== 'ALL_DONE') return 0.0; // still resting
+            [$exit, $fq] = $this->ocoFill($client, $sym, $s['data']);
+            if ($exit > 0) {
+                $pnl = ($exit - $entry) * $fq;
+                $trades->closeTrade($id, $exit, $pnl);
+                $trades->setProtection($id, null, null);
+                $thoughts->add(sprintf('Exchange closed %s at $%s (OCO) · P&L %s$%.4f.',
+                    $sym, $this->fmt($exit), $pnl >= 0 ? '+' : '-', abs($pnl)),
+                    'bot', 'trade', $sym, 'OCO', ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+                return $pnl;
+            }
+            // ALL_DONE with no fill = both legs canceled externally -> unprotected. Flatten.
+            $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
+            $pnl = ($price - $entry) * $qty;
+            $trades->closeTrade($id, $price, $pnl);
+            $trades->setProtection($id, null, null);
+            $thoughts->add("$sym OCO was canceled on the exchange — flattened to stay safe.",
+                'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+            return $pnl;
+        }
+
+        // Single stop-limit (trailing template): fill -> close; alive -> maybe ratchet up.
+        $o = $client->orderStatus($sym, (string) $pid);
+        if (empty($o['ok'])) return 0.0;
+        $status = $o['data']['status'] ?? '';
+        if ($status === 'FILLED') {
+            $exec = (float) ($o['data']['executedQty'] ?? 0);
+            $cum  = (float) ($o['data']['cummulativeQuoteQty'] ?? 0);
+            $exit = $exec > 0 ? $cum / $exec : $price;
+            $pnl  = ($exit - $entry) * ($exec > 0 ? $exec : $qty);
+            $trades->closeTrade($id, $exit, $pnl);
+            $trades->setProtection($id, null, null);
+            $thoughts->add(sprintf('Exchange stop hit %s at $%s · P&L %s$%.4f.',
+                $sym, $this->fmt($exit), $pnl >= 0 ? '+' : '-', abs($pnl)),
+                'bot', 'trade', $sym, 'STOP', ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+            return $pnl;
+        }
+        if (in_array($status, ['CANCELED', 'EXPIRED', 'REJECTED', 'PENDING_CANCEL'], true)) {
+            $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $pos['stop_loss']]);
+            if (!empty($prot['error'])) {
+                $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
+                $pnl = ($price - $entry) * $qty;
+                $trades->closeTrade($id, $price, $pnl);
+                $trades->setProtection($id, null, null);
+                $thoughts->add("$sym stop vanished and re-protect failed — flattened.",
+                    'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+                return $pnl;
+            }
+            $trades->setProtection($id, $prot['type'], $prot['id']);
+            return 0.0;
+        }
+        // Still resting (NEW): ratchet the trailing stop upward if price made new highs.
+        $trailPct = (float) ($pos['trail_pct'] ?: 0);
+        if ($trailPct > 0) {
+            $prevPeak = (float) ($pos['peak_price'] ?: $entry);
+            $peak     = max($prevPeak, $price);
+            $newStop  = $peak * (1.0 - $trailPct / 100.0);
+            $curStop  = (float) $pos['stop_loss'];
+            if ($newStop > $curStop * 1.001) {           // meaningful ratchet — cancel + replace higher
+                $client->cancelOrder($sym, (string) $pid);
+                $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $newStop]);
+                if (!empty($prot['error'])) {            // couldn't re-place — flatten rather than run naked
+                    $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
+                    $pnl = ($price - $entry) * $qty;
+                    $trades->closeTrade($id, $price, $pnl);
+                    $trades->setProtection($id, null, null);
+                    $thoughts->add("$sym trailing replace failed — flattened to stay safe.",
+                        'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+                    return $pnl;
+                }
+                $trades->updateStop($id, $newStop, $peak);
+                $trades->setProtection($id, $prot['type'], $prot['id']);
+            } elseif ($peak > $prevPeak) {
+                $trades->updateStop($id, $curStop, $peak);
+            }
+        }
+        return 0.0;
+    }
+
+    /** Find the filled leg of a completed OCO and return [avgPrice, filledQty]. */
+    private function ocoFill(BinanceClient $client, string $symbol, array $ocoData): array
+    {
+        foreach (($ocoData['orders'] ?? []) as $o) {
+            $oid = (string) ($o['orderId'] ?? '');
+            if ($oid === '') continue;
+            $r = $client->orderStatus($symbol, $oid);
+            if (empty($r['ok'])) continue;
+            if (($r['data']['status'] ?? '') === 'FILLED') {
+                $exec = (float) ($r['data']['executedQty'] ?? 0);
+                $cum  = (float) ($r['data']['cummulativeQuoteQty'] ?? 0);
+                if ($exec > 0) return [$cum / $exec, $exec];
+            }
+        }
+        return [0.0, 0.0];
     }
 
     /** Scale a template's stop/target by the profile's risk multipliers (distance from entry). */
