@@ -174,19 +174,22 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 <section class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
     <?php
     $movers = [
-        ['id' => 'gtb-hot',     'title' => 'Hot Coins',    'icon' => 'fa-fire',             'tone' => 'text-primary',                       'sub' => 'by 24h volume'],
-        ['id' => 'gtb-gainers', 'title' => 'Top Gainers',  'icon' => 'fa-arrow-trend-up',   'tone' => 'text-green-600 dark:text-green-400',  'sub' => '24h change'],
-        ['id' => 'gtb-losers',  'title' => 'Top Losers',   'icon' => 'fa-arrow-trend-down', 'tone' => 'text-red-500 dark:text-red-400',      'sub' => '24h change'],
+        ['col' => 'hot',     'title' => 'Hot Coins',   'icon' => 'fa-fire',             'tone' => 'text-primary'],
+        ['col' => 'gainers', 'title' => 'Top Gainers', 'icon' => 'fa-arrow-trend-up',   'tone' => 'text-green-600 dark:text-green-400'],
+        ['col' => 'losers',  'title' => 'Top Losers',  'icon' => 'fa-arrow-trend-down', 'tone' => 'text-red-500 dark:text-red-400'],
     ];
     foreach ($movers as $m): ?>
         <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
-            <div class="flex items-center justify-between mb-3">
+            <button type="button" class="gtb-sort-btn group w-full flex items-center justify-between mb-3"
+                    data-col="<?= $m['col'] ?>" title="Click to sort by 24h change (toggle high↔low)">
                 <h3 class="font-semibold text-gray-900 dark:text-white">
                     <i class="fas <?= $m['icon'] ?> <?= $m['tone'] ?> mr-1.5"></i><?= $m['title'] ?>
                 </h3>
-                <span class="text-[11px] text-gray-400 dark:text-gray-500"><?= $m['sub'] ?></span>
-            </div>
-            <div id="<?= $m['id'] ?>" class="space-y-0.5 max-h-[340px] overflow-y-auto pr-1">
+                <span class="text-[11px] text-gray-400 dark:text-gray-500 group-hover:text-primary flex items-center gap-1">
+                    24h % <i id="gtb-sort-<?= $m['col'] ?>" class="fas fa-sort"></i>
+                </span>
+            </button>
+            <div id="gtb-<?= $m['col'] ?>" class="space-y-0.5 max-h-[340px] overflow-y-auto pr-1">
                 <div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
             </div>
         </div>
@@ -277,7 +280,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 <script>
     const GTB_API_CONFIGURED = <?= $apiConfigured ? 'true' : 'false' ?>;
     const GTB = { symbol: 'BTCUSDT', base: 'BTC', interval: '1h', chart: null, series: null,
-                  markets: { hot: [], gainers: [], losers: [] }, cat: 'hot' };
+                  markets: { hot: [], gainers: [], losers: [] },
+                  // sort direction by 24h change per column (null = as-loaded: hot by volume)
+                  sortDir: { hot: null, gainers: 'desc', losers: 'asc' } };
 
     function gtbIsDark() { return document.documentElement.classList.contains('dark'); }
     function gtbFmtPrice(p) {
@@ -354,21 +359,47 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 </span></button>`;
     }
 
-    function gtbFillCol(id, list) {
-        const box = document.getElementById(id);
+    function gtbSortList(list, dir) {
+        if (!dir) return list; // null = keep server order (hot: by volume)
+        return list.slice().sort((a, b) => dir === 'desc' ? b.changePct - a.changePct : a.changePct - b.changePct);
+    }
+
+    function gtbFillCol(col) {
+        const box = document.getElementById('gtb-' + col);
         if (!box) return;
-        if (!list || !list.length) { box.innerHTML = '<div class="py-4 text-center text-gray-400 text-xs">No data</div>'; return; }
+        const list = gtbSortList(GTB.markets[col] || [], GTB.sortDir[col]);
+        if (!list.length) { box.innerHTML = '<div class="py-4 text-center text-gray-400 text-xs">No data</div>'; return; }
         box.innerHTML = list.slice(0, 12).map(gtbMoverRow).join('');
         box.querySelectorAll('.gtb-pair').forEach(btn => {
             btn.addEventListener('click', () => gtbSelectSymbol(btn.dataset.symbol, btn.dataset.base, btn.dataset.price, btn.dataset.change));
             btn.classList.toggle('gtb-pair-active', btn.dataset.symbol === GTB.symbol);
         });
+        gtbUpdateSortArrow(col);
+    }
+
+    function gtbUpdateSortArrow(col) {
+        const el = document.getElementById('gtb-sort-' + col);
+        if (!el) return;
+        const dir = GTB.sortDir[col];
+        el.className = 'fas ' + (dir === 'desc' ? 'fa-arrow-down text-primary'
+                              : dir === 'asc' ? 'fa-arrow-up text-primary'
+                              : 'fa-sort');
+    }
+
+    function gtbToggleSort(col) {
+        GTB.sortDir[col] = GTB.sortDir[col] === 'desc' ? 'asc' : 'desc';
+        gtbFillCol(col);
+    }
+
+    function gtbInitSort() {
+        document.querySelectorAll('.gtb-sort-btn').forEach(btn =>
+            btn.addEventListener('click', () => gtbToggleSort(btn.dataset.col)));
     }
 
     function gtbRenderMovers() {
-        gtbFillCol('gtb-hot', GTB.markets.hot);
-        gtbFillCol('gtb-gainers', GTB.markets.gainers);
-        gtbFillCol('gtb-losers', GTB.markets.losers);
+        gtbFillCol('hot');
+        gtbFillCol('gainers');
+        gtbFillCol('losers');
     }
 
     async function gtbLoadMovers() {
@@ -453,6 +484,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
         gtbInitIntervals();
+        gtbInitSort();
         gtbLoadMovers();
         if (GTB_API_CONFIGURED) gtbLoadAccount();
     });
