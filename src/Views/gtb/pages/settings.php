@@ -40,11 +40,10 @@ $gtbModelOptions = [
     'claude-opus-4-8'  => 'Opus 4.8 — smartest ($5 / $25 per 1M)',
 ];
 $gtbGroqModels = [
-    'llama-3.1-8b-instant'          => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
-    'qwen/qwen3-32b'                => 'Qwen3 32B ($0.29 / $0.59)',
-    'llama-3.3-70b-versatile'       => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
-    'deepseek-r1-distill-llama-70b' => 'DeepSeek R1 70B — reasoning ($0.75 / $0.99)',
-    'openai/gpt-oss-120b'           => 'GPT-OSS 120B ($0.15 / $0.75)',
+    'llama-3.1-8b-instant'    => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
+    'qwen/qwen3-32b'          => 'Qwen3 32B — reasoning ($0.29 / $0.59)',
+    'llama-3.3-70b-versatile' => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
+    'openai/gpt-oss-120b'     => 'GPT-OSS 120B — strongest reasoning ($0.15 / $0.75)',
 ];
 function gtb_model_select(string $id, string $current, array $opts): void {
     echo '<select id="' . $id . '" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">';
@@ -158,7 +157,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                         <?php gtb_model_select('groq_decision_model', $groqModel, $gtbGroqModels); ?>
                     </div>
                 </div>
-                <p class="text-[11px] text-gray-400 dark:text-gray-500"><strong>DeepSeek R1</strong> = strongest reasoning (the Alpha-Arena winner); <strong>Llama 3.3 70B</strong> = fast &amp; balanced; <strong>Llama 3.1 8B</strong> = cheapest for scans. A decision costs roughly ~0.02–0.1¢ (vs ~1¢ on Opus).</p>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500"><strong>GPT-OSS 120B</strong> or <strong>Qwen3 32B</strong> = strongest reasoning; <strong>Llama 3.3 70B</strong> = fast &amp; balanced (recommended); <strong>Llama 3.1 8B</strong> = cheapest for scans. A decision costs ~0.02–0.1¢ (vs ~1¢ on Opus). <em>(DeepSeek R1 was retired from Groq.)</em></p>
             </div>
 
             <!-- Anthropic block -->
