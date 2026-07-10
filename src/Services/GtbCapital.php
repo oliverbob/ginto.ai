@@ -76,14 +76,20 @@ class GtbCapital
         return $staked;
     }
 
-    /** Concurrent trade slots unlocked: one per full $unit of tradable (min 1 once above min notional). */
+    /**
+     * Concurrent trade slots unlocked: one per full $unit of tradable, but never so many
+     * that a slot would fall below the min per-trade — so each open trade always clears
+     * Binance's minimum (and setting a small unit can't silently stop the bot trading).
+     */
     public function slots(float $realizedPnl): int
     {
         $t = $this->tradable($realizedPnl);
         if ($t < $this->minNotional) {
             return 0;
         }
-        return max(1, (int) floor($t / $this->unit));
+        $byUnit     = (int) floor($t / $this->unit);
+        $byNotional = (int) floor($t / $this->minNotional);   // cap so perTradeSize >= minNotional
+        return max(1, min($byUnit, $byNotional));
     }
 
     /** Size per trade; profit compounds into open positions until the next slot unlocks. Capped by GTB_MAX_TRADE_USD. */

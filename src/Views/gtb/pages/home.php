@@ -331,12 +331,23 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             }
                         }
                         usort($events, fn($a, $b) => strcmp((string) $b['time'], (string) $a['time']));
+                        // Coin badge: real icon from a CDN, with a colored ticker-initials fallback (robust for meme coins).
+                        $coinIcon = function (string $symbol): string {
+                            $base = strtolower(preg_replace('/USDT$/', '', $symbol));
+                            $up   = strtoupper(substr($base, 0, 3));
+                            $hue  = crc32($base) % 360;
+                            $url  = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/' . htmlspecialchars($base) . '.png';
+                            return '<span class="relative inline-flex w-6 h-6 shrink-0 align-middle">'
+                                . '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[8px] font-bold text-white" style="background:hsl(' . $hue . ',55%,45%)">' . htmlspecialchars($up) . '</span>'
+                                . '<img src="' . $url . '" alt="" loading="lazy" class="absolute inset-0 w-6 h-6 rounded-full object-cover" onerror="this.remove()">'
+                                . '</span>';
+                        };
                         foreach (array_slice($events, 0, 30) as $t):
                             $pnl = $t['pnl'];
                             $pnlNeg = $pnl !== null && (float)$pnl < 0; ?>
                             <tr class="text-gray-800 dark:text-gray-200">
-                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400"><?= htmlspecialchars($t['created_at'] ?? '') ?></td>
-                                <td class="py-2.5 pr-4 font-medium"><?= htmlspecialchars($t['symbol'] ?? '') ?></td>
+                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars($t['time'] ?? '') ?></td>
+                                <td class="py-2.5 pr-4 font-medium"><span class="inline-flex items-center gap-2"><?= $coinIcon($t['symbol'] ?? '') ?><span><?= htmlspecialchars($t['symbol'] ?? '') ?></span></span></td>
                                 <td class="py-2.5 pr-4">
                                     <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded
                                         <?= ($t['side'] ?? '') === 'BUY' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
