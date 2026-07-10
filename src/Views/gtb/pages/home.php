@@ -255,7 +255,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <span id="gtb-port-unreal" class="text-sm font-bold"></span>
     </div>
     <div id="gtb-trades-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        <div class="col-span-full py-10 text-center text-gray-400 dark:text-gray-500 text-sm">
+        <div data-empty class="col-span-full py-10 text-center text-gray-400 dark:text-gray-500 text-sm">
             No open positions — start the bot to trade.
         </div>
     </div>
