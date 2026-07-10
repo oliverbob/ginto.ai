@@ -225,7 +225,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             <i class="fas fa-play"></i> Start bot
         </button>
         <label id="gtb-arm-wrap" class="hidden inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 cursor-pointer">
-            <input type="checkbox" id="gtb-arm-live" class="w-4 h-4 rounded border-red-400 text-red-600 focus:ring-red-500">
+            <input type="checkbox" id="gtb-arm-live" onchange="gtbSetArmLive()" <?= ($botArmLive ?? false) ? 'checked' : '' ?> class="w-4 h-4 rounded border-red-400 text-red-600 focus:ring-red-500">
             Arm LIVE trading (real money)
         </label>
         <span id="gtb-action" class="text-xs text-gray-500 dark:text-gray-400"></span>
@@ -553,7 +553,11 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Bot Brain: reflections + capital ------------------------------------
     const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
     const GTB_TESTNET = <?= ($isTestnet ?? false) ? 'true' : 'false' ?>;
-    const GTB_BOT = { enabled: false, open_new: true };
+    const GTB_BOT = {
+        enabled: <?= ($botEnabled ?? false) ? 'true' : 'false' ?>,
+        open_new: <?= (!isset($botOpenNew) || $botOpenNew) ? 'true' : 'false' ?>,
+        arm_live: <?= ($botArmLive ?? false) ? 'true' : 'false' ?>,
+    };
 
     function gtbModeBadge() {
         const b = document.getElementById('gtb-mode-badge');
@@ -608,6 +612,27 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         } finally {
             btn.disabled = wasDisabled;
         }
+    }
+
+    // Persist Arm-LIVE independently of Start/Stop so the state survives reloads and
+    // takes effect on the next runner step (arm or disarm real-money trading live).
+    async function gtbSetArmLive() {
+        if (GTB_TESTNET) return;
+        const armed = document.getElementById('gtb-arm-live').checked;
+        if (armed && !confirm('Arm LIVE trading? The bot may place REAL orders with real money (capped at your $7 base, every trade with an exchange-side stop).')) {
+            document.getElementById('gtb-arm-live').checked = false;
+            return;
+        }
+        GTB_BOT.arm_live = armed;
+        try {
+            const res = await fetch('/gtb/bot/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF, action: 'arm', arm_live: armed }),
+            });
+            const d = await res.json();
+            if (d.ok) GTB_BOT.arm_live = !!d.bot.arm_live;
+        } catch (e) { /* ignore */ }
     }
 
     // Three states: stopped -> [Start]; running -> [Stop bot] (wind down); winding down -> [Force stop].
@@ -761,6 +786,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         if (d.bot) {
             GTB_BOT.enabled = !!d.bot.enabled;
             GTB_BOT.open_new = ('open_new' in d.bot) ? !!d.bot.open_new : true;
+            // Reflect persisted arm-live (unless the user is mid-toggle on the checkbox).
+            const armEl = document.getElementById('gtb-arm-live');
+            if (armEl && 'arm_live' in d.bot && document.activeElement !== armEl) {
+                armEl.checked = !!d.bot.arm_live;
+                GTB_BOT.arm_live = !!d.bot.arm_live;
+            }
             gtbSetRunBtn();
             const act = document.getElementById('gtb-action');
             const st = gtbBotStateName();
@@ -888,6 +919,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbInitSort();
         gtbLoadMovers();
         gtbModeBadge();
+        gtbSetRunBtn();  // paint Start/Stop from persisted state on load
         gtbLoadThoughts();
         gtbLoadPositions();
         setInterval(gtbLoadPositions, 6000);

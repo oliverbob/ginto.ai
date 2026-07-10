@@ -64,6 +64,9 @@ class GtbBotState
     /** Full stop: runner halts. Live positions keep their resting exchange stops. */
     public function stop(): void { $this->upsert(['enabled' => 0, 'open_new' => 0]); }
 
+    /** Arm/disarm real-money trading independently of run state (takes effect next step). */
+    public function setArmLive(bool $armLive): void { $this->upsert(['arm_live' => $armLive ? 1 : 0]); }
+
     /** Back-compat: true => start, false => wind down (graceful). */
     public function set(bool $enabled, bool $armLive): void
     {

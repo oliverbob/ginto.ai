@@ -52,6 +52,12 @@ class GtbController
             // DB unavailable — render an empty dashboard rather than erroring.
         }
 
+        // Persisted runner state, so the page paints the correct Start/Stop + Arm-LIVE state.
+        $botStatus = ['enabled' => false, 'open_new' => true, 'arm_live' => false];
+        try {
+            $botStatus = (new \Ginto\Models\GtbBotState())->status();
+        } catch (\Throwable $e) {}
+
         $isAdmin = false;
         if (class_exists('\\Ginto\\Controllers\\UserController')) {
             try {
@@ -74,6 +80,9 @@ class GtbController
             'recentTrades'  => $recentTrades,
             'recentLogs'    => $recentLogs,
             'realizedPnl'   => $realizedPnl,
+            'botEnabled'    => !empty($botStatus['enabled']),
+            'botOpenNew'    => !isset($botStatus['open_new']) || !empty($botStatus['open_new']),
+            'botArmLive'    => !empty($botStatus['arm_live']),
         ]);
     }
 
@@ -575,7 +584,10 @@ class GtbController
             if ($action === '') $action = !empty($input['enabled']) ? 'start' : 'stop';
             $state = new \Ginto\Models\GtbBotState();
             $result = null;
-            if ($action === 'start') {
+            if ($action === 'arm') {
+                // Persist just the arm/disarm state (takes effect on the next runner step).
+                $state->setArmLive($armLive);
+            } elseif ($action === 'start') {
                 $state->start($armLive);
             } elseif ($action === 'flatten') {
                 $result = (new \Ginto\Services\GtbStrategy())->flattenAll();
