@@ -12,10 +12,10 @@ $userFullname = $userFullname ?? null;
                     <i class="fas fa-arrow-left"></i>
                     <span class="hidden sm:inline">Ginto</span>
                 </a>
-                <h1 class="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-white">
+                <h1 class="flex items-center gap-2 text-xl font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                     <i class="fas fa-robot text-primary"></i>
-                    Ginto Trading Bot
-                    <span class="ml-1 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded bg-primary/10 text-primary">GTB</span>
+                    <span class="hidden sm:inline">Ginto Trading Bot</span>
+                    <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide rounded bg-primary/10 text-primary">GTB</span>
                 </h1>
             </div>
             <div class="flex items-center gap-4">
