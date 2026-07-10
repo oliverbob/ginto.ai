@@ -33,6 +33,24 @@ class GtbThought
         }
     }
 
+    /** Total estimated AI spend (USD) and reflection count, from stored meta. */
+    public function spend(): array
+    {
+        try {
+            $stmt = $this->db->query(
+                "SELECT COALESCE(SUM(CAST(JSON_EXTRACT(meta, '$.cost_usd') AS DECIMAL(14,6))), 0) AS total, "
+                . "SUM(CASE WHEN role = 'claude' THEN 1 ELSE 0 END) AS cnt FROM {$this->table}"
+            );
+            $row = $stmt ? $stmt->fetch(\PDO::FETCH_ASSOC) : null;
+            return [
+                'total' => round((float) ($row['total'] ?? 0), 6),
+                'count' => (int) ($row['cnt'] ?? 0),
+            ];
+        } catch (\Throwable $e) {
+            return ['total' => 0.0, 'count' => 0];
+        }
+    }
+
     /** Most recent thoughts, oldest→newest for chat display. */
     public function recent(int $limit = 40): array
     {

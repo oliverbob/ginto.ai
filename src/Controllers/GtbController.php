@@ -101,8 +101,9 @@ class GtbController
             // env unavailable — render an empty form
         }
         $endpoint = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
-        $anthropicKeySet = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
-        $anthropicModel  = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
+        $anthropicKeySet    = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
+        $anthropicModel     = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
+        $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -119,9 +120,10 @@ class GtbController
             'testnetSecretSet' => $testSecretSet,
             'binanceTestnet'   => $testnet,
             'binanceEndpoint'  => $endpoint,
-            'anthropicKeySet'  => $anthropicKeySet,
-            'anthropicModel'   => $anthropicModel,
-            'csrf_token'       => $this->csrfToken(),
+            'anthropicKeySet'   => $anthropicKeySet,
+            'anthropicModel'    => $anthropicModel,
+            'anthropicScanModel'=> $anthropicScanModel,
+            'csrf_token'        => $this->csrfToken(),
         ]);
     }
 
@@ -172,6 +174,13 @@ class GtbController
             // AI brain key (write-only, like the Binance secrets)
             $anthropicKey = trim((string) ($input['anthropic_api_key'] ?? ''));
             if ($anthropicKey !== '') $pairs['ANTHROPIC_API_KEY'] = $anthropicKey;
+
+            // AI brain model selection (validated allowlist)
+            $allowedModels = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'];
+            $decModel  = (string) ($input['decision_model'] ?? '');
+            $scanModel = (string) ($input['scan_model'] ?? '');
+            if (in_array($decModel, $allowedModels, true))  $pairs['ANTHROPIC_MODEL'] = $decModel;
+            if (in_array($scanModel, $allowedModels, true)) $pairs['ANTHROPIC_SCAN_MODEL'] = $scanModel;
 
             $this->updateEnvKeys($pairs);
 
@@ -386,14 +395,17 @@ class GtbController
         $thoughts = [];
         $capital = null;
         $brainReady = false;
+        $spend = ['total' => 0.0, 'count' => 0];
         try {
-            $thoughts = (new \Ginto\Models\GtbThought())->recent(40);
+            $tModel = new \Ginto\Models\GtbThought();
+            $thoughts = $tModel->recent(40);
+            $spend = $tModel->spend();
             $realized = (new GtbTrade())->totalRealizedPnl();
             $capital = (new \Ginto\Services\GtbCapital())->summary($realized);
             $brainReady = (new \Ginto\Services\GtbBrain())->isConfigured();
         } catch (\Throwable $e) {}
 
-        echo json_encode(['ok' => true, 'thoughts' => $thoughts, 'capital' => $capital, 'brainReady' => $brainReady]);
+        echo json_encode(['ok' => true, 'thoughts' => $thoughts, 'capital' => $capital, 'brainReady' => $brainReady, 'spend' => $spend]);
         exit;
     }
 
@@ -440,8 +452,9 @@ class GtbController
                 exit;
             }
 
-            $thoughts->add($res['text'], 'claude', 'reflect', null, $res['decision'] ?? null, ['model' => $brain->model()]);
-            echo json_encode(['ok' => true, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+            $meta = array_merge(['model' => $res['model'] ?? $brain->model()], $res['usage'] ?? []);
+            $thoughts->add($res['text'], 'claude', 'reflect', null, $res['decision'] ?? null, $meta);
+            echo json_encode(['ok' => true, 'text' => $res['text'], 'decision' => $res['decision'] ?? null, 'usage' => $res['usage'] ?? null]);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

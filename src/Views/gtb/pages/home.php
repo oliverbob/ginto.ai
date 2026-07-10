@@ -203,8 +203,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             <i class="fas fa-robot text-primary mr-2"></i>Bot Brain
             <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">Claude · reflections &amp; decisions</span>
         </h3>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
             <span id="gtb-capital-chip" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
+            <span id="gtb-spend-chip" title="Estimated AI spend" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
             <button type="button" id="gtb-reflect-btn" onclick="gtbReflect()"
                     class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
                 <i class="fas fa-brain"></i> Reflect now
@@ -546,6 +547,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 const c = d.capital;
                 document.getElementById('gtb-capital-chip').textContent =
                     `tradable $${(+c.tradable).toFixed(2)} · size $${(+c.perTradeSize).toFixed(2)} · slots ${c.slots}`;
+            }
+            if (d.spend) {
+                document.getElementById('gtb-spend-chip').innerHTML =
+                    `<i class="fas fa-coins"></i> $${(+d.spend.total).toFixed(4)} · ${d.spend.count} refl`;
             }
             if (!d.thoughts.length) {
                 feed.innerHTML = '<div class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">No reflections yet — hit “Reflect now”.</div>';

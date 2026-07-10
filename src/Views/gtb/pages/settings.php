@@ -9,9 +9,23 @@ $testnetApiKey    = $testnetApiKey ?? '';
 $testnetSecretSet = $testnetSecretSet ?? false;
 $binanceTestnet   = $binanceTestnet ?? false;
 $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
-$anthropicKeySet  = $anthropicKeySet ?? false;
-$anthropicModel   = $anthropicModel ?? 'claude-opus-4-8';
-$csrf_token       = $csrf_token ?? '';
+$anthropicKeySet   = $anthropicKeySet ?? false;
+$anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
+$anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
+$csrf_token        = $csrf_token ?? '';
+
+$gtbModelOptions = [
+    'claude-haiku-4-5' => 'Haiku 4.5 — cheapest ($1 / $5 per 1M)',
+    'claude-sonnet-5'  => 'Sonnet 5 — mid ($3 / $15 per 1M)',
+    'claude-opus-4-8'  => 'Opus 4.8 — smartest ($5 / $25 per 1M)',
+];
+function gtb_model_select(string $id, string $current, array $opts): void {
+    echo '<select id="' . $id . '" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">';
+    foreach ($opts as $val => $label) {
+        echo '<option value="' . htmlspecialchars($val) . '"' . ($val === $current ? ' selected' : '') . '>' . htmlspecialchars($label) . '</option>';
+    }
+    echo '</select>';
+}
 
 function gtb_key_section(string $env, string $label, string $apiKey, bool $secretSet, string $tone): void {
     $keyId = "{$env}_api_key";
@@ -100,6 +114,19 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                     <?= $anthropicKeySet ? 'A key is saved. Leave blank to keep it, or type a new one to replace it.' : 'Write-only — never shown after saving. Billed per token, separately from Claude Pro.' ?>
                 </p>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label for="scan_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Scan model (cheap, frequent)</label>
+                    <?php gtb_model_select('scan_model', $anthropicScanModel, $gtbModelOptions); ?>
+                </div>
+                <div>
+                    <label for="decision_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Decision model (used by “Reflect now”)</label>
+                    <?php gtb_model_select('decision_model', $anthropicModel, $gtbModelOptions); ?>
+                </div>
+            </div>
+            <p class="text-[11px] text-gray-400 dark:text-gray-500">
+                Routine market scans use the cheaper model; actual trade decisions use the smarter one. A reflection costs roughly Haiku ~0.2¢ · Opus ~1¢.
+            </p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 pt-1">
@@ -145,6 +172,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             testnet_api_key: document.getElementById('testnet_api_key').value.trim(),
             testnet_api_secret: document.getElementById('testnet_api_secret').value,
             anthropic_api_key: document.getElementById('anthropic_api_key').value,
+            scan_model: document.getElementById('scan_model').value,
+            decision_model: document.getElementById('decision_model').value,
         };
         const orig = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';

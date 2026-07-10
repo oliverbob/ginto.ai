@@ -15,14 +15,24 @@ use Ginto\Support\Env;
  */
 class GtbBrain
 {
+    // USD per 1M tokens: [input, output]. Fallback = Opus (conservative overestimate).
+    private const PRICING = [
+        'claude-opus-4-8'  => [5.0, 25.0],
+        'claude-opus-4-7'  => [5.0, 25.0],
+        'claude-opus-4-6'  => [5.0, 25.0],
+        'claude-sonnet-5'  => [3.0, 15.0],
+        'claude-haiku-4-5' => [1.0, 5.0],
+    ];
+
     private string $apiKey;
-    private string $model;
+    private string $decisionModel;
+    private string $scanModel;
 
     public function __construct()
     {
-        $this->apiKey = (string) (Env::get('ANTHROPIC_API_KEY', '') ?? '');
-        $this->model  = (string) (Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
-        if ($this->model === '') $this->model = 'claude-opus-4-8';
+        $this->apiKey        = (string) (Env::get('ANTHROPIC_API_KEY', '') ?? '');
+        $this->decisionModel = (string) (Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8') ?: 'claude-opus-4-8';
+        $this->scanModel     = (string) (Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5') ?: 'claude-haiku-4-5';
     }
 
     public function isConfigured(): bool
@@ -30,20 +40,29 @@ class GtbBrain
         return $this->apiKey !== '';
     }
 
-    public function model(): string
+    /** Model for a tier: 'scan' (cheap, high-frequency) or 'decision' (higher quality). */
+    public function model(string $tier = 'decision'): string
     {
-        return $this->model;
+        return $tier === 'scan' ? $this->scanModel : $this->decisionModel;
+    }
+
+    /** Estimated USD cost of a call from token usage. */
+    public static function costUsd(string $model, int $inputTokens, int $outputTokens): float
+    {
+        [$in, $out] = self::PRICING[$model] ?? self::PRICING['claude-opus-4-8'];
+        return ($inputTokens / 1_000_000) * $in + ($outputTokens / 1_000_000) * $out;
     }
 
     /**
      * Reflect on the current market + capital state.
      * @return array{ok:bool, text?:string, decision?:?string, error?:string}
      */
-    public function reflect(array $context): array
+    public function reflect(array $context, string $tier = 'decision'): array
     {
         if (!$this->isConfigured()) {
             return ['ok' => false, 'error' => 'No Anthropic API key set. Add it on the API Settings page.'];
         }
+        $model = $this->model($tier);
 
         $env = $context['env'] ?? 'testnet';
         $system = "You are GTB, an autonomous Binance Spot trading bot thinking out loud before you act. "
@@ -58,7 +77,7 @@ class GtbBrain
             . "\n\nGiven the capital rules and current movers, is there a momentum trade worth taking right now? Reflect, then decide.";
 
         $body = [
-            'model'      => $this->model,
+            'model'      => $model,
             'max_tokens' => 600,
             'system'     => $system,
             'messages'   => [['role' => 'user', 'content' => $user]],
@@ -108,6 +127,16 @@ class GtbBrain
             $decision = strtoupper(trim($m[1]));
         }
 
-        return ['ok' => true, 'text' => $text, 'decision' => $decision];
+        $usageIn  = (int) ($data['usage']['input_tokens'] ?? 0);
+        $usageOut = (int) ($data['usage']['output_tokens'] ?? 0);
+        $cost     = self::costUsd($model, $usageIn, $usageOut);
+
+        return [
+            'ok'       => true,
+            'text'     => $text,
+            'decision' => $decision,
+            'model'    => $model,
+            'usage'    => ['input_tokens' => $usageIn, 'output_tokens' => $usageOut, 'cost_usd' => round($cost, 6)],
+        ];
     }
 }
