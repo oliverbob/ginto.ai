@@ -283,12 +283,27 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             <th class="py-2 pr-4 font-medium">Type</th>
                             <th class="py-2 pr-4 font-medium text-right">Price</th>
                             <th class="py-2 pr-4 font-medium text-right">Qty</th>
-                            <th class="py-2 font-medium text-right">P&amp;L</th>
+                            <th class="py-2 font-medium text-right" title="Realized P&amp;L, net of Binance buy+sell fees (~0.2% round-trip)">P&amp;L <span class="text-gray-400 font-normal">(net)</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                        <?php foreach ($recentTrades as $t):
-                            $pnl = $t['realized_pnl'] ?? null;
+                        <?php
+                        // Each stored row is one position; expand it into its BUY (entry) and,
+                        // once closed, its SELL (exit) so both sides of every trade are logged.
+                        $events = [];
+                        foreach ($recentTrades as $t) {
+                            $events[] = ['time' => $t['created_at'] ?? '', 'symbol' => $t['symbol'] ?? '',
+                                'side' => 'BUY', 'type' => $t['type'] ?? 'MARKET',
+                                'price' => $t['price'] ?? null, 'qty' => $t['qty'] ?? '', 'pnl' => null];
+                            if (($t['status'] ?? '') === 'CLOSED' && ($t['exit_price'] ?? null) !== null) {
+                                $events[] = ['time' => $t['closed_at'] ?? ($t['created_at'] ?? ''), 'symbol' => $t['symbol'] ?? '',
+                                    'side' => 'SELL', 'type' => 'MARKET',
+                                    'price' => $t['exit_price'], 'qty' => $t['qty'] ?? '', 'pnl' => $t['realized_pnl'] ?? null];
+                            }
+                        }
+                        usort($events, fn($a, $b) => strcmp((string) $b['time'], (string) $a['time']));
+                        foreach (array_slice($events, 0, 30) as $t):
+                            $pnl = $t['pnl'];
                             $pnlNeg = $pnl !== null && (float)$pnl < 0; ?>
                             <tr class="text-gray-800 dark:text-gray-200">
                                 <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400"><?= htmlspecialchars($t['created_at'] ?? '') ?></td>

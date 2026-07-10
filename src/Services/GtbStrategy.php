@@ -101,7 +101,7 @@ class GtbStrategy
             $m = $tpl->manage($pos, (float) $price);
             if (!$m) continue;
             if (isset($m['close'])) {
-                $pnl = ((float) $price - (float) $pos['price']) * (float) $pos['qty'];
+                $pnl = $this->netPnl((float) $pos["price"], (float) $price, (float) $pos["qty"]);
                 $trades->closeTrade((int) $pos['id'], (float) $price, $pnl);
                 $realized += $pnl;
                 $thoughts->add(sprintf('Closed %s at $%s (%s) [%s] · P&L %s$%.4f.',
@@ -300,7 +300,7 @@ class GtbStrategy
             $q = $this->floorToStep($client, $pos['symbol'], (float) $pos['qty'] * 0.999);
             $client->marketSell($pos['symbol'], $q);
         }
-        $pnl = ((float) $price - (float) $pos['price']) * (float) $pos['qty'];
+        $pnl = $this->netPnl((float) $pos["price"], (float) $price, (float) $pos["qty"]);
         $trades->closeTrade((int) $pos['id'], (float) $price, $pnl);
         $trades->setProtection((int) $pos['id'], null, null);
         $thoughts->add(sprintf('Manually closed %s at $%s [%s] · P&L %s$%.4f.',
@@ -333,7 +333,7 @@ class GtbStrategy
             $entry = (float) $p['price'];
             $qty   = (float) $p['qty'];
             $mark  = ($price !== null && $price > 0) ? (float) $price : $entry;
-            $un    = ($mark - $entry) * $qty;
+            $un    = $this->netPnl($entry, $mark, $qty);
             $unrealTotal += $un;
             $positions[] = [
                 'id'          => (int) $p['id'],
@@ -500,7 +500,7 @@ class GtbStrategy
             $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $pos['stop_loss'], 'take_profit' => $pos['take_profit']]);
             if (!empty($prot['error'])) {
                 $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
-                $pnl = ($price - $entry) * $qty;
+                $pnl = $this->netPnl($entry, $price, $qty);
                 $trades->closeTrade($id, $price, $pnl);
                 $thoughts->add("$sym had no exchange stop and re-protect failed — flattened to stay safe.",
                     'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
@@ -517,7 +517,7 @@ class GtbStrategy
             if (($s['data']['listOrderStatus'] ?? '') !== 'ALL_DONE') return 0.0; // still resting
             [$exit, $fq] = $this->ocoFill($client, $sym, $s['data']);
             if ($exit > 0) {
-                $pnl = ($exit - $entry) * $fq;
+                $pnl = $this->netPnl($entry, $exit, $fq);
                 $trades->closeTrade($id, $exit, $pnl);
                 $trades->setProtection($id, null, null);
                 $thoughts->add(sprintf('Exchange closed %s at $%s (OCO) · P&L %s$%.4f.',
@@ -527,7 +527,7 @@ class GtbStrategy
             }
             // ALL_DONE with no fill = both legs canceled externally -> unprotected. Flatten.
             $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
-            $pnl = ($price - $entry) * $qty;
+            $pnl = $this->netPnl($entry, $price, $qty);
             $trades->closeTrade($id, $price, $pnl);
             $trades->setProtection($id, null, null);
             $thoughts->add("$sym OCO was canceled on the exchange — flattened to stay safe.",
@@ -543,7 +543,7 @@ class GtbStrategy
             $exec = (float) ($o['data']['executedQty'] ?? 0);
             $cum  = (float) ($o['data']['cummulativeQuoteQty'] ?? 0);
             $exit = $exec > 0 ? $cum / $exec : $price;
-            $pnl  = ($exit - $entry) * ($exec > 0 ? $exec : $qty);
+            $pnl  = $this->netPnl($entry, $exit, $exec > 0 ? $exec : $qty);
             $trades->closeTrade($id, $exit, $pnl);
             $trades->setProtection($id, null, null);
             $thoughts->add(sprintf('Exchange stop hit %s at $%s · P&L %s$%.4f.',
@@ -555,7 +555,7 @@ class GtbStrategy
             $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $pos['stop_loss']]);
             if (!empty($prot['error'])) {
                 $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
-                $pnl = ($price - $entry) * $qty;
+                $pnl = $this->netPnl($entry, $price, $qty);
                 $trades->closeTrade($id, $price, $pnl);
                 $trades->setProtection($id, null, null);
                 $thoughts->add("$sym stop vanished and re-protect failed — flattened.",
@@ -577,7 +577,7 @@ class GtbStrategy
                 $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $newStop]);
                 if (!empty($prot['error'])) {            // couldn't re-place — flatten rather than run naked
                     $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
-                    $pnl = ($price - $entry) * $qty;
+                    $pnl = $this->netPnl($entry, $price, $qty);
                     $trades->closeTrade($id, $price, $pnl);
                     $trades->setProtection($id, null, null);
                     $thoughts->add("$sym trailing replace failed — flattened to stay safe.",
@@ -605,7 +605,7 @@ class GtbStrategy
             elseif ($type === 'stop' && $pid) $client->cancelOrder($sym, (string) $pid);
             $client->marketSell($sym, $this->floorToStep($client, $sym, (float) $pos['qty'] * 0.999));
         }
-        $pnl = ($price - (float) $pos['price']) * (float) $pos['qty'];
+        $pnl = $this->netPnl((float) $pos["price"], $price, (float) $pos["qty"]);
         $trades->closeTrade($id, $price, $pnl);
         $trades->setProtection($id, null, null);
         $thoughts->add(sprintf('Closed %s at $%s (%s) [%s] · P&L %s$%.4f.',
@@ -613,6 +613,17 @@ class GtbStrategy
             $pnl >= 0 ? '+' : '-', abs($pnl)),
             'bot', 'trade', $sym, $reason, ['mode' => ($pos['mode'] ?? $mode), 'pnl' => round($pnl, 6)]);
         return $pnl;
+    }
+
+    /**
+     * Realized P&L NET of Binance fees: gross move minus the taker fee on BOTH the
+     * buy and the sell (~0.1% each). So a "win" is only booked once it actually
+     * covers the round-trip charge — no phantom profit that fees would eat.
+     */
+    private function netPnl(float $entry, float $exit, float $qty): float
+    {
+        $fee = (float) (Env::get('GTB_FEE_RATE', '0.001') ?? 0.001);
+        return ($exit - $entry) * $qty - $fee * $qty * ($entry + $exit);
     }
 
     /** Whole minutes a position has been open (from its created_at), or null. */
