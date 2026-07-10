@@ -16,6 +16,8 @@ $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback']
 $gtbMemory         = $gtbMemory ?? false;
 $gtbInstructions   = $gtbInstructions ?? '';
 $gtbProfiles       = $gtbProfiles ?? ['conservative', 'aggressive'];
+$gtbCapitalMode    = $gtbCapitalMode ?? 'staked';
+$gtbPaperWallet    = $gtbPaperWallet ?? 35;
 $csrf_token        = $csrf_token ?? '';
 
 $gtbModelOptions = [
@@ -133,6 +135,35 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </p>
         </div>
 
+        <!-- Capital strategy -->
+        <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-coins text-primary mr-1.5"></i>Capital strategy</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">How much of your wallet the bot may put to work. Your $7 stake is always the starting point.</p>
+            <?php
+            $capOpts = [
+                'staked' => ['Staked — $7 discipline', 'Never risk more than your $7 stake plus the profit it earns. Safest.'],
+                'full'   => ['Full wallet (manual override)', 'After the $7 is working, deploy the entire available balance across concurrent slots.'],
+                'ai'     => ['Performance-scaled (AI-guided)', 'Starts at $7 and unlocks more of the wallet only as the bot grows the stake; losses pull it back.'],
+            ];
+            foreach ($capOpts as $k => $info): ?>
+                <label class="flex items-start gap-2 cursor-pointer">
+                    <input type="radio" name="capital_mode" class="gtb-cap mt-0.5 w-4 h-4 border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                           value="<?= $k ?>" <?= $gtbCapitalMode === $k ? 'checked' : '' ?>>
+                    <span class="text-sm"><span class="font-medium text-gray-800 dark:text-gray-200"><?= $info[0] ?></span>
+                        <span class="block text-xs text-gray-400 dark:text-gray-500"><?= $info[1] ?></span></span>
+                </label>
+            <?php endforeach; ?>
+            <p id="cap-warn" class="text-xs text-amber-600 dark:text-amber-400 <?= $gtbCapitalMode === 'staked' ? 'hidden' : '' ?>">
+                <i class="fas fa-triangle-exclamation mr-0.5"></i> This can risk more than $7 of real capital. Every position still opens with an exchange-side stop-loss, but larger size means larger swings.
+            </p>
+            <div class="flex items-center gap-2 pt-1 border-t border-gray-100 dark:border-gray-700/60">
+                <label for="paper_wallet" class="text-xs text-gray-500 dark:text-gray-400">Paper wallet size (testnet sim, full/AI modes)</label>
+                <span class="text-xs text-gray-400">$</span>
+                <input type="number" id="paper_wallet" min="7" step="1" value="<?= htmlspecialchars((string) $gtbPaperWallet, ENT_QUOTES) ?>"
+                       class="w-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1 focus:ring-primary focus:border-primary">
+            </div>
+        </div>
+
         <!-- Trading profiles (two bots, one wallet) -->
         <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-user-group text-primary mr-1.5"></i>Trading bots</h3>
@@ -213,6 +244,11 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
 <script>
     const GTB_CSRF = <?= json_encode($csrf_token) ?>;
 
+    document.querySelectorAll('.gtb-cap').forEach(r => r.addEventListener('change', () => {
+        const sel = document.querySelector('.gtb-cap:checked');
+        document.getElementById('cap-warn').classList.toggle('hidden', !sel || sel.value === 'staked');
+    }));
+
     function gtbSyncActive() {
         const testnet = document.getElementById('binance_testnet').checked;
         document.getElementById('binance_endpoint_display').textContent =
@@ -239,6 +275,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             anthropic_api_key: document.getElementById('anthropic_api_key').value,
             scan_model: document.getElementById('scan_model').value,
             decision_model: document.getElementById('decision_model').value,
+            capital_mode: (document.querySelector('.gtb-cap:checked') || {}).value || 'staked',
+            paper_wallet: parseFloat(document.getElementById('paper_wallet').value) || 0,
             profiles: Array.from(document.querySelectorAll('.gtb-prof:checked')).map(c => c.value),
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,

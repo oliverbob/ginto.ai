@@ -27,6 +27,9 @@ class GtbStrategy
     /** @var array<string,GtbTemplate> */
     private array $templates = [];
 
+    /** Free USDT available for a live buy this step (full/ai modes cap size to it); null = no cap. */
+    private ?float $liveFreeUsd = null;
+
     public function __construct()
     {
         $all = ['scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
@@ -48,6 +51,7 @@ class GtbStrategy
         $cap      = new GtbCapital();
         $realized = $trades->totalRealizedPnl();
         $tickers  = $this->liquidTickers($client);
+        $this->configureCapital($cap, $client, $trades, $mode, $realized, $tickers);
         $priceOf  = function (string $sym) use ($tickers, $client) {
             return isset($tickers[$sym]) ? $tickers[$sym]['price'] : $client->price($sym);
         };
@@ -100,6 +104,14 @@ class GtbStrategy
             } else {
                 $held = array_column($open, 'symbol');
                 $size = $cap->perTradeSize($realized);
+                // Live full/ai modes: never size a buy above the free USDT actually on hand.
+                if ($mode === 'live' && $this->liveFreeUsd !== null) {
+                    $size = min($size, $this->liveFreeUsd * 0.997);
+                }
+                if ($size < $cap->minNotional()) {
+                    return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                        'insufficient free USDT for a new trade', $tickers);
+                }
                 $memory = Env::bool('GTB_MEMORY_ENABLED', false) ? $this->buildMemory($trades) : null;
 
                 // Profile order: least-used first so the two bots share slots fairly.
@@ -195,6 +207,18 @@ class GtbStrategy
         return $this->openPositionsState($client, $trades, $cap, $realized, $mode, $action, $tickers);
     }
 
+    /** Wallet-aware capital summary for display / AI context (respects the capital mode). */
+    public function capitalSummary(): array
+    {
+        $client   = new BinanceClient();
+        $trades   = new GtbTrade();
+        $mode     = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
+        $realized = $trades->totalRealizedPnl();
+        $cap      = new GtbCapital();
+        $this->configureCapital($cap, $client, $trades, $mode, $realized);
+        return $cap->summary($realized);
+    }
+
     /** Manually close one open position at the current price (paper or live). */
     public function closePosition(int $id): array
     {
@@ -233,9 +257,13 @@ class GtbStrategy
     ): array {
         $client = $client ?? new BinanceClient();
         $trades = $trades ?? new GtbTrade();
-        $cap    = $cap ?? new GtbCapital();
-        if ($realized === null) $realized = $trades->totalRealizedPnl();
         if ($mode === null)     $mode = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
+        if ($realized === null) $realized = $trades->totalRealizedPnl();
+        // If called fresh (e.g. from the dashboard), teach a new capital object about the wallet.
+        if ($cap === null) {
+            $cap = new GtbCapital();
+            $this->configureCapital($cap, $client, $trades, $mode, $realized, $tickers);
+        }
 
         $positions = [];
         $unrealTotal = 0.0;
@@ -284,6 +312,44 @@ class GtbStrategy
             'templates' => $tmplList,
             'profiles'  => $profList,
         ];
+    }
+
+    /**
+     * Teach the capital object about the wallet for full/ai modes (staked mode needs
+     * nothing extra). Wallet = free USDT + value already deployed in open positions
+     * (live), or the configured paper wallet (paper). Also caches free USDT so a live
+     * buy can be capped to what's actually on hand.
+     */
+    private function configureCapital(GtbCapital $cap, BinanceClient $client, GtbTrade $trades, string $mode, float $realized, array $tickers = []): void
+    {
+        $this->liveFreeUsd = null;
+        if ($cap->mode() === 'staked') return;
+
+        $invested = 0.0;
+        foreach ($trades->openPositions() as $p) {
+            if (($p['mode'] ?? $mode) !== $mode) continue;
+            $sym = $p['symbol'];
+            $px  = isset($tickers[$sym]) ? (float) $tickers[$sym]['price'] : (float) ($client->price($sym) ?? $p['price']);
+            $invested += $px * (float) $p['qty'];
+        }
+
+        if ($mode === 'live') {
+            $free = 0.0;
+            $acct = $client->account();
+            if (!empty($acct['ok'])) {
+                foreach (($acct['data']['balances'] ?? []) as $b) {
+                    if (($b['asset'] ?? '') === 'USDT') $free = (float) ($b['free'] ?? 0);
+                }
+            }
+            $this->liveFreeUsd = $free;
+            $cap->setWallet($free + $invested);
+        } else {
+            $wallet = (float) (Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
+            $cap->setWallet($wallet);
+        }
+        if ($cap->mode() === 'ai') {
+            $cap->setAiPct($cap->autoAiPct($realized));
+        }
     }
 
     /** Liquid USDT tickers keyed by symbol (leveraged tokens + stablecoins excluded). */

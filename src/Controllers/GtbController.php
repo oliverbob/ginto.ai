@@ -108,6 +108,9 @@ class GtbController
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
         $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
         $gtbProfiles  = \Ginto\Services\Strategies\GtbProfiles::enabled();
+        $gtbCapitalMode = strtolower((string) (\Ginto\Support\Env::get('GTB_CAPITAL_MODE', 'staked') ?? 'staked'));
+        if (!in_array($gtbCapitalMode, ['staked', 'full', 'ai'], true)) $gtbCapitalMode = 'staked';
+        $gtbPaperWallet = (float) (\Ginto\Support\Env::get('GTB_PAPER_WALLET_USD', '35') ?? 35);
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -131,6 +134,8 @@ class GtbController
             'gtbMemory'         => $gtbMemory,
             'gtbInstructions'   => $gtbInstructions,
             'gtbProfiles'       => $gtbProfiles,
+            'gtbCapitalMode'    => $gtbCapitalMode,
+            'gtbPaperWallet'    => $gtbPaperWallet,
             'csrf_token'        => $this->csrfToken(),
         ]);
     }
@@ -199,6 +204,13 @@ class GtbController
             $allowedProfiles = ['conservative', 'aggressive'];
             $profs = array_values(array_intersect($allowedProfiles, (array) ($input['profiles'] ?? [])));
             if ($profs) $pairs['GTB_PROFILES'] = implode(',', $profs);
+
+            // Capital strategy: staked ($7 discipline) | full (whole wallet) | ai (performance-scaled)
+            $capMode = strtolower((string) ($input['capital_mode'] ?? 'staked'));
+            $pairs['GTB_CAPITAL_MODE'] = in_array($capMode, ['staked', 'full', 'ai'], true) ? $capMode : 'staked';
+            // Paper-mode simulated wallet size (used by full/ai modes on testnet)
+            $paperWallet = (float) ($input['paper_wallet'] ?? 0);
+            if ($paperWallet > 0) $pairs['GTB_PAPER_WALLET_USD'] = rtrim(rtrim(number_format($paperWallet, 2, '.', ''), '0'), '.');
 
             // Memory (opt-in; increases tokens per AI decision)
             $pairs['GTB_MEMORY_ENABLED'] = !empty($input['memory_enabled']) ? 'true' : 'false';
@@ -430,8 +442,7 @@ class GtbController
             $tModel = new \Ginto\Models\GtbThought();
             $thoughts = $tModel->recent(40);
             $spend = $tModel->spend();
-            $realized = (new GtbTrade())->totalRealizedPnl();
-            $capital = (new \Ginto\Services\GtbCapital())->summary($realized);
+            $capital = (new \Ginto\Services\GtbStrategy())->capitalSummary();
             $brainReady = (new \Ginto\Services\GtbBrain())->isConfigured();
         } catch (\Throwable $e) {}
 
@@ -466,8 +477,7 @@ class GtbController
                 exit;
             }
 
-            $realized = (new GtbTrade())->totalRealizedPnl();
-            $capital  = (new \Ginto\Services\GtbCapital())->summary($realized);
+            $capital  = (new \Ginto\Services\GtbStrategy())->capitalSummary();
             $context  = [
                 'env'      => $settings->isTestnet() ? 'testnet' : 'mainnet',
                 'capital'  => $capital,
