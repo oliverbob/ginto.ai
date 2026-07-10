@@ -12,6 +12,10 @@ $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
 $anthropicKeySet   = $anthropicKeySet ?? false;
 $anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
 $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
+$aiProvider        = $aiProvider ?? 'anthropic';
+$groqKeySet        = $groqKeySet ?? false;
+$groqModel         = $groqModel ?? 'llama-3.3-70b-versatile';
+$groqScanModel     = $groqScanModel ?? 'llama-3.1-8b-instant';
 $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
 $gtbInstructions   = $gtbInstructions ?? '';
@@ -34,6 +38,13 @@ $gtbModelOptions = [
     'claude-haiku-4-5' => 'Haiku 4.5 — cheapest ($1 / $5 per 1M)',
     'claude-sonnet-5'  => 'Sonnet 5 — mid ($3 / $15 per 1M)',
     'claude-opus-4-8'  => 'Opus 4.8 — smartest ($5 / $25 per 1M)',
+];
+$gtbGroqModels = [
+    'llama-3.1-8b-instant'          => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
+    'qwen/qwen3-32b'                => 'Qwen3 32B ($0.29 / $0.59)',
+    'llama-3.3-70b-versatile'       => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
+    'deepseek-r1-distill-llama-70b' => 'DeepSeek R1 70B — reasoning ($0.75 / $0.99)',
+    'openai/gpt-oss-120b'           => 'GPT-OSS 120B ($0.15 / $0.75)',
 ];
 function gtb_model_select(string $id, string $current, array $opts): void {
     echo '<select id="' . $id . '" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">';
@@ -112,37 +123,64 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             enable Reading + Spot, keep Withdrawals off, restrict to this server's IP.
         </div>
 
-        <!-- AI Brain (Claude) -->
+        <!-- AI Brain (provider-based) -->
         <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
             <div class="flex items-center justify-between">
-                <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-robot text-primary mr-1.5"></i>AI Brain (Claude)</h3>
-                <span class="text-[10px] font-mono text-gray-400 dark:text-gray-500"><?= htmlspecialchars($anthropicModel) ?></span>
+                <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-robot text-primary mr-1.5"></i>AI Brain</h3>
+                <span class="text-[10px] font-mono text-gray-400 dark:text-gray-500"><?= htmlspecialchars($aiProvider === 'groq' ? $groqModel : $anthropicModel) ?></span>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">
-                A <strong>paid Anthropic API key</strong> from <code>console.anthropic.com</code> (this is <em>not</em> your Claude Pro login — Pro can't be used programmatically). Powers the bot's self-reflection chat.
-            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">The engine that reflects and confirms trades. <strong>Groq</strong> runs open models (DeepSeek, Llama, Qwen) ~10–40× cheaper than Claude.</p>
+
             <div>
-                <label for="anthropic_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anthropic API Key</label>
-                <input type="password" id="anthropic_api_key" autocomplete="new-password" spellcheck="false"
-                       class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
-                       placeholder="<?= $anthropicKeySet ? '•••••••• saved — leave blank to keep' : 'sk-ant-...' ?>">
-                <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-                    <?= $anthropicKeySet ? 'A key is saved. Leave blank to keep it, or type a new one to replace it.' : 'Write-only — never shown after saving. Billed per token, separately from Claude Pro.' ?>
-                </p>
+                <label for="ai_provider" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Provider</label>
+                <select id="ai_provider" onchange="gtbSyncProvider()" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">
+                    <option value="groq" <?= $aiProvider === 'groq' ? 'selected' : '' ?>>Groq — cheapest (DeepSeek / Llama / Qwen)</option>
+                    <option value="anthropic" <?= $aiProvider === 'anthropic' ? 'selected' : '' ?>>Anthropic — Claude (premium)</option>
+                </select>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+
+            <!-- Groq block -->
+            <div id="prov-groq" class="space-y-3 <?= $aiProvider === 'groq' ? '' : 'hidden' ?>">
                 <div>
-                    <label for="scan_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Scan model (cheap, frequent)</label>
-                    <?php gtb_model_select('scan_model', $anthropicScanModel, $gtbModelOptions); ?>
+                    <label for="groq_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Groq API Key</label>
+                    <input type="password" id="groq_api_key" autocomplete="new-password" spellcheck="false"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
+                           placeholder="<?= $groqKeySet ? '•••••••• saved — leave blank to keep' : 'gsk_...' ?>">
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Free/cheap key from <code>console.groq.com</code>. Write-only. <?= $groqKeySet ? 'A key is saved.' : '' ?></p>
                 </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="groq_scan_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Scan model (cheap, frequent)</label>
+                        <?php gtb_model_select('groq_scan_model', $groqScanModel, $gtbGroqModels); ?>
+                    </div>
+                    <div>
+                        <label for="groq_decision_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Decision model</label>
+                        <?php gtb_model_select('groq_decision_model', $groqModel, $gtbGroqModels); ?>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 dark:text-gray-500"><strong>DeepSeek R1</strong> = strongest reasoning (the Alpha-Arena winner); <strong>Llama 3.3 70B</strong> = fast &amp; balanced; <strong>Llama 3.1 8B</strong> = cheapest for scans. A decision costs roughly ~0.02–0.1¢ (vs ~1¢ on Opus).</p>
+            </div>
+
+            <!-- Anthropic block -->
+            <div id="prov-anthropic" class="space-y-3 <?= $aiProvider === 'anthropic' ? '' : 'hidden' ?>">
                 <div>
-                    <label for="decision_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Decision model (used by “Reflect now”)</label>
-                    <?php gtb_model_select('decision_model', $anthropicModel, $gtbModelOptions); ?>
+                    <label for="anthropic_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anthropic API Key</label>
+                    <input type="password" id="anthropic_api_key" autocomplete="new-password" spellcheck="false"
+                           class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
+                           placeholder="<?= $anthropicKeySet ? '•••••••• saved — leave blank to keep' : 'sk-ant-...' ?>">
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500"><?= $anthropicKeySet ? 'A key is saved. Leave blank to keep it.' : 'Paid key from console.anthropic.com (not Claude Pro). Write-only.' ?></p>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label for="scan_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Scan model (cheap, frequent)</label>
+                        <?php gtb_model_select('scan_model', $anthropicScanModel, $gtbModelOptions); ?>
+                    </div>
+                    <div>
+                        <label for="decision_model" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Decision model</label>
+                        <?php gtb_model_select('decision_model', $anthropicModel, $gtbModelOptions); ?>
+                    </div>
                 </div>
             </div>
-            <p class="text-[11px] text-gray-400 dark:text-gray-500">
-                Routine market scans use the cheaper model; actual trade decisions use the smarter one. A reflection costs roughly Haiku ~0.2¢ · Opus ~1¢.
-            </p>
         </div>
 
         <!-- Capital strategy -->
@@ -324,6 +362,12 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
 <script>
     const GTB_CSRF = <?= json_encode($csrf_token) ?>;
 
+    function gtbSyncProvider() {
+        const p = document.getElementById('ai_provider').value;
+        document.getElementById('prov-groq').classList.toggle('hidden', p !== 'groq');
+        document.getElementById('prov-anthropic').classList.toggle('hidden', p !== 'anthropic');
+    }
+
     document.querySelectorAll('.gtb-cap').forEach(r => r.addEventListener('change', () => {
         const sel = document.querySelector('.gtb-cap:checked');
         document.getElementById('cap-warn').classList.toggle('hidden', !sel || sel.value === 'staked');
@@ -352,9 +396,13 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             mainnet_api_secret: document.getElementById('mainnet_api_secret').value,
             testnet_api_key: document.getElementById('testnet_api_key').value.trim(),
             testnet_api_secret: document.getElementById('testnet_api_secret').value,
+            ai_provider: document.getElementById('ai_provider').value,
             anthropic_api_key: document.getElementById('anthropic_api_key').value,
             scan_model: document.getElementById('scan_model').value,
             decision_model: document.getElementById('decision_model').value,
+            groq_api_key: document.getElementById('groq_api_key').value,
+            groq_scan_model: document.getElementById('groq_scan_model').value,
+            groq_decision_model: document.getElementById('groq_decision_model').value,
             capital_mode: (document.querySelector('.gtb-cap:checked') || {}).value || 'staked',
             paper_wallet: parseFloat(document.getElementById('paper_wallet').value) || 0,
             max_hold_min: parseInt(document.getElementById('max_hold_min').value) || 0,
@@ -384,7 +432,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             if (res.ok && d.success) {
                 status.textContent = '✓ ' + (d.message || 'Saved') + (d.configured ? '' : ' — active env still missing key/secret');
                 status.className = 'text-sm ' + (d.configured ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400');
-                ['mainnet_api_secret', 'testnet_api_secret', 'anthropic_api_key'].forEach(id => {
+                ['mainnet_api_secret', 'testnet_api_secret', 'anthropic_api_key', 'groq_api_key'].forEach(id => {
                     const el = document.getElementById(id);
                     if (el.value) { el.value = ''; el.placeholder = '•••••••• saved — leave blank to keep'; }
                 });

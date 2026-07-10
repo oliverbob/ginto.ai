@@ -126,6 +126,11 @@ class GtbController
         $anthropicKeySet    = (string) (\Ginto\Support\Env::get('ANTHROPIC_API_KEY', '') ?? '') !== '';
         $anthropicModel     = (string) (\Ginto\Support\Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8');
         $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
+        $aiProvider   = strtolower((string) (\Ginto\Support\Env::get('GTB_AI_PROVIDER', 'anthropic') ?? 'anthropic'));
+        if (!in_array($aiProvider, ['anthropic', 'groq'], true)) $aiProvider = 'anthropic';
+        $groqKeySet   = (string) (\Ginto\Support\Env::get('GROQ_API_KEY', '') ?? '') !== '';
+        $groqModel    = (string) (\Ginto\Support\Env::get('GROQ_MODEL', 'llama-3.3-70b-versatile') ?? 'llama-3.3-70b-versatile');
+        $groqScanModel= (string) (\Ginto\Support\Env::get('GROQ_SCAN_MODEL', 'llama-3.1-8b-instant') ?? 'llama-3.1-8b-instant');
         $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
         $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
@@ -161,6 +166,10 @@ class GtbController
             'anthropicKeySet'   => $anthropicKeySet,
             'anthropicModel'    => $anthropicModel,
             'anthropicScanModel'=> $anthropicScanModel,
+            'aiProvider'        => $aiProvider,
+            'groqKeySet'        => $groqKeySet,
+            'groqModel'         => $groqModel,
+            'groqScanModel'     => $groqScanModel,
             'gtbTemplates'      => $gtbTemplates,
             'gtbMemory'         => $gtbMemory,
             'gtbInstructions'   => $gtbInstructions,
@@ -224,16 +233,27 @@ class GtbController
             if ($mainSecret !== '') $pairs['BINANCE_API_SECRET'] = $mainSecret;
             if ($testSecret !== '') $pairs['BINANCE_TESTNET_API_SECRET'] = $testSecret;
 
-            // AI brain key (write-only, like the Binance secrets)
+            // AI provider selection (which brain the bot uses)
+            $provider = strtolower((string) ($input['ai_provider'] ?? 'anthropic'));
+            $pairs['GTB_AI_PROVIDER'] = in_array($provider, ['anthropic', 'groq'], true) ? $provider : 'anthropic';
+
+            // Anthropic key (write-only) + validated model allowlist
             $anthropicKey = trim((string) ($input['anthropic_api_key'] ?? ''));
             if ($anthropicKey !== '') $pairs['ANTHROPIC_API_KEY'] = $anthropicKey;
-
-            // AI brain model selection (validated allowlist)
             $allowedModels = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'];
             $decModel  = (string) ($input['decision_model'] ?? '');
             $scanModel = (string) ($input['scan_model'] ?? '');
             if (in_array($decModel, $allowedModels, true))  $pairs['ANTHROPIC_MODEL'] = $decModel;
             if (in_array($scanModel, $allowedModels, true)) $pairs['ANTHROPIC_SCAN_MODEL'] = $scanModel;
+
+            // Groq key (write-only) + model IDs (accept any valid-looking model slug)
+            $groqKey = trim((string) ($input['groq_api_key'] ?? ''));
+            if ($groqKey !== '') $pairs['GROQ_API_KEY'] = $groqKey;
+            $isModelId = static fn($m) => is_string($m) && $m !== '' && preg_match('#^[A-Za-z0-9._/\-]+$#', $m);
+            $gDec  = (string) ($input['groq_decision_model'] ?? '');
+            $gScan = (string) ($input['groq_scan_model'] ?? '');
+            if ($isModelId($gDec))  $pairs['GROQ_MODEL'] = $gDec;
+            if ($isModelId($gScan)) $pairs['GROQ_SCAN_MODEL'] = $gScan;
 
             // Strategy templates enable/disable (at least one required)
             $allowedTpls = ['scalp', 'breakout', 'trend', 'pullback'];
