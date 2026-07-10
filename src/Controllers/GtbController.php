@@ -70,6 +70,7 @@ class GtbController
             'userFullname'  => $_SESSION['fullname'] ?? $_SESSION['username'] ?? null,
             'apiConfigured' => $apiConfigured,
             'isTestnet'     => $isTestnet,
+            'binanceEndpoint' => $isTestnet ? 'https://testnet.binance.vision' : 'https://api.binance.com',
             'recentTrades'  => $recentTrades,
             'recentLogs'    => $recentLogs,
             'realizedPnl'   => $realizedPnl,
@@ -87,18 +88,17 @@ class GtbController
         $apiKey = '';
         $secretSet = false;
         $testnet = false;
-        $baseUrl = 'https://api.binance.com';
         $configured = false;
         try {
             $settings  = new GtbSettings();
             $apiKey    = $settings->getApiKey();
             $secretSet = $settings->getApiSecret() !== '';
             $testnet   = $settings->isTestnet();
-            $baseUrl   = (string) (\Ginto\Support\Env::get('BINANCE_BASE_URL', 'https://api.binance.com') ?? 'https://api.binance.com');
             $configured = $settings->isConfigured();
         } catch (\Throwable $e) {
             // DB/env unavailable — render an empty form
         }
+        $endpoint = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
 
         View::view('gtb/gtb', [
             'title'            => 'GTB · API Settings',
@@ -112,7 +112,7 @@ class GtbController
             'binanceApiKey'    => $apiKey,
             'binanceSecretSet' => $secretSet,
             'binanceTestnet'   => $testnet,
-            'binanceBaseUrl'   => $baseUrl,
+            'binanceEndpoint'  => $endpoint,
             'csrf_token'       => $this->csrfToken(),
         ]);
     }
@@ -143,15 +143,11 @@ class GtbController
             $apiKey  = trim((string) ($input['binance_api_key'] ?? ''));
             $secret  = trim((string) ($input['binance_api_secret'] ?? ''));
             $testnet = !empty($input['binance_testnet']);
-            $baseUrl = trim((string) ($input['binance_base_url'] ?? ''));
 
-            // Default base URL from the testnet flag when left blank
-            if ($baseUrl === '') {
-                $baseUrl = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
-            }
-            if (!preg_match('#^https?://#i', $baseUrl)) {
-                throw new \Exception('Base URL must start with http:// or https://');
-            }
+            // The testnet toggle is authoritative for the endpoint so the flag and
+            // the base URL can never disagree (prevents a "Testnet" badge while
+            // calls actually hit real-money mainnet).
+            $baseUrl = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
 
             $pairs = [
                 'BINANCE_API_KEY'  => $apiKey,
@@ -178,6 +174,104 @@ class GtbController
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** GET /gtb/markets — live market data (public mainnet) for the dashboard charts */
+    public function markets(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $this->requireAdmin(true);
+
+        $symbols = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT',
+                    'DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','LTCUSDT','TRXUSDT'];
+        try {
+            $client = new \Ginto\Services\BinanceClient();
+            $ticker = $client->ticker24hr($symbols);
+            if (empty($ticker['ok'])) {
+                http_response_code(502);
+                echo json_encode(['ok' => false, 'error' => $ticker['error'] ?? 'ticker failed']);
+                exit;
+            }
+            $closesMap = $client->klinesMulti($symbols, '1h', 24);
+
+            $bySymbol = [];
+            foreach ($ticker['data'] as $row) {
+                $bySymbol[$row['symbol']] = $row;
+            }
+            $markets = [];
+            foreach ($symbols as $s) {
+                if (!isset($bySymbol[$s])) continue;
+                $r = $bySymbol[$s];
+                $markets[] = [
+                    'symbol'      => $s,
+                    'base'        => str_replace('USDT', '', $s),
+                    'price'       => (float) $r['lastPrice'],
+                    'changePct'   => (float) $r['priceChangePercent'],
+                    'high'        => (float) $r['highPrice'],
+                    'low'         => (float) $r['lowPrice'],
+                    'quoteVolume' => (float) $r['quoteVolume'],
+                    'closes'      => $closesMap[$s] ?? [],
+                ];
+            }
+            echo json_encode(['ok' => true, 'markets' => $markets, 'source' => 'mainnet public']);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** GET /gtb/test-connection — signed account call to verify the API key works */
+    public function testConnection(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $this->requireAdmin(true);
+
+        try {
+            $client = new \Ginto\Services\BinanceClient();
+            if (!$client->isConfigured()) {
+                echo json_encode(['ok' => false, 'error' => 'No API key/secret saved yet.']);
+                exit;
+            }
+            $res = $client->account();
+            if (empty($res['ok'])) {
+                echo json_encode([
+                    'ok'       => false,
+                    'error'    => $res['error'] ?? 'Request failed',
+                    'endpoint' => $client->accountEndpoint(),
+                    'testnet'  => $client->isTestnet(),
+                ]);
+                exit;
+            }
+            $acct = $res['data'];
+            $balances = [];
+            foreach (($acct['balances'] ?? []) as $b) {
+                $free = (float) $b['free'];
+                $locked = (float) $b['locked'];
+                if ($free + $locked > 0) {
+                    $balances[] = ['asset' => $b['asset'], 'free' => $free, 'locked' => $locked];
+                }
+            }
+            usort($balances, static fn($a, $b) => ($b['free'] + $b['locked']) <=> ($a['free'] + $a['locked']));
+
+            echo json_encode([
+                'ok'       => true,
+                'endpoint' => $client->accountEndpoint(),
+                'testnet'  => $client->isTestnet(),
+                'canTrade' => $acct['canTrade'] ?? null,
+                'balances' => array_slice($balances, 0, 25),
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
     }

@@ -3,11 +3,14 @@
 // Controller-fed. No Binance calls yet: live portfolio/balance/holdings arrive
 // in a later step. Trades & logs read from the gtb_* tables (empty until used).
 
-$apiConfigured = $apiConfigured ?? false;
-$isTestnet     = $isTestnet ?? false;
-$recentTrades  = $recentTrades ?? [];
-$recentLogs    = $recentLogs ?? [];
-$realizedPnl   = $realizedPnl ?? 0.0;
+$apiConfigured   = $apiConfigured ?? false;
+$isTestnet       = $isTestnet ?? false;
+$binanceEndpoint = $binanceEndpoint ?? ($isTestnet ? 'https://testnet.binance.vision' : 'https://api.binance.com');
+$recentTrades    = $recentTrades ?? [];
+$recentLogs      = $recentLogs ?? [];
+$realizedPnl     = $realizedPnl ?? 0.0;
+
+$endpointHost = preg_replace('#^https?://#', '', $binanceEndpoint);
 
 $pnlPositive = $realizedPnl >= 0;
 $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2);
@@ -19,16 +22,27 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Dashboard</h2>
         <p class="text-sm text-gray-500 dark:text-gray-400">Binance Spot &middot; single-account trading bot</p>
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 flex-wrap">
         <?php if ($isTestnet): ?>
             <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
                 <i class="fas fa-flask"></i> Testnet
             </span>
+        <?php else: ?>
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400">
+                <i class="fas fa-triangle-exclamation"></i> Mainnet (real funds)
+            </span>
         <?php endif; ?>
+        <span class="inline-flex items-center gap-1.5 text-xs font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
+            <i class="fas fa-link"></i><?= htmlspecialchars($endpointHost) ?>
+        </span>
         <?php if ($apiConfigured): ?>
             <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">
-                <i class="fas fa-circle-check"></i> API connected
+                <i class="fas fa-circle-check"></i> Keys set
             </span>
+            <button type="button" id="gtb-test-btn" onclick="gtbTestConnection()"
+                    class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:border-primary hover:text-primary">
+                <i class="fas fa-plug"></i> Test connection
+            </button>
         <?php else: ?>
             <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300">
                 <i class="fas fa-circle-xmark"></i> API not configured
@@ -36,6 +50,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <?php endif; ?>
     </div>
 </div>
+
+<!-- Test connection result -->
+<div id="gtb-test-result" class="hidden mb-6 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 text-sm"></div>
 
 <?php if (!$apiConfigured): ?>
     <!-- Setup notice -->
@@ -114,6 +131,27 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             </button>
         <?php endif;
     endforeach; ?>
+</section>
+
+<!-- Markets (live, from Binance public data) -->
+<section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
+            <i class="fas fa-chart-line text-primary mr-2"></i>Markets
+            <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">live · 24h</span>
+        </h3>
+        <button type="button" onclick="gtbLoadMarkets()" class="text-xs text-gray-500 dark:text-gray-400 hover:text-primary">
+            <i class="fas fa-rotate"></i> Refresh
+        </button>
+    </div>
+    <div id="gtb-markets" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div class="col-span-full py-8 text-center text-gray-400 dark:text-gray-500 text-sm">
+            <i class="fas fa-spinner fa-spin mr-1"></i> Loading live markets…
+        </div>
+    </div>
+    <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
+        Prices from Binance public market data (mainnet). Charts are real regardless of your testnet setting.
+    </p>
 </section>
 
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
@@ -196,3 +234,92 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <?php endif; ?>
     </section>
 </div>
+
+<script>
+    // ---- Live markets + sparklines --------------------------------------------
+    function gtbSparkline(closes, up) {
+        if (!closes || closes.length < 2) return '';
+        const w = 120, h = 32, pad = 2;
+        const min = Math.min(...closes), max = Math.max(...closes);
+        const range = (max - min) || 1;
+        const stepX = (w - pad * 2) / (closes.length - 1);
+        const pts = closes.map((c, i) =>
+            `${(pad + i * stepX).toFixed(1)},${(h - pad - ((c - min) / range) * (h - pad * 2)).toFixed(1)}`).join(' ');
+        const stroke = up ? '#16a34a' : '#ef4444';
+        return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none" class="block">` +
+               `<polyline fill="none" stroke="${stroke}" stroke-width="1.5" points="${pts}" /></svg>`;
+    }
+
+    function gtbFmtPrice(p) {
+        if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        if (p >= 1) return p.toFixed(3);
+        return p.toPrecision(4);
+    }
+
+    async function gtbLoadMarkets() {
+        const box = document.getElementById('gtb-markets');
+        box.innerHTML = '<div class="col-span-full py-8 text-center text-gray-400 text-sm"><i class="fas fa-spinner fa-spin mr-1"></i> Loading live markets…</div>';
+        try {
+            const res = await fetch('/gtb/markets');
+            const d = await res.json();
+            if (!d.ok) { box.innerHTML = `<div class="col-span-full py-6 text-center text-red-500 text-sm">✗ ${d.error || 'Failed to load markets'}</div>`; return; }
+            box.innerHTML = d.markets.map(m => {
+                const up = m.changePct >= 0;
+                const chg = (up ? '+' : '') + m.changePct.toFixed(2) + '%';
+                const chgCls = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+                return `
+                <div class="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="font-semibold text-gray-900 dark:text-white">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></div>
+                        <div class="text-xs font-semibold ${chgCls}">${chg}</div>
+                    </div>
+                    <div class="mt-1 text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100">$${gtbFmtPrice(m.price)}</div>
+                    <div class="mt-2">${gtbSparkline(m.closes, up)}</div>
+                    <div class="mt-2 flex justify-between text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
+                        <span>H $${gtbFmtPrice(m.high)}</span>
+                        <span>L $${gtbFmtPrice(m.low)}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            box.innerHTML = `<div class="col-span-full py-6 text-center text-red-500 text-sm">✗ ${e.message}</div>`;
+        }
+    }
+
+    // ---- Test connection (signed account probe) -------------------------------
+    async function gtbTestConnection() {
+        const btn = document.getElementById('gtb-test-btn');
+        const boxEl = document.getElementById('gtb-test-result');
+        const orig = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing…'; }
+        boxEl.classList.remove('hidden');
+        boxEl.innerHTML = '<span class="text-gray-500">Contacting Binance…</span>';
+        try {
+            const res = await fetch('/gtb/test-connection');
+            const d = await res.json();
+            if (d.ok) {
+                const rows = (d.balances || []).map(b =>
+                    `<tr><td class="pr-4 font-medium">${b.asset}</td>` +
+                    `<td class="pr-4 text-right tabular-nums">${(+b.free).toLocaleString(undefined,{maximumFractionDigits:8})}</td>` +
+                    `<td class="text-right tabular-nums text-gray-400">${(+b.locked).toLocaleString(undefined,{maximumFractionDigits:8})}</td></tr>`).join('');
+                boxEl.innerHTML =
+                    `<div class="text-green-600 dark:text-green-400 font-semibold mb-1"><i class="fas fa-circle-check"></i> Connected</div>` +
+                    `<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">${d.testnet ? 'Testnet' : 'Mainnet'} · ${d.endpoint} · canTrade: ${d.canTrade}</div>` +
+                    (rows
+                        ? `<table class="w-full text-xs"><thead><tr class="text-gray-400 text-left"><th class="pr-4">Asset</th><th class="pr-4 text-right">Free</th><th class="text-right">Locked</th></tr></thead><tbody>${rows}</tbody></table>`
+                        : `<div class="text-xs text-gray-400">No non-zero balances (empty wallet — normal for a fresh testnet key).</div>`);
+            } else {
+                boxEl.innerHTML =
+                    `<div class="text-red-500 font-semibold mb-1"><i class="fas fa-circle-xmark"></i> Failed</div>` +
+                    `<div class="text-xs text-gray-500 dark:text-gray-400">${d.error || 'Unknown error'}</div>` +
+                    (d.endpoint ? `<div class="text-xs text-gray-400 mt-1">${d.testnet ? 'Testnet' : 'Mainnet'} · ${d.endpoint}</div>` : '');
+            }
+        } catch (e) {
+            boxEl.innerHTML = `<div class="text-red-500"><i class="fas fa-circle-xmark"></i> ${e.message}</div>`;
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', gtbLoadMarkets);
+</script>

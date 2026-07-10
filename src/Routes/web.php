@@ -1752,5 +1752,7 @@ $router->req('/playground/{tool}', 'PlaygroundController@tool'); // Catch-all mu
 // View:       src/Views/gtb/ (parts/ + pages/ per docs/routes.md)
 // ============================================================================
 $router->req('/gtb', 'GtbController@index');
+$router->get('/gtb/markets', 'GtbController@markets');          // live market data (public) for charts
+$router->get('/gtb/test-connection', 'GtbController@testConnection'); // signed account probe
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env
