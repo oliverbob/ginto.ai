@@ -85,18 +85,20 @@ class GtbController
         }
         $this->requireAdmin();
 
-        $apiKey = '';
-        $secretSet = false;
         $testnet = false;
+        $mainKey = ''; $mainSecretSet = false;
+        $testKey = ''; $testSecretSet = false;
         $configured = false;
         try {
-            $settings  = new GtbSettings();
-            $apiKey    = $settings->getApiKey();
-            $secretSet = $settings->getApiSecret() !== '';
-            $testnet   = $settings->isTestnet();
-            $configured = $settings->isConfigured();
+            $s = new GtbSettings();
+            $testnet       = $s->isTestnet();
+            $mainKey       = $s->mainnetApiKey();
+            $mainSecretSet = $s->mainnetApiSecret() !== '';
+            $testKey       = $s->testnetApiKey();
+            $testSecretSet = $s->testnetApiSecret() !== '';
+            $configured    = $s->isConfigured();
         } catch (\Throwable $e) {
-            // DB/env unavailable — render an empty form
+            // env unavailable — render an empty form
         }
         $endpoint = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
 
@@ -109,8 +111,10 @@ class GtbController
             'userId'           => $_SESSION['user_id'] ?? null,
             'userFullname'     => $_SESSION['fullname'] ?? $_SESSION['username'] ?? null,
             'apiConfigured'    => $configured,
-            'binanceApiKey'    => $apiKey,
-            'binanceSecretSet' => $secretSet,
+            'mainnetApiKey'    => $mainKey,
+            'mainnetSecretSet' => $mainSecretSet,
+            'testnetApiKey'    => $testKey,
+            'testnetSecretSet' => $testSecretSet,
             'binanceTestnet'   => $testnet,
             'binanceEndpoint'  => $endpoint,
             'csrf_token'       => $this->csrfToken(),
@@ -140,36 +144,36 @@ class GtbController
         $this->requireAdmin(true);
 
         try {
-            $apiKey  = trim((string) ($input['binance_api_key'] ?? ''));
-            $secret  = trim((string) ($input['binance_api_secret'] ?? ''));
-            $testnet = !empty($input['binance_testnet']);
+            $mainKey    = trim((string) ($input['mainnet_api_key'] ?? ''));
+            $mainSecret = trim((string) ($input['mainnet_api_secret'] ?? ''));
+            $testKey    = trim((string) ($input['testnet_api_key'] ?? ''));
+            $testSecret = trim((string) ($input['testnet_api_secret'] ?? ''));
+            $testnet    = !empty($input['binance_testnet']);
 
             // The testnet toggle is authoritative for the endpoint so the flag and
-            // the base URL can never disagree (prevents a "Testnet" badge while
-            // calls actually hit real-money mainnet).
+            // the base URL can never disagree.
             $baseUrl = $testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
 
+            // Keys are shown in the form (editable), so write them as submitted.
+            // Secrets are write-only, so a blank secret keeps the stored one.
             $pairs = [
-                'BINANCE_API_KEY'  => $apiKey,
-                'BINANCE_TESTNET'  => $testnet ? 'true' : 'false',
-                'BINANCE_BASE_URL' => $baseUrl,
+                'BINANCE_API_KEY'         => $mainKey,
+                'BINANCE_TESTNET_API_KEY' => $testKey,
+                'BINANCE_TESTNET'         => $testnet ? 'true' : 'false',
+                'BINANCE_BASE_URL'        => $baseUrl,
             ];
-            // Only overwrite the secret when a new value is supplied (blank = keep existing)
-            if ($secret !== '') {
-                $pairs['BINANCE_API_SECRET'] = $secret;
-            }
+            if ($mainSecret !== '') $pairs['BINANCE_API_SECRET'] = $mainSecret;
+            if ($testSecret !== '') $pairs['BINANCE_TESTNET_API_SECRET'] = $testSecret;
 
             $this->updateEnvKeys($pairs);
 
-            $secretPresent = $secret !== '';
-            if (!$secretPresent) {
-                try { $secretPresent = (new GtbSettings())->getApiSecret() !== ''; } catch (\Throwable $e) {}
-            }
-
+            // Re-read (fresh .env) to report whether the ACTIVE environment is ready.
+            $active = new GtbSettings();
             echo json_encode([
                 'success'    => true,
                 'message'    => 'Binance settings saved to .env',
-                'configured' => ($apiKey !== '' && $secretPresent),
+                'testnet'    => $testnet,
+                'configured' => $active->isConfigured(),
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);

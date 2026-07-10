@@ -1,14 +1,44 @@
 <?php
-// gtb/pages/settings.php - Binance API settings form
-// Writes BINANCE_* to .env via POST /gtb-settings (same mechanism as /live).
-// The Testnet toggle is authoritative for the endpoint (no free-text base URL).
+// gtb/pages/settings.php - Binance API settings (dual mainnet + testnet keys)
+// Writes BINANCE_* to .env via POST /gtb-settings. The Testnet toggle selects the
+// ACTIVE key pair + endpoint, so switching environments needs no re-entry of keys.
 
-$binanceApiKey    = $binanceApiKey ?? '';
-$binanceSecretSet = $binanceSecretSet ?? false;
+$mainnetApiKey    = $mainnetApiKey ?? '';
+$mainnetSecretSet = $mainnetSecretSet ?? false;
+$testnetApiKey    = $testnetApiKey ?? '';
+$testnetSecretSet = $testnetSecretSet ?? false;
 $binanceTestnet   = $binanceTestnet ?? false;
 $binanceEndpoint  = $binanceEndpoint ?? 'https://api.binance.com';
 $csrf_token       = $csrf_token ?? '';
-$apiConfigured    = $apiConfigured ?? false;
+
+function gtb_key_section(string $env, string $label, string $apiKey, bool $secretSet, string $tone): void {
+    $keyId = "{$env}_api_key";
+    $secId = "{$env}_api_secret";
+    ?>
+    <div id="gtb-sec-<?= $env ?>" class="rounded-xl border p-4 space-y-4 border-gray-200 dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><?= htmlspecialchars($label) ?></h3>
+            <span id="gtb-active-<?= $env ?>" class="hidden text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-primary/10 text-primary">Active</span>
+        </div>
+        <div>
+            <label for="<?= $keyId ?>" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">API Key</label>
+            <input type="text" id="<?= $keyId ?>" autocomplete="off" spellcheck="false"
+                   value="<?= htmlspecialchars($apiKey) ?>"
+                   class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
+                   placeholder="<?= htmlspecialchars($label) ?> API key">
+        </div>
+        <div>
+            <label for="<?= $secId ?>" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Secret Key</label>
+            <input type="password" id="<?= $secId ?>" autocomplete="new-password" spellcheck="false"
+                   class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
+                   placeholder="<?= $secretSet ? '•••••••• saved — leave blank to keep' : ($label . ' secret key') ?>">
+            <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+                <?= $secretSet ? 'Saved. Leave blank to keep, or type a new one to replace.' : 'Write-only — never shown after saving.' ?>
+            </p>
+        </div>
+    </div>
+    <?php
+}
 ?>
 
 <div class="mb-6 flex items-center gap-3">
@@ -17,57 +47,37 @@ $apiConfigured    = $apiConfigured ?? false;
     </a>
 </div>
 
-<div class="max-w-2xl">
+<div class="max-w-3xl">
     <h2 class="text-2xl font-bold text-gray-900 dark:text-white">Binance API Settings</h2>
     <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        Saved to <code class="px-1 rounded bg-gray-100 dark:bg-gray-700">.env</code> and read the same way as the
-        rest of the app. The secret is stored write-only here.
+        Store your mainnet and testnet keys once; the <strong>active environment</strong> toggle picks which the bot uses.
+        Saved to <code class="px-1 rounded bg-gray-100 dark:bg-gray-700">.env</code>; secrets are write-only.
     </p>
 
-    <!-- Guidance -->
-    <div class="mt-5 rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4 text-sm text-blue-800 dark:text-blue-200">
-        <p class="font-semibold"><i class="fas fa-circle-info mr-1"></i>Testnet vs Mainnet keys are different</p>
-        <ul class="mt-1 list-disc list-inside space-y-0.5 text-blue-700 dark:text-blue-300/90">
-            <li><strong>Testnet:</strong> create a key at <code>testnet.binance.vision</code> (fake money). A mainnet key will NOT work here.</li>
-            <li><strong>Mainnet:</strong> your real binance.com key — real funds. Enable Reading + Spot, keep Withdrawals off, restrict to this server's IP.</li>
-        </ul>
-    </div>
-
-    <form id="gtb-settings-form" class="mt-6 space-y-5" onsubmit="return false;">
-        <div>
-            <label for="binance_api_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">API Key</label>
-            <input type="text" id="binance_api_key" autocomplete="off" spellcheck="false"
-                   value="<?= htmlspecialchars($binanceApiKey) ?>"
-                   class="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm"
-                   placeholder="Your Binance API key">
-        </div>
-
-        <div>
-            <label for="binance_api_secret" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Secret Key</label>
-            <input type="password" id="binance_api_secret" autocomplete="new-password" spellcheck="false"
-                   class="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary focus:border-primary outline-none font-mono text-sm"
-                   placeholder="<?= $binanceSecretSet ? '•••••••• saved — leave blank to keep' : 'Your Binance secret key' ?>">
-            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">
-                <?= $binanceSecretSet
-                    ? 'A secret is already saved. Leave blank to keep it, or type a new one to replace it.'
-                    : 'The secret is never shown back after saving.' ?>
-            </p>
-        </div>
-
+    <!-- Active environment -->
+    <div class="mt-5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4">
         <label class="flex items-center gap-3 cursor-pointer select-none">
             <input type="checkbox" id="binance_testnet" <?= $binanceTestnet ? 'checked' : '' ?>
-                   onchange="gtbSyncEndpoint()"
+                   onchange="gtbSyncActive()"
                    class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary">
-            <span class="text-sm text-gray-700 dark:text-gray-300">Use Binance <strong>Testnet</strong> (fake money for safe testing)</span>
+            <span class="text-sm text-gray-700 dark:text-gray-300">Use Binance <strong>Testnet</strong> (fake money) as the active environment</span>
         </label>
+        <div class="mt-3 flex items-center gap-2 text-sm font-mono">
+            <span class="text-xs text-gray-500 dark:text-gray-400">Endpoint:</span>
+            <span id="binance_endpoint_display" class="text-gray-700 dark:text-gray-300"><?= htmlspecialchars($binanceEndpoint) ?></span>
+        </div>
+    </div>
 
-        <div>
-            <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Endpoint</span>
-            <div class="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800 text-sm font-mono">
-                <i class="fas fa-link text-gray-400"></i>
-                <span id="binance_endpoint_display" class="text-gray-700 dark:text-gray-300"><?= htmlspecialchars($binanceEndpoint) ?></span>
-            </div>
-            <p class="mt-1 text-xs text-gray-400 dark:text-gray-500">Derived automatically from the Testnet toggle — the flag and endpoint always match.</p>
+    <form id="gtb-settings-form" class="mt-4 space-y-4" onsubmit="return false;">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <?php gtb_key_section('mainnet', 'Mainnet (real funds)', $mainnetApiKey, $mainnetSecretSet, 'red'); ?>
+            <?php gtb_key_section('testnet', 'Testnet', $testnetApiKey, $testnetSecretSet, 'amber'); ?>
+        </div>
+
+        <div class="rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-3 text-xs text-blue-800 dark:text-blue-200">
+            <i class="fas fa-circle-info mr-1"></i>
+            Testnet keys come from <code>testnet.binance.vision</code> (tick TRADE + USER_DATA). Mainnet keys from binance.com —
+            enable Reading + Spot, keep Withdrawals off, restrict to this server's IP.
         </div>
 
         <div class="flex flex-wrap items-center gap-3 pt-1">
@@ -77,12 +87,11 @@ $apiConfigured    = $apiConfigured ?? false;
             </button>
             <button type="button" id="gtb-test-btn" onclick="gtbTestConnection()"
                     class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary disabled:opacity-60">
-                <i class="fas fa-plug"></i> Test connection
+                <i class="fas fa-plug"></i> Test active connection
             </button>
             <span id="gtb-save-status" class="text-sm"></span>
         </div>
 
-        <!-- Test connection result -->
         <div id="gtb-test-result" class="hidden mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 p-4 text-sm"></div>
     </form>
 </div>
@@ -90,66 +99,65 @@ $apiConfigured    = $apiConfigured ?? false;
 <script>
     const GTB_CSRF = <?= json_encode($csrf_token) ?>;
 
-    function gtbSyncEndpoint() {
+    function gtbSyncActive() {
         const testnet = document.getElementById('binance_testnet').checked;
         document.getElementById('binance_endpoint_display').textContent =
             testnet ? 'https://testnet.binance.vision' : 'https://api.binance.com';
+        // Highlight the active section + show its "Active" pill
+        const on = { mainnet: !testnet, testnet: testnet };
+        for (const env of ['mainnet', 'testnet']) {
+            document.getElementById('gtb-sec-' + env).classList.toggle('ring-2', on[env]);
+            document.getElementById('gtb-sec-' + env).classList.toggle('ring-primary', on[env]);
+            document.getElementById('gtb-active-' + env).classList.toggle('hidden', !on[env]);
+        }
     }
 
     async function gtbSaveSettings() {
         const btn = document.getElementById('gtb-save-btn');
         const status = document.getElementById('gtb-save-status');
-        const secretEl = document.getElementById('binance_api_secret');
-
         const payload = {
             csrf_token: GTB_CSRF,
-            binance_api_key: document.getElementById('binance_api_key').value.trim(),
-            binance_api_secret: secretEl.value,
             binance_testnet: document.getElementById('binance_testnet').checked,
+            mainnet_api_key: document.getElementById('mainnet_api_key').value.trim(),
+            mainnet_api_secret: document.getElementById('mainnet_api_secret').value,
+            testnet_api_key: document.getElementById('testnet_api_key').value.trim(),
+            testnet_api_secret: document.getElementById('testnet_api_secret').value,
         };
-
         const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
-        status.textContent = '';
-        status.className = 'text-sm';
-
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';
+        status.textContent = ''; status.className = 'text-sm';
         try {
             const res = await fetch('/gtb-settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
                 body: JSON.stringify(payload),
             });
-            const data = await res.json();
-            if (res.ok && data.success) {
-                status.textContent = '✓ ' + (data.message || 'Saved');
-                status.className = 'text-sm text-green-600 dark:text-green-400';
-                secretEl.value = '';
-                secretEl.placeholder = '•••••••• saved — leave blank to keep';
+            const d = await res.json();
+            if (res.ok && d.success) {
+                status.textContent = '✓ ' + (d.message || 'Saved') + (d.configured ? '' : ' — active env still missing key/secret');
+                status.className = 'text-sm ' + (d.configured ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400');
+                ['mainnet_api_secret', 'testnet_api_secret'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el.value) { el.value = ''; el.placeholder = '•••••••• saved — leave blank to keep'; }
+                });
             } else {
-                status.textContent = '✗ ' + (data.error || 'Save failed');
+                status.textContent = '✗ ' + (d.error || 'Save failed');
                 status.className = 'text-sm text-red-500 dark:text-red-400';
             }
         } catch (e) {
-            status.textContent = '✗ ' + e.message;
-            status.className = 'text-sm text-red-500 dark:text-red-400';
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
-        }
+            status.textContent = '✗ ' + e.message; status.className = 'text-sm text-red-500 dark:text-red-400';
+        } finally { btn.disabled = false; btn.innerHTML = orig; }
     }
 
     async function gtbTestConnection() {
         const btn = document.getElementById('gtb-test-btn');
         const box = document.getElementById('gtb-test-result');
         const orig = btn.innerHTML;
-        btn.disabled = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing…';
+        btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing…';
         box.classList.remove('hidden');
         box.innerHTML = '<span class="text-gray-500">Contacting Binance…</span>';
-
         try {
-            const res = await fetch('/gtb/test-connection', { headers: { 'X-CSRF-TOKEN': GTB_CSRF } });
+            const res = await fetch('/gtb/account');
             const d = await res.json();
             if (d.ok) {
                 const rows = (d.balances || []).map(b =>
@@ -161,7 +169,7 @@ $apiConfigured    = $apiConfigured ?? false;
                     `<div class="text-xs text-gray-500 dark:text-gray-400 mb-2">${d.testnet ? 'Testnet' : 'Mainnet'} · ${d.endpoint} · canTrade: ${d.canTrade}</div>` +
                     (rows
                         ? `<table class="w-full text-xs"><thead><tr class="text-gray-400 text-left"><th class="pr-4">Asset</th><th class="pr-4 text-right">Free</th><th class="text-right">Locked</th></tr></thead><tbody>${rows}</tbody></table>`
-                        : `<div class="text-xs text-gray-400">No non-zero balances (empty wallet — normal for a fresh key).</div>`);
+                        : `<div class="text-xs text-gray-400">No non-zero balances (empty wallet — normal for a fresh testnet key; fund it from the testnet faucet).</div>`);
             } else {
                 box.innerHTML =
                     `<div class="text-red-500 font-semibold mb-1"><i class="fas fa-circle-xmark"></i> Failed</div>` +
@@ -170,9 +178,8 @@ $apiConfigured    = $apiConfigured ?? false;
             }
         } catch (e) {
             box.innerHTML = `<div class="text-red-500"><i class="fas fa-circle-xmark"></i> ${e.message}</div>`;
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = orig;
-        }
+        } finally { btn.disabled = false; btn.innerHTML = orig; }
     }
+
+    document.addEventListener('DOMContentLoaded', gtbSyncActive);
 </script>
