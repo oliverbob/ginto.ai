@@ -569,11 +569,21 @@ class GtbController
         $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
         if (!$this->checkCsrf($input)) exit;
         try {
-            $enabled = !empty($input['enabled']);
             $armLive = !empty($input['arm_live']);
+            // action: start | stop (wind down) | flatten (sell all now). Back-compat with enabled bool.
+            $action = (string) ($input['action'] ?? '');
+            if ($action === '') $action = !empty($input['enabled']) ? 'start' : 'stop';
             $state = new \Ginto\Models\GtbBotState();
-            $state->set($enabled, $armLive);
-            echo json_encode(['ok' => true, 'bot' => $state->status()]);
+            $result = null;
+            if ($action === 'start') {
+                $state->start($armLive);
+            } elseif ($action === 'flatten') {
+                $result = (new \Ginto\Services\GtbStrategy())->flattenAll();
+                $state->stop();
+            } else { // stop = graceful wind-down (keep managing open positions to a good exit)
+                $state->windDown();
+            }
+            echo json_encode(['ok' => true, 'action' => $action, 'result' => $result, 'bot' => $state->status()]);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

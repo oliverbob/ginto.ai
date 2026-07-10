@@ -55,11 +55,13 @@ class GtbStrategy
         $this->configureCapital($cap, $client, $trades, $mode, $realized, $tickers);
 
         // Time-boxing: max hold per trade + optional session window (both deterministic).
+        $botState     = new GtbBotState();
+        $openNew      = $botState->isOpeningNew();
         $maxHoldMin   = (int) (Env::get('GTB_MAX_HOLD_MIN', 0) ?? 0);
         $sessionHours = (float) (Env::get('GTB_SESSION_HOURS', 0) ?? 0);
         $sessionOver  = false;
         if ($sessionHours > 0) {
-            $start = (new GtbBotState())->sessionStartedAt();
+            $start = $botState->sessionStartedAt();
             if ($start) $sessionOver = (time() - strtotime($start)) >= $sessionHours * 3600;
         }
 
@@ -116,6 +118,18 @@ class GtbStrategy
         if ($sessionOver) {
             return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
                 'session ended — flat, no new trades', $tickers);
+        }
+        // Wind-down (Stop pressed): keep managing open positions to a good exit, take
+        // nothing new, and finalize to a full stop once everything is closed.
+        if (!$openNew) {
+            $open = $trades->openPositions();
+            if (count($open) === 0) {
+                $botState->stop();
+                return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                    'wind-down complete — all positions closed, bot stopped', $tickers);
+            }
+            return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                'winding down — managing ' . count($open) . ' position(s), no new trades', $tickers);
         }
         $open  = $trades->openPositions();
         $slots = $cap->slots($realized);
@@ -246,6 +260,23 @@ class GtbStrategy
         $cap      = new GtbCapital();
         $this->configureCapital($cap, $client, $trades, $mode, $realized);
         return $cap->summary($realized);
+    }
+
+    /** Sell every open position at market now (emergency stop). Returns count closed. */
+    public function flattenAll(): array
+    {
+        $client   = new BinanceClient();
+        $trades   = new GtbTrade();
+        $thoughts = new GtbThought();
+        $mode     = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
+        $n = 0;
+        foreach ($trades->openPositions() as $pos) {
+            $price = $client->price($pos['symbol']);
+            if ($price === null || $price <= 0) $price = (float) $pos['price'];
+            $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'MANUAL-STOP');
+            $n++;
+        }
+        return ['ok' => true, 'closed' => $n];
     }
 
     /** Manually close one open position at the current price (paper or live). */

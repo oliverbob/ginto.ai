@@ -30,6 +30,8 @@ class GtbBotState
 
     public function isEnabled(): bool { return (int) ($this->row()['enabled'] ?? 0) === 1; }
     public function isArmLive(): bool { return (int) ($this->row()['arm_live'] ?? 0) === 1; }
+    /** Whether the bot may open NEW positions (false while winding down). */
+    public function isOpeningNew(): bool { return (int) ($this->row()['open_new'] ?? 1) === 1; }
 
     /** When the current trading session began (set on each Start). Null if never started. */
     public function sessionStartedAt(): ?string
@@ -38,22 +40,34 @@ class GtbBotState
         return $v ?: null;
     }
 
-    public function set(bool $enabled, bool $armLive): void
+    private function upsert(array $fields): void
     {
         try {
-            // Pressing Start begins a fresh session clock; stopping leaves it untouched.
-            $now = date('Y-m-d H:i:s');
             if ($this->db->has($this->table, ['id' => 1])) {
-                $upd = ['enabled' => $enabled ? 1 : 0, 'arm_live' => $armLive ? 1 : 0];
-                if ($enabled) $upd['session_started_at'] = $now;
-                $this->db->update($this->table, $upd, ['id' => 1]);
+                $this->db->update($this->table, $fields, ['id' => 1]);
             } else {
-                $this->db->insert($this->table, [
-                    'id' => 1, 'enabled' => $enabled ? 1 : 0, 'arm_live' => $armLive ? 1 : 0,
-                    'session_started_at' => $enabled ? $now : null,
-                ]);
+                $this->db->insert($this->table, ['id' => 1] + $fields);
             }
         } catch (\Throwable $e) {}
+    }
+
+    /** Start: run + open new trades, fresh session clock. */
+    public function start(bool $armLive): void
+    {
+        $this->upsert(['enabled' => 1, 'open_new' => 1, 'arm_live' => $armLive ? 1 : 0,
+                       'session_started_at' => date('Y-m-d H:i:s')]);
+    }
+
+    /** Wind down: keep running/managing open positions but stop opening new ones. */
+    public function windDown(): void { $this->upsert(['open_new' => 0]); }
+
+    /** Full stop: runner halts. Live positions keep their resting exchange stops. */
+    public function stop(): void { $this->upsert(['enabled' => 0, 'open_new' => 0]); }
+
+    /** Back-compat: true => start, false => wind down (graceful). */
+    public function set(bool $enabled, bool $armLive): void
+    {
+        $enabled ? $this->start($armLive) : $this->windDown();
     }
 
     public function markRun(string $action): void
@@ -68,6 +82,7 @@ class GtbBotState
         $r = $this->row();
         return [
             'enabled'     => (int) ($r['enabled'] ?? 0) === 1,
+            'open_new'    => (int) ($r['open_new'] ?? 1) === 1,
             'arm_live'    => (int) ($r['arm_live'] ?? 0) === 1,
             'last_run_at' => $r['last_run_at'] ?? null,
             'last_action' => $r['last_action'] ?? null,

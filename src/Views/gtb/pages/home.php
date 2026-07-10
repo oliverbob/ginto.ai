@@ -553,7 +553,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Bot Brain: reflections + capital ------------------------------------
     const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
     const GTB_TESTNET = <?= ($isTestnet ?? false) ? 'true' : 'false' ?>;
-    const GTB_BOT = { enabled: false };
+    const GTB_BOT = { enabled: false, open_new: true };
 
     function gtbModeBadge() {
         const b = document.getElementById('gtb-mode-badge');
@@ -610,22 +610,44 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
+    // Three states: stopped -> [Start]; running -> [Stop bot] (wind down); winding down -> [Force stop].
+    function gtbBotStateName() {
+        if (!GTB_BOT.enabled) return 'stopped';
+        return GTB_BOT.open_new ? 'running' : 'winddown';
+    }
     function gtbSetRunBtn() {
         const btn = document.getElementById('gtb-run-btn');
-        if (GTB_BOT.enabled) {
+        const st = gtbBotStateName();
+        if (st === 'running') {
             btn.innerHTML = '<i class="fas fa-stop"></i> Stop bot';
             btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700';
+            btn.title = 'Wind down: stop taking new trades, keep managing open ones to a good exit.';
+        } else if (st === 'winddown') {
+            btn.innerHTML = '<i class="fas fa-hand"></i> Force stop (sell all)';
+            btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-700 text-white hover:bg-red-800';
+            btn.title = 'Sell every open position at market now and fully stop.';
         } else {
             btn.innerHTML = '<i class="fas fa-play"></i> Start bot';
             btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700';
+            btn.title = 'Start the bot: open + manage trades.';
         }
     }
 
-    // Start/Stop toggles the PERSISTED server-side runner (survives restarts).
+    // Start / Stop(wind down) / Force stop(flatten) drive the PERSISTED server-side runner.
     async function gtbToggleBot() {
-        const enable = !GTB_BOT.enabled;
-        if (enable && !GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
-            if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" first, then start.')) return;
+        const st = gtbBotStateName();
+        let action;
+        if (st === 'stopped') {
+            action = 'start';
+            if (!GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
+                if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" first, then start.')) return;
+            }
+        } else if (st === 'running') {
+            action = 'stop'; // graceful wind-down
+            if (!confirm('Wind down?\n\nThe bot will STOP taking new trades but keep managing your open positions to a good exit (trailing stops, targets, time-box), then fully stop once flat.\n\nYour exchange-side stops stay in place the whole time.')) return;
+        } else { // winddown -> force stop
+            action = 'flatten';
+            if (!confirm('Force stop?\n\nThis SELLS every open position at market right now and fully stops the bot. Use only if you want out immediately.')) return;
         }
         const armed = !GTB_TESTNET && document.getElementById('gtb-arm-live').checked;
         const btn = document.getElementById('gtb-run-btn');
@@ -634,10 +656,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             const res = await fetch('/gtb/bot/control', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
-                body: JSON.stringify({ csrf_token: GTB_CSRF, enabled: enable, arm_live: armed }),
+                body: JSON.stringify({ csrf_token: GTB_CSRF, action: action, arm_live: armed }),
             });
             const d = await res.json();
-            if (d.ok) { GTB_BOT.enabled = !!d.bot.enabled; gtbSetRunBtn(); }
+            if (d.ok) { GTB_BOT.enabled = !!d.bot.enabled; GTB_BOT.open_new = !!d.bot.open_new; gtbSetRunBtn(); }
             gtbLoadPositions();
         } catch (e) { /* ignore */ } finally { btn.disabled = false; }
     }
@@ -738,9 +760,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     function gtbRenderPortfolio(d) {
         if (d.bot) {
             GTB_BOT.enabled = !!d.bot.enabled;
+            GTB_BOT.open_new = ('open_new' in d.bot) ? !!d.bot.open_new : true;
             gtbSetRunBtn();
             const act = document.getElementById('gtb-action');
-            if (act && d.bot.last_action) act.textContent = (d.bot.enabled ? '● running · ' : '○ stopped · ') + d.bot.last_action;
+            const st = gtbBotStateName();
+            const dot = st === 'running' ? '● running' : (st === 'winddown' ? '◐ winding down' : '○ stopped');
+            if (act && d.bot.last_action) act.textContent = dot + ' · ' + d.bot.last_action;
         }
         const p = d.portfolio || {};
         const sum = document.getElementById('gtb-port-summary');
