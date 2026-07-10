@@ -158,7 +158,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     <!-- Chart (full width) -->
     <div class="flex items-baseline justify-between mb-2">
-        <div class="flex items-baseline gap-2">
+        <div class="flex items-center gap-2">
+            <span id="gtb-chart-icon" class="inline-flex"></span>
             <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
             <span id="gtb-chart-price" class="text-lg font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
         </div>
@@ -335,7 +336,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                         $coinIcon = function (string $symbol): string {
                             $base = strtolower(preg_replace('/USDT$/', '', $symbol));
                             $up   = strtoupper(substr($base, 0, 3));
-                            $hue  = crc32($base) % 360;
+                            $h = 0; for ($i = 0; $i < strlen($base); $i++) $h = ($h * 31 + ord($base[$i])) & 0xFFFFFFFF;
+                            $hue = $h % 360;   // same rolling hash as JS gtbCoinIcon so colors match
                             $url  = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/' . htmlspecialchars($base) . '.png';
                             return '<span class="relative inline-flex w-6 h-6 shrink-0 align-middle">'
                                 . '<span class="inline-flex items-center justify-center w-6 h-6 rounded-full text-[8px] font-bold text-white" style="background:hsl(' . $hue . ',55%,45%)">' . htmlspecialchars($up) . '</span>'
@@ -457,6 +459,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     function gtbSelectSymbol(symbol, base, price, changePct) {
         GTB.symbol = symbol; GTB.base = base;
         document.getElementById('gtb-chart-symbol').textContent = base + '/USDT';
+        const icoEl = document.getElementById('gtb-chart-icon');
+        if (icoEl) icoEl.innerHTML = gtbCoinIcon(base, 24);
         if (price != null) document.getElementById('gtb-chart-price').textContent = '$' + gtbFmtPrice(price);
         const up = (+changePct) >= 0;
         const chgEl = document.getElementById('gtb-chart-change');
@@ -468,11 +472,26 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     // ---- Top movers: Hot / Gainers / Losers (three visible columns) -----------
+    // Coin badge: real icon from a CDN with a colored ticker-initials fallback (robust for meme coins).
+    function gtbCoinIcon(base, size) {
+        base = (base || '').toString();
+        const s = base.toLowerCase();
+        const up = base.substring(0, 3).toUpperCase();
+        let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+        const hue = h % 360;
+        const px = size || 20;
+        const url = 'https://cdn.jsdelivr.net/gh/atomiclabs/cryptocurrency-icons@1a63530be6e374711a8554f31b17e4cb92c25fa5/128/color/' + s + '.png';
+        return `<span class="relative inline-flex shrink-0 align-middle" style="width:${px}px;height:${px}px">`
+            + `<span class="inline-flex items-center justify-center rounded-full font-bold text-white" style="width:${px}px;height:${px}px;font-size:${Math.round(px*0.38)}px;background:hsl(${hue},55%,45%)">${up}</span>`
+            + `<img src="${url}" alt="" loading="lazy" class="absolute inset-0 rounded-full object-cover" style="width:${px}px;height:${px}px" onerror="this.remove()">`
+            + `</span>`;
+    }
+
     function gtbMoverRow(m) {
         const up = m.changePct >= 0;
         return `<button type="button" class="gtb-pair w-full flex items-center justify-between px-2.5 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
                   data-symbol="${m.symbol}" data-base="${m.base}" data-price="${m.price}" data-change="${m.changePct}">
-                <span class="font-medium text-gray-800 dark:text-gray-200 text-sm">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
+                <span class="flex items-center gap-2 font-medium text-gray-800 dark:text-gray-200 text-sm">${gtbCoinIcon(m.base)}<span>${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></span></span>
                 <span class="text-right leading-tight">
                     <span class="block text-sm tabular-nums text-gray-800 dark:text-gray-100">$${gtbFmtPrice(m.price)}</span>
                     <span class="block text-[11px] ${gtbChgClass(up)}">${up ? '+' : ''}${(+m.changePct).toFixed(2)}%</span>
@@ -930,7 +949,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         root.className = 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3';
         root.innerHTML =
             `<div class="flex items-center justify-between mb-1">
-               <div class="font-bold text-gray-900 dark:text-white">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span>
+               <div class="flex items-center gap-1.5 font-bold text-gray-900 dark:text-white">${gtbCoinIcon(p.symbol.replace('USDT',''), 18)}<span>${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
                  ${gtbProfBadge(p.profile)}
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
                  <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
@@ -1004,6 +1023,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
+        document.getElementById('gtb-chart-icon').innerHTML = gtbCoinIcon(GTB.base || 'BTC', 24);
         gtbInitIntervals();
         gtbInitSort();
         gtbLoadMovers();
