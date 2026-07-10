@@ -11,6 +11,14 @@ namespace Ginto\Services\Strategies;
  */
 final class GtbPrompts
 {
+    /**
+     * The built-in, win-focused strategy used when neither a dashboard prompt nor a
+     * /gtb-settings operator prompt is set — so the bot is never left ungoverned.
+     */
+    public const DEFAULT_TEXT = 'Trade to win with disciplined momentum. Focus on liquid USDT pairs with real 24h volume. Prefer clean, orderly moves with volume behind them: strong gainers still in an uptrend, fresh breakouts of the 24h high, and healthy pullbacks that hold support. Avoid the traps: skip anything already parabolic or up more than 40 percent in 24h, thin or illiquid names, and choppy structure. Only take high-conviction setups; when a trade is not clearly favorable, SKIP. Every entry is protected by a resting OCO or stop-loss on the exchange, sized within the capital rules. Cut losers quickly at the stop and let winners run by trailing the stop once the trade is working. Fewer good trades beat many marginal ones.';
+
+    public static function defaultText(): string { return self::DEFAULT_TEXT; }
+
     /** @var array<string,array{name:string,desc:string,text:string}> */
     public const ALL = [
         'runner' => [

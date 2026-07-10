@@ -269,9 +269,13 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                   class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2 focus:ring-primary focus:border-primary"><?= htmlspecialchars((($promptSource ?? '') === 'custom') ? ($activePrompt ?? '') : '', ENT_QUOTES) ?></textarea>
         <div class="flex flex-wrap items-center gap-2 mt-2">
             <button type="button" onclick="gtbInjectCustom()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90"><i class="fas fa-bolt"></i> Inject custom</button>
-            <button type="button" onclick="gtbClearPrompt()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary"><i class="fas fa-rotate-left"></i> Use Settings default</button>
+            <button type="button" onclick="gtbClearPrompt()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary"><i class="fas fa-rotate-left"></i> Clear (use default)</button>
             <span id="gtb-prompt-status" class="text-xs"></span>
         </div>
+        <details class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            <summary class="cursor-pointer hover:text-primary">What runs when nothing is injected? (built-in win-focused default)</summary>
+            <p class="mt-1 leading-relaxed"><?= htmlspecialchars($houseDefault ?? '') ?></p>
+        </details>
     </div>
 </section>
 
@@ -691,6 +695,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- AI system prompt picker (inject preset / custom, or clear to Settings default) ----
     const GTB_PROMPT_NAMES = <?= json_encode(array_column($promptCards ?? [], 'name', 'key')) ?>;
     function gtbPromptActiveLabel(source, key) {
+        if (source === 'house') return 'House default (win-focused)';
+        if (source === 'settings') return 'Settings default';
         if (source === 'default') return 'Settings default';
         if (source === 'custom') return 'Custom';
         return GTB_PROMPT_NAMES[key] || key;

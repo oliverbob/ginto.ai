@@ -34,11 +34,12 @@ class GtbBrain
         $this->apiKey        = (string) (Env::get('ANTHROPIC_API_KEY', '') ?? '');
         $this->decisionModel = (string) (Env::get('ANTHROPIC_MODEL', 'claude-opus-4-8') ?? 'claude-opus-4-8') ?: 'claude-opus-4-8';
         $this->scanModel     = (string) (Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5') ?: 'claude-haiku-4-5';
-        // The dashboard-injected system prompt overrides the /gtb-settings operator
-        // instructions; if none is active, fall back to the settings default.
+        // Precedence: dashboard-injected prompt > /gtb-settings operator prompt >
+        // built-in win-focused house default (so the AI is never left without a strategy).
         $active   = trim((string) (Env::get('GTB_ACTIVE_PROMPT', '') ?? ''));
         $fallback = trim((string) (Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? ''));
-        $this->operatorInstructions = $active !== '' ? $active : $fallback;
+        $this->operatorInstructions = $active !== '' ? $active
+            : ($fallback !== '' ? $fallback : \Ginto\Services\Strategies\GtbPrompts::defaultText());
     }
 
     /**

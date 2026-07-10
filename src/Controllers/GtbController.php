@@ -60,9 +60,11 @@ class GtbController
 
         // System-prompt picker: presets + which one (if any) is currently active.
         $promptCards   = \Ginto\Services\Strategies\GtbPrompts::cards();
-        $activePrompt  = (string) (\Ginto\Support\Env::get('GTB_ACTIVE_PROMPT', '') ?? '');
-        $activePromptKey = \Ginto\Services\Strategies\GtbPrompts::matchKey($activePrompt);
-        $promptSource  = $activePrompt === '' ? 'default' : ($activePromptKey ?: 'custom');
+        $ps            = $this->promptState();
+        $activePrompt  = $ps['active'];
+        $activePromptKey = $ps['key'];
+        $promptSource  = $ps['source'];
+        $houseDefault  = \Ginto\Services\Strategies\GtbPrompts::defaultText();
 
         $isAdmin = false;
         if (class_exists('\\Ginto\\Controllers\\UserController')) {
@@ -93,6 +95,7 @@ class GtbController
             'activePrompt'     => $activePrompt,
             'activePromptKey'  => $activePromptKey,
             'promptSource'     => $promptSource,
+            'houseDefault'     => $houseDefault,
         ]);
     }
 
@@ -656,12 +659,12 @@ class GtbController
                 $active = $this->sanitizeInstr((string) $input['custom']);
             }
             $this->updateEnvKeys(['GTB_ACTIVE_PROMPT' => $active]);
-            $key = \Ginto\Services\Strategies\GtbPrompts::matchKey($active);
+            $st = $this->promptState();
             echo json_encode([
                 'ok'     => true,
-                'active' => $active,
-                'preset' => $key,
-                'source' => $active === '' ? 'default' : ($key ?: 'custom'),
+                'active' => $st['active'],
+                'preset' => $st['key'],
+                'source' => $st['source'],
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);
@@ -828,6 +831,19 @@ class GtbController
         if (file_put_contents($envPath, $new) === false) {
             throw new \Exception('Failed to write .env file');
         }
+    }
+
+    /** Current system-prompt state: which text is active and where it comes from. */
+    private function promptState(): array
+    {
+        $active = (string) (\Ginto\Support\Env::get('GTB_ACTIVE_PROMPT', '') ?? '');
+        $key    = \Ginto\Services\Strategies\GtbPrompts::matchKey($active);
+        if (trim($active) !== '') {
+            $source = $key ?: 'custom';
+        } else {
+            $source = trim((string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '')) !== '' ? 'settings' : 'house';
+        }
+        return ['active' => $active, 'key' => $key, 'source' => $source];
     }
 
     /** Sanitize free-text instructions to a single safe .env line (no newlines/quotes, capped). */
