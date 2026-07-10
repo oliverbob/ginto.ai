@@ -168,9 +168,20 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             </div>
             <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
         </div>
-        <!-- Pair list -->
+        <!-- Pair list with category tabs -->
         <div class="lg:col-span-1 order-2">
-            <div id="gtb-pairs" class="space-y-1 lg:max-h-[392px] overflow-y-auto pr-1">
+            <div class="flex mb-2 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs font-medium">
+                <button type="button" data-cat="hot" class="gtb-cat flex-1 px-2 py-1.5 bg-primary text-white">
+                    <i class="fas fa-fire"></i> Hot
+                </button>
+                <button type="button" data-cat="gainers" class="gtb-cat flex-1 px-2 py-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <i class="fas fa-arrow-trend-up"></i> Gainers
+                </button>
+                <button type="button" data-cat="losers" class="gtb-cat flex-1 px-2 py-1.5 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                    <i class="fas fa-arrow-trend-down"></i> Losers
+                </button>
+            </div>
+            <div id="gtb-pairs" class="space-y-1 lg:max-h-[352px] overflow-y-auto pr-1">
                 <div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm">
                     <i class="fas fa-spinner fa-spin mr-1"></i> Loading…
                 </div>
@@ -265,7 +276,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
 <script>
     const GTB_API_CONFIGURED = <?= $apiConfigured ? 'true' : 'false' ?>;
-    const GTB = { symbol: 'BTCUSDT', base: 'BTC', interval: '1h', chart: null, series: null };
+    const GTB = { symbol: 'BTCUSDT', base: 'BTC', interval: '1h', chart: null, series: null,
+                  markets: { hot: [], gainers: [], losers: [] }, cat: 'hot' };
 
     function gtbIsDark() { return document.documentElement.classList.contains('dark'); }
     function gtbFmtPrice(p) {
@@ -278,21 +290,27 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     function gtbChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
     // ---- Candlestick chart ----------------------------------------------------
-    function gtbInitChart() {
-        const el = document.getElementById('gtb-chart');
-        if (!el || typeof LightweightCharts === 'undefined') return;
+    function gtbChartTheme() {
         const dark = gtbIsDark();
         const grid = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-        GTB.chart = LightweightCharts.createChart(el, {
-            width: el.clientWidth,
-            height: 360,
+        return {
             layout: { background: { color: 'transparent' }, textColor: dark ? '#9ca3af' : '#374151', fontSize: 11 },
             grid: { vertLines: { color: grid }, horzLines: { color: grid } },
             rightPriceScale: { borderColor: grid },
             timeScale: { borderColor: grid, timeVisible: true, secondsVisible: false },
+        };
+    }
+    // Called by the header theme toggle (defined in head.php).
+    function gtbApplyChartTheme() { if (GTB.chart) GTB.chart.applyOptions(gtbChartTheme()); }
+
+    function gtbInitChart() {
+        const el = document.getElementById('gtb-chart');
+        if (!el || typeof LightweightCharts === 'undefined') return;
+        GTB.chart = LightweightCharts.createChart(el, Object.assign({
+            width: el.clientWidth, height: 360,
             crosshair: { mode: LightweightCharts.CrosshairMode ? LightweightCharts.CrosshairMode.Normal : 0 },
             handleScale: true, handleScroll: true,
-        });
+        }, gtbChartTheme()));
         GTB.series = GTB.chart.addCandlestickSeries({
             upColor: '#16a34a', downColor: '#ef4444', borderVisible: false,
             wickUpColor: '#16a34a', wickDownColor: '#ef4444',
@@ -324,26 +342,50 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbLoadChart();
     }
 
-    // ---- Pair list ------------------------------------------------------------
+    // ---- Pair list (Hot / Gainers / Losers) -----------------------------------
+    function gtbRenderCat(cat) {
+        const box = document.getElementById('gtb-pairs');
+        const list = GTB.markets[cat] || [];
+        if (!list.length) { box.innerHTML = '<div class="py-6 text-center text-gray-400 text-sm">No data</div>'; return; }
+        box.innerHTML = list.map(m => {
+            const up = m.changePct >= 0;
+            return `<button type="button" class="gtb-pair w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
+                      data-symbol="${m.symbol}" data-base="${m.base}" data-price="${m.price}" data-change="${m.changePct}">
+                    <span class="font-medium text-gray-800 dark:text-gray-200">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
+                    <span class="text-right leading-tight">
+                        <span class="block text-sm tabular-nums text-gray-800 dark:text-gray-100">$${gtbFmtPrice(m.price)}</span>
+                        <span class="block text-[11px] ${gtbChgClass(up)}">${up ? '+' : ''}${(+m.changePct).toFixed(2)}%</span>
+                    </span></button>`;
+        }).join('');
+        box.querySelectorAll('.gtb-pair').forEach(btn => {
+            btn.addEventListener('click', () => gtbSelectSymbol(btn.dataset.symbol, btn.dataset.base, btn.dataset.price, btn.dataset.change));
+            btn.classList.toggle('gtb-pair-active', btn.dataset.symbol === GTB.symbol);
+        });
+    }
+
+    function gtbInitCats() {
+        document.querySelectorAll('.gtb-cat').forEach(btn => btn.addEventListener('click', () => {
+            GTB.cat = btn.dataset.cat;
+            document.querySelectorAll('.gtb-cat').forEach(b => {
+                const on = b === btn;
+                b.classList.toggle('bg-primary', on);
+                b.classList.toggle('text-white', on);
+                b.classList.toggle('text-gray-600', !on);
+                b.classList.toggle('dark:text-gray-300', !on);
+            });
+            gtbRenderCat(GTB.cat);
+        }));
+    }
+
     async function gtbLoadPairs() {
         const box = document.getElementById('gtb-pairs');
         try {
             const res = await fetch('/gtb/markets');
             const d = await res.json();
             if (!d.ok) { box.innerHTML = `<div class="py-4 text-center text-red-500 text-xs">✗ ${d.error || 'Failed'}</div>`; return; }
-            box.innerHTML = d.markets.map(m => {
-                const up = m.changePct >= 0;
-                return `<button type="button" class="gtb-pair w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 text-left transition-colors"
-                          data-symbol="${m.symbol}" data-base="${m.base}" data-price="${m.price}" data-change="${m.changePct}">
-                        <span class="font-medium text-gray-800 dark:text-gray-200">${m.base}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
-                        <span class="text-right leading-tight">
-                            <span class="block text-sm tabular-nums text-gray-800 dark:text-gray-100">$${gtbFmtPrice(m.price)}</span>
-                            <span class="block text-[11px] ${gtbChgClass(up)}">${up ? '+' : ''}${m.changePct.toFixed(2)}%</span>
-                        </span></button>`;
-            }).join('');
-            box.querySelectorAll('.gtb-pair').forEach(btn => btn.addEventListener('click', () =>
-                gtbSelectSymbol(btn.dataset.symbol, btn.dataset.base, btn.dataset.price, btn.dataset.change)));
-            const first = d.markets[0];
+            GTB.markets = { hot: d.hot || [], gainers: d.gainers || [], losers: d.losers || [] };
+            gtbRenderCat(GTB.cat);
+            const first = GTB.markets.hot[0] || (GTB.markets[GTB.cat] || [])[0];
             if (first) gtbSelectSymbol(first.symbol, first.base, first.price, first.changePct);
         } catch (e) {
             box.innerHTML = `<div class="py-4 text-center text-red-500 text-xs">✗ ${e.message}</div>`;
@@ -420,6 +462,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
         gtbInitIntervals();
+        gtbInitCats();
         gtbLoadPairs();
         if (GTB_API_CONFIGURED) gtbLoadAccount();
     });

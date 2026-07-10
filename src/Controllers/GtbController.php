@@ -182,7 +182,7 @@ class GtbController
         exit;
     }
 
-    /** GET /gtb/markets — live market data (public mainnet) for the dashboard charts */
+    /** GET /gtb/markets — categorized USDT markets: hot (volume), gainers, losers */
     public function markets(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -191,38 +191,60 @@ class GtbController
         }
         $this->requireAdmin(true);
 
-        $symbols = ['BTCUSDT','ETHUSDT','BNBUSDT','SOLUSDT','XRPUSDT','ADAUSDT',
-                    'DOGEUSDT','AVAXUSDT','LINKUSDT','DOTUSDT','LTCUSDT','TRXUSDT'];
+        // Stablecoin / fiat bases to exclude (X/USDT where X≈1 isn't interesting).
+        $stable = ['USDC','BUSD','TUSD','FDUSD','DAI','USDP','USTC','EUR','GBP','AEUR','USD1','EURI','XUSD'];
+
         try {
             $client = new \Ginto\Services\BinanceClient();
-            $ticker = $client->ticker24hr($symbols);
-            if (empty($ticker['ok'])) {
+            $res = $client->allTickers24hr();
+            if (empty($res['ok']) || !is_array($res['data'])) {
                 http_response_code(502);
-                echo json_encode(['ok' => false, 'error' => $ticker['error'] ?? 'ticker failed']);
+                echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'ticker failed']);
                 exit;
             }
-            $closesMap = $client->klinesMulti($symbols, '1h', 24);
 
-            $bySymbol = [];
-            foreach ($ticker['data'] as $row) {
-                $bySymbol[$row['symbol']] = $row;
-            }
-            $markets = [];
-            foreach ($symbols as $s) {
-                if (!isset($bySymbol[$s])) continue;
-                $r = $bySymbol[$s];
-                $markets[] = [
-                    'symbol'      => $s,
-                    'base'        => str_replace('USDT', '', $s),
-                    'price'       => (float) $r['lastPrice'],
-                    'changePct'   => (float) $r['priceChangePercent'],
-                    'high'        => (float) $r['highPrice'],
-                    'low'         => (float) $r['lowPrice'],
-                    'quoteVolume' => (float) $r['quoteVolume'],
-                    'closes'      => $closesMap[$s] ?? [],
+            $items = [];
+            foreach ($res['data'] as $r) {
+                $sym = $r['symbol'] ?? '';
+                if (!str_ends_with($sym, 'USDT')) continue;
+                $base = substr($sym, 0, -4);
+                if ($base === '') continue;
+                if (preg_match('/(UP|DOWN|BULL|BEAR)$/', $base)) continue; // leveraged tokens
+                if (in_array($base, $stable, true)) continue;
+                $items[] = [
+                    'symbol'      => $sym,
+                    'base'        => $base,
+                    'price'       => (float) ($r['lastPrice'] ?? 0),
+                    'changePct'   => (float) ($r['priceChangePercent'] ?? 0),
+                    'high'        => (float) ($r['highPrice'] ?? 0),
+                    'low'         => (float) ($r['lowPrice'] ?? 0),
+                    'quoteVolume' => (float) ($r['quoteVolume'] ?? 0),
                 ];
             }
-            echo json_encode(['ok' => true, 'markets' => $markets, 'source' => 'mainnet public']);
+
+            // Liquidity floor for gainers/losers so micro-cap pumps don't dominate.
+            $minVol = 5000000.0;
+            $liquid = array_values(array_filter($items, static fn($i) => $i['quoteVolume'] >= $minVol));
+
+            $hot = $items;
+            usort($hot, static fn($a, $b) => $b['quoteVolume'] <=> $a['quoteVolume']);
+            $hot = array_slice($hot, 0, 24);
+
+            $gainers = $liquid;
+            usort($gainers, static fn($a, $b) => $b['changePct'] <=> $a['changePct']);
+            $gainers = array_slice($gainers, 0, 24);
+
+            $losers = $liquid;
+            usort($losers, static fn($a, $b) => $a['changePct'] <=> $b['changePct']);
+            $losers = array_slice($losers, 0, 24);
+
+            echo json_encode([
+                'ok'      => true,
+                'hot'     => $hot,
+                'gainers' => $gainers,
+                'losers'  => $losers,
+                'source'  => 'mainnet public',
+            ]);
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);

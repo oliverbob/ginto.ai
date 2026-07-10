@@ -115,6 +115,12 @@ class BinanceClient
         return ['ok' => true, 'data' => $candles];
     }
 
+    /** 24h ticker for ALL symbols in one request (for hot/gainers/losers). Public mainnet. */
+    public function allTickers24hr(): array
+    {
+        return $this->httpGet($this->marketBase . '/api/v3/ticker/24hr');
+    }
+
     /** All symbol prices as [SYMBOL => price] for portfolio valuation. Public mainnet. */
     public function allPrices(): array
     {

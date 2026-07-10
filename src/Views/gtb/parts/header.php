@@ -19,6 +19,11 @@ $userFullname = $userFullname ?? null;
                 </h1>
             </div>
             <div class="flex items-center gap-4">
+                <button type="button" id="gtb-theme-toggle" onclick="gtbToggleTheme()" title="Toggle dark / light"
+                        class="w-9 h-9 inline-flex items-center justify-center rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-300 hover:text-primary hover:border-primary transition-colors">
+                    <i class="fas fa-moon gtb-theme-dark-icon"></i>
+                    <i class="fas fa-sun gtb-theme-light-icon hidden"></i>
+                </button>
                 <?php if ($isLoggedIn): ?>
                     <span class="text-sm text-gray-500 dark:text-gray-300">
                         <i class="fas fa-user-circle mr-1"></i><?= htmlspecialchars($userFullname ?? $username ?? 'Account') ?>

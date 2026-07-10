@@ -13,6 +13,21 @@
             let shouldBeDark = savedTheme === 'dark' || (savedTheme !== 'light' && (systemDark || true));
             document.documentElement.classList.toggle('dark', shouldBeDark);
         })();
+
+        // Dark/light toggle (persisted). Re-themes the chart if present.
+        function gtbSyncThemeIcons() {
+            const dark = document.documentElement.classList.contains('dark');
+            document.querySelectorAll('.gtb-theme-light-icon').forEach(el => el.classList.toggle('hidden', !dark)); // sun when dark
+            document.querySelectorAll('.gtb-theme-dark-icon').forEach(el => el.classList.toggle('hidden', dark));    // moon when light
+        }
+        function gtbToggleTheme() {
+            const dark = !document.documentElement.classList.contains('dark');
+            document.documentElement.classList.toggle('dark', dark);
+            try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+            gtbSyncThemeIcons();
+            if (typeof gtbApplyChartTheme === 'function') gtbApplyChartTheme();
+        }
+        document.addEventListener('DOMContentLoaded', gtbSyncThemeIcons);
     </script>
 
     <!-- Tailwind CSS (local, same as /chat) -->
