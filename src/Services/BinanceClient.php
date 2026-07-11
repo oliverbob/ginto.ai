@@ -176,7 +176,9 @@ class BinanceClient
     {
         if ($step <= 0) return 8;
         if ($step >= 1) return 0;
-        $s = rtrim(sprintf('%.18f', $step), '0');
+        // Binance precision is capped at 8 dp; %.8f avoids float-representation noise
+        // (e.g. %.18f of 0.1 -> 0.100000000000000006, which mis-counts as 18 decimals).
+        $s = rtrim(sprintf('%.8f', $step), '0');
         $dot = strpos($s, '.');
         return $dot === false ? 0 : strlen($s) - $dot - 1;
     }

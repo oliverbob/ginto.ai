@@ -41,12 +41,12 @@ $gtbModelOptions = [
     'claude-opus-4-8'  => 'Opus 4.8 — smartest ($5 / $25 per 1M)',
 ];
 $gtbGroqModels = [
-    'llama-3.1-8b-instant'                      => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
+    'llama-3.1-8b-instant'                      => 'Llama 3.1 8B Instant — cheapest, for scans ($0.05 / $0.08)',
     'openai/gpt-oss-20b'                        => 'GPT-OSS 20B — cheap reasoning ($0.10 / $0.50)',
     'meta-llama/llama-4-scout-17b-16e-instruct' => 'Llama 4 Scout 17B — fast ($0.11 / $0.34)',
     'qwen/qwen3-32b'                            => 'Qwen3 32B — reasoning ($0.29 / $0.59)',
-    'llama-3.3-70b-versatile'                   => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
-    'openai/gpt-oss-120b'                       => 'GPT-OSS 120B — strongest reasoning ($0.15 / $0.75)',
+    'qwen/qwen3.6-27b'                          => 'Qwen3.6 27B — newest, highest intelligence',
+    'openai/gpt-oss-120b'                       => 'GPT-OSS 120B — best for trading (reasoning + fast) ($0.15 / $0.60)',
 ];
 function gtb_model_select(string $id, string $current, array $opts): void {
     echo '<select id="' . $id . '" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">';

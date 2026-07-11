@@ -24,19 +24,33 @@ class GtbThought
     public function tradeLog(int $limit = 20): array
     {
         try {
-            $rows = $this->db->select($this->table, ['message', 'phase', 'role', 'created_at'], [
+            $rows = $this->db->select($this->table, ['id', 'message', 'phase', 'role', 'created_at'], [
                 'OR' => ['phase' => ['trade', 'error'], 'role' => 'system'],
                 'ORDER' => ['id' => 'DESC'],
                 'LIMIT' => $limit,
             ]);
             if (!is_array($rows)) return [];
             return array_map(static fn($r) => [
+                'id'         => (int) ($r['id'] ?? 0),
                 'message'    => $r['message'] ?? '',
                 'level'      => (($r['role'] ?? '') === 'system' || ($r['phase'] ?? '') === 'error') ? 'error' : 'trade',
-                'created_at' => $r['created_at'] ?? '',
+                'created_at' => self::manilaTime($r['created_at'] ?? ''),
             ], $rows);
         } catch (\Throwable $e) {
             return [];
+        }
+    }
+
+    /** Format a stored (UTC) timestamp to human-readable Asia/Manila time, e.g. "Jul 11, 8:55 AM". */
+    public static function manilaTime(string $ts): string
+    {
+        if ($ts === '') return '';
+        try {
+            $d = new \DateTime($ts, new \DateTimeZone('UTC'));
+            $d->setTimezone(new \DateTimeZone('Asia/Manila'));
+            return $d->format('M j, g:i A');
+        } catch (\Throwable $e) {
+            return $ts;
         }
     }
 

@@ -27,9 +27,10 @@ class GtbBrain
         'llama-3.1-8b-instant'                      => [0.05, 0.08],
         'llama-3.3-70b-versatile'                   => [0.59, 0.79],
         'meta-llama/llama-4-scout-17b-16e-instruct' => [0.11, 0.34],
-        'openai/gpt-oss-120b'                       => [0.15, 0.75],
+        'openai/gpt-oss-120b'                       => [0.15, 0.60],
         'openai/gpt-oss-20b'                        => [0.10, 0.50],
         'qwen/qwen3-32b'                            => [0.29, 0.59],
+        'qwen/qwen3.6-27b'                          => [0.30, 0.60],
     ];
 
     private string $provider;

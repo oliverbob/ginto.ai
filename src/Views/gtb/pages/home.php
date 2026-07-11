@@ -300,6 +300,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <section class="lg:col-span-2 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             <i class="fas fa-receipt text-primary mr-2"></i>Trading History
+            <?php if (!empty($recentTrades)): ?><span class="text-sm font-normal text-gray-400 dark:text-gray-500">· <?= count($recentTrades) ?> trade<?= count($recentTrades) === 1 ? '' : 's' ?> (# = trade no.)</span><?php endif; ?>
         </h3>
         <?php if (empty($recentTrades)): ?>
             <div class="py-10 text-center text-gray-400 dark:text-gray-500">
@@ -311,6 +312,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-left text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
+                            <th class="py-2 pr-4 font-medium">#</th>
                             <th class="py-2 pr-4 font-medium">Time</th>
                             <th class="py-2 pr-4 font-medium">Symbol</th>
                             <th class="py-2 pr-4 font-medium">Side</th>
@@ -326,11 +328,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                         // once closed, its SELL (exit) so both sides of every trade are logged.
                         $events = [];
                         foreach ($recentTrades as $t) {
-                            $events[] = ['time' => $t['created_at'] ?? '', 'symbol' => $t['symbol'] ?? '',
+                            $tid = (int) ($t['id'] ?? 0);
+                            $events[] = ['id' => $tid, 'time' => $t['created_at'] ?? '', 'symbol' => $t['symbol'] ?? '',
                                 'side' => 'BUY', 'type' => $t['type'] ?? 'MARKET',
                                 'price' => $t['price'] ?? null, 'qty' => $t['qty'] ?? '', 'pnl' => null];
                             if (($t['status'] ?? '') === 'CLOSED' && ($t['exit_price'] ?? null) !== null) {
-                                $events[] = ['time' => $t['closed_at'] ?? ($t['created_at'] ?? ''), 'symbol' => $t['symbol'] ?? '',
+                                $events[] = ['id' => $tid, 'time' => $t['closed_at'] ?? ($t['created_at'] ?? ''), 'symbol' => $t['symbol'] ?? '',
                                     'side' => 'SELL', 'type' => 'MARKET',
                                     'price' => $t['exit_price'], 'qty' => $t['qty'] ?? '', 'pnl' => $t['realized_pnl'] ?? null];
                             }
@@ -352,7 +355,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             $pnl = $t['pnl'];
                             $pnlNeg = $pnl !== null && (float)$pnl < 0; ?>
                             <tr class="text-gray-800 dark:text-gray-200">
-                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars($t['time'] ?? '') ?></td>
+                                <td class="py-2.5 pr-4 text-gray-400 dark:text-gray-500 font-mono text-xs">#<?= (int)($t['id'] ?? 0) ?></td>
+                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(\Ginto\Models\GtbThought::manilaTime($t['time'] ?? '')) ?></td>
                                 <td class="py-2.5 pr-4 font-medium"><span class="inline-flex items-center gap-2"><?= $coinIcon($t['symbol'] ?? '') ?><span><?= htmlspecialchars($t['symbol'] ?? '') ?></span></span></td>
                                 <td class="py-2.5 pr-4">
                                     <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded
@@ -394,6 +398,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                     <li class="text-sm flex gap-2">
                         <i class="fas fa-circle text-[6px] mt-1.5 <?= $lvlColor ?>"></i>
                         <div>
+                            <span class="text-gray-400 dark:text-gray-500 font-mono text-xs mr-1">#<?= (int)($log['id'] ?? 0) ?></span>
                             <span class="text-gray-700 dark:text-gray-300"><?= htmlspecialchars($log['message'] ?? '') ?></span>
                             <span class="block text-xs text-gray-400 dark:text-gray-500"><?= htmlspecialchars($log['created_at'] ?? '') ?></span>
                         </div>
@@ -909,7 +914,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         box.innerHTML = '<ul class="space-y-2">' + logs.map(l => {
             const c = l.level === 'error' ? 'text-red-500' : 'text-primary';
             return `<li class="text-sm flex gap-2"><i class="fas fa-circle text-[6px] mt-1.5 ${c}"></i>`
-                + `<div><span class="text-gray-700 dark:text-gray-300">${esc(l.message)}</span>`
+                + `<div><span class="text-gray-400 dark:text-gray-500 font-mono text-xs mr-1">#${l.id || 0}</span>`
+                + `<span class="text-gray-700 dark:text-gray-300">${esc(l.message)}</span>`
                 + `<span class="block text-xs text-gray-400 dark:text-gray-500">${esc(l.created_at)}</span></div></li>`;
         }).join('') + '</ul>';
     }
