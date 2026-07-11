@@ -64,7 +64,7 @@ $featuresFor = function (array $p): array {
                     <?php if ($isLoggedIn): ?>
                         <a href="/academy/subscribe?plan=<?= urlencode($p['name']) ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Subscribe — <?= $peso($p['price_monthly'] ?? 0) ?>/mo</a>
                     <?php else: ?>
-                        <a href="/login?redirect=<?= urlencode('/academy/pricing') ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Log in to subscribe</a>
+                        <a href="/login?promo=GINTO-ACADEMY&redirect=<?= urlencode('/academy/pricing') ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Log in to subscribe</a>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>

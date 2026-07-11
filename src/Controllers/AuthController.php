@@ -114,6 +114,10 @@ class AuthController
             if (isset($_GET['ref'])) {
                 $_SESSION['referral_code'] = $_GET['ref'];
             }
+
+            // Prefill a promo code from the URL (e.g. Academy applicants: ?promo=GINTO-ACADEMY).
+            $prefillPromo = strtoupper(preg_replace('/[^A-Za-z0-9\-]/', '', (string) ($_GET['promo'] ?? '')));
+            $prefillPromo = substr($prefillPromo, 0, 40);
             
             $detectedCountryCode = null;
             $levels = [];
@@ -127,6 +131,7 @@ class AuthController
             View::view('user/register/register', [
                 'title' => 'Register for Ginto',
                 'ref_id' => $refId,
+                'prefill_promo' => $prefillPromo,
                 'error' => null,
                 'old' => [],
                 'countries' => $this->countries,

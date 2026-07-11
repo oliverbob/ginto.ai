@@ -1142,7 +1142,22 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <input type="hidden" name="package_amount" id="selectedPackageAmount" value="10000">
             <input type="hidden" name="package_currency" id="selectedPackageCurrency" value="PHP">
             <input type="hidden" name="pay_method" id="selectedPayMethod" value="btcpay">
-            <input type="hidden" name="promo_code" id="appliedPromoCode" value="">
+            <input type="hidden" name="promo_code" id="appliedPromoCode" value="<?= htmlspecialchars($prefill_promo ?? '', ENT_QUOTES) ?>">
+            <?php if (!empty($prefill_promo)): ?>
+            <script>
+              // Prefill a promo code from the URL (e.g. Academy applicants). Kept in
+              // window.appliedPromoCode so it survives the on-submit sync, and shown in the field.
+              (function () {
+                var code = <?= json_encode($prefill_promo) ?>;
+                window.appliedPromoCode = code;
+                function fill() {
+                  var hid = document.getElementById('appliedPromoCode'); if (hid) hid.value = code;
+                  var inp = document.getElementById('promo-code-input'); if (inp) inp.value = code;
+                }
+                if (document.readyState !== 'loading') fill(); else document.addEventListener('DOMContentLoaded', fill);
+              })();
+            </script>
+            <?php endif; ?>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label class="block font-medium mb-2" style="color: var(--text-primary);">Full Name</label>

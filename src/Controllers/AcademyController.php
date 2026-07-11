@@ -46,7 +46,7 @@ class AcademyController
         $userId = $_SESSION['user_id'] ?? null;
 
         if (empty($userId)) {
-            $this->redirect('/login?redirect=' . urlencode('/academy/enter'));
+            $this->redirect('/login?promo=GINTO-ACADEMY&redirect=' . urlencode('/academy/enter'));
             return;
         }
         if ($this->hasActiveSubscription((int) $userId)) {
@@ -215,7 +215,7 @@ class AcademyController
     {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         $userId = $_SESSION['user_id'] ?? null;
-        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/pricing')); return; }
+        if (empty($userId)) { $this->redirect('/login?promo=GINTO-ACADEMY&redirect=' . urlencode('/academy/pricing')); return; }
 
         $planName = (string) ($_GET['plan'] ?? '');
         try {

@@ -65,8 +65,15 @@
 
     </form>
 
+    <?php
+        // Carry a promo code onto the Register link — explicit ?promo, or inferred when
+        // the login was reached from the Academy (so Academy applicants are tracked).
+        $regPromo = $_GET['promo'] ?? '';
+        if ($regPromo === '' && strpos((string)($_GET['redirect'] ?? ''), 'academy') !== false) $regPromo = 'GINTO-ACADEMY';
+        $registerUrl = '/register' . ($regPromo !== '' ? ('?promo=' . urlencode($regPromo)) : '');
+    ?>
     <p class="mt-4 text-center text-gray-700 dark:text-gray-300">
-        Don't have an account? <a href="/register" class="text-amber-600 dark:text-amber-400 hover:underline">Register here</a>
+        Don't have an account? <a href="<?= htmlspecialchars($registerUrl) ?>" class="text-amber-600 dark:text-amber-400 hover:underline">Register here</a>
     </p>
     <p class="mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
         <a href="/forgot-password" class="text-amber-600 dark:text-amber-400 hover:underline">Forgot your password?</a>
