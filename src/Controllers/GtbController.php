@@ -133,7 +133,8 @@ class GtbController
         $groqSharedKey= (string) (\Ginto\Support\Env::get('GROQ_API_KEY', '') ?? '') !== '';
         $groqModel    = (string) (\Ginto\Support\Env::get('GROQ_MODEL', 'openai/gpt-oss-120b') ?? 'openai/gpt-oss-120b');
         $groqScanModel= (string) (\Ginto\Support\Env::get('GROQ_SCAN_MODEL', 'llama-3.1-8b-instant') ?? 'llama-3.1-8b-instant');
-        $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
+        $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'gainers,scalp,breakout,trend,pullback') ?? ''))));
+        $gtbTemplateCatalog = \Ginto\Services\GtbStrategy::catalog();
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
         $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
         $pineB64 = (string) (\Ginto\Support\Env::get('GTB_PINESCRIPT_B64', '') ?? '');
@@ -179,6 +180,7 @@ class GtbController
             'groqModel'         => $groqModel,
             'groqScanModel'     => $groqScanModel,
             'gtbTemplates'      => $gtbTemplates,
+            'gtbTemplateCatalog'=> $gtbTemplateCatalog,
             'gtbMemory'         => $gtbMemory,
             'gtbInstructions'   => $gtbInstructions,
             'gtbPineScript'     => $gtbPineScript,
@@ -268,7 +270,7 @@ class GtbController
             if ($isModelId($gScan)) $pairs['GROQ_SCAN_MODEL'] = $gScan;
 
             // Strategy templates enable/disable (at least one required)
-            $allowedTpls = ['scalp', 'breakout', 'trend', 'pullback'];
+            $allowedTpls = ['gainers', 'scalp', 'breakout', 'trend', 'pullback'];
             $tpls = array_values(array_intersect($allowedTpls, (array) ($input['templates'] ?? [])));
             if ($tpls) $pairs['GTB_TEMPLATES'] = implode(',', $tpls);
 

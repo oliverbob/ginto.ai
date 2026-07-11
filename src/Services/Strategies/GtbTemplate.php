@@ -13,6 +13,15 @@ interface GtbTemplate
     public function description(): string;
 
     /**
+     * Testable metadata about the template's target/behaviour. Keys:
+     *   min_gain (float %)  — the minimum profit a win aims to bank (0 = none/rides).
+     *   max_gain (float %)  — the highest gain it reaches for (0 = uncapped / trails).
+     *   min_hold_min (int)  — don't rotate/stall out before this many minutes (0 = default).
+     *   max_hold_min (int)  — force a time-box exit after this many minutes (0 = global default).
+     */
+    public function meta(): array;
+
+    /**
      * Pick one entry candidate from liquid USDT tickers, excluding held symbols.
      * $tickers items: ['symbol','base','changePct','price','high','low','quoteVol'].
      * Return ['symbol','price','changePct','reason'] or null.

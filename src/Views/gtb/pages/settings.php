@@ -288,18 +288,38 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-shapes text-primary mr-1.5"></i>Strategy templates</h3>
             <p class="text-xs text-gray-500 dark:text-gray-400">Which strategies the bot may run. Each open capital slot uses one, diversified least-used-first.</p>
             <?php
-            $tplOpts = [
-                'scalp'    => ['Scalp Momentum', 'Top gainer, tight stop-loss / take-profit'],
-                'breakout' => ['Breakout', 'Coin pressing its 24h high on volume'],
-                'trend'    => ['Trend Trailing', 'Ride momentum with a trailing stop'],
-                'pullback' => ['Pullback Dip', 'Buy an uptrend that pulled back off its 24h high'],
-            ];
-            foreach ($tplOpts as $k => $info): ?>
+            $tplCatalog = $gtbTemplateCatalog ?? [];
+            if (!$tplCatalog) { // defensive fallback if the catalog wasn't provided
+                $tplCatalog = [
+                    'gainers'  => ['name' => 'Top-3 Gainer Hunter', 'description' => 'Chase the top 3 gainers with a profit-locking OCO.', 'meta' => ['min_gain' => 1.5, 'max_gain' => 8, 'min_hold_min' => 15, 'max_hold_min' => 45]],
+                    'scalp'    => ['name' => 'Scalp Momentum', 'description' => 'Top gainer, tight stop-loss / take-profit', 'meta' => ['min_gain' => 2.5, 'max_gain' => 2.5]],
+                    'breakout' => ['name' => 'Breakout', 'description' => 'Coin pressing its 24h high on volume', 'meta' => ['min_gain' => 4, 'max_gain' => 4]],
+                    'trend'    => ['name' => 'Trend Trailing', 'description' => 'Ride momentum with a trailing stop', 'meta' => ['min_gain' => 0, 'max_gain' => 0]],
+                    'pullback' => ['name' => 'Pullback Dip', 'description' => 'Buy an uptrend that pulled back off its 24h high', 'meta' => ['min_gain' => 3, 'max_gain' => 3]],
+                ];
+            }
+            $numFmt = fn($n) => rtrim(rtrim(number_format((float) $n, 1), '0'), '.');
+            $fmtRange = function (array $meta) use ($numFmt) {
+                $min = (float) ($meta['min_gain'] ?? 0); $max = (float) ($meta['max_gain'] ?? 0);
+                if ($max <= 0 && $min <= 0) return 'trails · uncapped';
+                if ($max <= 0)              return 'locks ≥' . $numFmt($min) . '% · uncapped';
+                if (abs($min - $max) < 0.01) return $numFmt($max) . '% target';
+                return 'min ' . $numFmt($min) . '% · max ' . $numFmt($max) . '%';
+            };
+            foreach ($tplCatalog as $k => $info):
+                $meta = $info['meta'] ?? [];
+                $hold = '';
+                if (!empty($meta['max_hold_min'])) $hold = (!empty($meta['min_hold_min']) ? $meta['min_hold_min'] . '–' : '≤') . $meta['max_hold_min'] . 'm hold';
+            ?>
                 <label class="flex items-start gap-2 cursor-pointer">
                     <input type="checkbox" class="gtb-tpl mt-0.5 w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
-                           value="<?= $k ?>" <?= in_array($k, $gtbTemplates, true) ? 'checked' : '' ?>>
-                    <span class="text-sm"><span class="font-medium text-gray-800 dark:text-gray-200"><?= $info[0] ?></span>
-                        <span class="text-xs text-gray-400 dark:text-gray-500">— <?= $info[1] ?></span></span>
+                           value="<?= htmlspecialchars($k) ?>" <?= in_array($k, $gtbTemplates, true) ? 'checked' : '' ?>>
+                    <span class="text-sm">
+                        <span class="font-medium text-gray-800 dark:text-gray-200"><?= htmlspecialchars($info['name'] ?? $k) ?></span>
+                        <span class="inline-block ml-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-primary/10 text-primary align-middle"><?= htmlspecialchars($fmtRange($meta)) ?></span>
+                        <?php if ($hold): ?><span class="inline-block ml-1 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700/60 text-gray-500 dark:text-gray-400 align-middle"><?= htmlspecialchars($hold) ?></span><?php endif; ?>
+                        <span class="block text-xs text-gray-400 dark:text-gray-500 mt-0.5"><?= htmlspecialchars($info['description'] ?? '') ?></span>
+                    </span>
                 </label>
             <?php endforeach; ?>
 

@@ -11,6 +11,7 @@ use Ginto\Services\Strategies\ScalpMomentum;
 use Ginto\Services\Strategies\Breakout;
 use Ginto\Services\Strategies\TrendTrailing;
 use Ginto\Services\Strategies\PullbackDip;
+use Ginto\Services\Strategies\GainerHunter;
 use Ginto\Services\Strategies\GtbProfiles;
 
 /**
@@ -36,13 +37,25 @@ class GtbStrategy
 
     public function __construct()
     {
-        $all = ['scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
-        $enabled = array_filter(array_map('trim', explode(',', (string) (Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
+        $all = ['gainers' => GainerHunter::class, 'scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
+        $enabled = array_filter(array_map('trim', explode(',', (string) (Env::get('GTB_TEMPLATES', 'gainers,scalp,breakout,trend,pullback') ?? ''))));
         if (!$enabled) $enabled = array_keys($all);
         foreach ($enabled as $k) {
             if (isset($all[$k])) $this->templates[$k] = new $all[$k]();
         }
         if (!$this->templates) $this->templates['scalp'] = new ScalpMomentum();
+    }
+
+    /** All known templates with display info + testable metadata (min/max gain, hold window). */
+    public static function catalog(): array
+    {
+        $classes = ['gainers' => GainerHunter::class, 'scalp' => ScalpMomentum::class, 'breakout' => Breakout::class, 'trend' => TrendTrailing::class, 'pullback' => PullbackDip::class];
+        $out = [];
+        foreach ($classes as $k => $cls) {
+            try { $t = new $cls(); $out[$k] = ['name' => $t->name(), 'description' => $t->description(), 'meta' => $t->meta()]; }
+            catch (\Throwable $e) {}
+        }
+        return $out;
     }
 
     public function step(bool $armLive = false): array
@@ -89,18 +102,24 @@ class GtbStrategy
                 $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'SESSION-END');
                 continue;
             }
-            if ($maxHoldMin > 0) {
+            // Per-template time-box: a template may set its own max-hold / min-hold (e.g. the
+            // Gainer Hunter holds 15–45m); fall back to the global setting otherwise.
+            $tplMeta    = isset($this->templates[$pos['template'] ?? '']) ? $this->templates[$pos['template']]->meta() : [];
+            $posMaxHold = ((int) ($tplMeta['max_hold_min'] ?? 0)) ?: $maxHoldMin;
+            $posMinHold = (int) ($tplMeta['min_hold_min'] ?? 0);
+            if ($posMaxHold > 0) {
                 $age = $this->ageMinutes($pos['created_at'] ?? null);
-                if ($age !== null && $age >= $maxHoldMin) {
+                if ($age !== null && $age >= $posMaxHold) {
                     $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'MAX-HOLD');
                     continue;
                 }
             }
-            // Stall rotation: after N minutes with less than the required follow-through gain, rotate out.
+            // Stall rotation: after N minutes below the required follow-through gain, rotate out —
+            // but never before the template's minimum hold (give a fresh runner room to work).
             if ($stallMin > 0) {
                 $age  = $this->ageMinutes($pos['created_at'] ?? null);
                 $gain = ((float) $price - (float) $pos['price']) / (float) $pos['price'] * 100.0;
-                if ($age !== null && $age >= $stallMin && $gain < $stallMinGain) {
+                if ($age !== null && $age >= max($stallMin, $posMinHold) && $gain < $stallMinGain) {
                     $realized += $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'STALL');
                     continue;
                 }
@@ -562,7 +581,11 @@ class GtbStrategy
         if ($type === 'oco') {
             $s = $client->ocoStatus((string) $pid);
             if (empty($s['ok'])) return 0.0; // transient; retry next cycle
-            if (($s['data']['listOrderStatus'] ?? '') !== 'ALL_DONE') return 0.0; // still resting
+            if (($s['data']['listOrderStatus'] ?? '') !== 'ALL_DONE') {
+                // Still resting — for a profit-locking template (trail_pct set) ratchet the OCO stop
+                // up onto the PLUS side as new highs print; cancel+replace so no orders overlap.
+                return $this->ratchetOco($client, $trades, $thoughts, $pos, $price, (string) $pid);
+            }
             [$exit, $fq] = $this->ocoFill($client, $sym, $s['data']);
             if ($exit > 0) {
                 $pnl = $this->netPnl($entry, $exit, $fq);
@@ -638,6 +661,60 @@ class GtbStrategy
                 $trades->updateStop($id, $curStop, $peak);
             }
         }
+        return 0.0;
+    }
+
+    /**
+     * Profit-locking OCO ratchet for a resting live OCO (Gainer Hunter). Once price is up ~arm%,
+     * raise the stop onto the plus side (lock ≥ lock%) and trail it under the peak, keeping the TP
+     * ceiling. Cancels the old OCO before re-placing so the book never carries overlapping orders.
+     * @return float realized P&L (0 unless a re-protect failure forced a flatten)
+     */
+    private function ratchetOco(BinanceClient $client, GtbTrade $trades, GtbThought $thoughts, array $pos, float $price, string $pid): float
+    {
+        $trailPct = (float) ($pos['trail_pct'] ?: 0);
+        if ($trailPct <= 0) return 0.0;   // fixed-OCO template — leave it be
+        $sym   = $pos['symbol'];
+        $id    = (int) $pos['id'];
+        $entry = (float) $pos['price'];
+        $qty   = (float) $pos['qty'];
+        $tp    = (float) ($pos['take_profit'] ?: 0);
+        if ($tp <= 0 || $entry <= 0) return 0.0;
+
+        $lockPct = (float) (Env::get('GTB_GAINER_LOCK_PCT', '1.5') ?? 1.5);
+        $armPct  = (float) (Env::get('GTB_GAINER_ARM_PCT', '2.0') ?? 2.0);
+
+        $prevPeak = (float) ($pos['peak_price'] ?: $entry);
+        $peak     = max($prevPeak, $price);
+        if ($price < $entry * (1 + $armPct / 100.0)) {   // not armed yet — just track the peak
+            if ($peak > $prevPeak) $trades->updateStop($id, (float) $pos['stop_loss'], $peak);
+            return 0.0;
+        }
+
+        $newStop = max((float) $pos['stop_loss'], $entry * (1 + $lockPct / 100.0), $peak * (1 - $trailPct / 100.0));
+        $newStop = min($newStop, $price * 0.999);   // must rest below market
+        $curStop = (float) $pos['stop_loss'];
+        if ($newStop <= $curStop * 1.001) {         // nothing meaningful to raise
+            if ($peak > $prevPeak) $trades->updateStop($id, $curStop, $peak);
+            return 0.0;
+        }
+
+        $client->cancelOco($sym, $pid);   // cancel BEFORE re-placing — no overlapping orders
+        $prot = $this->protectLive($client, $sym, $qty, ['stop_loss' => $newStop, 'take_profit' => $tp]);
+        if (!empty($prot['error'])) {
+            $client->marketSell($sym, $this->floorToStep($client, $sym, $qty * 0.999));
+            $pnl = $this->netPnl($entry, $price, $qty);
+            $trades->closeTrade($id, $price, $pnl);
+            $trades->setProtection($id, null, null);
+            $thoughts->add("$sym OCO re-lock failed — flattened to stay safe.",
+                'system', 'error', $sym, null, ['mode' => 'live', 'pnl' => round($pnl, 6)]);
+            return $pnl;
+        }
+        $trades->updateStop($id, $newStop, $peak);
+        $trades->setProtection($id, $prot['type'], $prot['id']);
+        $thoughts->add(sprintf('%s stop locked to $%s (≥ +%.2f%%) · TP $%s — trailing the OCO up.',
+            $sym, $this->fmt($newStop), ($newStop / $entry - 1) * 100, $this->fmt($tp)),
+            'bot', 'trade', $sym, 'LOCK', ['mode' => 'live']);
         return 0.0;
     }
 

@@ -48,6 +48,12 @@ class TrendTrailing implements GtbTemplate
         return ['stop_loss' => $entry * (1 - $this->sl), 'take_profit' => null, 'trail_pct' => $this->trail];
     }
 
+    public function meta(): array
+    {
+        // Trailing: no fixed floor, no cap — it rides and gives back ~trail% from the peak.
+        return ['min_gain' => 0.0, 'max_gain' => 0.0, 'min_hold_min' => 0, 'max_hold_min' => 0];
+    }
+
     public function manage(array $pos, float $price): ?array
     {
         $prevPeak  = (float) ($pos['peak_price'] ?: $pos['price']);

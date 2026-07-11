@@ -898,7 +898,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Active Trades grid (per-trade mini charts) ---------------------------
     const GTB_TRADES = { cards: {} };  // id -> { root, chart, series, lastKey }
 
-    function gtbTemplLabel(k) { return ({scalp:'Scalp', breakout:'Breakout', trend:'Trend', pullback:'Pullback'})[k] || k; }
+    function gtbTemplLabel(k) { return ({gainers:'Gainer Hunter', scalp:'Scalp', breakout:'Breakout', trend:'Trend', pullback:'Pullback'})[k] || k; }
     function gtbProfLabel(k) { return ({conservative:'Conservative', aggressive:'Aggressive'})[k] || k; }
     function gtbProfBadge(k) {
         const cls = k === 'aggressive'

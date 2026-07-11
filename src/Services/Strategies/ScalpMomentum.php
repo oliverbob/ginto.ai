@@ -42,6 +42,11 @@ class ScalpMomentum implements GtbTemplate
         return ['stop_loss' => $entry * (1 - $this->sl), 'take_profit' => $entry * (1 + $this->tp), 'trail_pct' => null];
     }
 
+    public function meta(): array
+    {
+        return ['min_gain' => round($this->tp * 100, 2), 'max_gain' => round($this->tp * 100, 2), 'min_hold_min' => 0, 'max_hold_min' => 0];
+    }
+
     public function manage(array $pos, float $price): ?array
     {
         if ($price <= (float) $pos['stop_loss'])  return ['close' => 'STOP-LOSS'];

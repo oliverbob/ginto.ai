@@ -28,10 +28,10 @@ final class GtbProfiles
         ],
         'aggressive' => [
             'name'      => 'Aggressive',
-            // Ride runners FIRST (trailing stop, no fixed cap) so a parabolic top-gainer like PYR
-            // is held and ratcheted up instead of scalped out at +2.5/4%. Breakout/scalp are the
-            // fallback for strong moves that aren't cleanly trending.
-            'templates' => ['trend', 'breakout', 'scalp'],
+            // Hunt the top gainers FIRST with a profit-locking OCO (locks ≥1.5%, aims 5–8%), then
+            // ride cleaner trends; breakout/scalp are the fallback. This chases the strongest movers
+            // while the ratcheting OCO banks the plus side — top gainers drop fast.
+            'templates' => ['gainers', 'trend', 'breakout', 'scalp'],
             'slMult'    => 1.20,   // more room to breathe (also widens the trailing distance)
             'tpMult'    => 1.50,   // let winners run further
             'posture'   => 'Trade like a decisive momentum trader hunting the fastest movers. On a strong, real '
