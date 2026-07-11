@@ -64,12 +64,15 @@ $featuresFor = function (array $p): array {
                     <?php if ($isLoggedIn): ?>
                         <a href="/academy/subscribe?plan=<?= urlencode($p['name']) ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Subscribe — <?= $peso($p['price_monthly'] ?? 0) ?>/mo</a>
                     <?php else: ?>
-                        <a href="/login?promo=GINTO-ACADEMY&redirect=<?= urlencode('/academy/pricing') ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Log in to subscribe</a>
+                        <a href="/register?promo=GINTO-ACADEMY" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Get started — <?= $peso($p['price_monthly'] ?? 0) ?>/mo</a>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
         </div>
-        <p class="mt-6 text-xs text-gray-400"><i class="fas fa-lock mr-1"></i> Secure checkout via PayMongo (cards / InstaPay / QR Ph). Billed in PHP.</p>
+        <p class="mt-6 text-xs text-gray-400"><i class="fas fa-lock mr-1"></i> Secure checkout via PayMongo (cards / InstaPay / QR Ph). Billed in PHP. No login required to buy.</p>
+        <?php if (!$isLoggedIn): ?>
+            <p class="mt-2 text-xs text-gray-400">Already have an account? <a href="/login?redirect=<?= urlencode('/academy/pricing') ?>" class="text-primary hover:underline">Log in</a></p>
+        <?php endif; ?>
     <?php endif; ?>
 
     <div class="mt-10 max-w-2xl mx-auto rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">

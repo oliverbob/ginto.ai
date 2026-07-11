@@ -43,70 +43,40 @@
     }
   }
 
-  // Live gainer / popular / loser mini charts for the homepage Academy banner (Binance data).
+  // Live gainer / popular / loser mini charts — data via our own server (reliable),
+  // drawn as pure SVG sparklines (no external library, no client-side Binance call).
   function renderHomeAcademyCharts() {
     const wrap = document.getElementById('home-academy-charts');
     if (!wrap) return;
-    function go() {
-      fetch('https://api.binance.com/api/v3/ticker/24hr')
-        .then(function (r) { return r.json(); })
-        .then(function (all) {
-          if (!Array.isArray(all)) return;
-          const stable = ['USDCUSDT','FDUSDUSDT','TUSDUSDT','BUSDUSDT','DAIUSDT','EURUSDT','USD1USDT'];
-          const usdt = all.filter(function (t) {
-            return /USDT$/.test(t.symbol) && !/(UP|DOWN|BULL|BEAR)USDT$/.test(t.symbol)
-              && stable.indexOf(t.symbol) < 0 && parseFloat(t.quoteVolume) > 30000000;
-          });
-          if (usdt.length < 3) return;
-          usdt.sort(function (a, b) { return parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent); });
-          const popular = all.find(function (t) { return t.symbol === 'BTCUSDT'; }) || usdt[Math.floor(usdt.length / 2)];
-          const picks = [
-            { t: usdt[0], tag: 'TOP GAINER' },
-            { t: popular, tag: 'POPULAR' },
-            { t: usdt[usdt.length - 1], tag: 'TOP LOSER' }
-          ];
-          wrap.innerHTML = '';
-          picks.forEach(function (p) {
-            const d = document.createElement('div');
-            d.setAttribute('data-symbol', p.t.symbol);
-            d.setAttribute('data-chg', parseFloat(p.t.priceChangePercent).toFixed(2));
-            d.setAttribute('data-tag', p.tag);
-            d.style.cssText = 'position:relative;height:56px;border-radius:8px;overflow:hidden;background:rgba(0,0,0,0.18);';
-            wrap.appendChild(d);
-            drawHomeMini(d);
-          });
-        }).catch(function () {});
-    }
-    if (typeof LightweightCharts !== 'undefined') go();
-    else {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
-      s.onload = go; document.head.appendChild(s);
-    }
-  }
-  function drawHomeMini(el) {
-    if (typeof LightweightCharts === 'undefined') return;
-    const sym = el.getAttribute('data-symbol');
-    const chg = parseFloat(el.getAttribute('data-chg'));
-    const tag = el.getAttribute('data-tag');
-    const up = chg >= 0, col = up ? '#22c55e' : '#ef4444';
-    const label = document.createElement('div');
-    label.style.cssText = 'position:absolute;inset:0;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;pointer-events:none;';
-    label.innerHTML = '<span style="opacity:.85">' + tag + ' · ' + sym.replace('USDT', '') + '</span><span style="color:' + col + '">' + (up ? '+' : '') + chg + '%</span>';
-    el.appendChild(label);
-    const chart = LightweightCharts.createChart(el, {
-      width: el.clientWidth || 240, height: 56,
-      layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(0,0,0,0)', fontSize: 1 },
-      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
-      rightPriceScale: { visible: false }, leftPriceScale: { visible: false }, timeScale: { visible: false },
-      handleScale: false, handleScroll: false, crosshair: { mode: 0 }
-    });
-    const series = chart.addAreaSeries({ lineColor: col, topColor: up ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)', bottomColor: 'rgba(0,0,0,0)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
-    fetch('https://api.binance.com/api/v3/klines?symbol=' + sym + '&interval=15m&limit=48')
+    fetch('/api/academy/movers')
       .then(function (r) { return r.json(); })
-      .then(function (rows) { if (!Array.isArray(rows)) return; series.setData(rows.map(function (k) { return { time: Math.floor(k[0] / 1000), value: +k[4] }; })); chart.timeScale().fitContent(); })
-      .catch(function () {});
-    try { new ResizeObserver(function () { try { chart.applyOptions({ width: el.clientWidth }); } catch (e) {} }).observe(el); } catch (e) {}
+      .then(function (d) {
+        if (!d || !d.ok || !Array.isArray(d.movers) || !d.movers.length) { wrap.style.display = 'none'; return; }
+        wrap.innerHTML = d.movers.map(homeMiniHtml).join('');
+      })
+      .catch(function () { wrap.style.display = 'none'; });
+  }
+  function homeSparkline(vals, col) {
+    if (!vals || vals.length < 2) return '';
+    var w = 280, h = 56, min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), rng = (max - min) || 1;
+    var pts = vals.map(function (v, i) {
+      var x = (i / (vals.length - 1)) * w;
+      var y = h - 6 - ((v - min) / rng) * (h - 16);
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    });
+    var id = 'g' + Math.random().toString(36).slice(2, 7);
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" width="100%" height="100%" style="position:absolute;inset:0;">'
+      + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity="0.35"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>'
+      + '<path d="M0,' + h + ' L' + pts.join(' L') + ' L' + w + ',' + h + ' Z" fill="url(#' + id + ')"/>'
+      + '<path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+  }
+  function homeMiniHtml(m) {
+    var up = (+m.chg) >= 0, col = up ? '#22c55e' : '#ef4444';
+    return '<div style="position:relative;height:56px;border-radius:8px;overflow:hidden;background:rgba(0,0,0,0.2);">'
+      + homeSparkline(m.closes || [], col)
+      + '<div style="position:absolute;inset:0;display:flex;justify-content:space-between;align-items:flex-start;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;pointer-events:none;">'
+      + '<span style="opacity:.85">' + m.tag + ' · ' + m.base + '</span>'
+      + '<span style="color:' + col + '">' + (up ? '+' : '') + m.chg + '%</span></div></div>';
   }
 
   // Example prompts: fetch role-based prompts from server and render

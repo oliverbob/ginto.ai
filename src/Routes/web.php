@@ -1682,6 +1682,7 @@ $router->get('/academy/pricing', 'AcademyController@pricing');
 $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');
+$router->get('/api/academy/movers', 'AcademyController@movers'); // server-side gainer/popular/loser for banner charts
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');

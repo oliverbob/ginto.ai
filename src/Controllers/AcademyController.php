@@ -161,6 +161,61 @@ class AcademyController
         $this->redirect('/academy/admin?saved=1');
     }
 
+    /**
+     * GET /api/academy/movers — top gainer, popular (BTC), top loser with recent closes,
+     * fetched SERVER-SIDE (reliable) and cached ~60s. Powers the homepage/banner charts.
+     */
+    public function movers(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $cacheFile = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_movers.json';
+        if (is_file($cacheFile) && (time() - filemtime($cacheFile) < 60)) {
+            echo (string) file_get_contents($cacheFile); exit;
+        }
+        $out = [];
+        try {
+            $client = new \Ginto\Services\BinanceClient();
+            $res = $client->allTickers24hr();
+            if (!empty($res['ok']) && is_array($res['data'] ?? null)) {
+                $stable = ['USDC','FDUSD','TUSD','BUSD','DAI','EUR','GBP','USD1','AEUR'];
+                $rows = [];
+                foreach ($res['data'] as $r) {
+                    $sym = $r['symbol'] ?? '';
+                    if (!str_ends_with($sym, 'USDT')) continue;
+                    $base = substr($sym, 0, -4);
+                    if ($base === '' || preg_match('/(UP|DOWN|BULL|BEAR)$/', $base) || in_array($base, $stable, true)) continue;
+                    if ((float) ($r['quoteVolume'] ?? 0) < 30000000) continue;
+                    $rows[] = ['symbol' => $sym, 'base' => $base, 'chg' => (float) ($r['priceChangePercent'] ?? 0)];
+                }
+                if (count($rows) >= 3) {
+                    usort($rows, static fn($a, $b) => $b['chg'] <=> $a['chg']);
+                    $popular = null;
+                    foreach ($rows as $rr) { if ($rr['symbol'] === 'BTCUSDT') { $popular = $rr; break; } }
+                    if (!$popular) $popular = $rows[intdiv(count($rows), 2)];
+                    $picks = [
+                        ['tag' => 'TOP GAINER'] + $rows[0],
+                        ['tag' => 'POPULAR'] + $popular,
+                        ['tag' => 'TOP LOSER'] + $rows[count($rows) - 1],
+                    ];
+                    $klines = $client->klinesMulti(array_column($picks, 'symbol'), '15m', 48);
+                    foreach ($picks as $p) {
+                        $out[] = [
+                            'symbol' => $p['symbol'], 'base' => $p['base'], 'tag' => $p['tag'],
+                            'chg'    => round($p['chg'], 2),
+                            'closes' => array_map('floatval', $klines[$p['symbol']] ?? []),
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Academy movers error: ' . $e->getMessage());
+        }
+        $json = json_encode(['ok' => !empty($out), 'movers' => $out]);
+        if (!empty($out)) @file_put_contents($cacheFile, $json);
+        echo $json;
+        exit;
+    }
+
     /** Published lessons for the facility, ordered. */
     private function publishedLessons(): array
     {
@@ -215,7 +270,9 @@ class AcademyController
     {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         $userId = $_SESSION['user_id'] ?? null;
-        if (empty($userId)) { $this->redirect('/login?promo=GINTO-ACADEMY&redirect=' . urlencode('/academy/pricing')); return; }
+        // Buying must not require login: guests register-and-pay via the wizard (fill in as a
+        // new user). Logged-in users continue to the one-click PayMongo checkout below.
+        if (empty($userId)) { $this->redirect('/register?promo=GINTO-ACADEMY'); return; }
 
         $planName = (string) ($_GET['plan'] ?? '');
         try {
