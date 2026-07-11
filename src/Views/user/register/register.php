@@ -868,18 +868,8 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div class="tier-card p-6 relative" data-tier-id="2" data-tier-name="Professional" data-tier-display="Trader"
                  data-tier-first-php="1000" data-tier-first-usd="20"
                  data-tier-recurring-php="1000" data-tier-recurring-usd="20">
-              <div class="w-full rounded-lg mb-4 flex items-center justify-center" style="height:160px;background:linear-gradient(135deg,#1e293b,#4338ca);">
-                <svg viewBox="0 0 300 150" width="88%" style="max-width:270px">
-                  <line x1="10" y1="34" x2="290" y2="34" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>
-                  <g stroke-linecap="round">
-                    <line x1="40" y1="96" x2="40" y2="122" stroke="rgba(255,255,255,.5)"/><rect x="33" y="102" width="14" height="16" rx="1.5" fill="#f87171"/>
-                    <line x1="85" y1="78" x2="85" y2="108" stroke="rgba(255,255,255,.5)"/><rect x="78" y="84" width="14" height="18" rx="1.5" fill="#34d399"/>
-                    <line x1="130" y1="66" x2="130" y2="94" stroke="rgba(255,255,255,.5)"/><rect x="123" y="72" width="14" height="16" rx="1.5" fill="#34d399"/>
-                    <line x1="175" y1="70" x2="175" y2="96" stroke="rgba(255,255,255,.5)"/><rect x="168" y="76" width="14" height="14" rx="1.5" fill="#f87171"/>
-                    <line x1="220" y1="52" x2="220" y2="80" stroke="rgba(255,255,255,.5)"/><rect x="213" y="58" width="14" height="18" rx="1.5" fill="#34d399"/>
-                    <line x1="265" y1="40" x2="265" y2="66" stroke="rgba(255,255,255,.5)"/><rect x="258" y="46" width="14" height="16" rx="1.5" fill="#34d399"/>
-                  </g>
-                </svg>
+              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="BTCUSDT" style="height:160px;background:linear-gradient(135deg,#0b1020,#111a33);overflow:hidden;">
+                <span class="reg-chart-label" style="position:absolute;top:6px;left:8px;z-index:2;font-size:10px;font-weight:700;color:rgba(255,255,255,.7);">BTC/USDT · 1h</span>
               </div>
               <div class="tier-badge">Recommended</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Trader</h4>
@@ -909,18 +899,8 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div class="tier-card p-6 relative" data-tier-id="3" data-tier-name="Executive" data-tier-display="Pro Trader"
                  data-tier-first-php="5000" data-tier-first-usd="99"
                  data-tier-recurring-php="5000" data-tier-recurring-usd="99">
-              <div class="w-full rounded-lg mb-4 flex items-center justify-center" style="height:160px;background:linear-gradient(135deg,#0f172a,#6d28d9);">
-                <svg viewBox="0 0 300 150" width="88%" style="max-width:270px">
-                  <line x1="10" y1="26" x2="290" y2="26" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>
-                  <g stroke-linecap="round">
-                    <line x1="40" y1="104" x2="40" y2="128" stroke="rgba(255,255,255,.5)"/><rect x="33" y="110" width="14" height="16" rx="1.5" fill="#f87171"/>
-                    <line x1="85" y1="84" x2="85" y2="112" stroke="rgba(255,255,255,.5)"/><rect x="78" y="90" width="14" height="18" rx="1.5" fill="#34d399"/>
-                    <line x1="130" y1="60" x2="130" y2="90" stroke="rgba(255,255,255,.5)"/><rect x="123" y="66" width="14" height="20" rx="1.5" fill="#34d399"/>
-                    <line x1="175" y1="52" x2="175" y2="78" stroke="rgba(255,255,255,.5)"/><rect x="168" y="58" width="14" height="16" rx="1.5" fill="#34d399"/>
-                    <line x1="220" y1="40" x2="220" y2="64" stroke="rgba(255,255,255,.5)"/><rect x="213" y="46" width="14" height="12" rx="1.5" fill="#f87171"/>
-                    <line x1="265" y1="24" x2="265" y2="52" stroke="rgba(255,255,255,.5)"/><rect x="258" y="30" width="14" height="20" rx="1.5" fill="#34d399"/>
-                  </g>
-                </svg>
+              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="ETHUSDT" style="height:160px;background:linear-gradient(135deg,#0b1020,#1a1035);overflow:hidden;">
+                <span class="reg-chart-label" style="position:absolute;top:6px;left:8px;z-index:2;font-size:10px;font-weight:700;color:rgba(255,255,255,.7);">ETH/USDT · 1h</span>
               </div>
               <div class="tier-badge">Elite</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Pro Trader</h4>
@@ -3789,6 +3769,39 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     }
   });
 });
+</script>
+
+<!-- Live mini candlestick charts on the tier cards (TradingView Lightweight Charts + live Binance data) -->
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+  (function () {
+    function draw(el) {
+      if (typeof LightweightCharts === 'undefined') return;
+      var symbol = el.getAttribute('data-symbol') || 'BTCUSDT';
+      var chart = LightweightCharts.createChart(el, {
+        width: el.clientWidth, height: 160,
+        layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(255,255,255,0.35)', fontSize: 9 },
+        grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
+        rightPriceScale: { borderVisible: false }, timeScale: { visible: false, borderVisible: false },
+        handleScale: false, handleScroll: false, crosshair: { mode: 0 }
+      });
+      var series = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderVisible: false, wickUpColor: '#22c55e', wickDownColor: '#ef4444' });
+      function load() {
+        fetch('https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=1h&limit=60')
+          .then(function (r) { return r.json(); })
+          .then(function (rows) {
+            if (!Array.isArray(rows)) return;
+            series.setData(rows.map(function (k) { return { time: Math.floor(k[0] / 1000), open: +k[1], high: +k[2], low: +k[3], close: +k[4] }; }));
+            chart.timeScale().fitContent();
+          }).catch(function () {});
+      }
+      load();
+      setInterval(load, 60000); // refresh hourly candles each minute — keeps it live
+      try { new ResizeObserver(function () { try { chart.applyOptions({ width: el.clientWidth }); } catch (e) {} }).observe(el); } catch (e) {}
+    }
+    function init() { document.querySelectorAll('.reg-live-chart').forEach(draw); }
+    if (document.readyState !== 'loading') init(); else document.addEventListener('DOMContentLoaded', init);
+  })();
 </script>
 </body>
 </html>
