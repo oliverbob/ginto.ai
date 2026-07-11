@@ -763,155 +763,34 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       </div>
     </section>
 
-    <!-- Program Overview & Commission Structure -->
+    <!-- Program Overview & Referral Reward -->
     <section id="program-overview" class="py-16 px-4 bg-white">
-      <div class="max-w-7xl mx-auto">
-        <div class="rounded-xl shadow-lg overflow-hidden mb-8 glow-card" style="background: linear-gradient(135deg, var(--bg-card) 70%, var(--primary-700) 100%);">
-          <div style="background: linear-gradient(90deg, var(--primary-600) 0%, var(--accent-600) 100%); padding-left: 1.5rem; padding-right: 1.5rem; padding-top: 1rem; padding-bottom: 1rem;">
-            <h2 class="text-3xl font-bold flex items-center" style="color: #fff; text-shadow: 0 2px 12px rgba(31,162,255,0.18);">
-              <i class="fas fa-info-circle mr-3" style="color: var(--accent-500);"></i> Ginto Commission Structure
+      <div class="max-w-5xl mx-auto">
+        <div class="rounded-xl shadow-lg overflow-hidden glow-card" style="background: linear-gradient(135deg, var(--bg-card) 70%, var(--primary-700) 100%);">
+          <div style="background: linear-gradient(90deg, var(--primary-600) 0%, var(--accent-600) 100%); padding: 1rem 1.5rem;">
+            <h2 class="text-3xl font-bold flex items-center" style="color:#fff; text-shadow: 0 2px 12px rgba(31,162,255,0.18);">
+              <i class="fas fa-hand-holding-dollar mr-3" style="color: var(--accent-500);"></i> 5% Referral on All Products
             </h2>
-            <p class="text-lg mt-1" style="color: #f4faff; opacity: 0.92;">Unlock superior earnings for your direct sales!</p>
+            <p class="text-lg mt-1" style="color:#f4faff; opacity:.92;">One simple, generous reward — earn on everything you refer.</p>
           </div>
-          <div class="p-8" style="background: linear-gradient(120deg, rgba(31,162,255,0.10) 0%, rgba(255,229,59,0.10) 100%);">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
-              <div>
-                <h3 class="text-2xl font-semibold mb-5" style="color: var(--primary-500);">Tiered Commission Breakdown (Per ₱150 Sale)</h3>
-                <div class="rounded-lg p-6 border" style="background: linear-gradient(135deg, var(--bg-card) 80%, var(--primary-700) 100%); border-color: var(--border-color);">
-                  <div class="grid grid-cols-4 gap-4 text-sm font-bold mb-3 border-b pb-2" style="color: var(--text-primary); border-bottom: 1px solid var(--border-color);">
-                    <span>Level</span>
-                    <span>Percentage</span>
-                    <span class="text-right">Commission</span>
-                    <span class="text-right">Cumulative</span>
-                  </div>
-                  <div class="space-y-3">
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">1 (Sponsor)</span>
-                      <span style="color: var(--primary-600);">0.25%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.38</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱0.38</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">2</span>
-                      <span style="color: var(--primary-600);">0.25%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.38</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱0.75</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">3</span>
-                      <span style="color: var(--primary-600);">0.5%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱0.75</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱1.50</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">4</span>
-                      <span style="color: var(--primary-600);">1%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱1.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱3.00</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">5</span>
-                      <span style="color: var(--primary-600);">2%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱3.00</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱6.00</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">6</span>
-                      <span style="color: var(--primary-600);">3%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱4.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱10.50</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 border-b items-center" style="border-bottom: 1px solid var(--border-color);">
-                      <span class="font-medium" style="color: var(--text-primary);">7</span>
-                      <span style="color: var(--primary-600);">4%</span>
-                      <span class="text-right font-bold" style="color: var(--positive-500);">₱6.00</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱16.50</span>
-                    </div>
-                    <div class="grid grid-cols-4 gap-4 py-2 items-center">
-                      <span class="font-bold" style="color: var(--primary-600);">8 (Your sales)</span>
-                      <span class="font-bold" style="color: var(--accent-600);">5%</span>
-                      <span class="text-right font-extrabold text-lg" style="color: var(--positive-500);">₱7.50</span>
-                      <span class="text-right" style="color: var(--text-secondary);">₱24.00</span>
-                    </div>
-                  </div>
-                  <div class="mt-6 pt-4 flex justify-between items-center" style="border-top: 1px solid var(--border-color);">
-                    <span class="text-xl font-bold" style="color: var(--text-primary);">Total Commissions Paid</span>
-                    <span class="text-2xl font-extrabold" style="color: var(--positive-500);">₱24.00 (16% of ₱150)</span>
-                  </div>
-                </div>
+          <div class="p-8 text-center" style="background: linear-gradient(120deg, rgba(31,162,255,0.10) 0%, rgba(255,229,59,0.10) 100%);">
+            <div class="text-6xl font-extrabold" style="color: var(--positive-500);">5%</div>
+            <p class="mt-2 text-lg" style="color: var(--text-primary);">referral commission on <strong>every product</strong> in the Ginto ecosystem — Academy memberships, kits, and services alike.</p>
+            <div class="grid sm:grid-cols-3 gap-4 mt-8 text-left">
+              <div class="rounded-lg p-5 border" style="background: var(--bg-card); border-color: var(--border-color);">
+                <i class="fas fa-bolt text-2xl" style="color: var(--accent-500);"></i>
+                <h4 class="font-bold mt-2" style="color: var(--text-primary);">Simple &amp; transparent</h4>
+                <p class="text-sm mt-1" style="color: var(--text-secondary);">No confusing levels — a flat 5% on all products you refer.</p>
               </div>
-              <div>
-                <h3 class="text-2xl font-semibold text-indigo-800 mb-5" style="color: var(--primary-500);">Profit Distribution & Key Advantages</h3>
-                <div class="rounded-lg p-6 border" style="background: var(--bg-card); border-color: var(--border-color);">
-                  <div class="flex items-center justify-between mb-5 pb-3" style="border-bottom: 1px solid var(--border-color);">
-                    <div class="flex items-center">
-                      <div class="w-14 h-14 rounded-full flex items-center justify-center mr-4 shadow" style="background: var(--primary-600);">
-                        <i class="fas fa-building text-2xl" style="color: #fff;"></i>
-                      </div>
-                      <div>
-                        <h4 class="font-bold text-xl" style="style=color: var(--primary-500);">Company Net Profit</h4>
-                        <p class="text-sm" style="color: var(--text-secondary);">After all payouts & operational costs</p>
-                      </div>
-                    </div>
-                    <span class="text-3xl font-extrabold" style="color: var(--positive-500);">₱51</span>
-                  </div>
-                  <div class="space-y-4 text-lg">
-                    <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Ginto Service Cost</span>
-                      <span class="font-bold" style="color: var(--text-primary);">₱250</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Direct Tier Commission (40%)</span>
-                      <span class="font-bold" style="color: #ff4d4f;">- ₱100</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Tiered Commission Payouts (9.6%)</span>
-                      <span class="font-bold" style="color: #ff4d4f;">- ₱24</span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                      <span class="font-medium" style="color: var(--text-primary);">Operational Costs</span>
-                      <span class="font-bold" style="color: #ff4d4f;">- ₱75</span>
-                    </div>
-                    <div class="pt-4 mt-4 flex justify-between items-center" style="border-top: 1px solid var(--border-color);">
-                      <span class="font-bold text-xl" style="color: var(--primary-500);">Company Net Profit</span>
-                      <span class="font-extrabold text-2xl" style="color: var(--positive-500);">₱51</span>
-                    </div>
-                  </div>
-                </div>
-
-                <h3 class="text-2xl font-semibold mt-10 mb-5" style="color: var(--primary-500);">Key Benefits of Commission</h3>
-                <div class="space-y-4 rounded-lg p-6" style="background: linear-gradient(120deg, var(--bg-secondary) 80%, var(--primary-500) 100%);">
-                  <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-1">
-                      <div class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style="background: var(--primary-600); color: #fff;">
-                        <i class="fas fa-star text-sm"></i>
-                      </div>
-                    </div>
-                    <p class="ml-3 text-lg" style="color: var(--text-primary);">
-                      <strong>Maximize Your Direct Sales:</strong> You earn the highest 5% commission on sales directly attributed to your efforts (Level 8).
-                    </p>
-                  </div>
-                  <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-1">
-                      <div class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style="background: var(--primary-600); color: #fff;">
-                        <i class="fas fa-users text-sm"></i>
-                      </div>
-                    </div>
-                    <p class="ml-3 text-lg" style="color: var(--text-primary);">
-                      <strong>Fair Multi-tier Rewards:</strong> Commissions decrease as you move up the upline (to your sponsor and their upline), ensuring the person closest to the sale gets the best cut.
-                    </p>
-                  </div>
-                  <div class="flex items-start">
-                    <div class="flex-shrink-0 mt-1">
-                      <div class="w-8 h-8 rounded-full flex items-center justify-center shadow-sm" style="background: var(--primary-600); color: #fff;">
-                        <i class="fas fa-sync-alt text-sm"></i>
-                      </div>
-                    </div>
-                    <p class="ml-3 text-lg" style="color: var(--text-primary);">
-                      <strong>Long-term Sustainability:</strong> With total commission capped at 16%, our model is designed for stable growth and avoids aggressive payout structures that often lead to instability.
-                    </p>
-                  </div>
-                </div>
+              <div class="rounded-lg p-5 border" style="background: var(--bg-card); border-color: var(--border-color);">
+                <i class="fas fa-infinity text-2xl" style="color: var(--accent-500);"></i>
+                <h4 class="font-bold mt-2" style="color: var(--text-primary);">Every product counts</h4>
+                <p class="text-sm mt-1" style="color: var(--text-secondary);">Academy memberships, kits, and services all qualify.</p>
+              </div>
+              <div class="rounded-lg p-5 border" style="background: var(--bg-card); border-color: var(--border-color);">
+                <i class="fas fa-wallet text-2xl" style="color: var(--accent-500);"></i>
+                <h4 class="font-bold mt-2" style="color: var(--text-primary);">Paid to you</h4>
+                <p class="text-sm mt-1" style="color: var(--text-secondary);">Earn on every direct referral across the platform.</p>
               </div>
             </div>
           </div>
@@ -969,7 +848,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One Atome toothpaste</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 40% outright referral commission</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 5% referral commission on all products</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Monthly residual earnings</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Ginto General MasterClass</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to Level 1-4 commissions</li>
@@ -986,13 +865,25 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               </button>
             </div>
 
-            <div class="tier-card p-6 relative" data-tier-id="2" data-tier-name="Professional" 
-                 data-tier-first-php="1000" data-tier-first-usd="20" 
+            <div class="tier-card p-6 relative" data-tier-id="2" data-tier-name="Professional" data-tier-display="Trader"
+                 data-tier-first-php="1000" data-tier-first-usd="20"
                  data-tier-recurring-php="1000" data-tier-recurring-usd="20">
-              <img src="/assets/images/build-pro.png" alt="Build Pro Package" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
+              <div class="w-full rounded-lg mb-4 flex items-center justify-center" style="height:160px;background:linear-gradient(135deg,#1e293b,#4338ca);">
+                <svg viewBox="0 0 300 150" width="88%" style="max-width:270px">
+                  <line x1="10" y1="34" x2="290" y2="34" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>
+                  <g stroke-linecap="round">
+                    <line x1="40" y1="96" x2="40" y2="122" stroke="rgba(255,255,255,.5)"/><rect x="33" y="102" width="14" height="16" rx="1.5" fill="#f87171"/>
+                    <line x1="85" y1="78" x2="85" y2="108" stroke="rgba(255,255,255,.5)"/><rect x="78" y="84" width="14" height="18" rx="1.5" fill="#34d399"/>
+                    <line x1="130" y1="66" x2="130" y2="94" stroke="rgba(255,255,255,.5)"/><rect x="123" y="72" width="14" height="16" rx="1.5" fill="#34d399"/>
+                    <line x1="175" y1="70" x2="175" y2="96" stroke="rgba(255,255,255,.5)"/><rect x="168" y="76" width="14" height="14" rx="1.5" fill="#f87171"/>
+                    <line x1="220" y1="52" x2="220" y2="80" stroke="rgba(255,255,255,.5)"/><rect x="213" y="58" width="14" height="18" rx="1.5" fill="#34d399"/>
+                    <line x1="265" y1="40" x2="265" y2="66" stroke="rgba(255,255,255,.5)"/><rect x="258" y="46" width="14" height="16" rx="1.5" fill="#34d399"/>
+                  </g>
+                </svg>
+              </div>
               <div class="tier-badge">Recommended</div>
-              <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Professional</h4>
-              <p class="mb-4" style="color: var(--text-secondary);">For serious earners with advanced training.</p>
+              <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Trader</h4>
+              <p class="mb-4" style="color: var(--text-secondary);">For active traders learning on the live AI bot.</p>
               <div class="mb-4">
                 <div class="tier-price-display" style="color: var(--primary-500);">
                   <span class="text-3xl font-extrabold first-month-price">₱1,000</span>
@@ -1000,32 +891,40 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                 </div>
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Build Pro kit given free every 6 months</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Optional P3000.00 (PH only) for the multivitamin kit</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 45% outright commission</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Monthly residual income</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to Level 1-6 commissions</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced training</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Marketing materials</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Pro AI tools</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Website Kit</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Full Ginto Trading Academy curriculum</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Live AI trading-bot walkthroughs</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Risk-management masterclass</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Technical analysis: trends, breakouts, volume</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Weekly market breakdowns</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> AI tutor Q&amp;A</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Pro AI trading tools</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Motivational Dashboard</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Entry level AI tools</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Weekly PowerBuilder Tech Support</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Up to 5x daily than starter</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 5% referral commission on all products</li>
               </ul>
               <button type="button" class="w-full font-semibold py-2 px-4 rounded-lg transition-colors select-tier" style="background-color: var(--bg-secondary); color: var(--primary-500); border: 1px solid var(--primary-500);">
                 Select Plan
               </button>
             </div>
 
-            <div class="tier-card p-6 relative" data-tier-id="3" data-tier-name="Executive" 
-                 data-tier-first-php="5000" data-tier-first-usd="99" 
+            <div class="tier-card p-6 relative" data-tier-id="3" data-tier-name="Executive" data-tier-display="Pro Trader"
+                 data-tier-first-php="5000" data-tier-first-usd="99"
                  data-tier-recurring-php="5000" data-tier-recurring-usd="99">
-              <img src="/assets/images/smartfi.png" alt="SmartFi Device" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
+              <div class="w-full rounded-lg mb-4 flex items-center justify-center" style="height:160px;background:linear-gradient(135deg,#0f172a,#6d28d9);">
+                <svg viewBox="0 0 300 150" width="88%" style="max-width:270px">
+                  <line x1="10" y1="26" x2="290" y2="26" stroke="rgba(255,255,255,.25)" stroke-dasharray="4 4"/>
+                  <g stroke-linecap="round">
+                    <line x1="40" y1="104" x2="40" y2="128" stroke="rgba(255,255,255,.5)"/><rect x="33" y="110" width="14" height="16" rx="1.5" fill="#f87171"/>
+                    <line x1="85" y1="84" x2="85" y2="112" stroke="rgba(255,255,255,.5)"/><rect x="78" y="90" width="14" height="18" rx="1.5" fill="#34d399"/>
+                    <line x1="130" y1="60" x2="130" y2="90" stroke="rgba(255,255,255,.5)"/><rect x="123" y="66" width="14" height="20" rx="1.5" fill="#34d399"/>
+                    <line x1="175" y1="52" x2="175" y2="78" stroke="rgba(255,255,255,.5)"/><rect x="168" y="58" width="14" height="16" rx="1.5" fill="#34d399"/>
+                    <line x1="220" y1="40" x2="220" y2="64" stroke="rgba(255,255,255,.5)"/><rect x="213" y="46" width="14" height="12" rx="1.5" fill="#f87171"/>
+                    <line x1="265" y1="24" x2="265" y2="52" stroke="rgba(255,255,255,.5)"/><rect x="258" y="30" width="14" height="20" rx="1.5" fill="#34d399"/>
+                  </g>
+                </svg>
+              </div>
               <div class="tier-badge">Elite</div>
-              <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Executive</h4>
-              <p class="mb-4" style="color: var(--text-secondary);">Maximum earning potential with elite training.</p>
+              <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Pro Trader</h4>
+              <p class="mb-4" style="color: var(--text-secondary);">For serious traders — full toolkit, mentorship, and PineScript.</p>
               <div class="mb-4">
                 <div class="tier-price-display" style="color: var(--primary-500);">
                   <span class="text-3xl font-extrabold first-month-price">₱5,000</span>
@@ -1033,18 +932,15 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                 </div>
               </div>
               <ul class="space-y-2 mb-6 text-sm" style="color: var(--text-secondary);">
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> One SmartFi 360 Device every 3 months of subscription</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> SmartFi Masterclass</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Access to all 8 levels</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Elite training program</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Personal mentor</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> VIP Agentic Support</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Free Website on Profile</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Everything in Trader</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> PineScript strategy reviews (AI + mentor)</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 1:1 mentor &amp; live cohort sessions</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Advanced risk &amp; position-sizing playbooks</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Certificate of completion</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Priority support</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Early access to new bot strategies</li>
                 <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Motivational Dashboard</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Entry level AI tools</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Weekly PowerBuilder Tech Support</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> Wifi Business service to 1km radius</li>
-                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 5% referral commission</li>
+                <li class="flex items-center"><i class="fas fa-check text-green-500 mr-2"></i> 5% referral commission on all products</li>
               </ul>
               <button type="button" class="w-full font-semibold py-2 px-4 rounded-lg transition-colors select-tier" style="background-color: var(--bg-secondary); color: var(--primary-500); border: 1px solid var(--primary-500);">
                 Select Plan
@@ -1234,7 +1130,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               <div class="p-6 rounded-lg" style="background-color: var(--bg-secondary);">
                 <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
                   <span class="font-medium" style="color: var(--text-secondary);">Membership Tier:</span>
-                  <span class="font-bold" id="selected-tier" style="color: var(--text-primary);">Professional</span>
+                  <span class="font-bold" id="selected-tier" style="color: var(--text-primary);">Trader</span>
                 </div>
                 <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid var(--border-color);">
                   <span class="font-medium" style="color: var(--text-secondary);">Price:</span>
@@ -2235,6 +2131,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
         
         window.selectedTier.id = card.dataset.tierId;
         window.selectedTier.name = card.dataset.tierName;
+        window.selectedTier.displayName = card.dataset.tierDisplay || card.dataset.tierName;
         window.selectedTier.firstPhp = firstPhp;
         window.selectedTier.firstUsd = firstUsd;
         window.selectedTier.recurringPhp = recurringPhp;
@@ -2306,7 +2203,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             var displayPrice = currency === 'PHP' 
               ? '₱' + parseFloat(window.selectedTier.pricePhp).toLocaleString()
               : '$' + parseFloat(window.selectedTier.priceUsd).toLocaleString();
-            document.getElementById('selected-tier').textContent = window.selectedTier.name;
+            document.getElementById('selected-tier').textContent = window.selectedTier.displayName || window.selectedTier.name;
             document.getElementById('payment-step-price').textContent = displayPrice;
             document.getElementById('payment-total').textContent = displayPrice;
           }
