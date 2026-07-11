@@ -206,6 +206,20 @@ class GtbStrategy
                 $avoid = array_values(array_unique(array_merge(
                     $held, $trades->recentlyClosedSymbols($mode, $cooldownMin)
                 )));
+
+                // Session self-learning (Gainer Hunter): track how far the gainers we considered
+                // actually ran, count the ones we skipped that then moved, and switch to "chase"
+                // once we've missed enough runners — patient dip-buying first, chasing once burned.
+                $learn      = new \Ginto\Models\GtbLearning();
+                $sessionKey = $botState->sessionStartedAt() ?: 'nosession';
+                $priceMap   = [];
+                foreach ($tickers as $tk) { if (isset($tk['symbol'], $tk['price'])) $priceMap[$tk['symbol']] = (float) $tk['price']; }
+                $learn->updateBest($sessionKey, $priceMap);
+                $missPct    = (float) (Env::get('GTB_GAINER_MISS_PCT', '2.5') ?? 2.5);
+                $missTrig   = (int) (Env::get('GTB_GAINER_MISS_TRIGGER', '2') ?? 2);
+                $sessMisses = $learn->missCount($sessionKey, $missPct);
+                $chaseMode  = $sessMisses >= $missTrig;
+
                 $size = $cap->perTradeSize($realized);
                 // Live full/ai modes: never size a buy above the free USDT actually on hand.
                 if ($mode === 'live' && $this->liveFreeUsd !== null) {
@@ -234,13 +248,17 @@ class GtbStrategy
                 $opened = false;
                 foreach ($attempts as [$pk, $key, $cfg]) {
                     $tpl  = $this->templates[$key];
+                    $isGainer = $tpl instanceof GainerHunter;
+                    if ($isGainer) $tpl->setChase($chaseMode);
                     $cand = $tpl->entryCandidate(array_values($tickers), $avoid);
                     if (!$cand) continue;
+                    if ($isGainer) $learn->observe($sessionKey, $cand['symbol'], (float) $cand['price']);
 
                     $ctx = ['env' => $mode, 'profile' => $cfg['name'], 'posture' => $cfg['posture'],
                             'template' => $tpl->name(), 'templateRule' => $tpl->description(),
                             'capital' => $cap->summary($realized), 'perTradeSize' => round($size, 2)];
                     if ($memory) $ctx['memory'] = $memory;
+                    if ($isGainer) { $ctx['sessionMisses'] = $sessMisses; $ctx['entryMode'] = $chaseMode ? 'chase (missed runners — bid strength)' : 'patient (prefer a slight dip)'; }
                     $res = $brain->decide($cand, $ctx, 'decision');
                     if (empty($res['ok'])) {
                         $thoughts->add('Decision failed: ' . ($res['error'] ?? ''), 'system', 'error');
@@ -292,11 +310,13 @@ class GtbStrategy
                         'peak_price' => $fill, 'trail_pct' => $st['trail_pct'] ?? null, 'binance_order_id' => $oid,
                         'protect_type' => $protType, 'protect_id' => $protId,
                     ]);
+                    if ($isGainer) $learn->markEntered($sessionKey, $cand['symbol']);
                     $tpTxt = (!empty($st['take_profit'])) ? ' / TP $' . $this->fmt($st['take_profit']) : ' · trailing ' . ($st['trail_pct'] ?? '') . '%';
-                    $thoughts->add(sprintf('Entered %s %s [%s · %s] — $%.2f at $%s · SL $%s%s%s.',
+                    $chaseTxt = ($isGainer && $chaseMode) ? ' · chase mode (' . $sessMisses . ' missed runner' . ($sessMisses === 1 ? '' : 's') . ')' : '';
+                    $thoughts->add(sprintf('Entered %s %s [%s · %s] — $%.2f at $%s · SL $%s%s%s%s.',
                         $mode === 'paper' ? '(paper)' : '(LIVE)', $cand['symbol'], $cfg['name'], $tpl->name(), $size,
                         $this->fmt($fill), $this->fmt($st['stop_loss']), $tpTxt,
-                        $mode === 'live' ? ' · exchange-protected' : ''
+                        $mode === 'live' ? ' · exchange-protected' : '', $chaseTxt
                     ), 'bot', 'trade', $cand['symbol'], 'BUY', ['mode' => $mode, 'template' => $key, 'profile' => $pk]);
                     $action = 'entered ' . $cand['symbol'] . ' [' . $cfg['name'] . ']';
                     $opened = true;

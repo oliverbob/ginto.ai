@@ -25,9 +25,11 @@ class GainerHunter implements GtbTemplate
     private float $arm;       // price must be up this % before we start locking
     private float $trail;     // trail distance % below the peak once armed
     private float $chaseBand; // only enter within this % of the 24h high (still pressing up)
+    private float $dipMin;    // patient mode: require price to be at least this % off the high (buy a dip)
     private int   $topN;
     private int   $minHold;
     private int   $maxHold;
+    private bool  $chase = false; // set true by the strategy after repeated misses -> chase breakouts
 
     public function __construct()
     {
@@ -39,10 +41,14 @@ class GainerHunter implements GtbTemplate
         $this->arm       = (float) (Env::get('GTB_GAINER_ARM_PCT', '2.0') ?? 2.0);
         $this->trail     = (float) (Env::get('GTB_GAINER_TRAIL_PCT', '2.0') ?? 2.0);
         $this->chaseBand = (float) (Env::get('GTB_GAINER_CHASE_BAND_PCT', '4.0') ?? 4.0);
+        $this->dipMin    = (float) (Env::get('GTB_GAINER_DIP_MIN_PCT', '0.5') ?? 0.5);
         $this->topN      = max(1, (int) (Env::get('GTB_GAINER_TOP_N', '3') ?? 3));
         $this->minHold   = max(0, (int) (Env::get('GTB_GAINER_MIN_HOLD_MIN', '15') ?? 15));
         $this->maxHold   = max(0, (int) (Env::get('GTB_GAINER_MAX_HOLD_MIN', '45') ?? 45));
     }
+
+    /** Chase mode is turned on by the strategy once the session has missed enough runners. */
+    public function setChase(bool $on): void { $this->chase = $on; }
 
     public function key(): string { return 'gainers'; }
     public function name(): string { return 'Top-3 Gainer Hunter'; }
@@ -54,30 +60,37 @@ class GainerHunter implements GtbTemplate
      */
     public function entryCandidate(array $tickers, array $held): ?array
     {
-        $band = [];
+        $eligible = [];
         foreach ($tickers as $t) {
             if (in_array($t['symbol'], $held, true)) continue;
             $chg = (float) ($t['changePct'] ?? 0);
             if ($chg < $this->minG || $chg > $this->maxG) continue;
-            $band[] = $t;
+            $eligible[] = $t;
         }
-        if (!$band) return null;
-        usort($band, static fn($a, $b) => (float) $b['changePct'] <=> (float) $a['changePct']);
+        if (!$eligible) return null;
+        usort($eligible, static fn($a, $b) => (float) $b['changePct'] <=> (float) $a['changePct']);
 
-        $ranked = array_slice($band, 0, $this->topN);
+        // Chase mode (after repeated misses) widens the band and drops the "wait for a dip" rule,
+        // so it will buy a coin pressing its high. Patient mode wants a slight pullback first.
+        $bandPct = $this->chase ? $this->chaseBand * 1.5 : $this->chaseBand;
+        $ranked  = array_slice($eligible, 0, $this->topN);
         foreach ($ranked as $i => $t) {
             $price = (float) ($t['price'] ?? 0);
             $high  = (float) ($t['high'] ?? 0);
             if ($price <= 0) continue;
-            // Must still be pressing the high (chasing strength, not catching a collapse).
-            if ($high > 0 && $price < $high * (1 - $this->chaseBand / 100.0)) continue;
+            if ($high > 0) {
+                if ($price < $high * (1 - $bandPct / 100.0)) continue;             // collapsed too far off the high
+                if (!$this->chase && $price > $high * (1 - $this->dipMin / 100.0)) continue; // patient: need a slight dip
+            }
             $offHigh = $high > 0 ? round(($high - $price) / $high * 100, 2) : 0.0;
             return [
                 'symbol'    => $t['symbol'],
                 'price'     => $price,
                 'changePct' => (float) $t['changePct'],
-                'reason'    => sprintf('#%d gainer +%s%%, %s the 24h high — chase with profit-locking OCO',
-                    $i + 1, $t['changePct'], $offHigh <= 0.2 ? 'pressing' : ('~' . $offHigh . '% off')),
+                'reason'    => sprintf('#%d gainer +%s%%, %s the 24h high — %s with profit-locking OCO',
+                    $i + 1, $t['changePct'],
+                    $offHigh <= 0.2 ? 'pressing' : ('~' . $offHigh . '% off'),
+                    $this->chase ? 'CHASE (session missed runners)' : 'dip-buy'),
             ];
         }
         return null;
