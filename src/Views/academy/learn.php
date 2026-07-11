@@ -23,7 +23,7 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
     <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy" class="flex items-center gap-2 font-bold"><i class="fas fa-graduation-cap text-primary"></i> Ginto <span class="text-primary">Trading Academy</span></a>
         <?php if ($hasAccess): ?><span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">Member</span>
-        <?php else: ?><a href="/academy/pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Become a member</a><?php endif; ?>
+        <?php else: ?><a href="/academy#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Become a member</a><?php endif; ?>
     </div>
 </header>
 
@@ -40,7 +40,7 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
                 <?php foreach ($items as $l):
                     $locked = empty($l['is_preview']) && !$hasAccess;
                     $tb = $tierBadge[$l['tier'] ?? 'trader'] ?? $tierBadge['trader'];
-                    $href = $locked ? '/academy/pricing' : '/academy/lesson/' . urlencode($l['slug']); ?>
+                    $href = $locked ? '/academy#pricing' : '/academy/lesson/' . urlencode($l['slug']); ?>
                     <a href="<?= $href ?>" class="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-primary p-4 transition-colors <?= $locked ? 'opacity-80' : '' ?>">
                         <span class="w-9 h-9 rounded-lg inline-flex items-center justify-center <?= $locked ? 'bg-gray-100 dark:bg-gray-800 text-gray-400' : 'bg-primary/10 text-primary' ?>">
                             <i class="fas <?= $locked ? 'fa-lock' : 'fa-play' ?>"></i>

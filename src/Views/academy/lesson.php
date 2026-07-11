@@ -58,7 +58,7 @@ if ($video !== '') {
             <?php foreach ($lessons as $l):
                 $locked = empty($l['is_preview']) && !$hasAccess;
                 $active = ($l['slug'] ?? '') === $curSlug;
-                $href = $locked ? '/academy/pricing' : '/academy/lesson/' . urlencode($l['slug']); ?>
+                $href = $locked ? '/academy#pricing' : '/academy/lesson/' . urlencode($l['slug']); ?>
                 <a href="<?= $href ?>" class="flex items-center gap-2 text-sm px-3 py-2 rounded-lg <?= $active ? 'bg-primary/10 text-primary font-semibold' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800' ?>">
                     <i class="fas <?= $locked ? 'fa-lock text-gray-400' : ($active ? 'fa-play' : 'fa-circle text-[6px]') ?>"></i>
                     <span class="truncate"><?= htmlspecialchars($l['title']) ?></span>

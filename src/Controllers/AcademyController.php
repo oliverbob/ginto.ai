@@ -33,6 +33,7 @@ class AcademyController
             'userFullname' => $_SESSION['fullname'] ?? $_SESSION['username'] ?? null,
             'hasAccess'    => $hasAccess,
             'plans'        => $plans,
+            'csrf_token'   => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
         ]);
     }
 
@@ -53,7 +54,7 @@ class AcademyController
             $this->redirect('/academy/learn');     // active subscriber → the branded facility
             return;
         }
-        $this->redirect('/academy/pricing');       // no subscription → membership
+        $this->redirect('/academy#pricing');       // no subscription → membership (on the landing)
     }
 
     /** GET /academy/learn — the branded lessons facility (preview lessons open; rest gated). */
@@ -84,7 +85,7 @@ class AcademyController
         if (!is_array($lesson)) { $this->redirect('/academy/learn'); return; }
 
         if (empty($lesson['is_preview']) && !$hasAccess) {
-            $this->redirect('/academy/pricing');   // locked → membership
+            $this->redirect('/academy#pricing');   // locked → membership (on the landing)
             return;
         }
         View::view('academy/lesson', [
@@ -248,58 +249,101 @@ class AcademyController
         }
     }
 
-    /** GET /academy/pricing — the branded Academy membership page (its own, not /courses/pricing). */
+    /** GET /academy/pricing — retired. Membership now lives on the landing; keep the URL alive. */
     public function pricing(): void
     {
-        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
-        $userId = $_SESSION['user_id'] ?? null;
-        View::view('academy/pricing', [
-            'title'      => 'Membership — Ginto Trading Academy',
-            'isLoggedIn' => !empty($userId),
-            'hasAccess'  => !empty($userId) && $this->hasActiveSubscription((int) $userId),
-            'plans'      => $this->subscriptionPlans(),
-            'csrf_token' => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
-        ]);
+        $this->redirect('/academy#pricing');
     }
 
     /**
-     * GET /academy/subscribe?plan=academy_pro — create a PayMongo hosted checkout for a plan
-     * and redirect to it. On payment, checkout_session.payment.paid activates the membership.
+     * POST /academy/join — the standalone Academy sign-up + checkout. Guests create an account
+     * right here (shared DB, no /register detour) and are logged in; logged-in users just get a
+     * new order. Either way we open a PayMongo checkout for the chosen plan.
+     */
+    public function join(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+        $planName = (string) ($_POST['plan'] ?? '');
+        try {
+            $db   = Database::getInstance();
+            $plan = $db->get('subscription_plans', '*', ['name' => $planName, 'plan_type' => 'academy', 'is_active' => 1]);
+            if (!$plan) { $this->redirect('/academy?err=plan#pricing'); return; }
+
+            $userId = $_SESSION['user_id'] ?? null;
+
+            // Guest: register-and-pay without ever leaving the Academy.
+            if (empty($userId)) {
+                $name  = trim((string) ($_POST['name'] ?? ''));
+                $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+                $pass  = (string) ($_POST['password'] ?? '');
+                if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($pass) < 6) {
+                    $this->redirect('/academy?err=form#pricing'); return;
+                }
+                if (is_array($db->get('users', ['id'], ['email' => $email]))) {
+                    // Existing account — send them to log in, then straight back to checkout.
+                    $this->redirect('/login?redirect=' . urlencode('/academy/subscribe?plan=' . $planName)); return;
+                }
+                $userId = $this->createLearner($name, $email, $pass);
+                if (!$userId) { $this->redirect('/academy?err=signup#pricing'); return; }
+                $created = $db->get('users', '*', ['id' => $userId]);
+                if (is_array($created)) $this->loginSession($created);
+            }
+
+            $this->startCheckout((int) $userId, $plan);
+        } catch (\Throwable $e) {
+            error_log('Academy join error: ' . $e->getMessage());
+            $this->redirect('/academy?err=1#pricing');
+        }
+    }
+
+    /**
+     * GET /academy/subscribe?plan=academy_pro — one-click checkout for a logged-in member
+     * (used after login-then-return). Guests are sent to the on-page sign-up.
      */
     public function subscribe(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
         $userId = $_SESSION['user_id'] ?? null;
-        // Buying must not require login: guests register-and-pay via the wizard (fill in as a
-        // new user). Logged-in users continue to the one-click PayMongo checkout below.
-        if (empty($userId)) { $this->redirect('/register?promo=GINTO-ACADEMY'); return; }
+        if (empty($userId)) { $this->redirect('/academy#pricing'); return; }
 
         $planName = (string) ($_GET['plan'] ?? '');
         try {
             $db   = Database::getInstance();
             $plan = $db->get('subscription_plans', '*', ['name' => $planName, 'plan_type' => 'academy', 'is_active' => 1]);
-            if (!$plan) { $this->redirect('/academy/pricing'); return; }
+            if (!$plan) { $this->redirect('/academy#pricing'); return; }
+            $this->startCheckout((int) $userId, $plan);
+        } catch (\Throwable $e) {
+            error_log('Academy subscribe error: ' . $e->getMessage());
+            $this->redirect('/academy?err=1#pricing');
+        }
+    }
 
-            $user  = $db->get('users', ['email', 'name', 'username', 'fullname'], ['id' => $userId]);
+    /** Create + open a PayMongo hosted checkout for a user and record a pending academy_order. */
+    private function startCheckout(int $userId, array $plan): void
+    {
+        try {
+            $db    = Database::getInstance();
+            $user  = $db->get('users', ['email', 'fullname', 'username'], ['id' => $userId]);
             $email = $user['email'] ?? '';
-            $name  = $user['fullname'] ?? ($user['name'] ?? ($user['username'] ?? 'Ginto Learner'));
-            if ($email === '') { $this->redirect('/academy/pricing?err=email'); return; }
+            $name  = ($user['fullname'] ?? '') !== '' ? $user['fullname'] : ($user['username'] ?? 'Ginto Learner');
+            if ($email === '') { $this->redirect('/academy?err=email#pricing'); return; }
 
             $amount = (int) round(((float) $plan['price_monthly']) * 100); // centavos
             $base   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
 
-            $pm = new \Ginto\Handlers\PayMongoHandler();
+            $pm  = new \Ginto\Handlers\PayMongoHandler();
             $res = $pm->createCheckoutSession(
                 $amount,
                 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership'),
                 (string) $name,
                 (string) $email,
                 $base . '/academy/subscribe/success',
-                $base . '/academy/pricing'
+                $base . '/academy#pricing'
             );
             if (empty($res['success']) || empty($res['checkout_url'])) {
                 error_log('Academy checkout create failed: ' . json_encode($res));
-                $this->redirect('/academy/pricing?err=checkout'); return;
+                $this->redirect('/academy?err=checkout#pricing'); return;
             }
 
             $db->insert('academy_orders', [
@@ -312,9 +356,54 @@ class AcademyController
             ]);
             $this->redirect($res['checkout_url']);
         } catch (\Throwable $e) {
-            error_log('Academy subscribe error: ' . $e->getMessage());
-            $this->redirect('/academy/pricing?err=1');
+            error_log('Academy startCheckout error: ' . $e->getMessage());
+            $this->redirect('/academy?err=1#pricing');
         }
+    }
+
+    /** Create a new learner in the shared users table. Returns the new user id, or null on failure. */
+    private function createLearner(string $name, string $email, string $pass): ?int
+    {
+        try {
+            $db   = Database::getInstance();
+            $seed = preg_replace('/[^a-z0-9]+/', '', strtolower(explode('@', $email)[0])) ?: 'trader';
+            $username = substr($seed, 0, 18) . mt_rand(100, 9999);
+            for ($i = 0; $i < 6 && is_array($db->get('users', ['id'], ['username' => $username])); $i++) {
+                $username = substr($seed, 0, 14) . mt_rand(1000, 999999);
+            }
+            $db->insert('users', [
+                'public_id'     => substr(md5(uniqid((string) mt_rand(), true)), 0, 12),
+                'fullname'      => mb_substr($name, 0, 100),
+                'username'      => $username,
+                'email'         => $email,
+                'password_hash' => password_hash($pass, PASSWORD_DEFAULT),
+                'status'        => 'active',
+                'role_id'       => 5,
+                'created_at'    => date('Y-m-d H:i:s'),
+            ]);
+            $id = $db->id();
+            return $id ? (int) $id : null;
+        } catch (\Throwable $e) {
+            error_log('Academy createLearner error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** Establish a login session for a freshly-created learner (mirrors AuthController). */
+    private function loginSession(array $user): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        session_regenerate_id(true);
+        $_SESSION['user_id']              = $user['id'];
+        $_SESSION['username']             = $user['username'] ?? '';
+        $_SESSION['fullname']             = $user['fullname'] ?? '';
+        $_SESSION['user']                 = $user['email'] ?? ($user['username'] ?? '');
+        $_SESSION['user_email']           = $user['email'] ?? '';
+        $_SESSION['user_full_name']       = $user['fullname'] ?? 'User';
+        $_SESSION['user_username']        = $user['username'] ?? '';
+        $_SESSION['user_profile_picture'] = $user['avatar'] ?? null;
+        $_SESSION['role_id']              = $user['role_id'] ?? 5;
+        $_SESSION['role']                 = 'user';
     }
 
     /** GET /academy/subscribe/success — after PayMongo checkout; access reflects once the webhook lands. */
