@@ -1676,8 +1676,11 @@ $router->get('/sandbox-preview/{sandboxId}', 'ClientsController@previewRoot');
 
 $router->req('/rate-limits', 'ApiController@rateLimits');
 
-// Ginto Trading Academy (public landing + subscription gate)
+// Ginto Trading Academy (public landing + branded membership + PayMongo checkout)
 $router->get('/academy', 'AcademyController@index');
+$router->get('/academy/pricing', 'AcademyController@pricing');
+$router->get('/academy/subscribe', 'AcademyController@subscribe');
+$router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');
 
 // Courses

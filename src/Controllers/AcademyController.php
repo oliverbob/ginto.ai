@@ -75,15 +75,89 @@ class AcademyController
         }
     }
 
-    /** Active course subscription plans for the pricing section (defensive — empty on any error). */
+    /** GET /academy/pricing — the branded Academy membership page (its own, not /courses/pricing). */
+    public function pricing(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        View::view('academy/pricing', [
+            'title'      => 'Membership — Ginto Trading Academy',
+            'isLoggedIn' => !empty($userId),
+            'hasAccess'  => !empty($userId) && $this->hasActiveSubscription((int) $userId),
+            'plans'      => $this->subscriptionPlans(),
+            'csrf_token' => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
+        ]);
+    }
+
+    /**
+     * GET /academy/subscribe?plan=academy_pro — create a PayMongo hosted checkout for a plan
+     * and redirect to it. On payment, checkout_session.payment.paid activates the membership.
+     */
+    public function subscribe(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/pricing')); return; }
+
+        $planName = (string) ($_GET['plan'] ?? '');
+        try {
+            $db   = Database::getInstance();
+            $plan = $db->get('subscription_plans', '*', ['name' => $planName, 'plan_type' => 'academy', 'is_active' => 1]);
+            if (!$plan) { $this->redirect('/academy/pricing'); return; }
+
+            $user  = $db->get('users', ['email', 'name', 'username', 'fullname'], ['id' => $userId]);
+            $email = $user['email'] ?? '';
+            $name  = $user['fullname'] ?? ($user['name'] ?? ($user['username'] ?? 'Ginto Learner'));
+            if ($email === '') { $this->redirect('/academy/pricing?err=email'); return; }
+
+            $amount = (int) round(((float) $plan['price_monthly']) * 100); // centavos
+            $base   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
+
+            $pm = new \Ginto\Handlers\PayMongoHandler();
+            $res = $pm->createCheckoutSession(
+                $amount,
+                'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership'),
+                (string) $name,
+                (string) $email,
+                $base . '/academy/subscribe/success',
+                $base . '/academy/pricing'
+            );
+            if (empty($res['success']) || empty($res['checkout_url'])) {
+                error_log('Academy checkout create failed: ' . json_encode($res));
+                $this->redirect('/academy/pricing?err=checkout'); return;
+            }
+
+            $db->insert('academy_orders', [
+                'user_id'             => $userId,
+                'plan_id'             => $plan['id'],
+                'checkout_session_id' => $res['session_id'] ?? '',
+                'amount'              => $plan['price_monthly'],
+                'currency'            => $plan['price_currency'] ?? 'PHP',
+                'status'              => 'pending',
+            ]);
+            $this->redirect($res['checkout_url']);
+        } catch (\Throwable $e) {
+            error_log('Academy subscribe error: ' . $e->getMessage());
+            $this->redirect('/academy/pricing?err=1');
+        }
+    }
+
+    /** GET /academy/subscribe/success — after PayMongo checkout; access reflects once the webhook lands. */
+    public function success(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        View::view('academy/success', ['title' => 'Welcome to the Academy']);
+    }
+
+    /** Active Academy membership plans for the pricing section (defensive — empty on any error). */
     private function subscriptionPlans(): array
     {
         try {
             $db = Database::getInstance();
             $rows = $db->select('subscription_plans', '*', [
-                'plan_type' => 'courses',
+                'plan_type' => 'academy',
                 'is_active' => 1,
-                'ORDER'     => ['price' => 'ASC'],
+                'ORDER'     => ['sort_order' => 'ASC'],
             ]);
             return is_array($rows) ? $rows : [];
         } catch (\Throwable $e) {

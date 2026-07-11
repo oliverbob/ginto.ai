@@ -918,6 +918,41 @@ class WebhookController
         }
     }
 
+    /** Activate a Ginto Trading Academy membership from a paid PayMongo checkout session. */
+    private function activateAcademyOrder(string $checkoutSessionId, ?string $gatewayPaymentId): void
+    {
+        if ($checkoutSessionId === '') return;
+        $order = $this->db->get('academy_orders', '*', ['checkout_session_id' => $checkoutSessionId, 'status' => 'pending']);
+        if (!is_array($order)) return; // not an academy order, or already processed
+
+        $userId = (int) $order['user_id'];
+        $planId = $order['plan_id'] ?? null;
+        $now    = date('Y-m-d H:i:s');
+        $expires = date('Y-m-d H:i:s', strtotime('+1 month'));
+
+        // End any prior active subscription, then grant the Academy membership.
+        $this->db->update('user_subscriptions',
+            ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+            ['user_id' => $userId, 'status' => 'active']);
+        $this->db->insert('user_subscriptions', [
+            'user_id'           => $userId,
+            'plan_id'           => $planId,
+            'status'            => 'active',
+            'started_at'        => $now,
+            'expires_at'        => $expires,
+            'payment_method'    => 'paymongo',
+            'payment_reference' => $checkoutSessionId,
+            'gateway_payment_id'=> $gatewayPaymentId,
+            'amount_paid'       => $order['amount'] ?? 0,
+            'currency'          => $order['currency'] ?? 'PHP',
+            'auto_renew'        => 0,
+            'created_at'        => $now,
+            'updated_at'        => $now,
+        ]);
+        $this->db->update('academy_orders', ['status' => 'completed', 'updated_at' => $now], ['id' => $order['id']]);
+        error_log("Academy membership activated: user={$userId} plan={$planId} cs={$checkoutSessionId}");
+    }
+
     /** Activate or extend a user's PayMongo subscription by one billing period. */
     private function activatePaymongoSubscription(int $userId, string $subId, array $attr): void
     {
@@ -1111,6 +1146,13 @@ class WebhookController
                 $gatewayPaymentId,
                 'checkout_session.payment.paid'
             );
+        }
+
+        // Ginto Trading Academy orders correlate by checkout_session_id too.
+        try {
+            $this->activateAcademyOrder($checkoutSessionId, $gatewayPaymentId);
+        } catch (\Throwable $e) {
+            error_log('Academy order activation error: ' . $e->getMessage());
         }
 
         // Mall card checkout sessions store gateway_reference as checkout_session_id.

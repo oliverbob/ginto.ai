@@ -45,17 +45,17 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
         <nav class="hidden md:flex items-center gap-6 text-sm text-gray-600 dark:text-gray-300">
             <a href="#curriculum" class="hover:text-primary">Curriculum</a>
             <a href="#bot" class="hover:text-primary">Live Bot</a>
-            <a href="#pricing" class="hover:text-primary">Pricing</a>
+            <a href="/academy/pricing" class="hover:text-primary">Pricing</a>
         </nav>
         <div class="flex items-center gap-2">
             <button onclick="gtaToggleTheme()" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <?php if ($hasAccess): ?>
                 <a href="/academy/enter" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Enter Academy</a>
             <?php elseif ($isLoggedIn): ?>
-                <a href="#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Subscribe</a>
+                <a href="/academy/pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Subscribe</a>
             <?php else: ?>
                 <a href="/login" class="hidden sm:inline text-sm text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2">Log in</a>
-                <a href="#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Get started</a>
+                <a href="/academy/pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Get started</a>
             <?php endif; ?>
         </div>
     </div>
@@ -71,7 +71,7 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
             <?php if ($hasAccess): ?>
                 <a href="/academy/enter" class="px-6 py-3 rounded-xl font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20"><i class="fas fa-play mr-1.5"></i> Enter the Academy</a>
             <?php else: ?>
-                <a href="#pricing" class="px-6 py-3 rounded-xl font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20">Start learning</a>
+                <a href="/academy/pricing" class="px-6 py-3 rounded-xl font-semibold bg-primary text-white hover:bg-primary/90 shadow-lg shadow-primary/20">Start learning</a>
             <?php endif; ?>
             <a href="#bot" class="px-6 py-3 rounded-xl font-semibold border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary">See the live bot</a>
         </div>
@@ -159,8 +159,8 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
         <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-<?= min(3, max(1, count($plans))) ?> gap-5 max-w-4xl mx-auto">
             <?php foreach ($plans as $i => $p):
                 $name  = $p['display_name'] ?? ($p['name'] ?? 'Plan');
-                $price = $p['price'] ?? 0;
-                $featured = $i === 1; ?>
+                $price = $p['price_monthly'] ?? 0;
+                $featured = ($p['name'] ?? '') === 'academy_pro'; ?>
                 <div class="rounded-2xl border p-6 <?= $featured ? 'border-primary ring-2 ring-primary/30 bg-primary/5' : 'border-gray-200 dark:border-gray-800' ?>">
                     <?php if ($featured): ?><div class="text-[10px] font-bold uppercase text-primary mb-2">Most popular</div><?php endif; ?>
                     <h3 class="font-bold text-lg"><?= htmlspecialchars($name) ?></h3>
@@ -171,13 +171,13 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
                         <li><i class="fas fa-check text-green-500 mr-1.5"></i>Full curriculum</li>
                         <li><i class="fas fa-check text-green-500 mr-1.5"></i>Live bot walkthroughs</li>
                     </ul>
-                    <a href="/subscribe?plan=<?= urlencode($p['name'] ?? '') ?>" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Choose <?= htmlspecialchars($name) ?></a>
+                    <a href="/academy/pricing" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Choose <?= htmlspecialchars($name) ?></a>
                 </div>
             <?php endforeach; ?>
         </div>
     <?php else: ?>
         <div class="mt-10 text-center">
-            <a href="/courses/pricing" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-primary text-white hover:bg-primary/90">View plans &amp; subscribe <i class="fas fa-arrow-right"></i></a>
+            <a href="/academy/pricing" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold bg-primary text-white hover:bg-primary/90">View plans &amp; subscribe <i class="fas fa-arrow-right"></i></a>
             <p class="mt-3 text-xs text-gray-400">Secure checkout via PayPal / PayMongo.</p>
         </div>
     <?php endif; ?>
