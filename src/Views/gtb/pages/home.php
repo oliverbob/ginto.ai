@@ -225,6 +225,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700">
             <i class="fas fa-play"></i> Start bot
         </button>
+        <button type="button" id="gtb-forcestop-btn" onclick="gtbForceStop()" title="Sell every open position at market now and fully stop."
+                class="hidden inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">
+            <i class="fas fa-hand"></i> Force stop
+        </button>
         <label id="gtb-arm-wrap" class="hidden inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400 cursor-pointer">
             <input type="checkbox" id="gtb-arm-live" onchange="gtbSetArmLive()" <?= ($botArmLive ?? false) ? 'checked' : '' ?> class="w-4 h-4 rounded border-red-400 text-red-600 focus:ring-red-500">
             Arm LIVE trading (real money)
@@ -763,41 +767,51 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
     function gtbSetRunBtn() {
         const btn = document.getElementById('gtb-run-btn');
+        const fs = document.getElementById('gtb-forcestop-btn');
         const st = gtbBotStateName();
         if (st === 'running') {
             btn.innerHTML = '<i class="fas fa-stop"></i> Stop bot';
             btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-600 text-white hover:bg-red-700';
             btn.title = 'Wind down: stop taking new trades, keep managing open ones to a good exit.';
         } else if (st === 'winddown') {
-            btn.innerHTML = '<i class="fas fa-hand"></i> Force stop (sell all)';
-            btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-red-700 text-white hover:bg-red-800';
-            btn.title = 'Sell every open position at market now and fully stop.';
+            btn.innerHTML = '<i class="fas fa-play"></i> Resume trading';
+            btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700';
+            btn.title = 'Resume: take new trades again and start a fresh session.';
         } else {
             btn.innerHTML = '<i class="fas fa-play"></i> Start bot';
             btn.className = 'inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700';
             btn.title = 'Start the bot: open + manage trades.';
         }
+        // Force-stop (sell all) is available whenever the bot is active (running or winding down).
+        if (fs) fs.classList.toggle('hidden', st === 'stopped');
     }
 
-    // Start / Stop(wind down) / Force stop(flatten) drive the PERSISTED server-side runner.
+    // Main button: Start / Stop(wind down) / Resume — drives the PERSISTED server-side runner.
     async function gtbToggleBot() {
         const st = gtbBotStateName();
         let action;
-        if (st === 'stopped') {
+        if (st === 'running') {
+            action = 'stop'; // graceful wind-down
+            if (!confirm('Wind down?\n\nThe bot will STOP taking new trades but keep managing your open positions to a good exit, then fully stop once flat.\n\nYour exchange-side stops stay in place the whole time.')) return;
+        } else {
+            // stopped OR winddown -> (re)start a fresh trading session
             action = 'start';
             if (!GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
-                if (!confirm('LIVE mode: the bot will place REAL orders with real money (capped at your $7 base, with stop-losses). Tick "Arm LIVE trading" first, then start.')) return;
+                if (!confirm('LIVE mode: the bot will place REAL orders with real money (within your capital + loss limits, every trade with a stop). Tick "Arm LIVE trading" first, then start.')) return;
             }
-        } else if (st === 'running') {
-            action = 'stop'; // graceful wind-down
-            if (!confirm('Wind down?\n\nThe bot will STOP taking new trades but keep managing your open positions to a good exit (trailing stops, targets, time-box), then fully stop once flat.\n\nYour exchange-side stops stay in place the whole time.')) return;
-        } else { // winddown -> force stop
-            action = 'flatten';
-            if (!confirm('Force stop?\n\nThis SELLS every open position at market right now and fully stops the bot. Use only if you want out immediately.')) return;
         }
+        gtbBotControl(action, document.getElementById('gtb-run-btn'));
+    }
+
+    // Separate Force-stop button: sell everything now and fully stop.
+    async function gtbForceStop() {
+        if (!confirm('Force stop?\n\nThis SELLS every open position at market right now and fully stops the bot. Use only if you want out immediately.')) return;
+        gtbBotControl('flatten', document.getElementById('gtb-forcestop-btn'));
+    }
+
+    async function gtbBotControl(action, btn) {
         const armed = !GTB_TESTNET && document.getElementById('gtb-arm-live').checked;
-        const btn = document.getElementById('gtb-run-btn');
-        btn.disabled = true;
+        if (btn) btn.disabled = true;
         try {
             const res = await fetch('/gtb/bot/control', {
                 method: 'POST',
@@ -807,7 +821,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             const d = await res.json();
             if (d.ok) { GTB_BOT.enabled = !!d.bot.enabled; GTB_BOT.open_new = !!d.bot.open_new; gtbSetRunBtn(); }
             gtbLoadPositions();
-        } catch (e) { /* ignore */ } finally { btn.disabled = false; }
+        } catch (e) { /* ignore */ } finally { if (btn) btn.disabled = false; }
     }
 
 

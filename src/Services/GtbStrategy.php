@@ -245,6 +245,7 @@ class GtbStrategy
                         $oid = $d['orderId'] ?? null;
                     }
                     $st = $this->applyRisk($tpl->stops($fill), $fill, $cfg);
+                    $st = $this->applyTargetOverride($st, $fill);
                     if ($mode === 'live') {
                         // Put the stop (and target) ON the exchange before we consider the position held.
                         $prot = $this->protectLive($client, $cand['symbol'], $qty, $st);
@@ -689,6 +690,21 @@ class GtbStrategy
             }
         }
         return [0.0, 0.0];
+    }
+
+    /**
+     * Optional global override for a "small, frequent profit" style: if a fixed
+     * take-profit % and/or stop-loss % are set, use them for EVERY entry (a fixed
+     * small target instead of the template's larger one). Replaces trailing with a
+     * fixed target so the small gain is actually banked.
+     */
+    private function applyTargetOverride(array $st, float $entry): array
+    {
+        $tp = (float) (Env::get('GTB_TP_OVERRIDE_PCT', '0') ?? 0);
+        $sl = (float) (Env::get('GTB_SL_OVERRIDE_PCT', '0') ?? 0);
+        if ($sl > 0) $st['stop_loss'] = $entry * (1 - $sl / 100.0);
+        if ($tp > 0) { $st['take_profit'] = $entry * (1 + $tp / 100.0); $st['trail_pct'] = null; }
+        return $st;
     }
 
     /** Scale a template's stop/target by the profile's risk multipliers (distance from entry). */

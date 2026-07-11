@@ -147,6 +147,8 @@ class GtbController
         $gtbStallMin    = (int) (\Ginto\Support\Env::get('GTB_STALL_MINUTES', '0') ?? 0);
         $gtbStallGain   = (float) (\Ginto\Support\Env::get('GTB_STALL_MIN_GAIN_PCT', '0') ?? 0);
         $gtbSessionMaxLoss = (float) (\Ginto\Support\Env::get('GTB_SESSION_MAX_LOSS', '0') ?? 0);
+        $gtbTpOverride  = (float) (\Ginto\Support\Env::get('GTB_TP_OVERRIDE_PCT', '0') ?? 0);
+        $gtbSlOverride  = (float) (\Ginto\Support\Env::get('GTB_SL_OVERRIDE_PCT', '0') ?? 0);
         $gtbBaseCapital = (float) (\Ginto\Support\Env::get('GTB_BASE_CAPITAL', '7') ?? 7);
         $gtbMinNotional = (float) (\Ginto\Support\Env::get('GTB_MIN_NOTIONAL', '5') ?? 5);
         $gtbMaxTrade    = (float) (\Ginto\Support\Env::get('GTB_MAX_TRADE_USD', '0') ?? 0);
@@ -188,6 +190,8 @@ class GtbController
             'gtbStallMin'       => $gtbStallMin,
             'gtbStallGain'      => $gtbStallGain,
             'gtbSessionMaxLoss' => $gtbSessionMaxLoss,
+            'gtbTpOverride'     => $gtbTpOverride,
+            'gtbSlOverride'     => $gtbSlOverride,
             'gtbBaseCapital'    => $gtbBaseCapital,
             'gtbMinNotional'    => $gtbMinNotional,
             'gtbMaxTrade'       => $gtbMaxTrade,
@@ -300,6 +304,9 @@ class GtbController
             $pairs['GTB_STALL_MIN_GAIN_PCT'] = $this->numStr($input['stall_min_gain'] ?? 0, 0);
             // Circuit breaker: stop opening new trades after this much session loss (0 = off).
             $pairs['GTB_SESSION_MAX_LOSS']   = $this->numStr($input['session_max_loss'] ?? 0, 0);
+            // Small-profit override: fixed take-profit / stop-loss % for every trade (0 = template default).
+            $pairs['GTB_TP_OVERRIDE_PCT']    = $this->numStr($input['tp_override'] ?? 0, 0);
+            $pairs['GTB_SL_OVERRIDE_PCT']    = $this->numStr($input['sl_override'] ?? 0, 0);
 
             // Capital & spend limits (numeric; blank/invalid falls back to a safe default).
             $pairs['GTB_BASE_CAPITAL'] = $this->numStr($input['base_capital'] ?? 0, 7,  0.0001);

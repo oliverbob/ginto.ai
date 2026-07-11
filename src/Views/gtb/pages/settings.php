@@ -29,6 +29,8 @@ $gtbSessionHours   = $gtbSessionHours ?? 0;
 $gtbStallMin       = $gtbStallMin ?? 0;
 $gtbStallGain      = $gtbStallGain ?? 0;
 $gtbSessionMaxLoss = $gtbSessionMaxLoss ?? 0;
+$gtbTpOverride     = $gtbTpOverride ?? 0;
+$gtbSlOverride     = $gtbSlOverride ?? 0;
 $gtbBaseCapital    = $gtbBaseCapital ?? 7;
 $gtbMinNotional    = $gtbMinNotional ?? 5;
 $gtbMaxTrade       = $gtbMaxTrade ?? 0;
@@ -313,6 +315,27 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             </label>
         </div>
 
+        <!-- Profit target override -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-bullseye text-primary mr-1.5"></i>Profit target</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Force a fixed take-profit / stop-loss on <em>every</em> trade instead of the template's bigger targets. Use this to bank <strong>small, frequent</strong> wins. Leave 0 to keep template defaults.</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="tp_override" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Take-profit (%)</label>
+                    <input type="number" id="tp_override" min="0" step="0.1" value="<?= $nf($gtbTpOverride) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">e.g. 1.0. Bank the win here. 0 = template default.</p>
+                </div>
+                <div>
+                    <label for="sl_override" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Stop-loss (%)</label>
+                    <input type="number" id="sl_override" min="0" step="0.1" value="<?= $nf($gtbSlOverride) ?>"
+                           class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                    <p class="text-[11px] text-gray-400 mt-0.5">e.g. 0.8. Keep it tight. 0 = template default.</p>
+                </div>
+            </div>
+            <p class="text-[11px] text-amber-600 dark:text-amber-400"><i class="fas fa-triangle-exclamation mr-0.5"></i> Fees are ~0.2% round-trip, so a target below ~0.5% barely clears costs. Small targets need a high win-rate to net positive.</p>
+        </div>
+
         <!-- Session & time-boxing -->
         <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-hourglass-half text-primary mr-1.5"></i>Session &amp; time-boxing</h3>
@@ -478,6 +501,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             stall_minutes: parseInt(document.getElementById('stall_minutes').value) || 0,
             stall_min_gain: parseFloat(document.getElementById('stall_min_gain').value) || 0,
             session_max_loss: parseFloat(document.getElementById('session_max_loss').value) || 0,
+            tp_override: parseFloat(document.getElementById('tp_override').value) || 0,
+            sl_override: parseFloat(document.getElementById('sl_override').value) || 0,
             base_capital: parseFloat(document.getElementById('base_capital').value) || 0,
             min_notional: parseFloat(document.getElementById('min_notional').value) || 0,
             max_trade: parseFloat(document.getElementById('max_trade').value) || 0,
