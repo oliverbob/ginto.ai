@@ -1679,7 +1679,9 @@ $router->req('/rate-limits', 'ApiController@rateLimits');
 // Ginto Trading Academy (public landing + branded membership + PayMongo checkout)
 $router->get('/academy', 'AcademyController@index');
 $router->get('/academy/pricing', 'AcademyController@pricing');
-$router->req('/academy/join', 'AcademyController@join', ['POST']); // standalone sign-up + checkout (guests & members)
+$router->req('/academy/join', 'AcademyController@join', ['POST']); // no-JS fallback: hosted checkout
+$router->req('/academy/qrph/init', 'AcademyController@qrphInit', ['POST']);       // on-site QR Ph: create intent + QR
+$router->req('/academy/qrph/finalize', 'AcademyController@qrphFinalize', ['POST']); // on-site QR Ph: verify paid + grant
 $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');

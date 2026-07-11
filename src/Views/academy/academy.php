@@ -196,14 +196,8 @@ $csrf = $csrf_token ?? '';
                     </ul>
                     <?php if ($hasAccess): ?>
                         <a href="/academy/enter" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary">Enter the Academy</a>
-                    <?php elseif ($isLoggedIn): ?>
-                        <form action="/academy/join" method="post" class="mt-6">
-                            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-                            <input type="hidden" name="plan" value="<?= htmlspecialchars($pname) ?>">
-                            <button type="submit" class="w-full px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Subscribe — <?= $peso($price) ?>/mo</button>
-                        </form>
                     <?php else: ?>
-                        <button type="button" onclick="gtaOpenJoin('<?= htmlspecialchars($pname) ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($peso($price)) ?>')" class="mt-6 w-full px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>">Get <?= htmlspecialchars($name) ?> — <?= $peso($price) ?>/mo</button>
+                        <button type="button" onclick="gtaBuy('<?= htmlspecialchars($pname) ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($peso($price)) ?>', <?= $isLoggedIn ? 'false' : 'true' ?>)" class="mt-6 w-full px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>"><?= $isLoggedIn ? 'Subscribe' : 'Get ' . htmlspecialchars($name) ?> — <?= $peso($price) ?>/mo</button>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
@@ -220,52 +214,150 @@ $csrf = $csrf_token ?? '';
     </div>
 </section>
 
-<?php if (!$isLoggedIn && !empty($plans)): ?>
-<!-- Guest sign-up + checkout modal (standalone: creates the account and pays in one step) -->
+<?php if (!$hasAccess && !empty($plans)): ?>
+<!-- On-site sign-up + QR Ph payment — the QR is generated and paid on ginto.ai (no PayMongo redirect). -->
 <div id="join-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60" onclick="if(event.target===this)gtaCloseJoin()">
     <div class="w-full max-w-md rounded-2xl bg-white dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-6 shadow-2xl">
         <div class="flex items-center justify-between mb-1">
             <h3 class="font-bold text-lg">Join the Academy</h3>
             <button type="button" onclick="gtaCloseJoin()" class="text-gray-400 hover:text-primary"><i class="fas fa-xmark"></i></button>
         </div>
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4"><span id="join-plan-label" class="font-semibold text-primary"></span> — create your account and pay in one step.</p>
-        <form action="/academy/join" method="post" class="space-y-3">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-            <input type="hidden" name="plan" id="join-plan" value="">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-4"><span id="join-plan-label" class="font-semibold text-primary"></span></p>
+
+        <div id="join-error" class="hidden mb-3 rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-3 py-2 text-sm text-red-700 dark:text-red-300"></div>
+
+        <?php if (!$isLoggedIn): ?>
+        <!-- Pane 1: guest account details -->
+        <div id="join-form-pane" class="space-y-3">
             <div>
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Full name</label>
-                <input type="text" name="name" required maxlength="100" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Juan dela Cruz">
+                <input id="join-name" type="text" maxlength="100" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Juan dela Cruz">
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Email</label>
-                <input type="email" name="email" required class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="you@email.com">
+                <input id="join-email" type="email" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="you@email.com">
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Password</label>
-                <input type="password" name="password" required minlength="6" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="At least 6 characters">
+                <input id="join-password" type="password" minlength="6" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="At least 6 characters">
             </div>
-            <button type="submit" class="w-full mt-2 px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90"><i class="fas fa-lock mr-1"></i> Create account &amp; pay <span id="join-price"></span></button>
+            <button type="button" onclick="gtaStartPay()" class="w-full mt-1 px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90">Continue to payment</button>
             <p class="text-center text-xs text-gray-400">Already have an account? <a href="/login?redirect=<?= urlencode('/academy#pricing') ?>" class="text-primary hover:underline">Log in</a>.</p>
+        </div>
+        <?php endif; ?>
+
+        <!-- Pane 2: on-site QR Ph payment -->
+        <div id="join-pay-pane" class="hidden text-center">
+            <div id="join-pay-loading" class="py-8 text-sm text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i> Generating your QR…</div>
+            <div id="join-qr-wrap" class="hidden">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Scan with GCash, Maya, GoTyme, BPI or any QR Ph app.</p>
+                <div class="mt-3 inline-block rounded-xl bg-white p-3 border border-gray-200"><img id="join-qr" alt="QR Ph code" class="w-56 h-56 object-contain"></div>
+                <div class="mt-3 text-2xl font-extrabold" id="join-pay-amount"></div>
+                <div class="mt-1 text-sm" id="join-pay-status"><i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Waiting for your payment…</div>
+                <a id="join-qr-dl" download="ginto-academy-qrph.png" class="mt-3 inline-block text-xs text-primary hover:underline"><i class="fas fa-download mr-1"></i> Download QR</a>
+            </div>
+        </div>
+
+        <p class="mt-4 text-center text-[11px] text-gray-400"><i class="fas fa-lock mr-1"></i> Paid securely on ginto.ai via QR Ph. Prefer a card? <a href="#" onclick="gtaHostedFallback(event)" class="text-primary hover:underline">Use the secure checkout page</a>.</p>
+        <form id="join-hosted-fallback" action="/academy/join" method="post" class="hidden">
+            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
+            <input type="hidden" name="plan" id="join-hosted-plan" value="">
         </form>
     </div>
 </div>
 <script>
-    function gtaOpenJoin(plan, label, price) {
-        document.getElementById('join-plan').value = plan;
-        document.getElementById('join-plan-label').textContent = label;
-        document.getElementById('join-price').textContent = price ? '· ' + price + '/mo' : '';
-        const m = document.getElementById('join-modal');
-        m.classList.remove('hidden'); m.classList.add('flex');
+(function () {
+    var CSRF = <?= json_encode($csrf) ?>;
+    var plan = null, piId = null, pollTimer = null, isGuest = <?= $isLoggedIn ? 'false' : 'true' ?>;
+    function el(id) { return document.getElementById(id); }
+    function showErr(m) { var e = el('join-error'); if (!e) return; e.textContent = m; e.classList.remove('hidden'); }
+    function clearErr() { var e = el('join-error'); if (!e) return; e.textContent = ''; e.classList.add('hidden'); }
+
+    window.gtaBuy = function (planName, label, price, guest) {
+        plan = planName; isGuest = !!guest; clearErr();
+        el('join-plan-label').textContent = label + ' — ' + price + '/mo';
+        if (el('join-hosted-plan')) el('join-hosted-plan').value = planName;
+        el('join-pay-pane').classList.add('hidden');
+        el('join-qr-wrap').classList.add('hidden');
+        el('join-pay-loading').classList.remove('hidden');
+        if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
+        el('join-modal').classList.remove('hidden'); el('join-modal').classList.add('flex');
         document.body.style.overflow = 'hidden';
-    }
-    function gtaCloseJoin() {
-        const m = document.getElementById('join-modal');
-        m.classList.add('hidden'); m.classList.remove('flex');
+        if (!isGuest) gtaStartPay(); // logged-in members skip straight to the QR
+    };
+    window.gtaCloseJoin = function () {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        el('join-modal').classList.add('hidden'); el('join-modal').classList.remove('flex');
         document.body.style.overflow = '';
+    };
+    window.gtaHostedFallback = function (ev) {
+        ev.preventDefault();
+        if (el('join-hosted-plan')) el('join-hosted-plan').value = plan;
+        el('join-hosted-fallback').submit();
+    };
+
+    window.gtaStartPay = function () {
+        clearErr();
+        var fd = new FormData();
+        fd.append('csrf_token', CSRF);
+        fd.append('plan', plan);
+        if (isGuest && el('join-form-pane')) {
+            var n = el('join-name').value.trim(), e = el('join-email').value.trim(), p = el('join-password').value;
+            if (!n || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) || p.length < 6) {
+                showErr('Enter your name, a valid email, and a 6+ character password.'); return;
+            }
+            fd.append('name', n); fd.append('email', e); fd.append('password', p);
+        }
+        if (el('join-form-pane')) el('join-form-pane').classList.add('hidden');
+        el('join-pay-pane').classList.remove('hidden');
+        el('join-qr-wrap').classList.add('hidden');
+        el('join-pay-loading').classList.remove('hidden');
+        fetch('/academy/qrph/init', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (!d.success) {
+                    el('join-pay-loading').classList.add('hidden');
+                    if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
+                    showErr(d.message || 'Could not start the payment.');
+                    return;
+                }
+                piId = d.pi_id;
+                if (d.qr_image) { el('join-qr').src = d.qr_image; el('join-qr-dl').href = d.qr_image; }
+                el('join-pay-amount').textContent = '₱' + Number(d.amount).toLocaleString();
+                el('join-pay-loading').classList.add('hidden');
+                el('join-qr-wrap').classList.remove('hidden');
+                startPoll();
+            })
+            .catch(function () {
+                el('join-pay-loading').classList.add('hidden');
+                if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
+                showErr('Network error — please try again.');
+            });
+    };
+
+    function startPoll() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(function () {
+            fetch('/api/payments/paymongo-qrph-status?pi_id=' + encodeURIComponent(piId), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { if (d.paid) { clearInterval(pollTimer); pollTimer = null; finalize(); } })
+                .catch(function () {});
+        }, 3000);
     }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') gtaCloseJoin(); });
-    // If we returned with an error, reopen the sign-up so the visitor can retry.
-    <?php if ($err): ?>window.addEventListener('DOMContentLoaded', () => { document.getElementById('pricing')?.scrollIntoView(); });<?php endif; ?>
+    function finalize() {
+        el('join-pay-status').innerHTML = '<i class="fas fa-circle-check mr-1 text-green-500"></i> Payment received — activating your membership…';
+        var fd = new FormData(); fd.append('csrf_token', CSRF); fd.append('pi_id', piId);
+        fetch('/academy/qrph/finalize', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d.success) { window.location.href = d.redirect || '/academy/learn'; }
+                else { showErr(d.message || 'Payment received but activation failed — please contact support.'); }
+            })
+            .catch(function () { showErr('Payment received but activation failed — please contact support.'); });
+    }
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') gtaCloseJoin(); });
+    <?php if ($err): ?>window.addEventListener('DOMContentLoaded', function () { var s = document.getElementById('pricing'); if (s) s.scrollIntoView(); });<?php endif; ?>
+})();
 </script>
 <?php endif; ?>
 
