@@ -868,7 +868,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div class="tier-card p-6 relative" data-tier-id="2" data-tier-name="Professional" data-tier-display="Trader"
                  data-tier-first-php="1000" data-tier-first-usd="20"
                  data-tier-recurring-php="1000" data-tier-recurring-usd="20">
-              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="BTCUSDT" style="height:160px;background:linear-gradient(135deg,#0b1020,#111a33);overflow:hidden;">
+              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="BTCUSDT" data-interval="1h" style="height:160px;background:linear-gradient(135deg,#0b1020,#111a33);overflow:hidden;">
                 <span class="reg-chart-label" style="position:absolute;top:6px;left:8px;z-index:2;font-size:10px;font-weight:700;color:rgba(255,255,255,.7);">BTC/USDT · 1h</span>
               </div>
               <div class="tier-badge">Recommended</div>
@@ -899,8 +899,8 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div class="tier-card p-6 relative" data-tier-id="3" data-tier-name="Executive" data-tier-display="Pro Trader"
                  data-tier-first-php="5000" data-tier-first-usd="99"
                  data-tier-recurring-php="5000" data-tier-recurring-usd="99">
-              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="ETHUSDT" style="height:160px;background:linear-gradient(135deg,#0b1020,#1a1035);overflow:hidden;">
-                <span class="reg-chart-label" style="position:absolute;top:6px;left:8px;z-index:2;font-size:10px;font-weight:700;color:rgba(255,255,255,.7);">ETH/USDT · 1h</span>
+              <div class="reg-live-chart w-full rounded-lg mb-4 relative" data-symbol="SOLUSDT" data-interval="15m" style="height:160px;background:linear-gradient(135deg,#0b1020,#1a1035);overflow:hidden;">
+                <span class="reg-chart-label" style="position:absolute;top:6px;left:8px;z-index:2;font-size:10px;font-weight:700;color:rgba(255,255,255,.7);">SOL/USDT · 15m</span>
               </div>
               <div class="tier-badge">Elite</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Pro Trader</h4>
@@ -3778,6 +3778,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     function draw(el) {
       if (typeof LightweightCharts === 'undefined') return;
       var symbol = el.getAttribute('data-symbol') || 'BTCUSDT';
+      var interval = el.getAttribute('data-interval') || '1h';
       var chart = LightweightCharts.createChart(el, {
         width: el.clientWidth, height: 160,
         layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(255,255,255,0.35)', fontSize: 9 },
@@ -3787,7 +3788,7 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
       });
       var series = chart.addCandlestickSeries({ upColor: '#22c55e', downColor: '#ef4444', borderVisible: false, wickUpColor: '#22c55e', wickDownColor: '#ef4444' });
       function load() {
-        fetch('https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=1h&limit=60')
+        fetch('https://api.binance.com/api/v3/klines?symbol=' + symbol + '&interval=' + interval + '&limit=60')
           .then(function (r) { return r.json(); })
           .then(function (rows) {
             if (!Array.isArray(rows)) return;
