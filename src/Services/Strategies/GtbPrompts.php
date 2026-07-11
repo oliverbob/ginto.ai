@@ -21,6 +21,11 @@ final class GtbPrompts
 
     /** @var array<string,array{name:string,desc:string,text:string}> */
     public const ALL = [
+        'gainers' => [
+            'name' => 'Top-3 Gainer Hunter',
+            'desc' => 'Chase the top 3 gainers pressing their highs; profit-locking OCO locks ≥1.5%, aims 5–8%. Many wins, 15–45m holds.',
+            'text' => 'Hunt the day\'s top 3 gainers and bank many small, protected wins. Focus on the three strongest liquid USDT movers (prioritise the number one gainer) that are STILL PRESSING their 24h high on real volume — never a coin that already spiked and collapsed back off its high, and never anything thin or choppy. Prefer to buy a slight dip off the high; but if a mover keeps running away without dipping and you have already missed similar runners this session, CHASE it and bid the strength — always protected. EVERY entry is an OCO. The target is a minimum of 1.5 percent and ideally 5 to 8 percent. Once the trade is up about 2 percent, the stop ratchets ONTO THE PLUS SIDE: it locks in at least 1.5 percent profit and then trails upward under the peak, so a winner can never turn into a loss — because top gainers drop fast, your downside stop becomes a profit-taking stop. Hold at least 15 minutes to let it work, but no more than 30 to 60 minutes; if it stalls, rotate to the next mover. Do not marry a position, do not widen a stop downward, do not chase a blow-off top already up more than 60 percent. Many locked wins beat one round-trip you gave back. Speed and protection are the edge: the only losing trade is one you were too slow to OCO.',
+        ],
         'runner' => [
             'name' => 'Fastest-Mover Chaser',
             'desc' => 'Chase the fastest-accelerating gainer on volume; wide trail for 2x-5x runners. Always OCO.',
