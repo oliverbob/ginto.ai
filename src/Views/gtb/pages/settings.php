@@ -131,7 +131,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                 <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-robot text-primary mr-1.5"></i>AI Brain</h3>
                 <span class="text-[10px] font-mono text-gray-400 dark:text-gray-500"><?= htmlspecialchars($aiProvider === 'groq' ? $groqModel : $anthropicModel) ?></span>
             </div>
-            <p class="text-xs text-gray-500 dark:text-gray-400">The engine that reflects and confirms trades. <strong>Groq</strong> runs open models (DeepSeek, Llama, Qwen) ~10–40× cheaper than Claude.</p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">The engine that reflects and confirms trades. Both providers below keep their own API key &amp; models — the <strong>Provider</strong> picks which one the bot uses. <strong>Groq</strong> (Llama, Qwen, GPT-OSS) runs ~10–40× cheaper than <strong>Claude</strong>.</p>
 
             <div>
                 <label for="ai_provider" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Provider</label>
@@ -141,8 +141,12 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                 </select>
             </div>
 
-            <!-- Groq block -->
-            <div id="prov-groq" class="space-y-3 <?= $aiProvider === 'groq' ? '' : 'hidden' ?>">
+            <!-- Groq block (always visible; the dropdown only marks which is active) -->
+            <div id="prov-groq" class="space-y-3 rounded-lg border p-3 border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200"><i class="fas fa-bolt text-primary mr-1"></i>Groq</span>
+                    <span id="prov-badge-groq" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 <?= $aiProvider === 'groq' ? '' : 'hidden' ?>">Active</span>
+                </div>
                 <div>
                     <label for="groq_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Groq API Key <span class="text-gray-400 font-normal">(dedicated to the bot)</span></label>
                     <input type="password" id="groq_api_key" autocomplete="new-password" spellcheck="false"
@@ -163,8 +167,12 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                 <p class="text-[11px] text-gray-400 dark:text-gray-500"><strong>GPT-OSS 120B</strong> or <strong>Qwen3 32B</strong> = strongest reasoning; <strong>Llama 3.3 70B</strong> = fast &amp; balanced (recommended); <strong>Llama 3.1 8B</strong> = cheapest for scans. A decision costs ~0.02–0.1¢ (vs ~1¢ on Opus). <em>(DeepSeek R1 was retired from Groq.)</em></p>
             </div>
 
-            <!-- Anthropic block -->
-            <div id="prov-anthropic" class="space-y-3 <?= $aiProvider === 'anthropic' ? '' : 'hidden' ?>">
+            <!-- Anthropic / Claude block (always visible) -->
+            <div id="prov-anthropic" class="space-y-3 rounded-lg border p-3 border-gray-200 dark:border-gray-700">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-semibold text-gray-800 dark:text-gray-200"><i class="fas fa-robot text-primary mr-1"></i>Claude (Anthropic)</span>
+                    <span id="prov-badge-anthropic" class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400 <?= $aiProvider === 'anthropic' ? '' : 'hidden' ?>">Active</span>
+                </div>
                 <div>
                     <label for="anthropic_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Anthropic API Key</label>
                     <input type="password" id="anthropic_api_key" autocomplete="new-password" spellcheck="false"
@@ -366,8 +374,13 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
 
     function gtbSyncProvider() {
         const p = document.getElementById('ai_provider').value;
-        document.getElementById('prov-groq').classList.toggle('hidden', p !== 'groq');
-        document.getElementById('prov-anthropic').classList.toggle('hidden', p !== 'anthropic');
+        // Both provider cards stay visible; the dropdown just marks which one is active.
+        document.getElementById('prov-badge-groq').classList.toggle('hidden', p !== 'groq');
+        document.getElementById('prov-badge-anthropic').classList.toggle('hidden', p !== 'anthropic');
+        document.getElementById('prov-groq').classList.toggle('ring-2', p === 'groq');
+        document.getElementById('prov-groq').classList.toggle('ring-primary', p === 'groq');
+        document.getElementById('prov-anthropic').classList.toggle('ring-2', p === 'anthropic');
+        document.getElementById('prov-anthropic').classList.toggle('ring-primary', p === 'anthropic');
     }
 
     document.querySelectorAll('.gtb-cap').forEach(r => r.addEventListener('change', () => {
@@ -479,5 +492,5 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
         } finally { btn.disabled = false; btn.innerHTML = orig; }
     }
 
-    document.addEventListener('DOMContentLoaded', gtbSyncActive);
+    document.addEventListener('DOMContentLoaded', () => { gtbSyncActive(); gtbSyncProvider(); });
 </script>
