@@ -180,6 +180,13 @@ class GtbStrategy
                 $action = 'no AI key — cannot open new trades';
             } else {
                 $held = array_column($open, 'symbol');
+                // Re-entry cooldown: never rebuy a coin we just exited for N minutes. This is the
+                // anti-churn guard — without it the bot rebuys the same top-gainer at a higher price
+                // right after a stop/target fill, bleeding round-trip fees on a choppy move.
+                $cooldownMin = (int) (Env::get('GTB_REENTRY_COOLDOWN_MIN', '20') ?? 20);
+                $avoid = array_values(array_unique(array_merge(
+                    $held, $trades->recentlyClosedSymbols($mode, $cooldownMin)
+                )));
                 $size = $cap->perTradeSize($realized);
                 // Live full/ai modes: never size a buy above the free USDT actually on hand.
                 if ($mode === 'live' && $this->liveFreeUsd !== null) {
@@ -208,7 +215,7 @@ class GtbStrategy
                 $opened = false;
                 foreach ($attempts as [$pk, $key, $cfg]) {
                     $tpl  = $this->templates[$key];
-                    $cand = $tpl->entryCandidate(array_values($tickers), $held);
+                    $cand = $tpl->entryCandidate(array_values($tickers), $avoid);
                     if (!$cand) continue;
 
                     $ctx = ['env' => $mode, 'profile' => $cfg['name'], 'posture' => $cfg['posture'],

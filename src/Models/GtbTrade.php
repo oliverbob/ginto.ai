@@ -136,6 +136,24 @@ class GtbTrade
         }
     }
 
+    /**
+     * Symbols closed within the last $minutes (for the re-entry cooldown). Prevents the bot from
+     * immediately rebuying a coin it just exited — the main driver of fee-bleeding churn.
+     */
+    public function recentlyClosedSymbols(string $mode, int $minutes): array
+    {
+        if ($minutes <= 0) return [];
+        try {
+            $since = date('Y-m-d H:i:s', time() - $minutes * 60);
+            $rows = $this->db->select($this->table, 'symbol', [
+                'mode' => $mode, 'status' => 'CLOSED', 'closed_at[>=]' => $since, 'GROUP' => 'symbol',
+            ]);
+            return is_array($rows) ? array_values(array_unique(array_filter($rows))) : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     /** Realized P&L for trades closed at/after $since (for the session loss-limit circuit breaker). */
     public function realizedSince(string $mode, string $since): float
     {
