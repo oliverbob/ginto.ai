@@ -29,6 +29,26 @@ class PayMongoHandler
         }
     }
 
+    /** Look up a PayMongo customer's email by id (used to map subscription webhooks to a user). */
+    public static function getCustomerEmail(string $customerId): ?string
+    {
+        if ($customerId === '') return null;
+        $env = strtolower(trim($_ENV['PAYMONGO_ENVIRONMENT'] ?? getenv('PAYMONGO_ENVIRONMENT') ?? 'live'));
+        $sk  = $env === 'test'
+            ? ($_ENV['PAYMONGO_SECRET_KEY_TEST'] ?? getenv('PAYMONGO_SECRET_KEY_TEST') ?? '')
+            : ($_ENV['PAYMONGO_SECRET_KEY'] ?? getenv('PAYMONGO_SECRET_KEY') ?? '');
+        if ($sk === '') return null;
+        $ch = curl_init('https://api.paymongo.com/v1/customers/' . rawurlencode($customerId));
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15,
+            CURLOPT_HTTPHEADER => ['Authorization: Basic ' . base64_encode($sk . ':')],
+        ]);
+        $r = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        if ($code !== 200) return null;
+        $d = json_decode((string) $r, true);
+        return $d['data']['attributes']['email'] ?? null;
+    }
+
     /**
      * Check if PayMongo is configured
      */

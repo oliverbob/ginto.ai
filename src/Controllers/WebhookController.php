@@ -815,15 +815,16 @@ class WebhookController
         }
 
         $event = json_decode($rawBody, true);
-        if (json_last_error() !== JSON_ERROR_NONE || empty($event['data']['type'])) {
+        // PayMongo puts the event type at data.attributes.type (data.type is always "event").
+        $eventType = $event['data']['attributes']['type'] ?? ($event['data']['type'] ?? '');
+        if (json_last_error() !== JSON_ERROR_NONE || $eventType === '' || $eventType === 'event') {
             // Acknowledge with 200; malformed but authenticated payloads should not disable the endpoint.
-            error_log('PayMongo webhook: invalid JSON or missing data.type — body: ' . substr($rawBody, 0, 500));
+            error_log('PayMongo webhook: invalid JSON or missing event type — body: ' . substr($rawBody, 0, 500));
             http_response_code(200);
             echo json_encode(['status' => 'ok', 'note' => 'unrecognised payload']);
             exit();
         }
 
-        $eventType = $event['data']['type'] ?? '';
         error_log("PayMongo webhook received: {$eventType}");
 
         try {
@@ -836,6 +837,13 @@ class WebhookController
                     break;
                 case 'checkout_session.payment.paid':
                     $this->handleGintoPayCheckoutPaid($event);
+                    break;
+                case 'subscription.activated':
+                case 'subscription.invoice.paid':
+                case 'subscription.past_due':
+                case 'subscription.unpaid':
+                case 'subscription.cancelled':
+                    $this->handlePaymongoSubscription($event, $eventType);
                     break;
                 default:
                     // Acknowledge unknown events with 200 — do not return non-2xx for event types we don't handle.
@@ -851,6 +859,108 @@ class WebhookController
         http_response_code(200);
         echo json_encode(['status' => 'ok']);
         exit();
+    }
+
+    /**
+     * Handle PayMongo native subscription events → keep user_subscriptions in sync.
+     * Maps the event to a user via the stored gateway_subscription_id, falling back to
+     * the PayMongo customer's email. Defensive: logs the payload and never throws.
+     */
+    private function handlePaymongoSubscription(array $event, string $eventType): void
+    {
+        $resource = $event['data']['attributes']['data'] ?? [];
+        $attr     = $resource['attributes'] ?? [];
+        $resId    = (string) ($resource['id'] ?? '');
+        error_log('PayMongo ' . $eventType . ' resource: ' . json_encode($resource));
+
+        // Subscription id: the resource is either the subscription (sub_…) or an invoice referencing one.
+        $subId = $attr['subscription_id'] ?? ($attr['subscription'] ?? '');
+        if ($subId === '' && str_starts_with($resId, 'sub_')) $subId = $resId;
+
+        // Customer → email (for mapping to a local user).
+        $customerId = (string) ($attr['customer_id'] ?? ($attr['customer'] ?? ''));
+        $email = (string) ($attr['customer_email'] ?? ($attr['email'] ?? ''));
+        if ($email === '' && $customerId !== '') {
+            $email = (string) (\Ginto\Handlers\PayMongoHandler::getCustomerEmail($customerId) ?? '');
+        }
+
+        // Resolve the user: by stored subscription id first, else by email.
+        $userId = null;
+        if ($subId !== '') {
+            $row = $this->db->get('user_subscriptions', ['user_id'], ['gateway_subscription_id' => $subId]);
+            $userId = is_array($row) ? ($row['user_id'] ?? null) : null;
+        }
+        if (empty($userId) && $email !== '') {
+            $userId = $this->db->get('users', 'id', ['email' => $email]);
+        }
+        if (empty($userId)) {
+            error_log("PayMongo subscription: could not map to a user (sub={$subId} email={$email})");
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        switch ($eventType) {
+            case 'subscription.activated':
+            case 'subscription.invoice.paid':
+                $this->activatePaymongoSubscription((int) $userId, $subId, $attr);
+                break;
+            case 'subscription.unpaid':   // final failure → access ends
+                $this->db->update('user_subscriptions',
+                    ['status' => 'expired', 'updated_at' => $now],
+                    ['user_id' => $userId, 'payment_method' => 'paymongo', 'status' => 'active']);
+                break;
+            case 'subscription.cancelled':
+                $this->db->update('user_subscriptions',
+                    ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+                    ['user_id' => $userId, 'payment_method' => 'paymongo', 'status' => 'active']);
+                break;
+            // subscription.past_due → retrying; keep access during the grace period (no change).
+        }
+    }
+
+    /** Activate or extend a user's PayMongo subscription by one billing period. */
+    private function activatePaymongoSubscription(int $userId, string $subId, array $attr): void
+    {
+        $now  = date('Y-m-d H:i:s');
+        $plan = $this->db->get('subscription_plans', '*', ['plan_type' => 'courses', 'is_active' => 1, 'ORDER' => ['price' => 'ASC']]);
+
+        $existing = $subId !== ''
+            ? $this->db->get('user_subscriptions', '*', ['gateway_subscription_id' => $subId])
+            : null;
+
+        // Extend from the later of now / current expiry so mid-cycle renewals stack correctly.
+        $base = $now;
+        if (is_array($existing) && !empty($existing['expires_at']) && strtotime($existing['expires_at']) > time()) {
+            $base = $existing['expires_at'];
+        }
+        $expires = date('Y-m-d H:i:s', strtotime($base . ' +1 month'));
+
+        if (is_array($existing)) {
+            $this->db->update('user_subscriptions',
+                ['status' => 'active', 'expires_at' => $expires, 'updated_at' => $now],
+                ['id' => $existing['id']]);
+            return;
+        }
+
+        // No row yet: end any prior active sub for this user, then create the PayMongo one.
+        $this->db->update('user_subscriptions',
+            ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+            ['user_id' => $userId, 'status' => 'active']);
+        $this->db->insert('user_subscriptions', [
+            'user_id'                 => $userId,
+            'plan_id'                 => $plan['id'] ?? null,
+            'status'                  => 'active',
+            'started_at'              => $now,
+            'expires_at'              => $expires,
+            'payment_method'          => 'paymongo',
+            'gateway_subscription_id' => $subId,
+            'payment_reference'       => $subId,
+            'amount_paid'             => isset($attr['amount']) ? ((int) $attr['amount']) / 100 : ($plan['price'] ?? 0),
+            'currency'                => 'PHP',
+            'auto_renew'              => 1,
+            'created_at'              => $now,
+            'updated_at'              => $now,
+        ]);
     }
 
     /**
