@@ -329,13 +329,14 @@ class AcademyController
             $name  = ($user['fullname'] ?? '') !== '' ? $user['fullname'] : ($user['username'] ?? 'Ginto Learner');
             if ($email === '') { $this->redirect('/academy?err=email#pricing'); return; }
 
-            $amount = (int) round(((float) $plan['price_monthly']) * 100); // centavos
+            $vat    = $this->vatBreakdown((float) $plan['price_monthly']);
+            $amount = (int) round($vat['total'] * 100); // centavos, VAT-inclusive
             $base   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
 
             $pm  = new \Ginto\Handlers\PayMongoHandler();
             $res = $pm->createCheckoutSession(
                 $amount,
-                'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership'),
+                'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . sprintf(' (₱%s + 12%% VAT ₱%s)', number_format($vat['base'], 0), number_format($vat['vat'], 0)),
                 (string) $name,
                 (string) $email,
                 $base . '/academy/subscribe/success',
@@ -350,7 +351,7 @@ class AcademyController
                 'user_id'             => $userId,
                 'plan_id'             => $plan['id'],
                 'checkout_session_id' => $res['session_id'] ?? '',
-                'amount'              => $plan['price_monthly'],
+                'amount'              => $vat['total'],
                 'currency'            => $plan['price_currency'] ?? 'PHP',
                 'status'              => 'pending',
             ]);
@@ -431,6 +432,22 @@ class AcademyController
     }
 
     /**
+     * VAT breakdown for a plan's base price. Tax is added ON TOP (VAT-exclusive) at the rate in
+     * ACADEMY_VAT_PCT (default 12%). Returns whole-peso base/vat/total for display + billing.
+     */
+    private function vatBreakdown(float $base): array
+    {
+        $rate  = (float) (\Ginto\Support\Env::get('ACADEMY_VAT_PCT', '12') ?? 12);
+        $vat   = round($base * $rate / 100.0, 2);
+        return [
+            'base'  => round($base, 2),
+            'vat'   => $vat,
+            'total' => round($base + $vat, 2),
+            'rate'  => $rate,
+        ];
+    }
+
+    /**
      * POST /academy/qrph/init — start an ON-SITE QR Ph payment (no redirect to PayMongo).
      * Creates the payment intent + QR server-side and returns the QR image to render inline.
      * The amount is taken from the plan on the SERVER — never trusted from the client.
@@ -471,9 +488,10 @@ class AcademyController
 
             if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) { echo json_encode(['success' => false, 'message' => 'Payments are not configured.']); exit; }
 
-            $amount  = (int) round((float) $plan['price_monthly']); // whole pesos
+            $vat     = $this->vatBreakdown((float) $plan['price_monthly']);
+            $amount  = (int) round($vat['total']); // whole pesos, VAT-inclusive total charged
             $handler = new \Ginto\Handlers\PayMongoHandler();
-            $res     = $handler->initQrph($amount, (string) $payEmail, (string) $payName, '', 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership'));
+            $res     = $handler->initQrph($amount, (string) $payEmail, (string) $payName, '', 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . ' (incl. 12% VAT)');
             if (empty($res['success'])) { echo json_encode(['success' => false, 'message' => $res['message'] ?? 'Could not start the payment.']); exit; }
 
             $_SESSION['paymongo_pi_id'] = $res['pi_id']; // let the shared status poller accept this PI
@@ -481,7 +499,11 @@ class AcademyController
                 'pi_id'    => $res['pi_id'], 'plan_id' => $plan['id'], 'amount' => $amount,
                 'currency' => $plan['price_currency'] ?? 'PHP', 'user_id' => $userId ? (int) $userId : null, 'guest' => $guest,
             ];
-            echo json_encode(['success' => true, 'pi_id' => $res['pi_id'], 'qr_image' => $res['qr_image'] ?? null, 'qr_string' => $res['qr_string'] ?? null, 'amount' => $amount]);
+            echo json_encode([
+                'success' => true, 'pi_id' => $res['pi_id'],
+                'qr_image' => $res['qr_image'] ?? null, 'qr_string' => $res['qr_string'] ?? null,
+                'amount' => $amount, 'base' => $vat['base'], 'vat' => $vat['vat'], 'vat_rate' => $vat['rate'],
+            ]);
             exit;
         } catch (\Throwable $e) {
             error_log('Academy qrphInit error: ' . $e->getMessage());

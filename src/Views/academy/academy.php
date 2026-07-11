@@ -187,6 +187,7 @@ $csrf = $csrf_token ?? '';
                     <?php if ($featured): ?><div class="text-[10px] font-bold uppercase text-primary mb-2">Most popular</div><?php endif; ?>
                     <h3 class="font-bold text-lg"><?= htmlspecialchars($name) ?></h3>
                     <div class="mt-2 text-3xl font-extrabold"><?= $peso($price) ?><span class="text-sm font-normal text-gray-400">/mo</span></div>
+                    <div class="text-xs text-gray-400 mt-0.5">+12% VAT at checkout</div>
                     <?php if (!empty($p['description'])): ?><p class="mt-2 text-sm text-gray-500 dark:text-gray-400"><?= htmlspecialchars($p['description']) ?></p><?php endif; ?>
                     <ul class="mt-4 space-y-2 text-sm text-gray-600 dark:text-gray-300 flex-1">
                         <?php if (!empty($p['has_ai_tutor'])): ?><li><i class="fas fa-check text-green-500 mr-1.5"></i>AI tutor access</li><?php endif; ?>
@@ -252,8 +253,12 @@ $csrf = $csrf_token ?? '';
             <div id="join-qr-wrap" class="hidden">
                 <p class="text-sm text-gray-500 dark:text-gray-400">Scan with GCash, Maya, GoTyme, BPI or any QR Ph app.</p>
                 <div class="mt-3 inline-block rounded-xl bg-white p-3 border border-gray-200"><img id="join-qr" alt="QR Ph code" class="w-56 h-56 object-contain"></div>
-                <div class="mt-3 text-2xl font-extrabold" id="join-pay-amount"></div>
-                <div class="mt-1 text-sm" id="join-pay-status"><i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Waiting for your payment…</div>
+                <div class="mt-3 mx-auto max-w-[220px] text-sm text-gray-500 dark:text-gray-400 text-left">
+                    <div class="flex justify-between"><span>Subtotal</span><span id="join-sub">—</span></div>
+                    <div class="flex justify-between"><span>VAT (12%)</span><span id="join-vat">—</span></div>
+                    <div class="flex justify-between font-bold text-base text-gray-900 dark:text-gray-100 mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>Total</span><span id="join-pay-amount">—</span></div>
+                </div>
+                <div class="mt-2 text-sm" id="join-pay-status"><i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Waiting for your payment…</div>
                 <a id="join-qr-dl" download="ginto-academy-qrph.png" class="mt-3 inline-block text-xs text-primary hover:underline"><i class="fas fa-download mr-1"></i> Download QR</a>
             </div>
         </div>
@@ -324,6 +329,8 @@ $csrf = $csrf_token ?? '';
                 piId = d.pi_id;
                 if (d.qr_image) { el('join-qr').src = d.qr_image; el('join-qr-dl').href = d.qr_image; }
                 el('join-pay-amount').textContent = '₱' + Number(d.amount).toLocaleString();
+                if (el('join-sub')) el('join-sub').textContent = '₱' + Number(d.base).toLocaleString();
+                if (el('join-vat')) el('join-vat').textContent = '₱' + Number(d.vat).toLocaleString();
                 el('join-pay-loading').classList.add('hidden');
                 el('join-qr-wrap').classList.remove('hidden');
                 startPoll();
