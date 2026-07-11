@@ -127,24 +127,28 @@ class PayMongoHandler
      * @param array  $paymentMethodAllowed   e.g. ['qrph'] or ['card']
      * @return array ['success' => bool, 'pi_id' => string, 'client_key' => string, 'status' => string] | ['success' => false, 'message' => string]
      */
-    public function createPaymentIntent(int $amountCentavos, string $description = 'Ginto Membership', array $paymentMethodAllowed = ['qrph']): array
+    public function createPaymentIntent(int $amountCentavos, string $description = 'Ginto Membership', array $paymentMethodAllowed = ['qrph'], ?array $setupFutureUsage = null): array
     {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
         }
 
-        $body = [
-            'data' => [
-                'attributes' => [
-                    'amount'                  => $amountCentavos,
-                    'payment_method_allowed'  => $paymentMethodAllowed,
-                    'payment_method_options'  => ['card' => ['request_three_d_secure' => 'any']],
-                    'currency'                => 'PHP',
-                    'capture_type'            => 'automatic',
-                    'description'             => $description,
-                ],
-            ],
+        $attributes = [
+            'amount'                  => $amountCentavos,
+            'payment_method_allowed'  => $paymentMethodAllowed,
+            'payment_method_options'  => ['card' => ['request_three_d_secure' => 'any']],
+            'currency'                => 'PHP',
+            'capture_type'            => 'automatic',
+            'description'             => $description,
         ];
+        // Card vaulting: save this card to the customer for later (on-session) re-charges.
+        if (is_array($setupFutureUsage) && !empty($setupFutureUsage['customer_id'])) {
+            $attributes['setup_future_usage'] = [
+                'session_type' => $setupFutureUsage['session_type'] ?? 'on_session',
+                'customer_id'  => $setupFutureUsage['customer_id'],
+            ];
+        }
+        $body = ['data' => ['attributes' => $attributes]];
 
         $response = $this->request('POST', '/payment_intents', $body);
 
@@ -536,6 +540,89 @@ class PayMongoHandler
             'payment_id'   => $statusResult['payment_id'] ?? null,
             'next_action'  => $attachResult['next_action'] ?? [],
         ];
+    }
+
+    /** Normalize a PH mobile number to PayMongo's +63########## format. */
+    public static function normalizePhone(string $phone): string
+    {
+        $d = preg_replace('/[^0-9]/', '', $phone);
+        if ($d === '') return '+639000000000';
+        if (str_starts_with($d, '63')) return '+' . $d;
+        if (str_starts_with($d, '0'))  return '+63' . substr($d, 1);
+        if (strlen($d) === 10)         return '+63' . $d;
+        return '+' . $d;
+    }
+
+    /** Create a PayMongo Customer (for card vaulting). Returns ['success','customer_id']. */
+    public function createCustomer(string $firstName, string $lastName, string $email, string $phone): array
+    {
+        if (empty($this->secretKey)) return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        $body = ['data' => ['attributes' => [
+            'first_name'     => $firstName !== '' ? $firstName : 'Ginto',
+            'last_name'      => $lastName !== '' ? $lastName : 'Learner',
+            'email'          => $email,
+            'phone'          => self::normalizePhone($phone),
+            'default_device' => 'phone',
+        ]]];
+        $response = $this->request('POST', '/customers', $body);
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            $err = $response['errors'][0] ?? [];
+            $existing = null;
+            if (preg_match('/cus_[A-Za-z0-9]+/', (string) ($err['detail'] ?? ''), $m)) $existing = $m[0];
+            return ['success' => false, 'message' => $err['detail'] ?? 'Failed to create customer.', 'existing_id' => $existing];
+        }
+        return ['success' => true, 'customer_id' => $response['data']['id'] ?? null];
+    }
+
+    /**
+     * On-site card payment that ALSO vaults the card to $customerId for later on-session charges.
+     * Same result shape as initCardPayment, plus the saved-card setup.
+     */
+    public function initCardPaymentVault(float $amountPhp, string $email, string $name, string $phone, string $description, array $card, string $customerId, array $billingAddress = []): array
+    {
+        $amountCentavos = (int) round($amountPhp * 100);
+        $piResult = $this->createPaymentIntent($amountCentavos, $description, ['card'], ['session_type' => 'on_session', 'customer_id' => $customerId]);
+        if (!$piResult['success']) return $piResult;
+        $piId = $piResult['pi_id']; $clientKey = $piResult['client_key'];
+
+        $pmResult = $this->createCardPaymentMethod($card, ['name' => $name, 'email' => $email, 'phone' => $phone, 'address' => $billingAddress]);
+        if (!$pmResult['success']) return $pmResult;
+
+        $attachResult = $this->attachPaymentMethod($piId, $pmResult['pm_id'], $clientKey);
+        if (!$attachResult['success']) return $attachResult;
+
+        $statusResult = $this->getPaymentIntentStatus($piId);
+        return [
+            'success'     => true,
+            'pi_id'       => $piId,
+            'status'      => $attachResult['status'] ?? ($statusResult['status'] ?? 'unknown'),
+            'payment_id'  => $statusResult['payment_id'] ?? null,
+            'next_action' => $attachResult['next_action'] ?? [],
+        ];
+    }
+
+    /** List a customer's saved (vaulted) card payment methods. */
+    public function customerPaymentMethods(string $customerId): array
+    {
+        if (empty($this->secretKey)) return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        $response = $this->request('GET', '/customers/' . urlencode($customerId) . '/payment_methods');
+        if (!empty($response['errors']) || $response['http_code'] >= 400) {
+            return ['success' => false, 'message' => $response['errors'][0]['detail'] ?? 'Failed to list payment methods.'];
+        }
+        $cards = [];
+        foreach (($response['data'] ?? []) as $pm) {
+            $a = $pm['attributes'] ?? [];
+            if (($a['type'] ?? '') !== 'card') continue;
+            $c = $a['details'] ?? [];
+            $cards[] = [
+                'id'        => $pm['id'] ?? '',
+                'last4'     => $c['last4'] ?? '',
+                'brand'     => $c['brand'] ?? ($c['card_type'] ?? ''),
+                'exp_month' => $c['exp_month'] ?? null,
+                'exp_year'  => $c['exp_year'] ?? null,
+            ];
+        }
+        return ['success' => true, 'cards' => $cards];
     }
 
     /**

@@ -563,17 +563,35 @@ class AcademyController
 
             if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) { echo json_encode(['success' => false, 'message' => 'Payments are not configured.']); exit; }
 
-            $vat     = $this->vatBreakdown((float) $plan['price_monthly']);
-            $amount  = (int) round($vat['total']); // whole pesos, VAT-inclusive
-            $handler = new \Ginto\Handlers\PayMongoHandler();
-            $res     = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . ' (incl. 12% VAT)', $card, []);
+            $vat       = $this->vatBreakdown((float) $plan['price_monthly']);
+            $amount    = (int) round($vat['total']); // whole pesos, VAT-inclusive
+            $autoRenew = !empty($_POST['auto_renew']);
+            $desc      = 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . ' (incl. 12% VAT)';
+            $handler   = new \Ginto\Handlers\PayMongoHandler();
+
+            // Assisted auto-renew: vault the card to a PayMongo Customer so we can re-charge it
+            // on-session next month (with the member re-entering CVC). Falls back to a plain
+            // one-off card charge if the customer/vault can't be set up.
+            $customerId = null;
+            if ($autoRenew) {
+                $parts = preg_split('/\s+/', trim((string) $payName), 2);
+                $cust  = $handler->createCustomer($parts[0] ?? 'Ginto', $parts[1] ?? 'Learner', (string) $payEmail, (string) ($_POST['phone'] ?? ''));
+                $customerId = $cust['customer_id'] ?? ($cust['existing_id'] ?? null);
+            }
+            if ($autoRenew && $customerId) {
+                $res = $handler->initCardPaymentVault((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, $customerId, []);
+            } else {
+                $res = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, []);
+                $autoRenew = false; // couldn't vault — treat as a one-off
+            }
             if (empty($res['success'])) { echo json_encode(['success' => false, 'message' => $res['message'] ?? 'The card could not be processed.']); exit; }
 
             $_SESSION['paymongo_pi_id'] = $res['pi_id']; // shared status poller
             $_SESSION['academy_pay']    = [
                 'pi_id'    => $res['pi_id'], 'plan_id' => $plan['id'], 'amount' => $amount,
                 'currency' => $plan['price_currency'] ?? 'PHP', 'user_id' => $userId ? (int) $userId : null,
-                'guest'    => $guest, 'method' => 'paymongo_card', 'auto_renew' => !empty($_POST['auto_renew']),
+                'guest'    => $guest, 'method' => 'paymongo_card', 'auto_renew' => $autoRenew,
+                'customer_id' => $customerId,
             ];
             $nextUrl = $res['next_action']['redirect']['url'] ?? ($res['next_action']['url'] ?? null);
             echo json_encode([
@@ -635,6 +653,17 @@ class AcademyController
             }
 
             $this->activateMembership((int) $userId, $plan, $piId, $st['payment_id'] ?? null, (float) $ctx['amount'], (string) ($ctx['currency'] ?? 'PHP'), (string) ($ctx['method'] ?? 'paymongo_qrph'), !empty($ctx['auto_renew']));
+
+            // Assisted auto-renew: store the vaulted card reference for next month's on-session charge.
+            if (!empty($ctx['auto_renew']) && !empty($ctx['customer_id'])) {
+                try {
+                    $pm = $handler->customerPaymentMethods((string) $ctx['customer_id']);
+                    if (!empty($pm['success']) && !empty($pm['cards'])) {
+                        (new \Ginto\Models\AcademyCard())->save((int) $userId, (string) $ctx['customer_id'], $pm['cards'][0]);
+                    }
+                } catch (\Throwable $e) { error_log('Academy vault save error: ' . $e->getMessage()); }
+            }
+
             unset($_SESSION['academy_pay'], $_SESSION['paymongo_pi_id']);
             echo json_encode(['success' => true, 'redirect' => '/academy/learn']);
             exit;
