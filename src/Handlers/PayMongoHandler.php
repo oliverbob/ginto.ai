@@ -567,14 +567,16 @@ class PayMongoHandler
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
         }
 
-        // Which methods to offer. If none are given (and no env override), OMIT the field so
-        // PayMongo shows EVERY method enabled on the merchant account (GCash, Maya, QRPh, card…).
-        // Hardcoding a single method that isn't activated yields "No payment methods available".
+        // Which methods to offer. PayMongo REQUIRES payment_method_types, and it errors if you
+        // list a method that isn't activated — so we can't omit it and can't blindly pass all.
+        // Default to the methods enabled on this account (card + e-wallets + QR Ph), overridable
+        // via PAYMONGO_CHECKOUT_METHODS. Hardcoding a single method ("card") that doesn't render
+        // is what caused "No payment methods available".
         if (empty($paymentMethods)) {
             $envMethods = (string) (getenv('PAYMONGO_CHECKOUT_METHODS') ?: ($_ENV['PAYMONGO_CHECKOUT_METHODS'] ?? ''));
-            if ($envMethods !== '') {
-                $paymentMethods = array_values(array_filter(array_map('trim', explode(',', $envMethods))));
-            }
+            $paymentMethods = $envMethods !== ''
+                ? array_values(array_filter(array_map('trim', explode(',', $envMethods))))
+                : ['card', 'gcash', 'paymaya', 'qrph', 'grab_pay'];
         }
 
         $billingPayload = [
