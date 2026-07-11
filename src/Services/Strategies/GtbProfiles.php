@@ -28,12 +28,17 @@ final class GtbProfiles
         ],
         'aggressive' => [
             'name'      => 'Aggressive',
-            'templates' => ['scalp', 'breakout'],
-            'slMult'    => 1.20,   // more room to breathe
+            // Ride runners FIRST (trailing stop, no fixed cap) so a parabolic top-gainer like PYR
+            // is held and ratcheted up instead of scalped out at +2.5/4%. Breakout/scalp are the
+            // fallback for strong moves that aren't cleanly trending.
+            'templates' => ['trend', 'breakout', 'scalp'],
+            'slMult'    => 1.20,   // more room to breathe (also widens the trailing distance)
             'tpMult'    => 1.50,   // let winners run further
-            'posture'   => 'Trade like a decisive momentum trader hunting the fastest movers. Act on strong, real '
-                         . 'momentum and tolerate normal volatility; you may take a setup that is slightly extended if '
-                         . 'the thrust and volume are convincing. Still respect the hard stop — aggressive, not reckless.',
+            'posture'   => 'Trade like a decisive momentum trader hunting the fastest movers. On a strong, real '
+                         . 'uptrend prefer to RIDE it with the trailing stop rather than take a quick scalp — let the '
+                         . 'winner run and let the ratcheting stop decide the exit. Tolerate normal pullbacks; you may '
+                         . 'take a setup that is slightly extended if thrust and volume are convincing. Still respect '
+                         . 'the hard stop — aggressive, not reckless.',
         ],
     ];
 
