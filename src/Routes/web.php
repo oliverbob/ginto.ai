@@ -1682,6 +1682,10 @@ $router->get('/academy/pricing', 'AcademyController@pricing');
 $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');
+$router->get('/academy/learn', 'AcademyController@learn');
+$router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
+$router->get('/academy/admin', 'AcademyController@admin');
+$router->req('/academy/admin/save', 'AcademyController@adminSave', ['POST']);
 
 // Courses
 $router->req('/courses', 'CourseController@index');
