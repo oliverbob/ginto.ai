@@ -560,10 +560,21 @@ class PayMongoHandler
         string $successUrl,
         string $cancelUrl,
         string $phone = '',
-        array $billingAddress = []
+        array $billingAddress = [],
+        array $paymentMethods = []
     ): array {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
+        }
+
+        // Which methods to offer. If none are given (and no env override), OMIT the field so
+        // PayMongo shows EVERY method enabled on the merchant account (GCash, Maya, QRPh, card…).
+        // Hardcoding a single method that isn't activated yields "No payment methods available".
+        if (empty($paymentMethods)) {
+            $envMethods = (string) (getenv('PAYMONGO_CHECKOUT_METHODS') ?: ($_ENV['PAYMONGO_CHECKOUT_METHODS'] ?? ''));
+            if ($envMethods !== '') {
+                $paymentMethods = array_values(array_filter(array_map('trim', explode(',', $envMethods))));
+            }
         }
 
         $billingPayload = [
@@ -601,7 +612,6 @@ class PayMongoHandler
                             'quantity'    => 1,
                         ],
                     ],
-                    'payment_method_types' => ['card'],
                     'success_url'          => $successUrl,
                     'cancel_url'           => $cancelUrl,
                     'send_email_receipt'   => false,
@@ -610,6 +620,11 @@ class PayMongoHandler
                 ],
             ],
         ];
+
+        // Only constrain methods when explicitly requested; otherwise PayMongo shows all enabled.
+        if (!empty($paymentMethods)) {
+            $body['data']['attributes']['payment_method_types'] = array_values($paymentMethods);
+        }
 
         $response = $this->request('POST', '/checkout_sessions', $body);
 
