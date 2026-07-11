@@ -46,6 +46,11 @@ final class GtbPrompts
             'desc' => 'Enter confirmed trends, trail wide, let winners run for big multiples.',
             'text' => 'Ride sustained trends for outsized gains. Enter confirmed uptrends with momentum and volume behind them. Keep the initial stop tight to cap risk, but once the trade works, trail the stop wide and let it run, aiming for large multiples rather than quick scalps. No fixed take-profit ceiling: the trailing stop books the gain. Cut losers immediately at the initial stop. Always protect with a resting stop, using an OCO where a target applies. Fewer bolder positions in the best trends beat many small trades. Patience on winners, ruthlessness on losers.',
         ],
+        'rapid' => [
+            'name' => 'Rapid Scalp (1-3h)',
+            'desc' => 'High-turnover quick scalps for a short session; tight stop, fast small target, high hit-rate. Not guaranteed.',
+            'text' => 'Trade actively within a short 1-3 hour window, aiming for many small, quick wins rather than a few big ones. Take ONLY the cleanest fast momentum movers with real volume and orderly structure; never chase parabolic or choppy names. Target a fast take-profit around 1.5-2 percent with a tight stop around 1-1.5 percent, always as an OCO so risk is capped on every trade. Exit the instant momentum stalls and rotate to the next mover; do not marry a position. Discipline over frequency: a string of small losses means slow down and be more selective, not size up. Protecting capital comes before any trade. No trade is guaranteed, so keep each loss tiny.',
+        ],
     ];
 
     /** Preset metadata for the dashboard picker (without the full text). */

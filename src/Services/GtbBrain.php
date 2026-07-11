@@ -38,6 +38,7 @@ class GtbBrain
     private string $decisionModel;
     private string $scanModel;
     private string $operatorInstructions;
+    private string $pineScript = '';
 
     public function __construct()
     {
@@ -61,6 +62,21 @@ class GtbBrain
         $fallback = trim((string) (Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? ''));
         $this->operatorInstructions = $active !== '' ? $active
             : ($fallback !== '' ? $fallback : \Ginto\Services\Strategies\GtbPrompts::defaultText());
+
+        // Optional PineScript strategy (base64 in .env to preserve newlines). The AI reads
+        // its entry/exit logic and factors it into decisions (it is not executed).
+        $b64 = (string) (Env::get('GTB_PINESCRIPT_B64', '') ?? '');
+        $this->pineScript = $b64 !== '' ? trim((string) base64_decode($b64, true)) : '';
+    }
+
+    /** PineScript strategy context appended to the AI prompts, if provided. */
+    private function pineBlock(): string
+    {
+        if ($this->pineScript === '') return '';
+        return "\n\nOPERATOR PINESCRIPT STRATEGY (TradingView). You cannot run it, but read its entry/exit/filter "
+            . "logic and apply that INTENT to your decision — treat its conditions as the operator's rules. If the "
+            . "current setup would not satisfy this script's entry logic, lean toward SKIP:\n```pine\n"
+            . mb_substr($this->pineScript, 0, 6000) . "\n```";
     }
 
     /**
@@ -110,7 +126,7 @@ class GtbBrain
         if (!empty($context['posture'])) {
             $system .= "\n\nPROFILE POSTURE (the temperament you are trading with right now): " . $context['posture'];
         }
-        $system .= $this->operatorBlock();
+        $system .= $this->operatorBlock() . $this->pineBlock();
         $user = "Candidate + account (JSON):\n" . json_encode(['candidate' => $candidate] + $context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nEnter {$sym} now, or skip?";
 
@@ -153,7 +169,7 @@ class GtbBrain
             . "how you buy the top. If a 'memory' of recent outcomes is provided, factor it into your reasoning. "
             . "Be concise: 3-5 sentences of genuine reasoning. "
             . "Finish with exactly one line in this format: 'DECISION: BUY <SYMBOL> | HOLD | SKIP — <the single biggest risk you're watching>'."
-            . $this->operatorBlock();
+            . $this->operatorBlock() . $this->pineBlock();
 
         $user = "Snapshot (JSON):\n" . json_encode($context, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
             . "\n\nGiven the capital rules and current movers, is there a momentum trade worth taking right now? Reflect, then decide.";
@@ -167,6 +183,33 @@ class GtbBrain
         }
         $res['decision'] = $decision;
         return $res;
+    }
+
+    /** Inspect a pasted PineScript strategy for bugs, risk, and trading soundness. */
+    public function reviewPine(string $code): array
+    {
+        if (!$this->isConfigured()) return ['ok' => false, 'error' => 'No API key set for the active provider (' . $this->provider . ').'];
+        $code = mb_substr(trim($code), 0, 8000);
+        if ($code === '') return ['ok' => false, 'error' => 'Paste a PineScript strategy first.'];
+        $system = "You are a careful PineScript (TradingView) code reviewer for an automated crypto trading bot. "
+            . "Inspect the script for: syntax/logic bugs, look-ahead bias or repainting, missing stop-loss / risk control, "
+            . "over-fitting, and anything unsafe for live money. Be concise and specific. End with exactly one line: "
+            . "'VERDICT: SAFE TO USE' or 'VERDICT: DO NOT USE — <one-line reason>' or 'VERDICT: USE WITH FIXES — <what to fix>'.";
+        $user = "Review this PineScript strategy:\n```pine\n" . $code . "\n```";
+        return $this->call($this->model('decision'), $system, $user, 700);
+    }
+
+    /** Suggest a concise, protected PineScript momentum strategy the operator can copy/review. */
+    public function suggestPine(string $hint = ''): array
+    {
+        if (!$this->isConfigured()) return ['ok' => false, 'error' => 'No API key set for the active provider (' . $this->provider . ').'];
+        $system = "You are a pragmatic PineScript v5 strategy author for short-term crypto momentum trading. "
+            . "Write ONE compact, readable strategy that reflects current best-practice momentum/breakout ideas from the "
+            . "trading community. MANDATORY: include an explicit stop-loss and a take-profit (or trailing stop); never a "
+            . "strategy without risk control. Keep it ~40 lines, commented. Output ONLY the code in a ```pine block, then "
+            . "2-3 sentences explaining the logic and its main risk.";
+        $user = "Suggest a momentum/breakout strategy" . ($hint !== '' ? (" focused on: " . mb_substr(trim($hint), 0, 300)) : "") . ".";
+        return $this->call($this->model('decision'), $system, $user, 1200);
     }
 
     /** One LLM call, dispatched to the active provider. Normalizes to ok/text/model/usage. */

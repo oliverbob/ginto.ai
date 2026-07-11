@@ -136,6 +136,19 @@ class GtbTrade
         }
     }
 
+    /** Realized P&L for trades closed at/after $since (for the session loss-limit circuit breaker). */
+    public function realizedSince(string $mode, string $since): float
+    {
+        try {
+            $sum = $this->db->sum($this->table, 'realized_pnl', [
+                'mode' => $mode, 'status' => 'CLOSED', 'closed_at[>=]' => $since,
+            ]);
+            return $sum !== null ? (float) $sum : 0.0;
+        } catch (\Throwable $e) {
+            return 0.0;
+        }
+    }
+
     /**
      * Sum of realized P&L. When $mode is given, counts only that mode's trades so
      * paper profits never inflate live capital sizing (and vice-versa).

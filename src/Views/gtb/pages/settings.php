@@ -20,6 +20,7 @@ $groqScanModel     = $groqScanModel ?? 'llama-3.1-8b-instant';
 $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
 $gtbInstructions   = $gtbInstructions ?? '';
+$gtbPineScript     = $gtbPineScript ?? '';
 $gtbProfiles       = $gtbProfiles ?? ['conservative', 'aggressive'];
 $gtbCapitalMode    = $gtbCapitalMode ?? 'staked';
 $gtbPaperWallet    = $gtbPaperWallet ?? 35;
@@ -27,6 +28,7 @@ $gtbMaxHoldMin     = $gtbMaxHoldMin ?? 0;
 $gtbSessionHours   = $gtbSessionHours ?? 0;
 $gtbStallMin       = $gtbStallMin ?? 0;
 $gtbStallGain      = $gtbStallGain ?? 0;
+$gtbSessionMaxLoss = $gtbSessionMaxLoss ?? 0;
 $gtbBaseCapital    = $gtbBaseCapital ?? 7;
 $gtbMinNotional    = $gtbMinNotional ?? 5;
 $gtbMaxTrade       = $gtbMaxTrade ?? 0;
@@ -340,6 +342,12 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                            class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
                     <p class="text-[11px] text-gray-400 mt-0.5">Keep the trade past the stall time only if it's gained this much.</p>
                 </div>
+                <div>
+                    <label for="session_max_loss" class="block text-xs font-medium text-red-600 dark:text-red-400 mb-1"><i class="fas fa-shield-halved mr-0.5"></i>Max session loss ($)</label>
+                    <input type="number" id="session_max_loss" min="0" step="1" value="<?= $nf($gtbSessionMaxLoss) ?>"
+                           class="w-full rounded-lg border border-red-300 dark:border-red-700 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-red-500 focus:border-red-500">
+                    <p class="text-[11px] text-gray-400 mt-0.5"><strong>Circuit breaker</strong>: stop opening new trades once the session is down this much. 0 = off.</p>
+                </div>
             </div>
         </div>
 
@@ -351,6 +359,22 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                       class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-3 py-2 focus:ring-primary focus:border-primary"
                       placeholder="e.g. Only trade BTC, ETH and SOL. Skip anything already up more than 15% today. Prefer breakouts over dip-buys. Be conservative — when unsure, skip."><?= htmlspecialchars($gtbInstructions, ENT_QUOTES) ?></textarea>
             <p class="text-xs text-gray-400 dark:text-gray-500">Applied on the next decision after saving. Leave blank to remove.</p>
+        </div>
+
+        <!-- PineScript strategy -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-chart-line text-primary mr-1.5"></i>PineScript strategy <span class="text-xs font-normal text-gray-400">(optional)</span></h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Paste a TradingView PineScript strategy (e.g. one you found in the trading community). The AI <strong>reads its entry/exit logic and applies that intent</strong> to every decision — it is <em>not</em> executed. <strong>Inspect it first</strong> for bugs/risk, then Save to apply. Always keep a stop-loss.</p>
+            <textarea id="pinescript" rows="8" maxlength="8000" spellcheck="false"
+                      class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 font-mono text-xs px-3 py-2 focus:ring-primary focus:border-primary"
+                      placeholder="//@version=5&#10;strategy(&quot;My Momentum&quot;, overlay=true)&#10;// paste a community strategy here…"><?= htmlspecialchars($gtbPineScript, ENT_QUOTES) ?></textarea>
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="gtbPineReview()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary"><i class="fas fa-magnifying-glass"></i> Inspect with AI</button>
+                <button type="button" onclick="gtbPineSuggest()" class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:border-primary hover:text-primary"><i class="fas fa-lightbulb"></i> Suggest one</button>
+                <span id="gtb-pine-status" class="text-xs"></span>
+            </div>
+            <pre id="gtb-pine-out" class="hidden whitespace-pre-wrap text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-3 max-h-64 overflow-y-auto"></pre>
+            <p class="text-xs text-gray-400 dark:text-gray-500">Inspect/Suggest just show AI output — nothing is applied until you press <strong>Save settings</strong>.</p>
         </div>
 
         <div class="flex flex-wrap items-center gap-3 pt-1">
@@ -371,6 +395,35 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
 
 <script>
     const GTB_CSRF = <?= json_encode($csrf_token) ?>;
+
+    async function gtbPineCall(body, btnLabel) {
+        const status = document.getElementById('gtb-pine-status');
+        const out = document.getElementById('gtb-pine-out');
+        status.textContent = btnLabel + '…'; status.className = 'text-xs text-gray-400';
+        try {
+            const res = await fetch('/gtb/bot/pine', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify(Object.assign({ csrf_token: GTB_CSRF }, body)),
+            });
+            const d = await res.json();
+            if (d.ok) {
+                out.textContent = d.text || '(no output)';
+                out.classList.remove('hidden');
+                status.textContent = 'Done' + (d.cost ? ' · $' + (+d.cost).toFixed(5) : '');
+                status.className = 'text-xs text-green-600 dark:text-green-400';
+            } else {
+                status.textContent = d.error || 'Failed'; status.className = 'text-xs text-red-500';
+            }
+        } catch (e) { status.textContent = 'Network error'; status.className = 'text-xs text-red-500'; }
+    }
+    function gtbPineReview() {
+        const code = document.getElementById('pinescript').value.trim();
+        if (!code) { const s = document.getElementById('gtb-pine-status'); s.textContent = 'Paste a script first.'; s.className = 'text-xs text-amber-500'; return; }
+        gtbPineCall({ action: 'review', pinescript: code }, 'Inspecting');
+    }
+    function gtbPineSuggest() {
+        gtbPineCall({ action: 'suggest', hint: document.getElementById('custom_instructions').value || '' }, 'Generating');
+    }
 
     function gtbSyncProvider() {
         const p = document.getElementById('ai_provider').value;
@@ -424,6 +477,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             session_hours: parseFloat(document.getElementById('session_hours').value) || 0,
             stall_minutes: parseInt(document.getElementById('stall_minutes').value) || 0,
             stall_min_gain: parseFloat(document.getElementById('stall_min_gain').value) || 0,
+            session_max_loss: parseFloat(document.getElementById('session_max_loss').value) || 0,
             base_capital: parseFloat(document.getElementById('base_capital').value) || 0,
             min_notional: parseFloat(document.getElementById('min_notional').value) || 0,
             max_trade: parseFloat(document.getElementById('max_trade').value) || 0,
@@ -433,6 +487,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             templates: Array.from(document.querySelectorAll('.gtb-tpl:checked')).map(c => c.value),
             memory_enabled: document.getElementById('memory_enabled').checked,
             custom_instructions: document.getElementById('custom_instructions').value,
+            pinescript: document.getElementById('pinescript').value,
         };
         const orig = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving…';

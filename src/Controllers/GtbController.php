@@ -136,6 +136,8 @@ class GtbController
         $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
         $gtbInstructions = (string) (\Ginto\Support\Env::get('GTB_CUSTOM_INSTRUCTIONS', '') ?? '');
+        $pineB64 = (string) (\Ginto\Support\Env::get('GTB_PINESCRIPT_B64', '') ?? '');
+        $gtbPineScript = $pineB64 !== '' ? (string) base64_decode($pineB64, true) : '';
         $gtbProfiles  = \Ginto\Services\Strategies\GtbProfiles::enabled();
         $gtbCapitalMode = strtolower((string) (\Ginto\Support\Env::get('GTB_CAPITAL_MODE', 'staked') ?? 'staked'));
         if (!in_array($gtbCapitalMode, ['staked', 'full', 'ai'], true)) $gtbCapitalMode = 'staked';
@@ -144,6 +146,7 @@ class GtbController
         $gtbSessionHours= (float) (\Ginto\Support\Env::get('GTB_SESSION_HOURS', '0') ?? 0);
         $gtbStallMin    = (int) (\Ginto\Support\Env::get('GTB_STALL_MINUTES', '0') ?? 0);
         $gtbStallGain   = (float) (\Ginto\Support\Env::get('GTB_STALL_MIN_GAIN_PCT', '0') ?? 0);
+        $gtbSessionMaxLoss = (float) (\Ginto\Support\Env::get('GTB_SESSION_MAX_LOSS', '0') ?? 0);
         $gtbBaseCapital = (float) (\Ginto\Support\Env::get('GTB_BASE_CAPITAL', '7') ?? 7);
         $gtbMinNotional = (float) (\Ginto\Support\Env::get('GTB_MIN_NOTIONAL', '5') ?? 5);
         $gtbMaxTrade    = (float) (\Ginto\Support\Env::get('GTB_MAX_TRADE_USD', '0') ?? 0);
@@ -176,6 +179,7 @@ class GtbController
             'gtbTemplates'      => $gtbTemplates,
             'gtbMemory'         => $gtbMemory,
             'gtbInstructions'   => $gtbInstructions,
+            'gtbPineScript'     => $gtbPineScript,
             'gtbProfiles'       => $gtbProfiles,
             'gtbCapitalMode'    => $gtbCapitalMode,
             'gtbPaperWallet'    => $gtbPaperWallet,
@@ -183,6 +187,7 @@ class GtbController
             'gtbSessionHours'   => $gtbSessionHours,
             'gtbStallMin'       => $gtbStallMin,
             'gtbStallGain'      => $gtbStallGain,
+            'gtbSessionMaxLoss' => $gtbSessionMaxLoss,
             'gtbBaseCapital'    => $gtbBaseCapital,
             'gtbMinNotional'    => $gtbMinNotional,
             'gtbMaxTrade'       => $gtbMaxTrade,
@@ -281,6 +286,10 @@ class GtbController
             // Operator instructions: free-text steering fed into every AI decision.
             $pairs['GTB_CUSTOM_INSTRUCTIONS'] = $this->sanitizeInstr((string) ($input['custom_instructions'] ?? ''));
 
+            // PineScript strategy: base64 in .env to preserve newlines/special chars (blank clears).
+            $pine = (string) ($input['pinescript'] ?? '');
+            $pairs['GTB_PINESCRIPT_B64'] = trim($pine) === '' ? '' : base64_encode(mb_substr($pine, 0, 8000));
+
             // Time-boxing (deterministic): max hold per trade + session window (0 = off).
             $pairs['GTB_MAX_HOLD_MIN'] = (string) max(0, (int) ($input['max_hold_min'] ?? 0));
             $sessH = (float) ($input['session_hours'] ?? 0);
@@ -289,6 +298,8 @@ class GtbController
             // Stall rotation: close a position after N min if it hasn't gained at least X%.
             $pairs['GTB_STALL_MINUTES']      = (string) max(0, (int) ($input['stall_minutes'] ?? 0));
             $pairs['GTB_STALL_MIN_GAIN_PCT'] = $this->numStr($input['stall_min_gain'] ?? 0, 0);
+            // Circuit breaker: stop opening new trades after this much session loss (0 = off).
+            $pairs['GTB_SESSION_MAX_LOSS']   = $this->numStr($input['session_max_loss'] ?? 0, 0);
 
             // Capital & spend limits (numeric; blank/invalid falls back to a safe default).
             $pairs['GTB_BASE_CAPITAL'] = $this->numStr($input['base_capital'] ?? 0, 7,  0.0001);
@@ -689,6 +700,34 @@ class GtbController
                 'active' => $st['active'],
                 'preset' => $st['key'],
                 'source' => $st['source'],
+            ]);
+        } catch (\Throwable $e) {
+            http_response_code(500);
+            echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** POST /gtb/bot/pine — AI inspects a pasted PineScript for bugs/risk, or suggests one. */
+    public function pineTool(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        if (!$this->checkCsrf($input)) exit;
+        try {
+            $brain  = new \Ginto\Services\GtbBrain();
+            $action = (string) ($input['action'] ?? 'review');
+            $res = $action === 'suggest'
+                ? $brain->suggestPine((string) ($input['hint'] ?? ''))
+                : $brain->reviewPine((string) ($input['pinescript'] ?? ''));
+            echo json_encode([
+                'ok'    => !empty($res['ok']),
+                'text'  => $res['text'] ?? null,
+                'error' => $res['error'] ?? null,
+                'model' => $res['model'] ?? null,
+                'cost'  => $res['usage']['cost_usd'] ?? null,
             ]);
         } catch (\Throwable $e) {
             http_response_code(500);

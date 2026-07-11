@@ -145,6 +145,18 @@ class GtbStrategy
             return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
                 'winding down — managing ' . count($open) . ' position(s), no new trades', $tickers);
         }
+        // Circuit breaker: if the session has lost more than the limit, stop opening NEW trades
+        // (open positions still ride their exchange stops). Bounds how bad a session can get.
+        $maxLoss = (float) (Env::get('GTB_SESSION_MAX_LOSS', '0') ?? 0);
+        if ($maxLoss > 0) {
+            $sessStart = $botState->sessionStartedAt();
+            $sessPnl = $sessStart ? $trades->realizedSince($mode, $sessStart) : $realized;
+            if ($sessPnl <= -abs($maxLoss)) {
+                return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
+                    sprintf('circuit breaker — session P&L $%.2f hit the -$%.2f loss limit; no new trades', $sessPnl, abs($maxLoss)), $tickers);
+            }
+        }
+
         // Wallet floor: stop SPENDING (opening new) once the wallet drops below the floor,
         // but keep managing open positions to their exits.
         $floor = (float) (Env::get('GTB_WALLET_FLOOR', '0') ?? 0);
