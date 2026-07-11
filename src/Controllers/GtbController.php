@@ -47,7 +47,8 @@ class GtbController
             $recentTrades = $trades->recent(20);
             $realizedPnl  = $trades->totalRealizedPnl();
 
-            $recentLogs = (new GtbLog())->recent(20);
+            // Trading Log = the operational trade/error events (from gtb_thoughts), not gtb_logs.
+            $recentLogs = (new \Ginto\Models\GtbThought())->tradeLog(20);
         } catch (\Throwable $e) {
             // DB unavailable — render an empty dashboard rather than erroring.
         }
@@ -615,6 +616,7 @@ class GtbController
         try {
             $state = (new \Ginto\Services\GtbStrategy())->openPositionsState();
             $state['bot'] = (new \Ginto\Models\GtbBotState())->status();
+            $state['logs'] = (new \Ginto\Models\GtbThought())->tradeLog(20);
             echo json_encode($state);
         } catch (\Throwable $e) {
             http_response_code(500);

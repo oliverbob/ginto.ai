@@ -17,6 +17,29 @@ class GtbThought
         $this->db = Database::getInstance();
     }
 
+    /**
+     * Operational trade log: entries, exits, and errors (not the verbose AI reasoning),
+     * shaped as {message, level, created_at} for the Trading Log panel.
+     */
+    public function tradeLog(int $limit = 20): array
+    {
+        try {
+            $rows = $this->db->select($this->table, ['message', 'phase', 'role', 'created_at'], [
+                'OR' => ['phase' => ['trade', 'error'], 'role' => 'system'],
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => $limit,
+            ]);
+            if (!is_array($rows)) return [];
+            return array_map(static fn($r) => [
+                'message'    => $r['message'] ?? '',
+                'level'      => (($r['role'] ?? '') === 'system' || ($r['phase'] ?? '') === 'error') ? 'error' : 'trade',
+                'created_at' => $r['created_at'] ?? '',
+            ], $rows);
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     public function add(string $message, string $role = 'claude', string $phase = 'reflect', ?string $symbol = null, ?string $decision = null, ?array $meta = null): void
     {
         try {

@@ -380,6 +380,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             <i class="fas fa-list-ul text-primary mr-2"></i>Trading Log
         </h3>
+        <div id="gtb-log" class="max-h-[420px] overflow-y-auto pr-1">
         <?php if (empty($recentLogs)): ?>
             <div class="py-10 text-center text-gray-400 dark:text-gray-500">
                 <i class="fas fa-inbox text-2xl mb-2"></i>
@@ -400,6 +401,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 <?php endforeach; ?>
             </ul>
         <?php endif; ?>
+        </div>
     </section>
 </div>
 
@@ -896,7 +898,24 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         } catch (e) { /* ignore */ }
     }
 
+    function gtbRenderLog(logs) {
+        const box = document.getElementById('gtb-log');
+        if (!box) return;
+        if (!Array.isArray(logs) || logs.length === 0) {
+            box.innerHTML = '<div class="py-10 text-center text-gray-400 dark:text-gray-500"><i class="fas fa-inbox text-2xl mb-2"></i><p class="text-sm">No activity yet.</p></div>';
+            return;
+        }
+        const esc = s => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+        box.innerHTML = '<ul class="space-y-2">' + logs.map(l => {
+            const c = l.level === 'error' ? 'text-red-500' : 'text-primary';
+            return `<li class="text-sm flex gap-2"><i class="fas fa-circle text-[6px] mt-1.5 ${c}"></i>`
+                + `<div><span class="text-gray-700 dark:text-gray-300">${esc(l.message)}</span>`
+                + `<span class="block text-xs text-gray-400 dark:text-gray-500">${esc(l.created_at)}</span></div></li>`;
+        }).join('') + '</ul>';
+    }
+
     function gtbRenderPortfolio(d) {
+        if (d.logs) gtbRenderLog(d.logs);
         if (d.bot) {
             GTB_BOT.enabled = !!d.bot.enabled;
             GTB_BOT.open_new = ('open_new' in d.bot) ? !!d.bot.open_new : true;
