@@ -186,6 +186,21 @@
           </div>
         </div>
 
+        <!-- Ginto Trading Academy ad (logged-in users; guests get the full academy banner instead) -->
+        <a href="/academy" class="mb-6 w-full max-w-lg block group">
+          <div class="relative overflow-hidden rounded-xl px-5 py-4 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 transition-transform group-hover:scale-[1.01]">
+            <div class="flex items-center gap-4">
+              <div class="text-3xl leading-none">🎓</div>
+              <div class="text-left flex-1 min-w-0">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-white/80">New · Ginto Trading Academy</div>
+                <div class="text-sm font-bold leading-snug">Learn to trade crypto with a real, live AI bot</div>
+                <div class="text-xs text-white/85 mt-0.5">Charts, risk, and the Ginto Trading Bot — hands-on lessons.</div>
+              </div>
+              <div class="shrink-0 inline-flex items-center gap-1 text-xs font-semibold bg-white/15 group-hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors">Explore <span aria-hidden="true">→</span></div>
+            </div>
+          </div>
+        </a>
+
         <!-- Example prompts (loaded dynamically) -->
         <div id="welcome-prompts" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg">
           <!-- Prompts will be fetched from /chat/prompts/ and injected here -->
