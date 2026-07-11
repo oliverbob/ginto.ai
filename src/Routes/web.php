@@ -1681,7 +1681,8 @@ $router->get('/academy', 'AcademyController@index');
 $router->get('/academy/pricing', 'AcademyController@pricing');
 $router->req('/academy/join', 'AcademyController@join', ['POST']); // no-JS fallback: hosted checkout
 $router->req('/academy/qrph/init', 'AcademyController@qrphInit', ['POST']);       // on-site QR Ph: create intent + QR
-$router->req('/academy/qrph/finalize', 'AcademyController@qrphFinalize', ['POST']); // on-site QR Ph: verify paid + grant
+$router->req('/academy/card/init', 'AcademyController@cardInit', ['POST']);       // on-site card: intent + card + 3DS
+$router->req('/academy/qrph/finalize', 'AcademyController@qrphFinalize', ['POST']); // on-site: verify paid + grant (QR or card)
 $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');

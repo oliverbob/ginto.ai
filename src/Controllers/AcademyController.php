@@ -396,8 +396,8 @@ class AcademyController
         }
     }
 
-    /** Record the paid order and grant/refresh the Academy membership (on-site QRPh path). */
-    private function activateMembership(int $userId, array $plan, string $ref, ?string $gatewayPaymentId, float $amount, string $currency): void
+    /** Record the paid order and grant/refresh the Academy membership (on-site QRPh / card path). */
+    private function activateMembership(int $userId, array $plan, string $ref, ?string $gatewayPaymentId, float $amount, string $currency, string $method = 'paymongo_qrph', bool $autoRenew = false): void
     {
         $db      = Database::getInstance();
         $now     = date('Y-m-d H:i:s');
@@ -419,16 +419,16 @@ class AcademyController
             'status'             => 'active',
             'started_at'         => $now,
             'expires_at'         => $expires,
-            'payment_method'     => 'paymongo_qrph',
+            'payment_method'     => $method,
             'payment_reference'  => $ref,
             'gateway_payment_id' => $gatewayPaymentId,
             'amount_paid'        => $amount,
             'currency'           => $currency,
-            'auto_renew'         => 0,
+            'auto_renew'         => $autoRenew ? 1 : 0,
             'created_at'         => $now,
             'updated_at'         => $now,
         ]);
-        error_log("Academy membership activated on-site: user={$userId} plan={$plan['id']} pi={$ref}");
+        error_log("Academy membership activated on-site: user={$userId} plan={$plan['id']} method={$method} pi={$ref}");
     }
 
     /**
@@ -512,6 +512,83 @@ class AcademyController
     }
 
     /**
+     * POST /academy/card/init — start an ON-SITE credit/debit card payment (card entered on
+     * ginto.ai). Creates the intent, attaches the card, and returns any 3DS/OTP next-action URL
+     * to complete inline. Finalization reuses /academy/qrph/finalize (it verifies PI status).
+     */
+    public function cardInit(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        header('Content-Type: application/json; charset=utf-8');
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { http_response_code(405); echo json_encode(['success' => false, 'message' => 'Method not allowed']); exit; }
+        if (empty($_POST['csrf_token']) || !function_exists('validateCsrfToken') || !validateCsrfToken($_POST['csrf_token'])) {
+            http_response_code(403); echo json_encode(['success' => false, 'message' => 'Invalid session token — please refresh.']); exit;
+        }
+        try {
+            $db   = Database::getInstance();
+            $plan = $db->get('subscription_plans', '*', ['name' => (string) ($_POST['plan'] ?? ''), 'plan_type' => 'academy', 'is_active' => 1]);
+            if (!$plan) { echo json_encode(['success' => false, 'message' => 'That plan is unavailable.']); exit; }
+
+            $userId = $_SESSION['user_id'] ?? null;
+            $guest  = null;
+            if (empty($userId)) {
+                $name  = trim((string) ($_POST['name'] ?? ''));
+                $email = strtolower(trim((string) ($_POST['email'] ?? '')));
+                $pass  = (string) ($_POST['password'] ?? '');
+                if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($pass) < 6) {
+                    echo json_encode(['success' => false, 'message' => 'Enter your name, a valid email, and a 6+ character password.']); exit;
+                }
+                if (is_array($db->get('users', ['id'], ['email' => $email]))) {
+                    echo json_encode(['success' => false, 'message' => 'That email already has an account — please log in.', 'login' => true]); exit;
+                }
+                $guest    = ['name' => mb_substr($name, 0, 100), 'email' => $email, 'password_hash' => password_hash($pass, PASSWORD_DEFAULT)];
+                $payEmail = $email; $payName = $name;
+            } else {
+                $u = $db->get('users', ['email', 'fullname', 'username'], ['id' => $userId]);
+                $payEmail = $u['email'] ?? '';
+                $payName  = ($u['fullname'] ?? '') !== '' ? $u['fullname'] : ($u['username'] ?? 'Ginto Learner');
+                if ($payEmail === '') { echo json_encode(['success' => false, 'message' => 'Your account has no email on file.']); exit; }
+            }
+
+            $card = [
+                'number'    => preg_replace('/[^0-9]/', '', (string) ($_POST['card_number'] ?? '')),
+                'exp_month' => preg_replace('/[^0-9]/', '', (string) ($_POST['exp_month'] ?? '')),
+                'exp_year'  => preg_replace('/[^0-9]/', '', (string) ($_POST['exp_year'] ?? '')),
+                'cvc'       => preg_replace('/[^0-9]/', '', (string) ($_POST['cvc'] ?? '')),
+            ];
+            if (strlen($card['number']) < 13 || strlen($card['number']) > 19) { echo json_encode(['success' => false, 'message' => 'Please enter a valid card number.']); exit; }
+            if ((int) $card['exp_month'] < 1 || (int) $card['exp_month'] > 12 || strlen($card['exp_year']) < 2 || strlen($card['cvc']) < 3) {
+                echo json_encode(['success' => false, 'message' => 'Please check the card expiry and CVC.']); exit;
+            }
+
+            if (!\Ginto\Handlers\PayMongoHandler::isConfigured()) { echo json_encode(['success' => false, 'message' => 'Payments are not configured.']); exit; }
+
+            $vat     = $this->vatBreakdown((float) $plan['price_monthly']);
+            $amount  = (int) round($vat['total']); // whole pesos, VAT-inclusive
+            $handler = new \Ginto\Handlers\PayMongoHandler();
+            $res     = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . ' (incl. 12% VAT)', $card, []);
+            if (empty($res['success'])) { echo json_encode(['success' => false, 'message' => $res['message'] ?? 'The card could not be processed.']); exit; }
+
+            $_SESSION['paymongo_pi_id'] = $res['pi_id']; // shared status poller
+            $_SESSION['academy_pay']    = [
+                'pi_id'    => $res['pi_id'], 'plan_id' => $plan['id'], 'amount' => $amount,
+                'currency' => $plan['price_currency'] ?? 'PHP', 'user_id' => $userId ? (int) $userId : null,
+                'guest'    => $guest, 'method' => 'paymongo_card', 'auto_renew' => !empty($_POST['auto_renew']),
+            ];
+            $nextUrl = $res['next_action']['redirect']['url'] ?? ($res['next_action']['url'] ?? null);
+            echo json_encode([
+                'success' => true, 'pi_id' => $res['pi_id'], 'status' => $res['status'] ?? 'processing',
+                'requires_action' => !empty($nextUrl), 'next_action_url' => $nextUrl,
+                'amount' => $amount, 'base' => $vat['base'], 'vat' => $vat['vat'],
+            ]);
+            exit;
+        } catch (\Throwable $e) {
+            error_log('Academy cardInit error: ' . $e->getMessage());
+            http_response_code(500); echo json_encode(['success' => false, 'message' => 'An error occurred processing the card.']); exit;
+        }
+    }
+
+    /**
      * POST /academy/qrph/finalize — verify the payment SUCCEEDED server-side, then create the
      * account (guests) + grant the membership. Called by the poller when the QR is paid.
      */
@@ -557,7 +634,7 @@ class AcademyController
                 if (is_array($created)) $this->loginSession($created);
             }
 
-            $this->activateMembership((int) $userId, $plan, $piId, $st['payment_id'] ?? null, (float) $ctx['amount'], (string) ($ctx['currency'] ?? 'PHP'));
+            $this->activateMembership((int) $userId, $plan, $piId, $st['payment_id'] ?? null, (float) $ctx['amount'], (string) ($ctx['currency'] ?? 'PHP'), (string) ($ctx['method'] ?? 'paymongo_qrph'), !empty($ctx['auto_renew']));
             unset($_SESSION['academy_pay'], $_SESSION['paymongo_pi_id']);
             echo json_encode(['success' => true, 'redirect' => '/academy/learn']);
             exit;

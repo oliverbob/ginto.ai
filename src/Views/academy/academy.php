@@ -242,12 +242,23 @@ $csrf = $csrf_token ?? '';
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Password</label>
                 <input id="join-password" type="password" minlength="6" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="At least 6 characters">
             </div>
-            <button type="button" onclick="gtaStartPay()" class="w-full mt-1 px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90">Continue to payment</button>
+            <button type="button" onclick="gtaChooseMethod()" class="w-full mt-1 px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90">Continue to payment</button>
             <p class="text-center text-xs text-gray-400">Already have an account? <a href="/login?redirect=<?= urlencode('/academy#pricing') ?>" class="text-primary hover:underline">Log in</a>.</p>
         </div>
         <?php endif; ?>
 
-        <!-- Pane 2: on-site QR Ph payment -->
+        <!-- Pane 2: choose a payment method -->
+        <div id="join-method-pane" class="hidden space-y-3">
+            <div id="join-total-line" class="rounded-lg bg-gray-50 dark:bg-white/5 px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
+                <div class="flex justify-between"><span>Subtotal</span><span id="jm-sub">—</span></div>
+                <div class="flex justify-between"><span>VAT (12%)</span><span id="jm-vat">—</span></div>
+                <div class="flex justify-between font-bold text-base text-gray-900 dark:text-gray-100 mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>Total due</span><span id="jm-total">—</span></div>
+            </div>
+            <button type="button" onclick="gtaPickQr()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary text-left"><i class="fas fa-qrcode text-primary text-lg"></i><span><span class="font-semibold block">QR Ph</span><span class="text-xs text-gray-400">GCash, Maya, GoTyme, BPI &amp; banks</span></span></button>
+            <button type="button" onclick="gtaPickCard()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary text-left"><i class="fas fa-credit-card text-primary text-lg"></i><span><span class="font-semibold block">Credit / Debit card</span><span class="text-xs text-gray-400">Visa, Mastercard — entered on ginto.ai</span></span></button>
+        </div>
+
+        <!-- Pane 3a: on-site QR Ph payment -->
         <div id="join-pay-pane" class="hidden text-center">
             <div id="join-pay-loading" class="py-8 text-sm text-gray-500"><i class="fas fa-spinner fa-spin mr-1"></i> Generating your QR…</div>
             <div id="join-qr-wrap" class="hidden">
@@ -263,85 +274,156 @@ $csrf = $csrf_token ?? '';
             </div>
         </div>
 
-        <p class="mt-4 text-center text-[11px] text-gray-400"><i class="fas fa-lock mr-1"></i> Paid securely on ginto.ai via QR Ph. Prefer a card? <a href="#" onclick="gtaHostedFallback(event)" class="text-primary hover:underline">Use the secure checkout page</a>.</p>
-        <form id="join-hosted-fallback" action="/academy/join" method="post" class="hidden">
-            <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($csrf) ?>">
-            <input type="hidden" name="plan" id="join-hosted-plan" value="">
-        </form>
+        <!-- Pane 3b: on-site card payment -->
+        <div id="join-card-pane" class="hidden space-y-3">
+            <div>
+                <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Card number</label>
+                <input id="card-number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="1234 5678 9012 3456">
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div><label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">MM</label><input id="card-mm" type="text" inputmode="numeric" maxlength="2" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="09"></div>
+                <div><label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">YY</label><input id="card-yy" type="text" inputmode="numeric" maxlength="2" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="28"></div>
+                <div><label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">CVC</label><input id="card-cvc" type="text" inputmode="numeric" autocomplete="cc-csc" maxlength="4" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="123"></div>
+            </div>
+            <label class="flex items-start gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer">
+                <input id="card-autorenew" type="checkbox" class="mt-0.5" style="accent-color:#6366f1;">
+                <span>Save my card and remind me to renew each month (assisted auto-renew). We'll email a 1-click renewal near expiry — you confirm the CVC to pay.</span>
+            </label>
+            <button type="button" id="card-pay-btn" onclick="gtaPayCard()" class="w-full px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90">Pay <span id="card-pay-amount"></span></button>
+            <div class="text-sm text-center" id="card-pay-status"></div>
+            <p class="text-center text-[11px] text-gray-400"><i class="fas fa-lock mr-1"></i> Card details are sent directly to PayMongo over TLS. Your bank may ask for OTP/3DS.</p>
+        </div>
+
+        <p class="mt-4 text-center text-[11px] text-gray-400"><i class="fas fa-shield-halved mr-1"></i> Paid securely on ginto.ai. QR Ph &amp; card, incl. 12% VAT.</p>
+    </div>
+</div>
+
+<!-- 3DS / OTP verification overlay (card) -->
+<div id="join-3ds" class="hidden fixed inset-0 z-[60] bg-black/70 items-center justify-center p-4">
+    <div class="w-full max-w-md h-[80vh] rounded-2xl bg-white overflow-hidden flex flex-col shadow-2xl">
+        <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+            <span class="text-sm font-semibold text-gray-700">Verify your card</span>
+            <button type="button" onclick="gtaClose3ds()" class="text-gray-400 hover:text-primary"><i class="fas fa-xmark"></i></button>
+        </div>
+        <iframe id="join-3ds-frame" class="flex-1 w-full border-0" src="about:blank" title="Card verification"></iframe>
+        <div id="join-3ds-fallback" class="hidden px-4 py-2 text-center text-xs text-gray-500 border-t border-gray-200">If verification doesn't load, <a id="join-3ds-newtab" target="_blank" rel="noopener" class="text-primary underline">open it in a new tab</a>. This window updates once you're done.</div>
     </div>
 </div>
 <script>
 (function () {
     var CSRF = <?= json_encode($csrf) ?>;
     var plan = null, piId = null, pollTimer = null, isGuest = <?= $isLoggedIn ? 'false' : 'true' ?>;
+    var curBase = 0, curVat = 0, curTotal = 0;
     function el(id) { return document.getElementById(id); }
+    function peso(n) { return '₱' + Number(n).toLocaleString(); }
     function showErr(m) { var e = el('join-error'); if (!e) return; e.textContent = m; e.classList.remove('hidden'); }
     function clearErr() { var e = el('join-error'); if (!e) return; e.textContent = ''; e.classList.add('hidden'); }
+    function hide(id) { if (el(id)) el(id).classList.add('hidden'); }
+    function show(id) { if (el(id)) el(id).classList.remove('hidden'); }
+    function guestValid() {
+        if (!(isGuest && el('join-form-pane'))) return true;
+        var n = el('join-name').value.trim(), e = el('join-email').value.trim(), p = el('join-password').value;
+        return n && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) && p.length >= 6;
+    }
+    function appendGuest(fd) {
+        if (isGuest && el('join-form-pane')) {
+            fd.append('name', el('join-name').value.trim());
+            fd.append('email', el('join-email').value.trim());
+            fd.append('password', el('join-password').value);
+        }
+    }
 
     window.gtaBuy = function (planName, label, price, guest) {
         plan = planName; isGuest = !!guest; clearErr();
+        curBase = Number(String(price).replace(/[^\d.]/g, '')) || 0;
+        curVat = Math.round(curBase * 0.12); curTotal = curBase + curVat;
         el('join-plan-label').textContent = label + ' — ' + price + '/mo';
-        if (el('join-hosted-plan')) el('join-hosted-plan').value = planName;
-        el('join-pay-pane').classList.add('hidden');
-        el('join-qr-wrap').classList.add('hidden');
-        el('join-pay-loading').classList.remove('hidden');
-        if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
+        // reset all panes
+        hide('join-method-pane'); hide('join-pay-pane'); hide('join-qr-wrap'); hide('join-card-pane');
+        show('join-pay-loading');
+        // seed totals
+        if (el('jm-sub')) el('jm-sub').textContent = peso(curBase);
+        if (el('jm-vat')) el('jm-vat').textContent = peso(curVat);
+        if (el('jm-total')) el('jm-total').textContent = peso(curTotal);
+        if (el('card-pay-amount')) el('card-pay-amount').textContent = peso(curTotal);
         el('join-modal').classList.remove('hidden'); el('join-modal').classList.add('flex');
         document.body.style.overflow = 'hidden';
-        if (!isGuest) gtaStartPay(); // logged-in members skip straight to the QR
+        if (isGuest && el('join-form-pane')) { show('join-form-pane'); }
+        else { gtaChooseMethod(); }  // logged-in: straight to the method chooser
     };
+    window.gtaChooseMethod = function () {
+        clearErr();
+        if (!guestValid()) { showErr('Enter your name, a valid email, and a 6+ character password.'); return; }
+        hide('join-form-pane'); show('join-method-pane');
+    };
+    window.gtaPickQr = function () { hide('join-method-pane'); gtaStartPay(); };
+    window.gtaPickCard = function () { clearErr(); hide('join-method-pane'); show('join-card-pane'); };
     window.gtaCloseJoin = function () {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+        gtaClose3ds();
         el('join-modal').classList.add('hidden'); el('join-modal').classList.remove('flex');
         document.body.style.overflow = '';
     };
-    window.gtaHostedFallback = function (ev) {
-        ev.preventDefault();
-        if (el('join-hosted-plan')) el('join-hosted-plan').value = plan;
-        el('join-hosted-fallback').submit();
-    };
 
+    // ---- QR Ph ----
     window.gtaStartPay = function () {
         clearErr();
-        var fd = new FormData();
-        fd.append('csrf_token', CSRF);
-        fd.append('plan', plan);
-        if (isGuest && el('join-form-pane')) {
-            var n = el('join-name').value.trim(), e = el('join-email').value.trim(), p = el('join-password').value;
-            if (!n || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e) || p.length < 6) {
-                showErr('Enter your name, a valid email, and a 6+ character password.'); return;
-            }
-            fd.append('name', n); fd.append('email', e); fd.append('password', p);
-        }
-        if (el('join-form-pane')) el('join-form-pane').classList.add('hidden');
-        el('join-pay-pane').classList.remove('hidden');
-        el('join-qr-wrap').classList.add('hidden');
-        el('join-pay-loading').classList.remove('hidden');
+        var fd = new FormData(); fd.append('csrf_token', CSRF); fd.append('plan', plan); appendGuest(fd);
+        show('join-pay-pane'); hide('join-qr-wrap'); show('join-pay-loading');
         fetch('/academy/qrph/init', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (d) {
-                if (!d.success) {
-                    el('join-pay-loading').classList.add('hidden');
-                    if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
-                    showErr(d.message || 'Could not start the payment.');
-                    return;
-                }
+                if (!d.success) { hide('join-pay-pane'); show('join-method-pane'); showErr(d.message || 'Could not start the payment.'); return; }
                 piId = d.pi_id;
                 if (d.qr_image) { el('join-qr').src = d.qr_image; el('join-qr-dl').href = d.qr_image; }
-                el('join-pay-amount').textContent = '₱' + Number(d.amount).toLocaleString();
-                if (el('join-sub')) el('join-sub').textContent = '₱' + Number(d.base).toLocaleString();
-                if (el('join-vat')) el('join-vat').textContent = '₱' + Number(d.vat).toLocaleString();
-                el('join-pay-loading').classList.add('hidden');
-                el('join-qr-wrap').classList.remove('hidden');
-                startPoll();
+                el('join-pay-amount').textContent = peso(d.amount);
+                if (el('join-sub')) el('join-sub').textContent = peso(d.base);
+                if (el('join-vat')) el('join-vat').textContent = peso(d.vat);
+                hide('join-pay-loading'); show('join-qr-wrap'); startPoll();
             })
-            .catch(function () {
-                el('join-pay-loading').classList.add('hidden');
-                if (el('join-form-pane')) el('join-form-pane').classList.remove('hidden');
-                showErr('Network error — please try again.');
-            });
+            .catch(function () { hide('join-pay-pane'); show('join-method-pane'); showErr('Network error — please try again.'); });
     };
 
+    // ---- Card ----
+    window.gtaPayCard = function () {
+        clearErr();
+        var digits = (el('card-number').value || '').replace(/\D/g, '');
+        var mm = (el('card-mm').value || '').replace(/\D/g, ''), yy = (el('card-yy').value || '').replace(/\D/g, ''), cvc = (el('card-cvc').value || '').replace(/\D/g, '');
+        if (digits.length < 13 || digits.length > 19) { showErr('Please enter a valid card number.'); return; }
+        if (+mm < 1 || +mm > 12 || yy.length < 2 || cvc.length < 3) { showErr('Please check the card expiry and CVC.'); return; }
+        var fd = new FormData();
+        fd.append('csrf_token', CSRF); fd.append('plan', plan);
+        fd.append('card_number', digits); fd.append('exp_month', mm); fd.append('exp_year', yy); fd.append('cvc', cvc);
+        if (el('card-autorenew') && el('card-autorenew').checked) fd.append('auto_renew', '1');
+        appendGuest(fd);
+        var btn = el('card-pay-btn'); if (btn) { btn.disabled = true; btn.textContent = 'Processing…'; }
+        el('card-pay-status').textContent = '';
+        fetch('/academy/card/init', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd, credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (btn) { btn.disabled = false; btn.innerHTML = 'Pay ' + peso(curTotal); }
+                if (!d.success) { showErr(d.message || 'The card could not be processed.'); return; }
+                piId = d.pi_id;
+                if (d.requires_action && d.next_action_url) { el('card-pay-status').innerHTML = '<i class="fas fa-shield-halved mr-1 text-primary"></i> Complete the bank verification…'; gtaOpen3ds(d.next_action_url); startPoll(); }
+                else if (d.status === 'succeeded') { finalize(); }
+                else { el('card-pay-status').innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Confirming your payment…'; startPoll(); }
+            })
+            .catch(function () { if (btn) { btn.disabled = false; btn.innerHTML = 'Pay ' + peso(curTotal); } showErr('Network error — please try again.'); });
+    };
+    window.gtaOpen3ds = function (url) {
+        el('join-3ds-frame').src = url;
+        if (el('join-3ds-newtab')) el('join-3ds-newtab').href = url;
+        hide('join-3ds-fallback');
+        el('join-3ds').classList.remove('hidden'); el('join-3ds').classList.add('flex');
+        setTimeout(function () { if (!el('join-3ds').classList.contains('hidden')) show('join-3ds-fallback'); }, 4500);
+    };
+    window.gtaClose3ds = function () {
+        var o = el('join-3ds'); if (!o) return;
+        o.classList.add('hidden'); o.classList.remove('flex');
+        if (el('join-3ds-frame')) el('join-3ds-frame').src = 'about:blank';
+    };
+
+    // ---- shared poll + finalize (QR or card) ----
     function startPoll() {
         if (pollTimer) clearInterval(pollTimer);
         pollTimer = setInterval(function () {
@@ -352,7 +434,9 @@ $csrf = $csrf_token ?? '';
         }, 3000);
     }
     function finalize() {
-        el('join-pay-status').innerHTML = '<i class="fas fa-circle-check mr-1 text-green-500"></i> Payment received — activating your membership…';
+        gtaClose3ds();
+        if (el('join-pay-status')) el('join-pay-status').innerHTML = '<i class="fas fa-circle-check mr-1 text-green-500"></i> Payment received — activating your membership…';
+        if (el('card-pay-status')) el('card-pay-status').innerHTML = '<i class="fas fa-circle-check mr-1 text-green-500"></i> Payment received — activating…';
         var fd = new FormData(); fd.append('csrf_token', CSRF); fd.append('pi_id', piId);
         fetch('/academy/qrph/finalize', { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
@@ -362,7 +446,7 @@ $csrf = $csrf_token ?? '';
             })
             .catch(function () { showErr('Payment received but activation failed — please contact support.'); });
     }
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') gtaCloseJoin(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (!el('join-3ds').classList.contains('hidden')) gtaClose3ds(); else gtaCloseJoin(); } });
     <?php if ($err): ?>window.addEventListener('DOMContentLoaded', function () { var s = document.getElementById('pricing'); if (s) s.scrollIntoView(); });<?php endif; ?>
 })();
 </script>
