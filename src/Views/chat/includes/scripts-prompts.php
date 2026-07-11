@@ -26,25 +26,7 @@
                 </div>
                 <div style="margin-top:18px;display:inline-flex;align-items:center;gap:8px;background:#fff;color:#4f46e5;font-weight:800;padding:11px 20px;border-radius:12px;font-size:0.9rem;">Start learning <span>→</span></div>
               </div>
-              <div style="flex:1 1 240px;min-width:220px;">
-                <svg viewBox="0 0 320 160" width="100%" style="display:block;max-width:340px;margin:0 auto;">
-                  <line x1="10" y1="30" x2="310" y2="30" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4 4"/>
-                  <text x="14" y="24" fill="rgba(255,255,255,0.8)" font-size="10">target</text>
-                  <line x1="10" y1="120" x2="310" y2="120" stroke="rgba(255,255,255,0.35)" stroke-width="1" stroke-dasharray="4 4"/>
-                  <text x="14" y="134" fill="rgba(255,255,255,0.8)" font-size="10">entry</text>
-                  <!-- candlesticks trending up -->
-                  <g stroke-linecap="round">
-                    <line x1="34"  y1="98"  x2="34"  y2="128" stroke="rgba(255,255,255,0.55)"/><rect x="27"  y="104" width="14" height="18" rx="1.5" fill="#f87171"/>
-                    <line x1="70"  y1="82"  x2="70"  y2="112" stroke="rgba(255,255,255,0.55)"/><rect x="63"  y="88"  width="14" height="18" rx="1.5" fill="#34d399"/>
-                    <line x1="106" y1="70"  x2="106" y2="98"  stroke="rgba(255,255,255,0.55)"/><rect x="99"  y="76"  width="14" height="16" rx="1.5" fill="#34d399"/>
-                    <line x1="142" y1="74"  x2="142" y2="100" stroke="rgba(255,255,255,0.55)"/><rect x="135" y="80"  width="14" height="14" rx="1.5" fill="#f87171"/>
-                    <line x1="178" y1="56"  x2="178" y2="88"  stroke="rgba(255,255,255,0.55)"/><rect x="171" y="62"  width="14" height="20" rx="1.5" fill="#34d399"/>
-                    <line x1="214" y1="44"  x2="214" y2="70"  stroke="rgba(255,255,255,0.55)"/><rect x="207" y="50"  width="14" height="16" rx="1.5" fill="#34d399"/>
-                    <line x1="250" y1="48"  x2="250" y2="72"  stroke="rgba(255,255,255,0.55)"/><rect x="243" y="54"  width="14" height="12" rx="1.5" fill="#f87171"/>
-                    <line x1="286" y1="30"  x2="286" y2="58"  stroke="rgba(255,255,255,0.55)"/><rect x="279" y="36"  width="14" height="18" rx="1.5" fill="#34d399"/>
-                  </g>
-                </svg>
-              </div>
+              <div id="home-academy-charts" style="flex:1 1 260px;min-width:220px;display:flex;flex-direction:column;gap:8px;"></div>
             </div>
           </a>
           <a href="/marketplace" aria-label="Visit Ginto Mall" style="display:block;margin-top:18px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;" onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 12px 40px rgba(0,0,0,0.28)';" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(0,0,0,0.18)';">
@@ -57,9 +39,76 @@
           </a>
         </div>
       `;
+      renderHomeAcademyCharts();
     }
   }
-  
+
+  // Live gainer / popular / loser mini charts for the homepage Academy banner (Binance data).
+  function renderHomeAcademyCharts() {
+    const wrap = document.getElementById('home-academy-charts');
+    if (!wrap) return;
+    function go() {
+      fetch('https://api.binance.com/api/v3/ticker/24hr')
+        .then(function (r) { return r.json(); })
+        .then(function (all) {
+          if (!Array.isArray(all)) return;
+          const stable = ['USDCUSDT','FDUSDUSDT','TUSDUSDT','BUSDUSDT','DAIUSDT','EURUSDT','USD1USDT'];
+          const usdt = all.filter(function (t) {
+            return /USDT$/.test(t.symbol) && !/(UP|DOWN|BULL|BEAR)USDT$/.test(t.symbol)
+              && stable.indexOf(t.symbol) < 0 && parseFloat(t.quoteVolume) > 30000000;
+          });
+          if (usdt.length < 3) return;
+          usdt.sort(function (a, b) { return parseFloat(b.priceChangePercent) - parseFloat(a.priceChangePercent); });
+          const popular = all.find(function (t) { return t.symbol === 'BTCUSDT'; }) || usdt[Math.floor(usdt.length / 2)];
+          const picks = [
+            { t: usdt[0], tag: 'TOP GAINER' },
+            { t: popular, tag: 'POPULAR' },
+            { t: usdt[usdt.length - 1], tag: 'TOP LOSER' }
+          ];
+          wrap.innerHTML = '';
+          picks.forEach(function (p) {
+            const d = document.createElement('div');
+            d.setAttribute('data-symbol', p.t.symbol);
+            d.setAttribute('data-chg', parseFloat(p.t.priceChangePercent).toFixed(2));
+            d.setAttribute('data-tag', p.tag);
+            d.style.cssText = 'position:relative;height:56px;border-radius:8px;overflow:hidden;background:rgba(0,0,0,0.18);';
+            wrap.appendChild(d);
+            drawHomeMini(d);
+          });
+        }).catch(function () {});
+    }
+    if (typeof LightweightCharts !== 'undefined') go();
+    else {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+      s.onload = go; document.head.appendChild(s);
+    }
+  }
+  function drawHomeMini(el) {
+    if (typeof LightweightCharts === 'undefined') return;
+    const sym = el.getAttribute('data-symbol');
+    const chg = parseFloat(el.getAttribute('data-chg'));
+    const tag = el.getAttribute('data-tag');
+    const up = chg >= 0, col = up ? '#22c55e' : '#ef4444';
+    const label = document.createElement('div');
+    label.style.cssText = 'position:absolute;inset:0;z-index:2;display:flex;justify-content:space-between;align-items:flex-start;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;pointer-events:none;';
+    label.innerHTML = '<span style="opacity:.85">' + tag + ' · ' + sym.replace('USDT', '') + '</span><span style="color:' + col + '">' + (up ? '+' : '') + chg + '%</span>';
+    el.appendChild(label);
+    const chart = LightweightCharts.createChart(el, {
+      width: el.clientWidth || 240, height: 56,
+      layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(0,0,0,0)', fontSize: 1 },
+      grid: { vertLines: { visible: false }, horzLines: { visible: false } },
+      rightPriceScale: { visible: false }, leftPriceScale: { visible: false }, timeScale: { visible: false },
+      handleScale: false, handleScroll: false, crosshair: { mode: 0 }
+    });
+    const series = chart.addAreaSeries({ lineColor: col, topColor: up ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)', bottomColor: 'rgba(0,0,0,0)', lineWidth: 2, priceLineVisible: false, lastValueVisible: false });
+    fetch('https://api.binance.com/api/v3/klines?symbol=' + sym + '&interval=15m&limit=48')
+      .then(function (r) { return r.json(); })
+      .then(function (rows) { if (!Array.isArray(rows)) return; series.setData(rows.map(function (k) { return { time: Math.floor(k[0] / 1000), value: +k[4] }; })); chart.timeScale().fitContent(); })
+      .catch(function () {});
+    try { new ResizeObserver(function () { try { chart.applyOptions({ width: el.clientWidth }); } catch (e) {} }).observe(el); } catch (e) {}
+  }
+
   // Example prompts: fetch role-based prompts from server and render
   function renderPrompts(prompts) {
     const container = document.getElementById('welcome-prompts');
