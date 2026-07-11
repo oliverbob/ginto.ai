@@ -128,8 +128,9 @@ class GtbController
         $anthropicScanModel = (string) (\Ginto\Support\Env::get('ANTHROPIC_SCAN_MODEL', 'claude-haiku-4-5') ?? 'claude-haiku-4-5');
         $aiProvider   = strtolower((string) (\Ginto\Support\Env::get('GTB_AI_PROVIDER', 'anthropic') ?? 'anthropic'));
         if (!in_array($aiProvider, ['anthropic', 'groq'], true)) $aiProvider = 'anthropic';
-        $groqKeySet   = (string) (\Ginto\Support\Env::get('GROQ_API_KEY', '') ?? '') !== '';
-        $groqModel    = (string) (\Ginto\Support\Env::get('GROQ_MODEL', 'llama-3.3-70b-versatile') ?? 'llama-3.3-70b-versatile');
+        $groqKeySet   = (string) (\Ginto\Support\Env::get('GTB_GROQ_API_KEY', '') ?? '') !== '';
+        $groqSharedKey= (string) (\Ginto\Support\Env::get('GROQ_API_KEY', '') ?? '') !== '';
+        $groqModel    = (string) (\Ginto\Support\Env::get('GROQ_MODEL', 'openai/gpt-oss-120b') ?? 'openai/gpt-oss-120b');
         $groqScanModel= (string) (\Ginto\Support\Env::get('GROQ_SCAN_MODEL', 'llama-3.1-8b-instant') ?? 'llama-3.1-8b-instant');
         $gtbTemplates = array_filter(array_map('trim', explode(',', (string) (\Ginto\Support\Env::get('GTB_TEMPLATES', 'scalp,breakout,trend,pullback') ?? ''))));
         $gtbMemory    = \Ginto\Support\Env::bool('GTB_MEMORY_ENABLED', false);
@@ -168,6 +169,7 @@ class GtbController
             'anthropicScanModel'=> $anthropicScanModel,
             'aiProvider'        => $aiProvider,
             'groqKeySet'        => $groqKeySet,
+            'groqSharedKey'     => $groqSharedKey,
             'groqModel'         => $groqModel,
             'groqScanModel'     => $groqScanModel,
             'gtbTemplates'      => $gtbTemplates,
@@ -246,9 +248,9 @@ class GtbController
             if (in_array($decModel, $allowedModels, true))  $pairs['ANTHROPIC_MODEL'] = $decModel;
             if (in_array($scanModel, $allowedModels, true)) $pairs['ANTHROPIC_SCAN_MODEL'] = $scanModel;
 
-            // Groq key (write-only) + model IDs (accept any valid-looking model slug)
+            // Dedicated GTB Groq key (write-only; separate from the app-wide GROQ_API_KEY)
             $groqKey = trim((string) ($input['groq_api_key'] ?? ''));
-            if ($groqKey !== '') $pairs['GROQ_API_KEY'] = $groqKey;
+            if ($groqKey !== '') $pairs['GTB_GROQ_API_KEY'] = $groqKey;
             $isModelId = static fn($m) => is_string($m) && $m !== '' && preg_match('#^[A-Za-z0-9._/\-]+$#', $m);
             $gDec  = (string) ($input['groq_decision_model'] ?? '');
             $gScan = (string) ($input['groq_scan_model'] ?? '');

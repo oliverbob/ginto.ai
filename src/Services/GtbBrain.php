@@ -24,13 +24,12 @@ class GtbBrain
         'claude-sonnet-5'  => [3.0, 15.0],
         'claude-haiku-4-5' => [1.0, 5.0],
         // Groq (OpenAI-compatible) — far cheaper
-        'llama-3.1-8b-instant'          => [0.05, 0.08],
-        'llama-3.3-70b-versatile'       => [0.59, 0.79],
-        'deepseek-r1-distill-llama-70b' => [0.75, 0.99],
-        'openai/gpt-oss-120b'           => [0.15, 0.75],
-        'openai/gpt-oss-20b'            => [0.10, 0.50],
-        'qwen/qwen3-32b'                => [0.29, 0.59],
-        'moonshotai/kimi-k2-instruct'   => [1.00, 3.00],
+        'llama-3.1-8b-instant'                      => [0.05, 0.08],
+        'llama-3.3-70b-versatile'                   => [0.59, 0.79],
+        'meta-llama/llama-4-scout-17b-16e-instruct' => [0.11, 0.34],
+        'openai/gpt-oss-120b'                       => [0.15, 0.75],
+        'openai/gpt-oss-20b'                        => [0.10, 0.50],
+        'qwen/qwen3-32b'                            => [0.29, 0.59],
     ];
 
     private string $provider;
@@ -45,8 +44,10 @@ class GtbBrain
         if (!in_array($this->provider, ['anthropic', 'groq'], true)) $this->provider = 'anthropic';
 
         if ($this->provider === 'groq') {
-            $this->apiKey        = (string) (Env::get('GROQ_API_KEY', '') ?? '');
-            $this->decisionModel = (string) (Env::get('GROQ_MODEL', 'llama-3.3-70b-versatile') ?? '') ?: 'llama-3.3-70b-versatile';
+            // Dedicated GTB Groq key; fall back to the app-wide key so the bot never goes dark.
+            $this->apiKey        = (string) (Env::get('GTB_GROQ_API_KEY', '') ?? '');
+            if ($this->apiKey === '') $this->apiKey = (string) (Env::get('GROQ_API_KEY', '') ?? '');
+            $this->decisionModel = (string) (Env::get('GROQ_MODEL', 'openai/gpt-oss-120b') ?? '') ?: 'openai/gpt-oss-120b';
             $this->scanModel     = (string) (Env::get('GROQ_SCAN_MODEL', 'llama-3.1-8b-instant') ?? '') ?: 'llama-3.1-8b-instant';
         } else {
             $this->apiKey        = (string) (Env::get('ANTHROPIC_API_KEY', '') ?? '');
@@ -215,21 +216,31 @@ class GtbBrain
     {
         $body = [
             'model'       => $model,
-            'max_tokens'  => $maxTokens,
+            'max_tokens'  => max($maxTokens, 512),   // reasoning models need room for the answer AFTER thinking
             'temperature' => 0.4,
             'messages'    => [
                 ['role' => 'system', 'content' => $system],
                 ['role' => 'user',   'content' => $user],
             ],
         ];
+        // Keep reasoning short so the final answer (with the DECISION line) isn't starved.
+        $lm = strtolower($model);
+        if (strpos($lm, 'gpt-oss') !== false) {
+            $body['reasoning_effort'] = 'low';
+        } elseif (strpos($lm, 'qwen3') !== false || strpos($lm, 'deepseek') !== false) {
+            $body['reasoning_format'] = 'parsed';
+        }
         $resp = $this->httpJson('https://api.groq.com/openai/v1/chat/completions', [
             'Authorization: Bearer ' . $this->apiKey,
             'content-type: application/json',
         ], $body);
         if (empty($resp['ok'])) return ['ok' => false, 'error' => $resp['error']];
         $data = $resp['data'];
-        $text = (string) ($data['choices'][0]['message']['content'] ?? '');
-        // Reasoning models (e.g. DeepSeek R1) may prefix <think>...</think>; strip it.
+        $msg  = $data['choices'][0]['message'] ?? [];
+        $text = (string) ($msg['content'] ?? '');
+        // Some reasoning models return the answer only in a separate 'reasoning' field.
+        if (trim($text) === '' && !empty($msg['reasoning'])) $text = (string) $msg['reasoning'];
+        // Others prefix <think>...</think> inline — strip it.
         $text = trim(preg_replace('/<think>.*?<\/think>/is', '', $text));
         return ['ok' => true, 'text' => $text,
                 'in' => (int) ($data['usage']['prompt_tokens'] ?? 0), 'out' => (int) ($data['usage']['completion_tokens'] ?? 0)];

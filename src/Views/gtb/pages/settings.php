@@ -14,7 +14,8 @@ $anthropicModel    = $anthropicModel ?? 'claude-opus-4-8';
 $anthropicScanModel = $anthropicScanModel ?? 'claude-haiku-4-5';
 $aiProvider        = $aiProvider ?? 'anthropic';
 $groqKeySet        = $groqKeySet ?? false;
-$groqModel         = $groqModel ?? 'llama-3.3-70b-versatile';
+$groqSharedKey     = $groqSharedKey ?? false;
+$groqModel         = $groqModel ?? 'openai/gpt-oss-120b';
 $groqScanModel     = $groqScanModel ?? 'llama-3.1-8b-instant';
 $gtbTemplates      = $gtbTemplates ?? ['scalp', 'breakout', 'trend', 'pullback'];
 $gtbMemory         = $gtbMemory ?? false;
@@ -40,10 +41,12 @@ $gtbModelOptions = [
     'claude-opus-4-8'  => 'Opus 4.8 — smartest ($5 / $25 per 1M)',
 ];
 $gtbGroqModels = [
-    'llama-3.1-8b-instant'    => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
-    'qwen/qwen3-32b'          => 'Qwen3 32B — reasoning ($0.29 / $0.59)',
-    'llama-3.3-70b-versatile' => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
-    'openai/gpt-oss-120b'     => 'GPT-OSS 120B — strongest reasoning ($0.15 / $0.75)',
+    'llama-3.1-8b-instant'                      => 'Llama 3.1 8B Instant — cheapest ($0.05 / $0.08)',
+    'openai/gpt-oss-20b'                        => 'GPT-OSS 20B — cheap reasoning ($0.10 / $0.50)',
+    'meta-llama/llama-4-scout-17b-16e-instruct' => 'Llama 4 Scout 17B — fast ($0.11 / $0.34)',
+    'qwen/qwen3-32b'                            => 'Qwen3 32B — reasoning ($0.29 / $0.59)',
+    'llama-3.3-70b-versatile'                   => 'Llama 3.3 70B — balanced ($0.59 / $0.79)',
+    'openai/gpt-oss-120b'                       => 'GPT-OSS 120B — strongest reasoning ($0.15 / $0.75)',
 ];
 function gtb_model_select(string $id, string $current, array $opts): void {
     echo '<select id="' . $id . '" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none text-sm">';
@@ -141,11 +144,11 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             <!-- Groq block -->
             <div id="prov-groq" class="space-y-3 <?= $aiProvider === 'groq' ? '' : 'hidden' ?>">
                 <div>
-                    <label for="groq_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Groq API Key</label>
+                    <label for="groq_api_key" class="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Groq API Key <span class="text-gray-400 font-normal">(dedicated to the bot)</span></label>
                     <input type="password" id="groq_api_key" autocomplete="new-password" spellcheck="false"
                            class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none font-mono text-sm"
                            placeholder="<?= $groqKeySet ? '•••••••• saved — leave blank to keep' : 'gsk_...' ?>">
-                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Free/cheap key from <code>console.groq.com</code>. Write-only. <?= $groqKeySet ? 'A key is saved.' : '' ?></p>
+                    <p class="mt-1 text-[11px] text-gray-400 dark:text-gray-500">Its own key from <code>console.groq.com</code> (separate from the app's Groq key). Write-only. <?= $groqKeySet ? 'A dedicated key is saved.' : ($groqSharedKey ? 'Until you add one, the bot uses the app-wide Groq key.' : '') ?></p>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
