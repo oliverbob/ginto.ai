@@ -151,6 +151,8 @@ class GtbController
         $gtbTpOverride  = (float) (\Ginto\Support\Env::get('GTB_TP_OVERRIDE_PCT', '0') ?? 0);
         $gtbSlOverride  = (float) (\Ginto\Support\Env::get('GTB_SL_OVERRIDE_PCT', '0') ?? 0);
         $gtbGainerMax   = (float) (\Ginto\Support\Env::get('GTB_GAINER_MAX_PCT', '300') ?? 300);
+        $gtbGainerTp    = (float) (\Ginto\Support\Env::get('GTB_GAINER_TP_PCT', '8') ?? 8);
+        $gtbGainerSl    = (float) (\Ginto\Support\Env::get('GTB_GAINER_SL_PCT', '2') ?? 2);
         $gtbBaseCapital = (float) (\Ginto\Support\Env::get('GTB_BASE_CAPITAL', '7') ?? 7);
         $gtbMinNotional = (float) (\Ginto\Support\Env::get('GTB_MIN_NOTIONAL', '5') ?? 5);
         $gtbMaxTrade    = (float) (\Ginto\Support\Env::get('GTB_MAX_TRADE_USD', '0') ?? 0);
@@ -196,6 +198,8 @@ class GtbController
             'gtbTpOverride'     => $gtbTpOverride,
             'gtbSlOverride'     => $gtbSlOverride,
             'gtbGainerMax'      => $gtbGainerMax,
+            'gtbGainerTp'       => $gtbGainerTp,
+            'gtbGainerSl'       => $gtbGainerSl,
             'gtbBaseCapital'    => $gtbBaseCapital,
             'gtbMinNotional'    => $gtbMinNotional,
             'gtbMaxTrade'       => $gtbMaxTrade,
@@ -312,8 +316,11 @@ class GtbController
             $pairs['GTB_TP_OVERRIDE_PCT']    = $this->numStr($input['tp_override'] ?? 0, 0);
             $pairs['GTB_SL_OVERRIDE_PCT']    = $this->numStr($input['sl_override'] ?? 0, 0);
 
-            // Gainer Hunter: highest 24h change % it may still ENTER/chase (it rides higher once in).
+            // Gainer Hunter: highest 24h change % it may still ENTER/chase (it rides higher once in),
+            // plus its take-profit ceiling and initial stop (applied to the NEXT decision).
             $pairs['GTB_GAINER_MAX_PCT']     = $this->numStr($input['gainer_max_pct'] ?? 0, 300, 1);
+            $pairs['GTB_GAINER_TP_PCT']      = $this->numStr($input['gainer_tp_pct'] ?? 0, 8, 0.5);
+            $pairs['GTB_GAINER_SL_PCT']      = $this->numStr($input['gainer_sl_pct'] ?? 0, 2, 0.1);
 
             // Capital & spend limits (numeric; blank/invalid falls back to a safe default).
             $pairs['GTB_BASE_CAPITAL'] = $this->numStr($input['base_capital'] ?? 0, 7,  0.0001);

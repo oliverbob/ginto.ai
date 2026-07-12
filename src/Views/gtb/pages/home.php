@@ -997,12 +997,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             if (act && d.bot.last_action) act.textContent = dot + ' · ' + d.bot.last_action;
         }
         const p = d.portfolio || {};
+        // P&L is tracked separately per network. Label it so paper testing is never mistaken
+        // for real-money results (and vice-versa).
+        const modeTag = (d.mode === 'live' || (!GTB_TESTNET && d.mode !== 'paper')) ? 'LIVE · real funds' : 'PAPER · testnet';
         const sum = document.getElementById('gtb-port-summary');
-        if (sum) sum.textContent = `${p.open||0}/${p.slots||0} slots · realized $${(+(p.realized||0)).toFixed(2)}`;
+        if (sum) sum.textContent = `${p.open||0}/${p.slots||0} slots · ${modeTag} · realized $${(+(p.realized||0)).toFixed(2)}`;
         const un = document.getElementById('gtb-port-unreal');
         if (un) {
             const v = +(p.unrealized || 0), up = v >= 0;
-            un.textContent = `Unrealized ${up?'+':''}$${v.toFixed(4)}`;
+            un.textContent = `${modeTag} · unrealized ${up?'+':''}$${v.toFixed(4)}`;
             un.className = 'text-sm font-bold ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
         }
     }

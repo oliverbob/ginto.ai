@@ -32,6 +32,8 @@ $gtbSessionMaxLoss = $gtbSessionMaxLoss ?? 0;
 $gtbTpOverride     = $gtbTpOverride ?? 0;
 $gtbSlOverride     = $gtbSlOverride ?? 0;
 $gtbGainerMax      = $gtbGainerMax ?? 300;
+$gtbGainerTp       = $gtbGainerTp ?? 8;
+$gtbGainerSl       = $gtbGainerSl ?? 2;
 $gtbBaseCapital    = $gtbBaseCapital ?? 7;
 $gtbMinNotional    = $gtbMinNotional ?? 5;
 $gtbMaxTrade       = $gtbMaxTrade ?? 0;
@@ -367,6 +369,24 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
                        class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
                 <p class="text-[11px] text-gray-400 mt-0.5">e.g. 300. Be more cautious around 70–100%; ride the rest with the OCO.</p>
             </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1 border-t border-gray-100 dark:border-gray-700/60 mt-1">
+                <div>
+                    <label class="flex items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <span>Take-profit target (TP)</span><span class="font-bold text-green-600 dark:text-green-400"><span id="gainer_tp_val"><?= $nf($gtbGainerTp) ?></span>%</span>
+                    </label>
+                    <input type="range" id="gainer_tp_pct" min="1" max="20" step="0.5" value="<?= htmlspecialchars($nf($gtbGainerTp), ENT_QUOTES) ?>"
+                           class="w-full accent-primary" oninput="document.getElementById('gainer_tp_val').textContent=(+this.value).toFixed(1)">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Where the OCO banks the win (5–8% typical). Applies to the next decision.</p>
+                </div>
+                <div>
+                    <label class="flex items-center justify-between text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        <span>Initial stop-loss (SL)</span><span class="font-bold text-red-500 dark:text-red-400"><span id="gainer_sl_val"><?= $nf($gtbGainerSl) ?></span>%</span>
+                    </label>
+                    <input type="range" id="gainer_sl_pct" min="0.5" max="10" step="0.1" value="<?= htmlspecialchars($nf($gtbGainerSl), ENT_QUOTES) ?>"
+                           class="w-full accent-red-500" oninput="document.getElementById('gainer_sl_val').textContent=(+this.value).toFixed(1)">
+                    <p class="text-[11px] text-gray-400 mt-0.5">Downside cap until the profit-lock arms; then it ratchets up.</p>
+                </div>
+            </div>
         </div>
 
         <!-- Session & time-boxing -->
@@ -537,6 +557,8 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             tp_override: parseFloat(document.getElementById('tp_override').value) || 0,
             sl_override: parseFloat(document.getElementById('sl_override').value) || 0,
             gainer_max_pct: parseFloat(document.getElementById('gainer_max_pct').value) || 0,
+            gainer_tp_pct: parseFloat(document.getElementById('gainer_tp_pct').value) || 0,
+            gainer_sl_pct: parseFloat(document.getElementById('gainer_sl_pct').value) || 0,
             base_capital: parseFloat(document.getElementById('base_capital').value) || 0,
             min_notional: parseFloat(document.getElementById('min_notional').value) || 0,
             max_trade: parseFloat(document.getElementById('max_trade').value) || 0,
