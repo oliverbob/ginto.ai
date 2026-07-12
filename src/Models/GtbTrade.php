@@ -91,6 +91,8 @@ class GtbTrade
                 'mode'             => $data['mode'] ?? 'paper',
                 'template'         => $data['template'] ?? null,
                 'profile'          => $data['profile'] ?? null,
+                'entry_chg'        => $data['entry_chg'] ?? null,
+                'entry_mode'       => $data['entry_mode'] ?? null,
                 'price'            => $data['price'],
                 'qty'              => $data['qty'],
                 'quote_qty'        => $data['quote_qty'] ?? null,
@@ -119,6 +121,11 @@ class GtbTrade
                 'realized_pnl' => $realizedPnl,
                 'closed_at'    => date('Y-m-d H:i:s'),
             ], ['id' => $id]);
+            // Cross-session learning (token-free): feed gainer outcomes into the bucket stats.
+            $row = $this->db->get($this->table, ['template', 'entry_chg', 'entry_mode'], ['id' => $id]);
+            if (is_array($row) && ($row['template'] ?? '') === 'gainers' && $row['entry_chg'] !== null && !empty($row['entry_mode'])) {
+                (new GtbGainerStats())->record(GtbGainerStats::bucket((string) $row['entry_mode'], (float) $row['entry_chg']), $realizedPnl);
+            }
         } catch (\Throwable $e) {}
     }
 

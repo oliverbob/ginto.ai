@@ -211,6 +211,7 @@ class GtbStrategy
                 // actually ran, count the ones we skipped that then moved, and switch to "chase"
                 // once we've missed enough runners — patient dip-buying first, chasing once burned.
                 $learn      = new \Ginto\Models\GtbLearning();
+                $gStats     = new \Ginto\Models\GtbGainerStats();
                 $sessionKey = $botState->sessionStartedAt() ?: 'nosession';
                 $priceMap   = [];
                 foreach ($tickers as $tk) { if (isset($tk['symbol'], $tk['price'])) $priceMap[$tk['symbol']] = (float) $tk['price']; }
@@ -252,7 +253,17 @@ class GtbStrategy
                     if ($isGainer) $tpl->setChase($chaseMode);
                     $cand = $tpl->entryCandidate(array_values($tickers), $avoid);
                     if (!$cand) continue;
-                    if ($isGainer) $learn->observe($sessionKey, $cand['symbol'], (float) $cand['price']);
+                    if ($isGainer) {
+                        $learn->observe($sessionKey, $cand['symbol'], (float) $cand['price']);
+                        // Cross-session learning: skip setups with a proven losing record BEFORE
+                        // spending an AI call on them (deterministic, token-free).
+                        if ($gStats->shouldAvoid($chaseMode ? 'chase' : 'dip', (float) $cand['changePct'])) {
+                            $thoughts->add(sprintf('Gainer Hunter passed on %s — learned that %s entries around +%s%% have been net losers.',
+                                $cand['symbol'], $chaseMode ? 'chase' : 'dip', $cand['changePct']), 'bot', 'note', $cand['symbol'], 'SKIP', ['learned' => true]);
+                            $action = 'skipped ' . $cand['symbol'] . ' (learned loser setup)';
+                            continue;
+                        }
+                    }
 
                     $ctx = ['env' => $mode, 'profile' => $cfg['name'], 'posture' => $cfg['posture'],
                             'template' => $tpl->name(), 'templateRule' => $tpl->description(),
@@ -305,6 +316,7 @@ class GtbStrategy
                     }
                     $trades->openTrade([
                         'symbol' => $cand['symbol'], 'mode' => $mode, 'template' => $key, 'profile' => $pk,
+                        'entry_chg' => (float) ($cand['changePct'] ?? 0), 'entry_mode' => $isGainer ? ($chaseMode ? 'chase' : 'dip') : null,
                         'price' => $fill, 'qty' => $qty, 'quote_qty' => $size,
                         'stop_loss' => $st['stop_loss'], 'take_profit' => $st['take_profit'] ?? null,
                         'peak_price' => $fill, 'trail_pct' => $st['trail_pct'] ?? null, 'binance_order_id' => $oid,
