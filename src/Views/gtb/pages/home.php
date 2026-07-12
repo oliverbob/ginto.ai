@@ -451,6 +451,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         return p.toPrecision(4);
     }
     function gtbFmtUsd(n) { return '$' + (+n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    // Compact amount in the coin's own units (for P&L expressed in the traded currency).
+    function gtbFmtCoin(x) { x = +x; const a = Math.abs(x); if (!a) return '0'; if (a >= 1000) return x.toFixed(1); if (a >= 1) return x.toFixed(3); if (a >= 0.001) return x.toFixed(5); return x.toPrecision(3); }
     // Decimal places the chart price scale needs so low-priced coins don't collapse to "0.01".
     function gtbPricePrecision(px) {
         px = Math.abs(+px) || 0;
@@ -1082,9 +1084,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         // Order cards by P&L% (best on top) via CSS order — reflows the grid without moving DOM nodes.
         card.root.style.order = String(Math.round(-(+p.pnlPct || 0) * 100));
         const pnl = card.root.querySelector('[data-pnl]'); const pct = card.root.querySelector('[data-pct]');
+        const coinPnl = (+p.mark > 0) ? (+p.unrealized) / (+p.mark) : 0;   // P&L in the coin's own units
         pnl.textContent = `${up?'+':''}$${(+p.unrealized).toFixed(4)}`;
         pnl.className = 'block text-sm font-bold ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
-        pct.textContent = `${up?'+':''}${(+p.pnlPct).toFixed(2)}% · $${(+p.mark).toPrecision(6)}`;
+        pct.textContent = `${up?'+':''}${(+p.pnlPct).toFixed(2)}% · ${coinPnl>=0?'+':''}${gtbFmtCoin(coinPnl)} ${p.symbol.replace('USDT','')}`;
         pct.className = 'block text-[11px] ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
         card.root.querySelector('[data-entry]').textContent = '$' + (+p.entry).toPrecision(6);
         card.root.querySelector('[data-sl]').textContent = '$' + (+p.stop_loss).toPrecision(6);
@@ -1197,9 +1200,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         const up = (+p.pnlPct) >= 0;
         const unreal = (p.unrealized !== undefined && p.unrealized !== null) ? +p.unrealized : ((+p.mark - +p.entry) * (+p.qty || 0));
         const pnlEl = o.querySelector('[data-m-pnl]'), pctEl = o.querySelector('[data-m-pct]');
-        pnlEl.textContent = `${unreal >= 0 ? '+' : ''}$${unreal.toFixed(4)}`;
+        const coinPnl = (+p.mark > 0) ? unreal / (+p.mark) : 0;   // P&L in the coin's own units
+        pnlEl.textContent = `${unreal >= 0 ? '+' : ''}$${unreal.toFixed(4)} USDT`;
         pnlEl.className = 'block text-2xl font-extrabold whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
-        pctEl.textContent = `${up ? '+' : ''}${(+p.pnlPct).toFixed(2)}% · mark $${(+p.mark).toPrecision(6)}`;
+        pctEl.textContent = `${up ? '+' : ''}${(+p.pnlPct).toFixed(2)}% · ${coinPnl >= 0 ? '+' : ''}${gtbFmtCoin(coinPnl)} ${p.symbol.replace('USDT','')} · mark $${(+p.mark).toPrecision(6)}`;
         pctEl.className = 'block text-xs whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
 
         // Capital in / reward @TP / risk @SL. Risk flips to a locked GAIN once the stop ratchets
