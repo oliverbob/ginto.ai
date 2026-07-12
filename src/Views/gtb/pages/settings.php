@@ -31,6 +31,7 @@ $gtbStallGain      = $gtbStallGain ?? 0;
 $gtbSessionMaxLoss = $gtbSessionMaxLoss ?? 0;
 $gtbTpOverride     = $gtbTpOverride ?? 0;
 $gtbSlOverride     = $gtbSlOverride ?? 0;
+$gtbGainerMax      = $gtbGainerMax ?? 300;
 $gtbBaseCapital    = $gtbBaseCapital ?? 7;
 $gtbMinNotional    = $gtbMinNotional ?? 5;
 $gtbMaxTrade       = $gtbMaxTrade ?? 0;
@@ -356,6 +357,18 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             <p class="text-[11px] text-amber-600 dark:text-amber-400"><i class="fas fa-triangle-exclamation mr-0.5"></i> Fees are ~0.2% round-trip, so a target below ~0.5% barely clears costs. Small targets need a high win-rate to net positive.</p>
         </div>
 
+        <!-- Gainer Hunter -->
+        <div class="rounded-xl border p-4 space-y-2.5 border-gray-200 dark:border-gray-700">
+            <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-rocket text-primary mr-1.5"></i>Gainer Hunter</h3>
+            <p class="text-xs text-gray-500 dark:text-gray-400">Highest 24h change % the hunter may still <em>enter</em> and chase. It rides higher than this once in (the trailing OCO has no cap) — this only limits fresh entries. Top gainers run 140–400%, so keep it high.</p>
+            <div class="w-1/2">
+                <label for="gainer_max_pct" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Max chase entry (%)</label>
+                <input type="number" id="gainer_max_pct" min="1" step="10" value="<?= htmlspecialchars($nf($gtbGainerMax), ENT_QUOTES) ?>"
+                       class="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm px-2 py-1.5 focus:ring-primary focus:border-primary">
+                <p class="text-[11px] text-gray-400 mt-0.5">e.g. 300. Be more cautious around 70–100%; ride the rest with the OCO.</p>
+            </div>
+        </div>
+
         <!-- Session & time-boxing -->
         <div class="rounded-xl border p-4 space-y-3 border-gray-200 dark:border-gray-700">
             <h3 class="font-semibold text-gray-900 dark:text-white"><i class="fas fa-hourglass-half text-primary mr-1.5"></i>Session &amp; time-boxing</h3>
@@ -523,6 +536,7 @@ function gtb_key_section(string $env, string $label, string $apiKey, bool $secre
             session_max_loss: parseFloat(document.getElementById('session_max_loss').value) || 0,
             tp_override: parseFloat(document.getElementById('tp_override').value) || 0,
             sl_override: parseFloat(document.getElementById('sl_override').value) || 0,
+            gainer_max_pct: parseFloat(document.getElementById('gainer_max_pct').value) || 0,
             base_capital: parseFloat(document.getElementById('base_capital').value) || 0,
             min_notional: parseFloat(document.getElementById('min_notional').value) || 0,
             max_trade: parseFloat(document.getElementById('max_trade').value) || 0,
