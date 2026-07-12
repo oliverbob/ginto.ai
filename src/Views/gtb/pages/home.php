@@ -1039,9 +1039,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     function gtbCreateTradeCard(grid, p) {
         const root = document.createElement('div');
-        root.className = 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 overflow-hidden min-w-0';
+        root.className = 'relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 overflow-hidden min-w-0';
         root.innerHTML =
-            `<div class="flex items-start justify-between gap-2 mb-1">
+            `<button data-expand title="Expand & sell" class="absolute top-2 right-2 z-20 w-7 h-7 rounded-lg bg-primary text-white hover:bg-primary/90 flex items-center justify-center text-xs shadow-md ring-2 ring-white/70 dark:ring-gray-900/70"><i class="fas fa-up-right-and-down-left-from-center"></i></button>
+             <div class="flex items-start justify-between gap-2 mb-1">
                <div class="min-w-0 flex flex-wrap items-center gap-x-1 gap-y-0.5 font-bold text-gray-900 dark:text-white">${gtbCoinIcon(p.symbol.replace('USDT',''), 18)}<span class="truncate max-w-full">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
                  ${gtbProfBadge(p.profile)}
                  <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
@@ -1050,15 +1051,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                     ? '<span title="Stop-loss resting on Binance" class="text-[9px] text-green-600 dark:text-green-400"><i class="fas fa-shield-halved"></i></span>'
                     : '<span title="No exchange stop yet" class="text-[9px] text-red-500"><i class="fas fa-triangle-exclamation"></i></span>') : ''}
                </div>
-               <div class="text-right leading-tight shrink-0">
+               <div class="text-right leading-tight shrink-0 pr-8">
                  <span data-pnl class="block text-sm font-bold whitespace-nowrap"></span>
                  <span data-pct class="block text-[11px] whitespace-nowrap"></span>
                </div>
              </div>
-             <div class="relative">
-               <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
-               <span class="absolute top-1 right-1 pointer-events-none text-[10px] font-semibold text-gray-600 dark:text-gray-300 bg-white/75 dark:bg-gray-900/70 rounded px-1.5 py-0.5"><i class="fas fa-up-right-and-down-left-from-center mr-0.5"></i>expand</span>
-             </div>
+             <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
              <div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">
                <div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>
                <div class="text-red-500">SL<br><span data-sl></span></div>
@@ -1074,6 +1072,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         const card = { root, chart: null, series: null, lastKey: '', p: p };
         GTB_TRADES.cards[String(p.id)] = card;
         el.addEventListener('click', () => gtbOpenTradeModal(card.p || p));
+        root.querySelector('[data-expand]').addEventListener('click', (e) => { e.stopPropagation(); gtbOpenTradeModal(card.p || p); });
         if (typeof LightweightCharts !== 'undefined') {
             card.chart = LightweightCharts.createChart(el, Object.assign({ autoSize: true,
                 crosshair: { mode: 0 }, handleScale: false, handleScroll: false,
