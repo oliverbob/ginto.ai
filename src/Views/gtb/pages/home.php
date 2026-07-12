@@ -1041,7 +1041,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         const root = document.createElement('div');
         root.className = 'relative rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 overflow-hidden min-w-0';
         root.innerHTML =
-            `<button data-expand title="Expand & sell" class="absolute top-2 right-2 z-20 w-7 h-7 rounded-lg bg-primary text-white hover:bg-primary/90 flex items-center justify-center text-xs shadow-md ring-2 ring-white/70 dark:ring-gray-900/70"><i class="fas fa-up-right-and-down-left-from-center"></i></button>
+            `<button data-expand title="Expand & sell" class="absolute top-2 right-2 z-20 w-6 h-6 rounded-md bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-primary hover:bg-black/10 dark:hover:bg-white/20 flex items-center justify-center text-xs transition-colors"><i class="fas fa-up-right-and-down-left-from-center"></i></button>
              <div class="flex items-start justify-between gap-2 mb-1">
                <div class="min-w-0 flex flex-wrap items-center gap-x-1 gap-y-0.5 font-bold text-gray-900 dark:text-white">${gtbCoinIcon(p.symbol.replace('USDT',''), 18)}<span class="truncate max-w-full">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
                  ${gtbProfBadge(p.profile)}
