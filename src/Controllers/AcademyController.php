@@ -569,20 +569,23 @@ class AcademyController
             $desc      = 'Ginto Trading Academy — ' . ($plan['display_name'] ?? 'Membership') . ' (incl. 12% VAT)';
             $handler   = new \Ginto\Handlers\PayMongoHandler();
 
-            // Assisted auto-renew: vault the card to a PayMongo Customer so we can re-charge it
-            // on-session next month (with the member re-entering CVC). Falls back to a plain
-            // one-off card charge if the customer/vault can't be set up.
+            // Try to vault the card for assisted renewal, but NEVER let that block the payment:
+            // PayMongo card vaulting ("on_session") may be unavailable, in which case we fall back
+            // to a plain one-off charge and just don't enable auto-renew.
             $customerId = null;
+            $res = null;
             if ($autoRenew) {
                 $parts = preg_split('/\s+/', trim((string) $payName), 2);
                 $cust  = $handler->createCustomer($parts[0] ?? 'Ginto', $parts[1] ?? 'Learner', (string) $payEmail, (string) ($_POST['phone'] ?? ''));
-                $customerId = $cust['customer_id'] ?? ($cust['existing_id'] ?? null);
+                $cid   = $cust['customer_id'] ?? ($cust['existing_id'] ?? null);
+                if ($cid) {
+                    $vaultRes = $handler->initCardPaymentVault((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, $cid, []);
+                    if (!empty($vaultRes['success'])) { $res = $vaultRes; $customerId = $cid; }
+                }
             }
-            if ($autoRenew && $customerId) {
-                $res = $handler->initCardPaymentVault((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, $customerId, []);
-            } else {
+            if ($res === null) {   // no vault (or vaulting unsupported) — charge one-off
                 $res = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, []);
-                $autoRenew = false; // couldn't vault — treat as a one-off
+                $autoRenew = false;
             }
             if (empty($res['success'])) { echo json_encode(['success' => false, 'message' => $res['message'] ?? 'The card could not be processed.']); exit; }
 
