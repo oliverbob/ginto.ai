@@ -676,6 +676,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     // ---- Bot Brain: reflections + capital ------------------------------------
     const GTB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
     const GTB_TESTNET = <?= ($isTestnet ?? false) ? 'true' : 'false' ?>;
+    const GTB_FEE_RATE = <?= json_encode((float) (\Ginto\Support\Env::get('GTB_FEE_RATE', '0.001') ?? 0.001)) ?>;  // per-side Binance fee
     const GTB_BOT = {
         enabled: <?= ($botEnabled ?? false) ? 'true' : 'false' ?>,
         open_new: <?= (!isset($botOpenNew) || $botOpenNew) ? 'true' : 'false' ?>,
@@ -1146,6 +1147,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                      <div class="mt-0.5"><span data-m-ago>loading…</span></div>
                    </div>
                  </div>
+                 <div data-m-fee class="mb-2 text-[11px] font-semibold px-2 py-1 rounded text-center"></div>
                  <div data-m-chart class="w-full rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800" style="height:320px"></div>
                  <div class="mt-3 grid grid-cols-3 gap-2 text-xs tabular-nums text-center">
                    <div class="text-gray-500 dark:text-gray-400">entry<br><span data-m-entry class="text-gray-800 dark:text-gray-200 font-semibold"></span></div>
@@ -1222,6 +1224,22 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             const l = (e - +p.stop_loss) * q, lp = e > 0 ? (e - +p.stop_loss) / e * 100 : 0;
             if (l < 0) { riskEl.textContent = `+$${(-l).toFixed(2)} locked`; riskEl.className = 'font-semibold text-green-600 dark:text-green-400'; }
             else { riskEl.textContent = `−$${l.toFixed(2)} (−${lp.toFixed(1)}%)`; riskEl.className = 'font-semibold text-red-500 dark:text-red-400'; }
+        }
+
+        // Fee threshold: `unrealized` is already NET of the round-trip fee, so its sign is the
+        // break-even. Show whether selling now clears charges, or how much more it needs.
+        const feeEl = o.querySelector('[data-m-fee]');
+        if (feeEl) {
+            const fee = GTB_FEE_RATE || 0.001, rt = (fee * 2 * 100).toFixed(1);  // round-trip %
+            if (unreal > 0) {
+                feeEl.textContent = `✓ Clears fees — sell now nets +$${unreal.toFixed(4)} after ~${rt}% round-trip charges`;
+                feeEl.className = 'mb-2 text-[11px] font-semibold px-2 py-1 rounded text-center bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300';
+            } else {
+                const be = e * (1 + fee) / (1 - fee);                       // break-even mark price
+                const need = (+p.mark > 0) ? Math.max(0, (be - +p.mark) / (+p.mark) * 100) : 0;
+                feeEl.textContent = `⚠ Below fees — needs +${need.toFixed(2)}% more (to $${be.toPrecision(6)}) to clear ~${rt}% charges`;
+                feeEl.className = 'mb-2 text-[11px] font-semibold px-2 py-1 rounded text-center bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300';
+            }
         }
     }
 
