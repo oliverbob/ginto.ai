@@ -18,13 +18,13 @@ class GtbTrade
     }
 
     /** Most recent trades, newest first. Empty if table missing. */
-    public function recent(int $limit = 20): array
+    public function recent(int $limit = 20, ?string $mode = null): array
     {
         try {
-            $rows = $this->db->select($this->table, '*', [
-                'ORDER' => ['created_at' => 'DESC', 'id' => 'DESC'],
-                'LIMIT' => $limit,
-            ]);
+            $where = $mode !== null ? ['mode' => $mode] : [];
+            $where['ORDER'] = ['created_at' => 'DESC', 'id' => 'DESC'];
+            $where['LIMIT'] = $limit;
+            $rows = $this->db->select($this->table, '*', $where);
             return is_array($rows) ? $rows : [];
         } catch (\Throwable $e) {
             return [];

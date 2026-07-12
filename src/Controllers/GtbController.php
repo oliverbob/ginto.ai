@@ -44,8 +44,10 @@ class GtbController
             $isTestnet     = $settings->isTestnet();
 
             $trades       = new GtbTrade();
-            $recentTrades = $trades->recent(20);
-            $realizedPnl  = $trades->totalRealizedPnl();
+            // Scope P&L + history to the ACTIVE network so paper and live never mix in the totals.
+            $mode         = $isTestnet ? 'paper' : 'live';
+            $recentTrades = $trades->recent(20, $mode);
+            $realizedPnl  = $trades->totalRealizedPnl($mode);
 
             // Trading Log = the operational trade/error events (from gtb_thoughts), not gtb_logs.
             $recentLogs = (new \Ginto\Models\GtbThought())->tradeLog(20);
