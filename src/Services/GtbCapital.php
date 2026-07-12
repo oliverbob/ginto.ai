@@ -89,7 +89,12 @@ class GtbCapital
         }
         $byUnit     = (int) floor($t / $this->unit);
         $byNotional = (int) floor($t / $this->minNotional);   // cap so perTradeSize >= minNotional
-        return max(1, min($byUnit, $byNotional));
+        $slots      = max(1, min($byUnit, $byNotional));
+        // Hard ceiling on concurrent trades so a large wallet can't spawn hundreds of positions
+        // (and burn AI tokens on every new entry). 0 = no cap.
+        $maxSlots   = (int) (Env::get('GTB_MAX_SLOTS', '0') ?? 0);
+        if ($maxSlots > 0) $slots = min($slots, $maxSlots);
+        return $slots;
     }
 
     /** Size per trade; profit compounds into open positions until the next slot unlocks. Capped by GTB_MAX_TRADE_USD. */
