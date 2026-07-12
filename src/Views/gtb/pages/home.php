@@ -1088,8 +1088,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     // ---- Expanded live trade view (on-demand; polls slowly; destroys itself on close) ----
-    const GTB_MODAL = { el: null, chart: null, series: null, timer: null, id: null };
-    const GTB_MODAL_MS = 15000;  // refresh every 15s — moves enough to decide, light on requests
+    const GTB_MODAL = { el: null, chart: null, series: null, timer: null, id: null, ms: 15000 };
+    try { const s = parseInt(localStorage.getItem('gtbModalMs')); if ([10000, 15000, 20000].includes(s)) GTB_MODAL.ms = s; } catch (e) {}
 
     function gtbBuildModal() {
         if (GTB_MODAL.el) return GTB_MODAL.el;
@@ -1105,7 +1105,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                <div class="px-4 py-3">
                  <div class="flex items-end justify-between mb-2 gap-2">
                    <div class="min-w-0"><span data-m-pnl class="block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="block text-xs whitespace-nowrap"></span></div>
-                   <div class="text-right text-[11px] text-gray-400 shrink-0">updates every 15s<br><span data-m-ago>loading…</span></div>
+                   <div class="text-right text-[11px] text-gray-400 shrink-0">
+                     <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-700" data-m-cadence>
+                       <button type="button" data-ms="10000" class="px-2 py-0.5 font-semibold">10s</button>
+                       <button type="button" data-ms="15000" class="px-2 py-0.5 font-semibold">15s</button>
+                       <button type="button" data-ms="20000" class="px-2 py-0.5 font-semibold">20s</button>
+                     </div>
+                     <div class="mt-0.5"><span data-m-ago>loading…</span></div>
+                   </div>
                  </div>
                  <div data-m-chart class="w-full rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800" style="height:320px"></div>
                  <div class="mt-3 grid grid-cols-3 gap-2 text-xs tabular-nums text-center">
@@ -1123,8 +1130,32 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         o.addEventListener('click', e => { if (e.target === o) gtbCloseTradeModal(); });
         o.querySelector('[data-m-x]').addEventListener('click', gtbCloseTradeModal);
         o.querySelector('[data-m-hold]').addEventListener('click', gtbCloseTradeModal);
+        o.querySelectorAll('[data-m-cadence] button').forEach(b => b.addEventListener('click', () => gtbModalSetCadence(parseInt(b.dataset.ms))));
         GTB_MODAL.el = o;
         return o;
+    }
+
+    function gtbModalApplyCadence() {
+        const o = GTB_MODAL.el; if (!o) return;
+        o.querySelectorAll('[data-m-cadence] button').forEach(b => {
+            const on = parseInt(b.dataset.ms) === GTB_MODAL.ms;
+            b.className = 'px-2 py-0.5 font-semibold ' + (b.previousElementSibling ? 'border-l border-gray-300 dark:border-gray-700 ' : '')
+                + (on ? 'bg-primary text-white' : 'text-gray-500 dark:text-gray-400 hover:text-primary');
+        });
+    }
+
+    function gtbModalSetCadence(ms) {
+        if (![10000, 15000, 20000].includes(ms)) return;
+        GTB_MODAL.ms = ms;
+        try { localStorage.setItem('gtbModalMs', String(ms)); } catch (e) {}
+        gtbModalApplyCadence();
+        // Restart the running poll at the new speed (if a trade view is open).
+        if (GTB_MODAL.timer && GTB_MODAL.id != null) {
+            clearInterval(GTB_MODAL.timer);
+            const card = GTB_TRADES.cards[String(GTB_MODAL.id)];
+            const p = card ? card.p : null;
+            if (p) GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL.ms);
+        }
     }
 
     function gtbModalSetPnl(p) {
@@ -1194,8 +1225,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             GTB_MODAL.series.createPriceLine({ price: +p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
             if (p.take_profit) GTB_MODAL.series.createPriceLine({ price: +p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
         }
+        gtbModalApplyCadence();
         gtbModalRefresh(p);  // first paint immediately
-        GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL_MS);
+        GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL.ms);
     }
 
     async function gtbModalSell(id, symbol) {
