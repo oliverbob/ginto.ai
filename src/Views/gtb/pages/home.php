@@ -429,6 +429,16 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         return p.toPrecision(4);
     }
     function gtbFmtUsd(n) { return '$' + (+n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    // Decimal places the chart price scale needs so low-priced coins don't collapse to "0.01".
+    function gtbPricePrecision(px) {
+        px = Math.abs(+px) || 0;
+        if (px >= 1000) return 2;
+        if (px >= 1)    return 4;
+        if (px >= 0.1)  return 5;
+        if (px >= 0.01) return 6;
+        if (px >= 0.0001) return 7;
+        return 8;
+    }
     function gtbChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
     // ---- Candlestick chart ----------------------------------------------------
@@ -1025,7 +1035,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             card.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 140,
                 crosshair: { mode: 0 }, handleScale: false, handleScroll: false,
                 rightPriceScale: { visible: true }, timeScale: { visible: false } }, gtbChartTheme()));
-            card.series = card.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
+            const gtbPrec = gtbPricePrecision(p.entry || p.mark || 1);
+            card.series = card.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444',
+                priceFormat: { type: 'price', precision: gtbPrec, minMove: Math.pow(10, -gtbPrec) } });
             card.series.createPriceLine({ price: p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
             card.series.createPriceLine({ price: p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
             if (p.take_profit) card.series.createPriceLine({ price: p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
