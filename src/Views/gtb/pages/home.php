@@ -323,6 +323,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             <th class="py-2 pr-4 font-medium">Type</th>
                             <th class="py-2 pr-4 font-medium text-right">Price</th>
                             <th class="py-2 pr-4 font-medium text-right">Qty</th>
+                            <th class="py-2 pr-4 font-medium text-right" title="Capital in/out (price × qty). On a BUY, the ▲/▼ show the possible gain at take-profit and possible loss at stop-loss.">Value <span class="text-gray-400 font-normal">($)</span></th>
                             <th class="py-2 font-medium text-right" title="Realized P&amp;L, net of Binance buy+sell fees (~0.2% round-trip)">P&amp;L <span class="text-gray-400 font-normal">(net)</span></th>
                         </tr>
                     </thead>
@@ -335,7 +336,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             $tid = (int) ($t['id'] ?? 0);
                             $events[] = ['id' => $tid, 'time' => $t['created_at'] ?? '', 'symbol' => $t['symbol'] ?? '',
                                 'side' => 'BUY', 'type' => $t['type'] ?? 'MARKET',
-                                'price' => $t['price'] ?? null, 'qty' => $t['qty'] ?? '', 'pnl' => null];
+                                'price' => $t['price'] ?? null, 'qty' => $t['qty'] ?? '', 'pnl' => null,
+                                'sl' => $t['stop_loss'] ?? null, 'tp' => $t['take_profit'] ?? null];
                             if (($t['status'] ?? '') === 'CLOSED' && ($t['exit_price'] ?? null) !== null) {
                                 $events[] = ['id' => $tid, 'time' => $t['closed_at'] ?? ($t['created_at'] ?? ''), 'symbol' => $t['symbol'] ?? '',
                                     'side' => 'SELL', 'type' => 'MARKET',
@@ -372,6 +374,22 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                                 <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400"><?= htmlspecialchars($t['type'] ?? '') ?></td>
                                 <td class="py-2.5 pr-4 text-right tabular-nums"><?= $t['price'] !== null ? htmlspecialchars($t['price']) : '—' ?></td>
                                 <td class="py-2.5 pr-4 text-right tabular-nums"><?= htmlspecialchars($t['qty'] ?? '') ?></td>
+                                <td class="py-2.5 pr-4 text-right tabular-nums">
+                                    <?php
+                                    $ev = ($t['price'] !== null && $t['qty'] !== '' && $t['qty'] !== null) ? (float) $t['price'] * (float) $t['qty'] : null;
+                                    echo $ev !== null ? '$' . number_format($ev, 2) : '—';
+                                    if (($t['side'] ?? '') === 'BUY' && $ev !== null):
+                                        $e = (float) $t['price']; $tp = $t['tp'] ?? null; $sl = $t['sl'] ?? null;
+                                        $gp = ($tp !== null && $e > 0) ? ((float) $tp - $e) / $e * 100 : null;
+                                        $lp = ($sl !== null && $e > 0) ? ($e - (float) $sl) / $e * 100 : null; ?>
+                                        <span class="block text-[10px] whitespace-nowrap">
+                                            <span class="text-green-600 dark:text-green-400"><?= $gp !== null ? '▲' . number_format($gp, 1) . '%' : '▲ trail' ?></span>
+                                            <?php if ($lp !== null): ?>
+                                                <span class="ml-1 <?= $lp >= 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400' ?>"><?= $lp >= 0 ? '▼' . number_format($lp, 1) . '%' : '▲' . number_format(abs($lp), 1) . '% lock' ?></span>
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ($pnlNeg ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
                                     <?php if ($pnl === null): ?>—<?php else: $pv = (float) $pnl; ?>
                                         <span class="inline-flex items-center justify-end gap-1" title="<?= $pv >= 0 ? 'Win' : 'Loss' ?>">
@@ -1027,6 +1045,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                <div class="text-red-500">SL<br><span data-sl></span></div>
                <div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>
              </div>
+             <div data-rr class="mt-1 text-[10px] text-center text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap"></div>
              <button data-close class="mt-1.5 w-full text-[11px] font-medium py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500 transition-colors">
                <i class="fas fa-xmark mr-1"></i>Close now
              </button>`;
@@ -1070,6 +1089,16 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         card.root.querySelector('[data-entry]').textContent = '$' + (+p.entry).toPrecision(6);
         card.root.querySelector('[data-sl]').textContent = '$' + (+p.stop_loss).toPrecision(6);
         card.root.querySelector('[data-tp]').textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
+        // Capital in · possible gain @TP / possible loss @SL (loss flips to "lock" when stop > entry).
+        const rrEl = card.root.querySelector('[data-rr]');
+        if (rrEl) {
+            const q = +p.qty || 0, e = +p.entry || 0;
+            const gp = (p.take_profit && e > 0) ? (+p.take_profit - e) / e * 100 : null;
+            const lp = e > 0 ? (e - +p.stop_loss) / e * 100 : 0;
+            const rew = gp !== null ? `<span class="text-green-600 dark:text-green-400">+${gp.toFixed(1)}%</span>` : `<span class="text-green-600 dark:text-green-400">trail</span>`;
+            const risk = lp < 0 ? `<span class="text-green-600 dark:text-green-400">+${Math.abs(lp).toFixed(1)}% lock</span>` : `<span class="text-red-500 dark:text-red-400">−${lp.toFixed(1)}%</span>`;
+            rrEl.innerHTML = `in $${(e * q).toFixed(2)} · ${rew} / ${risk}`;
+        }
     }
 
     async function gtbClosePosition(id, symbol) {
@@ -1120,6 +1149,11 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                    <div class="text-red-500">SL<br><span data-m-sl class="font-semibold"></span></div>
                    <div class="text-green-600 dark:text-green-400">TP<br><span data-m-tp class="font-semibold"></span></div>
                  </div>
+                 <div class="mt-2 grid grid-cols-3 gap-2 text-[11px] tabular-nums text-center border-t border-gray-100 dark:border-gray-800 pt-2">
+                   <div class="text-gray-500 dark:text-gray-400">capital in<br><span data-m-cap class="font-semibold text-gray-800 dark:text-gray-200"></span></div>
+                   <div class="text-gray-500 dark:text-gray-400">reward @TP<br><span data-m-rew class="font-semibold"></span></div>
+                   <div class="text-gray-500 dark:text-gray-400">risk @SL<br><span data-m-risk class="font-semibold"></span></div>
+                 </div>
                </div>
                <div class="flex gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
                  <button data-m-hold class="flex-1 px-4 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary hover:text-primary">Hold · close view</button>
@@ -1167,6 +1201,24 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         pnlEl.className = 'block text-2xl font-extrabold whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
         pctEl.textContent = `${up ? '+' : ''}${(+p.pnlPct).toFixed(2)}% · mark $${(+p.mark).toPrecision(6)}`;
         pctEl.className = 'block text-xs whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+
+        // Capital in / reward @TP / risk @SL. Risk flips to a locked GAIN once the stop ratchets
+        // above entry (the Gainer Hunter's profit-lock) — a clear "you can't lose from here" signal.
+        const q = +p.qty || 0, e = +p.entry || 0;
+        const capEl = o.querySelector('[data-m-cap]'), rewEl = o.querySelector('[data-m-rew]'), riskEl = o.querySelector('[data-m-risk]');
+        if (capEl) capEl.textContent = '$' + (e * q).toFixed(2);
+        if (rewEl) {
+            if (p.take_profit) {
+                const g = (+p.take_profit - e) * q, gp = e > 0 ? (+p.take_profit - e) / e * 100 : 0;
+                rewEl.textContent = `+$${g.toFixed(2)} (+${gp.toFixed(1)}%)`;
+                rewEl.className = 'font-semibold text-green-600 dark:text-green-400';
+            } else { rewEl.textContent = 'trail (open)'; rewEl.className = 'font-semibold text-gray-500 dark:text-gray-400'; }
+        }
+        if (riskEl) {
+            const l = (e - +p.stop_loss) * q, lp = e > 0 ? (e - +p.stop_loss) / e * 100 : 0;
+            if (l < 0) { riskEl.textContent = `+$${(-l).toFixed(2)} locked`; riskEl.className = 'font-semibold text-green-600 dark:text-green-400'; }
+            else { riskEl.textContent = `−$${l.toFixed(2)} (−${lp.toFixed(1)}%)`; riskEl.className = 'font-semibold text-red-500 dark:text-red-400'; }
+        }
     }
 
     function gtbModalDestroyChart() {
