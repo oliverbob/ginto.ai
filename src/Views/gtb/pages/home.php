@@ -319,33 +319,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                             <th class="py-2 pr-4 font-medium">#</th>
                             <th class="py-2 pr-4 font-medium">Time</th>
                             <th class="py-2 pr-4 font-medium">Symbol</th>
-                            <th class="py-2 pr-4 font-medium">Side</th>
-                            <th class="py-2 pr-4 font-medium">Type</th>
-                            <th class="py-2 pr-4 font-medium text-right">Price</th>
-                            <th class="py-2 pr-4 font-medium text-right">Qty</th>
-                            <th class="py-2 pr-4 font-medium text-right" title="Capital in/out (price × qty). On a BUY, the ▲/▼ show the possible gain at take-profit and possible loss at stop-loss.">Value <span class="text-gray-400 font-normal">($)</span></th>
-                            <th class="py-2 font-medium text-right" title="Realized P&amp;L, net of Binance buy+sell fees (~0.2% round-trip)">P&amp;L <span class="text-gray-400 font-normal">(net)</span></th>
+                            <th class="py-2 pr-4 font-medium text-right" title="USDT spent to buy (capital in)">Bought <span class="text-gray-400 font-normal">($)</span></th>
+                            <th class="py-2 pr-4 font-medium text-right" title="USDT received on sell (gross proceeds)">Sold <span class="text-gray-400 font-normal">($)</span></th>
+                            <th class="py-2 font-medium text-right" title="Gain or loss in USDT, net of Binance buy+sell fees (~0.2% round-trip)">Gain / Loss <span class="text-gray-400 font-normal">($ net)</span></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
                         <?php
-                        // Each stored row is one position; expand it into its BUY (entry) and,
-                        // once closed, its SELL (exit) so both sides of every trade are logged.
-                        $events = [];
-                        foreach ($recentTrades as $t) {
-                            $tid = (int) ($t['id'] ?? 0);
-                            $events[] = ['id' => $tid, 'time' => $t['created_at'] ?? '', 'symbol' => $t['symbol'] ?? '',
-                                'side' => 'BUY', 'type' => $t['type'] ?? 'MARKET',
-                                'price' => $t['price'] ?? null, 'qty' => $t['qty'] ?? '', 'pnl' => null,
-                                'sl' => $t['stop_loss'] ?? null, 'tp' => $t['take_profit'] ?? null];
-                            if (($t['status'] ?? '') === 'CLOSED' && ($t['exit_price'] ?? null) !== null) {
-                                $events[] = ['id' => $tid, 'time' => $t['closed_at'] ?? ($t['created_at'] ?? ''), 'symbol' => $t['symbol'] ?? '',
-                                    'side' => 'SELL', 'type' => 'MARKET',
-                                    'price' => $t['exit_price'], 'qty' => $t['qty'] ?? '', 'pnl' => $t['realized_pnl'] ?? null];
-                            }
-                        }
-                        usort($events, fn($a, $b) => strcmp((string) $b['time'], (string) $a['time']));
-                        // Coin badge: real icon from a CDN, with a colored ticker-initials fallback (robust for meme coins).
+                        // One row per trade, in plain USDT: amount bought ($), amount sold ($), and
+                        // net gain/loss ($). Open trades show "holding" + the forward plan.
                         $coinIcon = function (string $symbol): string {
                             $base = strtolower(preg_replace('/USDT$/', '', $symbol));
                             $up   = strtoupper(substr($base, 0, 3));
@@ -357,45 +339,42 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                                 . '<img src="' . $url . '" alt="" loading="lazy" class="absolute inset-0 w-6 h-6 rounded-full object-cover" onerror="this.remove()">'
                                 . '</span>';
                         };
-                        foreach (array_slice($events, 0, 30) as $t):
-                            $pnl = $t['pnl'];
-                            $pnlNeg = $pnl !== null && (float)$pnl < 0; ?>
+                        $rows = $recentTrades;
+                        usort($rows, fn($a, $b) => strcmp((string) ($b['closed_at'] ?? $b['created_at'] ?? ''), (string) ($a['closed_at'] ?? $a['created_at'] ?? '')));
+                        foreach (array_slice($rows, 0, 30) as $t):
+                            $tid    = (int) ($t['id'] ?? 0);
+                            $sym    = $t['symbol'] ?? '';
+                            $entry  = (float) ($t['price'] ?? 0);
+                            $qty    = (float) ($t['qty'] ?? 0);
+                            $bought = (($t['quote_qty'] ?? null) !== null && (float) $t['quote_qty'] > 0) ? (float) $t['quote_qty'] : $entry * $qty;
+                            $closed = ($t['status'] ?? '') === 'CLOSED' && ($t['exit_price'] ?? null) !== null;
+                            $sold   = $closed ? (float) $t['exit_price'] * $qty : null;
+                            $pnl    = ($closed && isset($t['realized_pnl'])) ? (float) $t['realized_pnl'] : null;
+                            $time   = $closed ? ($t['closed_at'] ?? $t['created_at'] ?? '') : ($t['created_at'] ?? '');
+                            $tp = $t['take_profit'] ?? null; $sl = $t['stop_loss'] ?? null;
+                            $gp = (!$closed && $tp !== null && $entry > 0) ? ((float) $tp - $entry) / $entry * 100 : null;
+                            $lp = (!$closed && $sl !== null && $entry > 0) ? ($entry - (float) $sl) / $entry * 100 : null;
+                        ?>
                             <tr class="text-gray-800 dark:text-gray-200">
-                                <td class="py-2.5 pr-4 text-gray-400 dark:text-gray-500 font-mono text-xs">#<?= (int)($t['id'] ?? 0) ?></td>
-                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(\Ginto\Models\GtbThought::manilaTime($t['time'] ?? '')) ?></td>
-                                <td class="py-2.5 pr-4 font-medium"><span class="inline-flex items-center gap-2"><?= $coinIcon($t['symbol'] ?? '') ?><span><?= htmlspecialchars($t['symbol'] ?? '') ?></span></span></td>
-                                <td class="py-2.5 pr-4">
-                                    <span class="inline-block text-[11px] font-bold px-2 py-0.5 rounded
-                                        <?= ($t['side'] ?? '') === 'BUY' ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'
-                                                                         : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' ?>">
-                                        <?= htmlspecialchars($t['side'] ?? '') ?>
+                                <td class="py-2.5 pr-4 text-gray-400 dark:text-gray-500 font-mono text-xs">#<?= $tid ?></td>
+                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(\Ginto\Models\GtbThought::manilaTime($time)) ?></td>
+                                <td class="py-2.5 pr-4 font-medium">
+                                    <span class="inline-flex items-center gap-2"><?= $coinIcon($sym) ?><span><?= htmlspecialchars($sym) ?></span>
+                                        <span class="text-[10px] font-bold px-1.5 py-0.5 rounded <?= $closed ? 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' ?>"><?= $closed ? 'CLOSED' : 'OPEN' ?></span>
                                     </span>
                                 </td>
-                                <td class="py-2.5 pr-4 text-gray-500 dark:text-gray-400"><?= htmlspecialchars($t['type'] ?? '') ?></td>
-                                <td class="py-2.5 pr-4 text-right tabular-nums"><?= $t['price'] !== null ? htmlspecialchars($t['price']) : '—' ?></td>
-                                <td class="py-2.5 pr-4 text-right tabular-nums"><?= htmlspecialchars($t['qty'] ?? '') ?></td>
-                                <td class="py-2.5 pr-4 text-right tabular-nums">
-                                    <?php
-                                    $ev = ($t['price'] !== null && $t['qty'] !== '' && $t['qty'] !== null) ? (float) $t['price'] * (float) $t['qty'] : null;
-                                    echo $ev !== null ? '$' . number_format($ev, 2) : '—';
-                                    if (($t['side'] ?? '') === 'BUY' && $ev !== null):
-                                        $e = (float) $t['price']; $tp = $t['tp'] ?? null; $sl = $t['sl'] ?? null;
-                                        $gp = ($tp !== null && $e > 0) ? ((float) $tp - $e) / $e * 100 : null;
-                                        $lp = ($sl !== null && $e > 0) ? ($e - (float) $sl) / $e * 100 : null; ?>
-                                        <span class="block text-[10px] whitespace-nowrap">
-                                            <span class="text-green-600 dark:text-green-400"><?= $gp !== null ? '▲' . number_format($gp, 1) . '%' : '▲ trail' ?></span>
-                                            <?php if ($lp !== null): ?>
-                                                <span class="ml-1 <?= $lp >= 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400' ?>"><?= $lp >= 0 ? '▼' . number_format($lp, 1) . '%' : '▲' . number_format(abs($lp), 1) . '% lock' ?></span>
-                                            <?php endif; ?>
-                                        </span>
-                                    <?php endif; ?>
-                                </td>
-                                <td class="py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ($pnlNeg ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
-                                    <?php if ($pnl === null): ?>—<?php else: $pv = (float) $pnl; ?>
+                                <td class="py-2.5 pr-4 text-right tabular-nums">$<?= number_format($bought, 2) ?></td>
+                                <td class="py-2.5 pr-4 text-right tabular-nums"><?= $sold !== null ? '$' . number_format($sold, 2) : '<span class="text-amber-600 dark:text-amber-400">holding</span>' ?></td>
+                                <td class="py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ((float) $pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
+                                    <?php if ($pnl !== null): $pv = (float) $pnl; ?>
                                         <span class="inline-flex items-center justify-end gap-1" title="<?= $pv >= 0 ? 'Win' : 'Loss' ?>">
-                                            <i class="fas fa-<?= $pv >= 0 ? 'caret-up' : 'caret-down' ?>"></i><?= ($pv >= 0 ? '+' : '−') . htmlspecialchars(number_format(abs($pv), 4)) ?>
+                                            <i class="fas fa-<?= $pv >= 0 ? 'caret-up' : 'caret-down' ?>"></i><?= ($pv >= 0 ? '+$' : '−$') . htmlspecialchars(number_format(abs($pv), 4)) ?>
                                         </span>
-                                    <?php endif; ?>
+                                    <?php elseif (!$closed): ?>
+                                        <span class="text-[10px] whitespace-nowrap font-normal text-gray-400">open ·
+                                            <span class="text-green-600 dark:text-green-400"><?= $gp !== null ? '▲' . number_format($gp, 1) . '%' : '▲ trail' ?></span><?php if ($lp !== null): ?><span class="ml-0.5 <?= $lp >= 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400' ?>"><?= $lp >= 0 ? '▼' . number_format($lp, 1) . '%' : '▲' . number_format(abs($lp), 1) . '% lock' ?></span><?php endif; ?>
+                                        </span>
+                                    <?php else: ?>—<?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
