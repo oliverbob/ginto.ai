@@ -432,6 +432,37 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     function gtbFmtUsd(n) { return '$' + (+n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     // Compact amount in the coin's own units (for P&L expressed in the traded currency).
     function gtbFmtCoin(x) { x = +x; const a = Math.abs(x); if (!a) return '0'; if (a >= 1000) return x.toFixed(1); if (a >= 1) return x.toFixed(3); if (a >= 0.001) return x.toFixed(5); return x.toPrecision(3); }
+
+    // Styled modal dialogs (replace native alert()/confirm()). Promise-based; theme-aware.
+    function gtbDialog({ title, message, confirmText, cancelText, danger, alertOnly }) {
+        return new Promise(resolve => {
+            const o = document.createElement('div');
+            o.className = 'fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/60';
+            o.innerHTML =
+                `<div class="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl p-5">
+                   <h3 data-title class="font-bold text-gray-900 dark:text-white mb-1.5${title ? '' : ' hidden'}"></h3>
+                   <p data-msg class="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-line"></p>
+                   <div class="mt-5 flex gap-2 justify-end">
+                     <button data-cancel class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary hover:text-primary${alertOnly ? ' hidden' : ''}"></button>
+                     <button data-ok class="px-4 py-2 rounded-lg text-sm font-semibold text-white ${danger ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:bg-primary/90'}"></button>
+                   </div>
+                 </div>`;
+            o.querySelector('[data-title]').textContent = title || '';
+            o.querySelector('[data-msg]').textContent = message || '';
+            o.querySelector('[data-ok]').textContent = confirmText || 'OK';
+            o.querySelector('[data-cancel]').textContent = cancelText || 'Cancel';
+            document.body.appendChild(o);
+            const done = v => { o.remove(); document.removeEventListener('keydown', onKey); resolve(v); };
+            function onKey(e) { if (e.key === 'Escape') done(!!alertOnly); if (e.key === 'Enter') done(true); }
+            o.querySelector('[data-ok]').addEventListener('click', () => done(true));
+            o.querySelector('[data-cancel]').addEventListener('click', () => done(false));
+            o.addEventListener('click', e => { if (e.target === o) done(!!alertOnly); });
+            document.addEventListener('keydown', onKey);
+            o.querySelector('[data-ok]').focus();
+        });
+    }
+    function gtbConfirm(message, opts = {}) { return gtbDialog({ message, ...opts }); }
+    function gtbAlert(message, opts = {}) { return gtbDialog({ message, alertOnly: true, ...opts }); }
     // Decimal places the chart price scale needs so low-priced coins don't collapse to "0.01".
     function gtbPricePrecision(px) {
         px = Math.abs(+px) || 0;
@@ -758,7 +789,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     async function gtbSetArmLive() {
         if (GTB_TESTNET) return;
         const armed = document.getElementById('gtb-arm-live').checked;
-        if (armed && !confirm('Arm LIVE trading? The bot may place REAL orders with real money (capped at your $7 base, every trade with an exchange-side stop).')) {
+        if (armed && !(await gtbConfirm('The bot may place REAL orders with real money (capped at your base, every trade with an exchange-side stop).', { title: 'Arm LIVE trading?', confirmText: 'Arm LIVE', danger: true }))) {
             document.getElementById('gtb-arm-live').checked = false;
             return;
         }
@@ -806,12 +837,12 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         let action;
         if (st === 'running') {
             action = 'stop'; // graceful wind-down
-            if (!confirm('Wind down?\n\nThe bot will STOP taking new trades but keep managing your open positions to a good exit, then fully stop once flat.\n\nYour exchange-side stops stay in place the whole time.')) return;
+            if (!(await gtbConfirm('The bot will STOP taking new trades but keep managing your open positions to a good exit, then fully stop once flat.\n\nYour exchange-side stops stay in place the whole time.', { title: 'Wind down?', confirmText: 'Wind down' }))) return;
         } else {
             // stopped OR winddown -> (re)start a fresh trading session
             action = 'start';
             if (!GTB_TESTNET && !document.getElementById('gtb-arm-live').checked) {
-                if (!confirm('LIVE mode: the bot will place REAL orders with real money (within your capital + loss limits, every trade with a stop). Tick "Arm LIVE trading" first, then start.')) return;
+                if (!(await gtbConfirm('The bot will place REAL orders with real money (within your capital + loss limits, every trade with a stop). Tick "Arm LIVE trading" first, then start.', { title: 'LIVE mode', confirmText: 'Continue', danger: true }))) return;
             }
         }
         gtbBotControl(action, document.getElementById('gtb-run-btn'));
@@ -819,7 +850,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     // Separate Force-stop button: sell everything now and fully stop.
     async function gtbForceStop() {
-        if (!confirm('Force stop?\n\nThis SELLS every open position at market right now and fully stops the bot. Use only if you want out immediately.')) return;
+        if (!(await gtbConfirm('This SELLS every open position at market right now and fully stops the bot. Use only if you want out immediately.', { title: 'Force stop?', confirmText: 'Sell all & stop', danger: true }))) return;
         gtbBotControl('flatten', document.getElementById('gtb-forcestop-btn'));
     }
 
@@ -1021,7 +1052,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                  <span data-pct class="block text-[11px] whitespace-nowrap"></span>
                </div>
              </div>
-             <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
+             <div class="relative">
+               <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
+               <span class="absolute top-1 right-1 pointer-events-none text-[10px] font-semibold text-gray-600 dark:text-gray-300 bg-white/75 dark:bg-gray-900/70 rounded px-1.5 py-0.5"><i class="fas fa-up-right-and-down-left-from-center mr-0.5"></i>expand</span>
+             </div>
              <div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">
                <div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>
                <div class="text-red-500">SL<br><span data-sl></span></div>
@@ -1085,7 +1119,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     async function gtbClosePosition(id, symbol) {
-        if (!confirm('Close ' + symbol + ' now at market?')) return;
+        if (!(await gtbConfirm('Close ' + symbol + ' now at market?', { title: 'Sell at market', confirmText: 'Sell now', danger: true }))) return;
         try {
             const res = await fetch('/gtb/bot/close', {
                 method: 'POST',
@@ -1093,15 +1127,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 body: JSON.stringify({ csrf_token: GTB_CSRF, id }),
             });
             const d = await res.json();
-            if (!d.ok) alert('Close failed: ' + (d.error || 'unknown'));
-        } catch (e) { alert(e.message); }
+            if (!d.ok) gtbAlert('Close failed: ' + (d.error || 'unknown'), { title: 'Error', danger: true });
+        } catch (e) { gtbAlert(e.message, { title: 'Error', danger: true }); }
         gtbLoadPositions();
         gtbLoadThoughts();
     }
 
     // ---- Expanded live trade view (on-demand; polls slowly; destroys itself on close) ----
     const GTB_MODAL = { el: null, chart: null, series: null, timer: null, id: null, ms: 15000 };
-    try { const s = parseInt(localStorage.getItem('gtbModalMs')); if ([10000, 15000, 20000].includes(s)) GTB_MODAL.ms = s; } catch (e) {}
+    try { const s = parseInt(localStorage.getItem('gtbModalMs')); if ([5000, 10000, 15000, 20000].includes(s)) GTB_MODAL.ms = s; } catch (e) {}
 
     function gtbBuildModal() {
         if (GTB_MODAL.el) return GTB_MODAL.el;
@@ -1119,6 +1153,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                    <div class="min-w-0"><span data-m-pnl class="block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="block text-xs whitespace-nowrap"></span></div>
                    <div class="text-right text-[11px] text-gray-400 shrink-0">
                      <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-700" data-m-cadence>
+                       <button type="button" data-ms="5000" class="px-2 py-0.5 font-semibold">5s</button>
                        <button type="button" data-ms="10000" class="px-2 py-0.5 font-semibold">10s</button>
                        <button type="button" data-ms="15000" class="px-2 py-0.5 font-semibold">15s</button>
                        <button type="button" data-ms="20000" class="px-2 py-0.5 font-semibold">20s</button>
@@ -1163,7 +1198,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     function gtbModalSetCadence(ms) {
-        if (![10000, 15000, 20000].includes(ms)) return;
+        if (![5000, 10000, 15000, 20000].includes(ms)) return;
         GTB_MODAL.ms = ms;
         try { localStorage.setItem('gtbModalMs', String(ms)); } catch (e) {}
         gtbModalApplyCadence();
@@ -1244,7 +1279,13 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                     const candles = d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
                     GTB_MODAL.series.setData(candles);
                     const last = candles[candles.length - 1];
-                    if (last) { p.mark = last.close; p.pnlPct = (+p.entry > 0) ? ((last.close - +p.entry) / +p.entry * 100) : 0; gtbModalSetPnl(p); }
+                    if (last) {
+                        const mark = +last.close, e = +p.entry, q = +p.qty || 0, fee = GTB_FEE_RATE || 0.001;
+                        p.mark = mark;
+                        p.pnlPct = e > 0 ? (mark - e) / e * 100 : 0;
+                        p.unrealized = (mark - e) * q - fee * q * (e + mark);  // NET of round-trip fee — keeps the fee badge honest
+                        gtbModalSetPnl(p);
+                    }
                     const ago = GTB_MODAL.el.querySelector('[data-m-ago]'); if (ago) ago.textContent = 'updated ' + new Date().toLocaleTimeString();
                 }
             }).catch(() => {});
@@ -1284,13 +1325,13 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     async function gtbModalSell(id, symbol) {
-        if (!confirm('Sell ' + symbol + ' now at market?')) return;
+        if (!(await gtbConfirm('Sell ' + symbol + ' now at market?', { title: 'Sell at market', confirmText: 'Sell now', danger: true }))) return;
         gtbCloseTradeModal();
         try {
             const res = await fetch('/gtb/bot/close', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF }, body: JSON.stringify({ csrf_token: GTB_CSRF, id }) });
             const d = await res.json();
-            if (!d.ok) alert('Sell failed: ' + (d.error || 'unknown'));
-        } catch (e) { alert(e.message); }
+            if (!d.ok) gtbAlert('Sell failed: ' + (d.error || 'unknown'), { title: 'Error', danger: true });
+        } catch (e) { gtbAlert(e.message, { title: 'Error', danger: true }); }
         gtbLoadPositions(); gtbLoadThoughts();
     }
 
