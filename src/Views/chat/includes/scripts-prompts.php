@@ -107,12 +107,14 @@
     // Check if user is logged in
     const isLoggedIn = window.GINTO_AUTH?.isLoggedIn;
     
-    // If not logged in, show YouTube video instead
+    // If not logged in, show the Academy banner (which renders its own live charts)
     if (!isLoggedIn) {
       renderYouTubeEmbed();
       return;
     }
-    
+    // Logged-in: fill the Academy ad card's live gainer/popular/loser mini-charts.
+    renderHomeAcademyCharts();
+
     try {
       await window.GINTO_AUTH_PROMISE; // ensure auth state ready
       const res = await fetch('/chat/prompts/', { credentials: 'same-origin' });
