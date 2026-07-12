@@ -1021,7 +1021,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                  <span data-pct class="block text-[11px] whitespace-nowrap"></span>
                </div>
              </div>
-             <div data-chart class="w-full rounded overflow-hidden" style="height:140px"></div>
+             <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
              <div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">
                <div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>
                <div class="text-red-500">SL<br><span data-sl></span></div>
@@ -1033,8 +1033,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         grid.appendChild(root);
         root.querySelector('[data-close]').addEventListener('click', () => gtbClosePosition(p.id, p.symbol));
         const el = root.querySelector('[data-chart]');
-        const card = { root, chart: null, series: null, lastKey: '' };
+        const card = { root, chart: null, series: null, lastKey: '', p: p };
         GTB_TRADES.cards[String(p.id)] = card;
+        el.addEventListener('click', () => gtbOpenTradeModal(card.p || p));
         if (typeof LightweightCharts !== 'undefined') {
             card.chart = LightweightCharts.createChart(el, Object.assign({ autoSize: true,
                 crosshair: { mode: 0 }, handleScale: false, handleScroll: false,
@@ -1055,6 +1056,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     function gtbUpdateTradeCard(p) {
         const card = GTB_TRADES.cards[String(p.id)];
         if (!card) return;
+        card.p = p;   // keep the freshest data for the expanded view
+        // If the expanded modal is open on this position, refresh its live P&L too.
+        if (GTB_MODAL.id === p.id) gtbModalSetPnl(p);
         const up = (+p.unrealized) >= 0;
         // Order cards by P&L% (best on top) via CSS order — reflows the grid without moving DOM nodes.
         card.root.style.order = String(Math.round(-(+p.pnlPct || 0) * 100));
@@ -1082,6 +1086,130 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbLoadPositions();
         gtbLoadThoughts();
     }
+
+    // ---- Expanded live trade view (on-demand; polls slowly; destroys itself on close) ----
+    const GTB_MODAL = { el: null, chart: null, series: null, timer: null, id: null };
+    const GTB_MODAL_MS = 15000;  // refresh every 15s — moves enough to decide, light on requests
+
+    function gtbBuildModal() {
+        if (GTB_MODAL.el) return GTB_MODAL.el;
+        const o = document.createElement('div');
+        o.id = 'gtb-trade-modal';
+        o.className = 'fixed inset-0 z-[60] hidden items-center justify-center p-3 sm:p-4 bg-black/70';
+        o.innerHTML =
+            `<div class="w-full max-w-2xl rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-2xl overflow-hidden">
+               <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                 <div data-m-title class="flex items-center gap-1.5 font-bold text-gray-900 dark:text-white min-w-0 flex-wrap"></div>
+                 <button data-m-x class="shrink-0 text-gray-400 hover:text-primary text-lg"><i class="fas fa-xmark"></i></button>
+               </div>
+               <div class="px-4 py-3">
+                 <div class="flex items-end justify-between mb-2 gap-2">
+                   <div class="min-w-0"><span data-m-pnl class="block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="block text-xs whitespace-nowrap"></span></div>
+                   <div class="text-right text-[11px] text-gray-400 shrink-0">updates every 15s<br><span data-m-ago>loading…</span></div>
+                 </div>
+                 <div data-m-chart class="w-full rounded-lg overflow-hidden border border-gray-100 dark:border-gray-800" style="height:320px"></div>
+                 <div class="mt-3 grid grid-cols-3 gap-2 text-xs tabular-nums text-center">
+                   <div class="text-gray-500 dark:text-gray-400">entry<br><span data-m-entry class="text-gray-800 dark:text-gray-200 font-semibold"></span></div>
+                   <div class="text-red-500">SL<br><span data-m-sl class="font-semibold"></span></div>
+                   <div class="text-green-600 dark:text-green-400">TP<br><span data-m-tp class="font-semibold"></span></div>
+                 </div>
+               </div>
+               <div class="flex gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-700">
+                 <button data-m-hold class="flex-1 px-4 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:border-primary hover:text-primary">Hold · close view</button>
+                 <button data-m-sell class="flex-1 px-4 py-2.5 rounded-lg font-semibold bg-red-500 text-white hover:bg-red-600"><i class="fas fa-bolt mr-1"></i>Sell at market now</button>
+               </div>
+             </div>`;
+        document.body.appendChild(o);
+        o.addEventListener('click', e => { if (e.target === o) gtbCloseTradeModal(); });
+        o.querySelector('[data-m-x]').addEventListener('click', gtbCloseTradeModal);
+        o.querySelector('[data-m-hold]').addEventListener('click', gtbCloseTradeModal);
+        GTB_MODAL.el = o;
+        return o;
+    }
+
+    function gtbModalSetPnl(p) {
+        const o = GTB_MODAL.el; if (!o) return;
+        const up = (+p.pnlPct) >= 0;
+        const unreal = (p.unrealized !== undefined && p.unrealized !== null) ? +p.unrealized : ((+p.mark - +p.entry) * (+p.qty || 0));
+        const pnlEl = o.querySelector('[data-m-pnl]'), pctEl = o.querySelector('[data-m-pct]');
+        pnlEl.textContent = `${unreal >= 0 ? '+' : ''}$${unreal.toFixed(4)}`;
+        pnlEl.className = 'block text-2xl font-extrabold whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+        pctEl.textContent = `${up ? '+' : ''}${(+p.pnlPct).toFixed(2)}% · mark $${(+p.mark).toPrecision(6)}`;
+        pctEl.className = 'block text-xs whitespace-nowrap ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+    }
+
+    function gtbModalDestroyChart() {
+        if (GTB_MODAL.chart) { try { GTB_MODAL.chart.remove(); } catch (e) {} }
+        GTB_MODAL.chart = null; GTB_MODAL.series = null;
+    }
+
+    function gtbCloseTradeModal() {
+        if (GTB_MODAL.timer) { clearInterval(GTB_MODAL.timer); GTB_MODAL.timer = null; }
+        gtbModalDestroyChart();
+        GTB_MODAL.id = null;
+        if (GTB_MODAL.el) { GTB_MODAL.el.classList.add('hidden'); GTB_MODAL.el.classList.remove('flex'); }
+        document.body.style.overflow = '';
+    }
+
+    function gtbModalRefresh(p) {
+        if (GTB_MODAL.id !== p.id) return;  // stale (modal closed or switched)
+        fetch(`/gtb/klines?symbol=${encodeURIComponent(p.symbol)}&interval=1m`)
+            .then(r => r.json()).then(d => {
+                if (GTB_MODAL.id !== p.id || !GTB_MODAL.series) return;
+                if (d.ok && Array.isArray(d.candles)) {
+                    const candles = d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
+                    GTB_MODAL.series.setData(candles);
+                    const last = candles[candles.length - 1];
+                    if (last) { p.mark = last.close; p.pnlPct = (+p.entry > 0) ? ((last.close - +p.entry) / +p.entry * 100) : 0; gtbModalSetPnl(p); }
+                    const ago = GTB_MODAL.el.querySelector('[data-m-ago]'); if (ago) ago.textContent = 'updated ' + new Date().toLocaleTimeString();
+                }
+            }).catch(() => {});
+    }
+
+    function gtbOpenTradeModal(p) {
+        if (!p) return;
+        const o = gtbBuildModal();
+        GTB_MODAL.id = p.id;
+        o.querySelector('[data-m-title]').innerHTML = gtbCoinIcon(p.symbol.replace('USDT', ''), 20)
+            + `<span class="truncate">${p.symbol.replace('USDT', '')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>`
+            + `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>`
+            + `<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode === 'live' ? 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>`;
+        o.querySelector('[data-m-sell]').onclick = () => gtbModalSell(p.id, p.symbol);
+        o.querySelector('[data-m-entry]').textContent = '$' + (+p.entry).toPrecision(6);
+        o.querySelector('[data-m-sl]').textContent = '$' + (+p.stop_loss).toPrecision(6);
+        o.querySelector('[data-m-tp]').textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
+        gtbModalSetPnl(p);
+        o.classList.remove('hidden'); o.classList.add('flex');
+        document.body.style.overflow = 'hidden';
+
+        gtbModalDestroyChart();
+        const el = o.querySelector('[data-m-chart]');
+        if (typeof LightweightCharts !== 'undefined') {
+            const prec = gtbPricePrecision(p.entry || p.mark || 1);
+            GTB_MODAL.chart = LightweightCharts.createChart(el, Object.assign({ autoSize: true, crosshair: { mode: 1 },
+                rightPriceScale: { visible: true }, timeScale: { visible: true, timeVisible: true, secondsVisible: false } }, gtbChartTheme()));
+            GTB_MODAL.series = GTB_MODAL.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444',
+                priceFormat: { type: 'price', precision: prec, minMove: Math.pow(10, -prec) } });
+            GTB_MODAL.series.createPriceLine({ price: +p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
+            GTB_MODAL.series.createPriceLine({ price: +p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
+            if (p.take_profit) GTB_MODAL.series.createPriceLine({ price: +p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
+        }
+        gtbModalRefresh(p);  // first paint immediately
+        GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL_MS);
+    }
+
+    async function gtbModalSell(id, symbol) {
+        if (!confirm('Sell ' + symbol + ' now at market?')) return;
+        gtbCloseTradeModal();
+        try {
+            const res = await fetch('/gtb/bot/close', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF }, body: JSON.stringify({ csrf_token: GTB_CSRF, id }) });
+            const d = await res.json();
+            if (!d.ok) alert('Sell failed: ' + (d.error || 'unknown'));
+        } catch (e) { alert(e.message); }
+        gtbLoadPositions(); gtbLoadThoughts();
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') gtbCloseTradeModal(); });
 
     document.addEventListener('DOMContentLoaded', () => {
         gtbInitChart();
