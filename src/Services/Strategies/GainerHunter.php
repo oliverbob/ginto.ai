@@ -34,7 +34,9 @@ class GainerHunter implements GtbTemplate
     public function __construct()
     {
         $this->minG      = (float) (Env::get('GTB_GAINER_MIN_PCT', '3') ?? 3);
-        $this->maxG      = (float) (Env::get('GTB_GAINER_MAX_PCT', '60') ?? 60);
+        // Top gainers routinely run 140–400%; capping entries low throws those away. Allow chasing
+        // strong uptrends far up (still gated by the "pressing the 24h high" filter + OCO protection).
+        $this->maxG      = (float) (Env::get('GTB_GAINER_MAX_PCT', '300') ?? 300);
         $this->sl        = (float) (Env::get('GTB_GAINER_SL_PCT', '2.0') ?? 2.0);
         $this->tp        = (float) (Env::get('GTB_GAINER_TP_PCT', '8.0') ?? 8.0);
         $this->lock      = (float) (Env::get('GTB_GAINER_LOCK_PCT', '1.5') ?? 1.5);
