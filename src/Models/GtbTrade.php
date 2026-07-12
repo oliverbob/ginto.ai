@@ -43,10 +43,13 @@ class GtbTrade
     }
 
     /** All open positions (oldest first). */
-    public function openPositions(): array
+    public function openPositions(?string $mode = null): array
     {
         try {
-            $rows = $this->db->select($this->table, '*', ['status' => 'OPEN', 'ORDER' => ['id' => 'ASC']]);
+            $where = $mode !== null ? ['mode' => $mode] : [];
+            $where['status'] = 'OPEN';
+            $where['ORDER']  = ['id' => 'ASC'];
+            $rows = $this->db->select($this->table, '*', $where);
             return is_array($rows) ? $rows : [];
         } catch (\Throwable $e) {
             return [];

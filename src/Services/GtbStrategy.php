@@ -93,7 +93,7 @@ class GtbStrategy
         //          reconcile fills, ratchet the trailing stop, and re-protect if a
         //          protective order goes missing — the exchange enforces the stop
         //          even if this runner is down.
-        foreach ($trades->openPositions() as $pos) {
+        foreach ($trades->openPositions($mode) as $pos) {
             $price = $priceOf($pos['symbol']);
             if ($price === null || $price <= 0) continue;
 
@@ -155,7 +155,7 @@ class GtbStrategy
         // Wind-down (Stop pressed): keep managing open positions to a good exit, take
         // nothing new, and finalize to a full stop once everything is closed.
         if (!$openNew) {
-            $open = $trades->openPositions();
+            $open = $trades->openPositions($mode);
             if (count($open) === 0) {
                 $botState->stop();
                 return $this->openPositionsState($client, $trades, $cap, $realized, $mode,
@@ -184,7 +184,7 @@ class GtbStrategy
                 sprintf('wallet $%.2f below floor $%.2f — holding, no new trades', $this->walletUsd, $floor), $tickers);
         }
 
-        $open  = $trades->openPositions();
+        $open  = $trades->openPositions($mode);
         $slots = $cap->slots($realized);
         $free  = $slots - count($open);
         $action = 'managing ' . count($open) . ' position(s)';
@@ -363,7 +363,7 @@ class GtbStrategy
         $thoughts = new GtbThought();
         $mode     = (new GtbSettings())->isTestnet() ? 'paper' : 'live';
         $n = 0;
-        foreach ($trades->openPositions() as $pos) {
+        foreach ($trades->openPositions($mode) as $pos) {
             $price = $client->price($pos['symbol']);
             if ($price === null || $price <= 0) $price = (float) $pos['price'];
             $this->forceClose($client, $trades, $thoughts, $pos, (float) $price, $mode, 'MANUAL-STOP');
@@ -420,7 +420,7 @@ class GtbStrategy
 
         $positions = [];
         $unrealTotal = 0.0;
-        foreach ($trades->openPositions() as $p) {
+        foreach ($trades->openPositions($mode) as $p) {
             $sym   = $p['symbol'];
             $price = isset($tickers[$sym]) ? $tickers[$sym]['price'] : $client->price($sym);
             $entry = (float) $p['price'];
@@ -483,7 +483,7 @@ class GtbStrategy
         if ($cap->mode() === 'staked' && $floor <= 0) return;
 
         $invested = 0.0;
-        foreach ($trades->openPositions() as $p) {
+        foreach ($trades->openPositions($mode) as $p) {
             if (($p['mode'] ?? $mode) !== $mode) continue;
             $sym = $p['symbol'];
             $px  = isset($tickers[$sym]) ? (float) $tickers[$sym]['price'] : (float) ($client->price($sym) ?? $p['price']);
