@@ -373,7 +373,11 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                                 <td class="py-2.5 pr-4 text-right tabular-nums"><?= $t['price'] !== null ? htmlspecialchars($t['price']) : '—' ?></td>
                                 <td class="py-2.5 pr-4 text-right tabular-nums"><?= htmlspecialchars($t['qty'] ?? '') ?></td>
                                 <td class="py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ($pnlNeg ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
-                                    <?= $pnl === null ? '—' : htmlspecialchars($pnl) ?>
+                                    <?php if ($pnl === null): ?>—<?php else: $pv = (float) $pnl; ?>
+                                        <span class="inline-flex items-center justify-end gap-1" title="<?= $pv >= 0 ? 'Win' : 'Loss' ?>">
+                                            <i class="fas fa-<?= $pv >= 0 ? 'caret-up' : 'caret-down' ?>"></i><?= ($pv >= 0 ? '+' : '−') . htmlspecialchars(number_format(abs($pv), 4)) ?>
+                                        </span>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -1001,20 +1005,20 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     function gtbCreateTradeCard(grid, p) {
         const root = document.createElement('div');
-        root.className = 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3';
+        root.className = 'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 p-3 overflow-hidden min-w-0';
         root.innerHTML =
-            `<div class="flex items-center justify-between mb-1">
-               <div class="flex items-center gap-1.5 font-bold text-gray-900 dark:text-white">${gtbCoinIcon(p.symbol.replace('USDT',''), 18)}<span>${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
+            `<div class="flex items-start justify-between gap-2 mb-1">
+               <div class="min-w-0 flex flex-wrap items-center gap-x-1 gap-y-0.5 font-bold text-gray-900 dark:text-white">${gtbCoinIcon(p.symbol.replace('USDT',''), 18)}<span class="truncate max-w-full">${p.symbol.replace('USDT','')}<span class="text-gray-400 text-xs font-normal">/USDT</span></span>
                  ${gtbProfBadge(p.profile)}
-                 <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
-                 <span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
+                 <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">${gtbTemplLabel(p.template)}</span>
+                 <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded ${p.mode==='live'?'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400':'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'}">${p.mode}</span>
                  ${p.mode==='live' ? (p.protected
-                    ? '<span title="Stop-loss resting on Binance" class="ml-1 text-[9px] text-green-600 dark:text-green-400"><i class="fas fa-shield-halved"></i></span>'
-                    : '<span title="No exchange stop yet" class="ml-1 text-[9px] text-red-500"><i class="fas fa-triangle-exclamation"></i></span>') : ''}
+                    ? '<span title="Stop-loss resting on Binance" class="text-[9px] text-green-600 dark:text-green-400"><i class="fas fa-shield-halved"></i></span>'
+                    : '<span title="No exchange stop yet" class="text-[9px] text-red-500"><i class="fas fa-triangle-exclamation"></i></span>') : ''}
                </div>
-               <div class="text-right leading-tight">
-                 <span data-pnl class="block text-sm font-bold"></span>
-                 <span data-pct class="block text-[11px]"></span>
+               <div class="text-right leading-tight shrink-0">
+                 <span data-pnl class="block text-sm font-bold whitespace-nowrap"></span>
+                 <span data-pct class="block text-[11px] whitespace-nowrap"></span>
                </div>
              </div>
              <div data-chart class="w-full rounded overflow-hidden" style="height:140px"></div>
@@ -1032,7 +1036,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         const card = { root, chart: null, series: null, lastKey: '' };
         GTB_TRADES.cards[String(p.id)] = card;
         if (typeof LightweightCharts !== 'undefined') {
-            card.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 140,
+            card.chart = LightweightCharts.createChart(el, Object.assign({ autoSize: true,
                 crosshair: { mode: 0 }, handleScale: false, handleScroll: false,
                 rightPriceScale: { visible: true }, timeScale: { visible: false } }, gtbChartTheme()));
             const gtbPrec = gtbPricePrecision(p.entry || p.mark || 1);
@@ -1041,7 +1045,6 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             card.series.createPriceLine({ price: p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
             card.series.createPriceLine({ price: p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
             if (p.take_profit) card.series.createPriceLine({ price: p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
-            new ResizeObserver(() => { try { card.chart.applyOptions({ width: el.clientWidth }); } catch (e) {} }).observe(el);
             fetch(`/gtb/klines?symbol=${encodeURIComponent(p.symbol)}&interval=5m`)
                 .then(r => r.json()).then(d => {
                     if (d.ok && card.series) { card.series.setData(d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }))); card.chart.timeScale().fitContent(); }
@@ -1053,6 +1056,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         const card = GTB_TRADES.cards[String(p.id)];
         if (!card) return;
         const up = (+p.unrealized) >= 0;
+        // Order cards by P&L% (best on top) via CSS order — reflows the grid without moving DOM nodes.
+        card.root.style.order = String(Math.round(-(+p.pnlPct || 0) * 100));
         const pnl = card.root.querySelector('[data-pnl]'); const pct = card.root.querySelector('[data-pct]');
         pnl.textContent = `${up?'+':''}$${(+p.unrealized).toFixed(4)}`;
         pnl.className = 'block text-sm font-bold ' + (up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
