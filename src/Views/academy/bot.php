@@ -288,8 +288,8 @@ function labRender(d) {
     document.getElementById('lab-run').textContent = d.running ? 'Live · trading' : 'Paused';
     document.getElementById('lab-run').className = 'text-[11px] font-bold px-2.5 py-1 rounded-full ' + (d.running ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400');
     document.getElementById('lab-open').textContent = (d.positions || []).length;
-    var ur = document.getElementById('lab-unreal'); ur.textContent = labFmt(d.unrealized); ur.className = 'mt-1 text-2xl font-extrabold ' + ((+d.unrealized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
-    var rz = document.getElementById('lab-realized'); rz.textContent = labFmt(d.realized); rz.className = 'mt-1 text-2xl font-extrabold ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400');
+    labApplyVal('lab-unreal', labFmt(d.unrealized), 'mt-1 text-2xl font-extrabold ' + ((+d.unrealized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'));
+    labApplyVal('lab-realized', labFmt(d.realized), 'mt-1 text-2xl font-extrabold ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'));
     document.getElementById('lab-updated').textContent = new Date().toLocaleTimeString();
 
     var pos = d.positions || [], pw = document.getElementById('lab-positions');
@@ -327,6 +327,14 @@ function labRender(d) {
     }
 }
 
+// Set a value + its color classes WITHOUT clobbering the eye-toggle blur.
+function labApplyVal(id, text, base) {
+    var el = document.getElementById(id); if (!el) return;
+    var blurred = el.classList.contains('lab-blur');
+    el.textContent = text;
+    el.className = base + (blurred ? ' lab-blur' : '');
+}
+
 // Per-card hide toggle (blur the number; state persists per learner).
 function labEye(key, ids) {
     var btn = document.getElementById('eye-' + key), i = btn && btn.querySelector('i');
@@ -351,10 +359,9 @@ function labLoadWallet() {
         .then(function (d) {
             if (!d || !d.ok) return;
             var eq = +d.equity, start = +d.starting || 10000, pnl = eq - start;
-            document.getElementById('lab-wallet').textContent = '$' + eq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            var p = document.getElementById('lab-wallet-pnl');
-            p.textContent = (pnl >= 0 ? '+' : '−') + '$' + Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            p.className = 'text-lg font-bold ' + (pnl > 0 ? 'text-green-600 dark:text-green-400' : pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400');
+            labApplyVal('lab-wallet', '$' + eq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'mt-1 text-4xl font-extrabold tabular-nums');
+            labApplyVal('lab-wallet-pnl', (pnl >= 0 ? '+' : '−') + '$' + Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+                'text-lg font-bold ' + (pnl > 0 ? 'text-green-600 dark:text-green-400' : pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400'));
         }).catch(function () {});
 }
 

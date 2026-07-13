@@ -852,7 +852,9 @@ class AcademyController
                 }
             }
             if ($res === null) {   // no vault (or vaulting unsupported) — charge one-off
-                $res = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, []);
+                $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+                $returnUrl = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/academy/card/return';
+                $res = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, [], $returnUrl);
                 $autoRenew = false;
             }
             if (empty($res['success'])) { echo json_encode(['success' => false, 'message' => $res['message'] ?? 'The card could not be processed.']); exit; }
@@ -875,6 +877,23 @@ class AcademyController
             error_log('Academy cardInit error: ' . $e->getMessage());
             http_response_code(500); echo json_encode(['success' => false, 'message' => 'An error occurred processing the card.']); exit;
         }
+    }
+
+    /**
+     * GET /academy/card/return — where PayMongo sends the browser back after 3-D Secure. This loads
+     * inside the checkout's 3DS iframe; the parent page's status poller does the actual finalize +
+     * grant, so this only needs to signal completion and stop the spinner.
+     */
+    public function cardReturn(): void
+    {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            . '<title>Verification complete</title><style>body{font-family:system-ui,-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;background:#0b1020;color:#e5e7eb}'
+            . '.c{text-align:center;padding:24px}.d{width:44px;height:44px;border-radius:50%;background:#22c55e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 12px}</style></head>'
+            . '<body><div class="c"><div class="d">&#10003;</div><div>Card verification complete.</div>'
+            . '<div style="color:#94a3b8;font-size:13px;margin-top:6px">You can return to the checkout window — it updates automatically.</div></div>'
+            . '<script>try{window.parent&&window.parent.postMessage({type:"gta-3ds-done"},"*");}catch(e){}</script></body></html>';
+        exit;
     }
 
     /**

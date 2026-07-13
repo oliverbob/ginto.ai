@@ -298,20 +298,22 @@ class PayMongoHandler
      * @param string $clientKey   Client key from payment intent
      * @return array ['success' => bool, 'qr_image' => string, 'qr_string' => string, 'status' => string] | ['success' => false, 'message' => string]
      */
-    public function attachPaymentMethod(string $piId, string $pmId, string $clientKey): array
+    public function attachPaymentMethod(string $piId, string $pmId, string $clientKey, string $returnUrl = ''): array
     {
         if (empty($this->secretKey)) {
             return ['success' => false, 'message' => 'PayMongo is not configured.'];
         }
 
-        $body = [
-            'data' => [
-                'attributes' => [
-                    'payment_method' => $pmId,
-                    'client_key'     => $clientKey,
-                ],
-            ],
+        $attrs = [
+            'payment_method' => $pmId,
+            'client_key'     => $clientKey,
         ];
+        // For card (3DS) payments PayMongo needs an https return_url to build the browser
+        // redirect; without it redirect.url comes back null and the payment stalls forever.
+        if ($returnUrl !== '') {
+            $attrs['return_url'] = $returnUrl;
+        }
+        $body = ['data' => ['attributes' => $attrs]];
 
         $response = $this->request('POST', '/payment_intents/' . urlencode($piId) . '/attach', $body);
 
@@ -504,7 +506,8 @@ class PayMongoHandler
         string $phone,
         string $description,
         array $card,
-        array $billingAddress = []
+        array $billingAddress = [],
+        string $returnUrl = ''
     ): array {
         $amountCentavos = (int)round($amountPhp * 100);
 
@@ -526,7 +529,7 @@ class PayMongoHandler
             return $pmResult;
         }
 
-        $attachResult = $this->attachPaymentMethod($piId, $pmResult['pm_id'], $clientKey);
+        $attachResult = $this->attachPaymentMethod($piId, $pmResult['pm_id'], $clientKey, $returnUrl);
         if (!$attachResult['success']) {
             return $attachResult;
         }

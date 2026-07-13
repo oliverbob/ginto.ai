@@ -1683,6 +1683,7 @@ $router->req('/academy/join', 'AcademyController@join', ['POST']); // no-JS fall
 $router->req('/academy/qrph/init', 'AcademyController@qrphInit', ['POST']);       // on-site QR Ph: create intent + QR
 $router->req('/academy/card/init', 'AcademyController@cardInit', ['POST']);       // on-site card: intent + card + 3DS
 $router->req('/academy/qrph/finalize', 'AcademyController@qrphFinalize', ['POST']); // on-site: verify paid + grant (QR or card)
+$router->get('/academy/card/return', 'AcademyController@cardReturn');              // 3DS return landing (loads in the checkout iframe)
 $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');
