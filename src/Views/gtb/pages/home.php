@@ -145,60 +145,45 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     endforeach; ?>
 </section>
 
-<!-- Markets + candlestick chart (live, Binance public data) -->
-<section class="mt-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
-    <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
-        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
-            <i class="fas fa-chart-line text-primary mr-2"></i>Markets
-            <span class="ml-1 text-xs font-normal text-gray-400 dark:text-gray-500">live</span>
-        </h3>
-        <div id="gtb-intervals" class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
-            <?php foreach (['1m','5m','15m','1h','4h','1d'] as $iv): ?>
-                <button type="button" data-interval="<?= $iv ?>"
-                        class="gtb-iv px-3 py-1.5 <?= $iv==='1h' ? 'bg-primary text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' ?>"><?= $iv ?></button>
-            <?php endforeach; ?>
-        </div>
-    </div>
-
-    <!-- Chart (full width) -->
-    <div class="flex items-baseline justify-between mb-2">
-        <div class="flex items-center gap-2">
-            <span id="gtb-chart-icon" class="inline-flex"></span>
-            <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
-            <span id="gtb-chart-price" class="text-lg font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
-        </div>
-        <span id="gtb-chart-change" class="text-sm font-semibold"></span>
-    </div>
-    <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
-    <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-        Candles from Binance public market data (mainnet) — real regardless of your testnet setting. Click any coin below to chart it.
-    </p>
-</section>
-
-<!-- Top Movers: Hot / Gainers / Losers (all visible at once) -->
-<section class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-    <?php
-    $movers = [
-        ['col' => 'hot',     'title' => 'Hot Coins',   'icon' => 'fa-fire',             'tone' => 'text-primary'],
-        ['col' => 'gainers', 'title' => 'Top Gainers', 'icon' => 'fa-arrow-trend-up',   'tone' => 'text-green-600 dark:text-green-400'],
-        ['col' => 'losers',  'title' => 'Top Losers',  'icon' => 'fa-arrow-trend-down', 'tone' => 'text-red-500 dark:text-red-400'],
-    ];
-    foreach ($movers as $m): ?>
-        <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
-            <button type="button" class="gtb-sort-btn group w-full flex items-center justify-between mb-3"
-                    data-col="<?= $m['col'] ?>" title="Click to sort by 24h change (toggle high↔low)">
-                <h3 class="font-semibold text-gray-900 dark:text-white">
-                    <i class="fas <?= $m['icon'] ?> <?= $m['tone'] ?> mr-1.5"></i><?= $m['title'] ?>
-                </h3>
-                <span class="text-[11px] text-gray-400 dark:text-gray-500 group-hover:text-primary flex items-center gap-1">
-                    24h % <i id="gtb-sort-<?= $m['col'] ?>" class="fas fa-sort"></i>
-                </span>
-            </button>
-            <div id="gtb-<?= $m['col'] ?>" class="space-y-0.5 max-h-[340px] overflow-y-auto pr-1">
-                <div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm"><i class="fas fa-spinner fa-spin"></i></div>
+<!-- Markets: live chart + tabbed movers (Popular / Gainers / Losers) — elegant single view -->
+<section class="mt-6 grid lg:grid-cols-3 gap-4">
+    <!-- Chart -->
+    <div class="lg:col-span-2 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+            <div class="flex items-center gap-2 min-w-0">
+                <span id="gtb-chart-icon" class="inline-flex"></span>
+                <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
+                <span id="gtb-chart-price" class="text-base font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
+                <span id="gtb-chart-change" class="text-sm font-semibold"></span>
+                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">● LIVE</span>
+            </div>
+            <div id="gtb-intervals" class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
+                <?php foreach (['1m','5m','15m','1h','4h','1d'] as $iv): ?>
+                    <button type="button" data-interval="<?= $iv ?>"
+                            class="gtb-iv px-3 py-1.5 <?= $iv==='1h' ? 'bg-primary text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' ?>"><?= $iv ?></button>
+                <?php endforeach; ?>
             </div>
         </div>
-    <?php endforeach; ?>
+        <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:380px"></div>
+        <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+            Candles from Binance public market data (mainnet) — real regardless of your testnet setting. Tap any coin to chart it.
+        </p>
+    </div>
+    <!-- Markets (tabbed, like the Academy) -->
+    <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
+        <div class="flex items-center justify-between mb-2">
+            <h3 class="text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-chart-line mr-1"></i>Markets</h3>
+            <span class="text-[11px] text-gray-400 dark:text-gray-500">24h · live</span>
+        </div>
+        <div id="gtb-mtabs" class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-2 text-xs font-bold">
+            <button type="button" data-mtab="hot" class="flex-1 py-1.5">Popular</button>
+            <button type="button" data-mtab="gainers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Gainers</button>
+            <button type="button" data-mtab="losers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Losers</button>
+        </div>
+        <div id="gtb-hot" class="gtb-mlist space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"><div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm"><i class="fas fa-spinner fa-spin"></i></div></div>
+        <div id="gtb-gainers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"></div>
+        <div id="gtb-losers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"></div>
+    </div>
 </section>
 
 <!-- Bot Brain: the AI reflecting on the market (advisory) -->
@@ -602,6 +587,20 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         gtbFillCol('hot');
         gtbFillCol('gainers');
         gtbFillCol('losers');
+    }
+
+    // Tabbed markets panel (Popular / Gainers / Losers) — one visible at a time.
+    function gtbSetMarketTab(tab) {
+        document.querySelectorAll('.gtb-mlist').forEach(el => el.classList.toggle('hidden', el.id !== 'gtb-' + tab));
+        document.querySelectorAll('#gtb-mtabs button').forEach(b => {
+            const on = b.dataset.mtab === tab;
+            b.classList.toggle('bg-primary', on); b.classList.toggle('text-white', on);
+            b.classList.toggle('text-gray-500', !on); b.classList.toggle('dark:text-gray-400', !on);
+        });
+    }
+    function gtbInitMarketTabs() {
+        document.querySelectorAll('#gtb-mtabs button').forEach(b => b.addEventListener('click', () => gtbSetMarketTab(b.dataset.mtab)));
+        gtbSetMarketTab('hot');
     }
 
     async function gtbLoadMovers() {
@@ -1401,6 +1400,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         document.getElementById('gtb-chart-icon').innerHTML = gtbCoinIcon(GTB.base || 'BTC', 24);
         gtbInitIntervals();
         gtbInitSort();
+        gtbInitMarketTabs();
         gtbLoadMovers();
         gtbModeBadge();
         gtbSetRunBtn();  // paint Start/Stop from persisted state on load
