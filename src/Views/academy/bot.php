@@ -11,7 +11,7 @@
     <script src="/assets/js/tailwindcss.js"></script>
     <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#6366f1',secondary:'#8b5cf6'}}}};</script>
     <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
-    <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css"><style>.dark{color-scheme:dark}</style>
+    <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css"><style>.dark{color-scheme:dark}.lab-blur{filter:blur(9px);user-select:none}</style>
 </head>
 <body class="bg-white dark:bg-[#0b1020] text-gray-900 dark:text-gray-100 min-h-screen">
 <header class="border-b border-gray-200 dark:border-gray-800 sticky top-0 bg-white/80 dark:bg-[#0b1020]/80 backdrop-blur z-30">
@@ -40,7 +40,8 @@
     <!-- Your own paper wallet (per-user) -->
     <div class="mt-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/10 p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
-            <div class="text-xs font-bold uppercase tracking-wide text-primary"><i class="fas fa-wallet mr-1"></i>Your paper wallet</div>
+            <div class="text-xs font-bold uppercase tracking-wide text-primary flex items-center gap-2"><span><i class="fas fa-wallet mr-1"></i>Your paper wallet</span>
+                <button type="button" id="eye-lab-wallet" onclick="labEye('lab-wallet',['lab-wallet','lab-wallet-pnl'])" title="Hide / show" class="text-primary/60 hover:text-primary"><i class="fas fa-eye"></i></button></div>
             <div id="lab-wallet" class="mt-1 text-4xl font-extrabold tabular-nums">$10,000.00</div>
             <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Your practice balance — real market prices, zero real risk. This account is yours alone.</div>
         </div>
@@ -50,6 +51,18 @@
         </div>
     </div>
 
+    <!-- Bot controls (prominent) -->
+    <div class="mt-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" id="lab-analyze-btn" onclick="labAnalyze()"
+                    class="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                <i class="fas fa-brain"></i> <span id="lab-analyze-label">Analyze market with AI</span>
+            </button>
+            <span id="lab-analyze-hint" class="text-xs text-gray-400">Analyses the coin shown on the chart below — advisory, no orders placed.</span>
+        </div>
+        <div id="lab-analysis" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
+    </div>
+
     <!-- The shared class bot the learner studies (clearly separated from their own money) -->
     <div class="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-400">
         <i class="fas fa-robot"></i> The class demo bot
@@ -57,9 +70,9 @@
         <span id="lab-updated" class="ml-auto font-normal normal-case">—</span>
     </div>
     <div class="mt-2 grid grid-cols-3 gap-3">
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Open positions</div><div id="lab-open" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Unrealized</div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Track record</div><div id="lab-realized" class="mt-1 text-2xl font-extrabold">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Open positions</span><button type="button" id="eye-lab-open" onclick="labEye('lab-open',['lab-open'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-open" class="mt-1 text-2xl font-extrabold">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Unrealized</span><button type="button" id="eye-lab-unreal" onclick="labEye('lab-unreal',['lab-unreal'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Track record</span><button type="button" id="eye-lab-realized" onclick="labEye('lab-realized',['lab-realized'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-realized" class="mt-1 text-2xl font-extrabold">—</div></div>
     </div>
 
     <!-- Live chart + markets (same engine as /gtb, testnet-only) -->
@@ -88,15 +101,6 @@
                 </div>
             </div>
             <div id="lab-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
-            <!-- AI analysis (advisory, same brain as /gtb Reflect) -->
-            <div class="mt-3 flex items-center gap-2">
-                <button type="button" id="lab-analyze-btn" onclick="labAnalyze()"
-                        class="inline-flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
-                    <i class="fas fa-brain"></i> <span id="lab-analyze-label">Analyze this coin with AI</span>
-                </button>
-                <span class="text-[11px] text-gray-400">Advisory only — the bot reasons out loud; no orders are placed.</span>
-            </div>
-            <div id="lab-analysis" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
         </div>
         <!-- Markets -->
         <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
@@ -130,6 +134,7 @@
 </section>
 
 <script>
+const LAB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
 function labCoinIcon(base, size) {
     var b = String(base || '').toLowerCase(), up = String(base || '').toUpperCase().slice(0, 3);
     var h = 0; for (var i = 0; i < b.length; i++) h = (h * 31 + b.charCodeAt(i)) & 0xffffffff;
@@ -313,6 +318,24 @@ function labRender(d) {
     }
 }
 
+// Per-card hide toggle (blur the number; state persists per learner).
+function labEye(key, ids) {
+    var btn = document.getElementById('eye-' + key), i = btn && btn.querySelector('i');
+    var hide = !(i && i.classList.contains('fa-eye-slash'));
+    ids.forEach(function (id) { var el = document.getElementById(id); if (el) el.classList.toggle('lab-blur', hide); });
+    if (i) i.className = hide ? 'fas fa-eye-slash' : 'fas fa-eye';
+    try { localStorage.setItem('labeye_' + key, hide ? '1' : '0'); } catch (e) {}
+}
+function labInitEyes() {
+    [['lab-wallet', ['lab-wallet', 'lab-wallet-pnl']], ['lab-open', ['lab-open']], ['lab-unreal', ['lab-unreal']], ['lab-realized', ['lab-realized']]].forEach(function (g) {
+        var on = false; try { on = localStorage.getItem('labeye_' + g[0]) === '1'; } catch (e) {}
+        if (on) {
+            g[1].forEach(function (id) { var el = document.getElementById(id); if (el) el.classList.add('lab-blur'); });
+            var btn = document.getElementById('eye-' + g[0]), i = btn && btn.querySelector('i'); if (i) i.className = 'fas fa-eye-slash';
+        }
+    });
+}
+
 function labLoadWallet() {
     fetch('/academy/wallet', { cache: 'no-store', credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
@@ -332,7 +355,7 @@ function labAnalyze() {
     btn.disabled = true; lbl.textContent = 'Thinking…';
     out.classList.remove('hidden');
     out.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-spinner fa-spin"></i> The bot is analysing ' + LAB.base + '/USDT…</div>';
-    fetch('/academy/bot/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ symbol: LAB.symbol }) })
+    fetch('/academy/bot/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol }) })
         .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
         .then(function (x) {
             var d = x.d;
@@ -360,6 +383,7 @@ function labPoll() {
 }
 document.addEventListener('DOMContentLoaded', function () {
     labInitChart();
+    labInitEyes();
     document.getElementById('lab-chart-icon').innerHTML = labCoinIcon('BTC', 22);
     labSetTab('hot');
     labLoadWallet();          // this learner's own $10k paper wallet

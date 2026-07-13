@@ -64,7 +64,8 @@ class AcademyController
         $userId = $_SESSION['user_id'] ?? null;
         if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/bot')); return; }
         if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
-        View::view('academy/bot', ['title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true]);
+        $csrf = function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? '');
+        View::view('academy/bot', ['title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true, 'csrf_token' => $csrf]);
     }
 
     /**
