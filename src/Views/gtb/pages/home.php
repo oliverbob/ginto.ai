@@ -104,12 +104,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <!-- Realized P&L (real, from DB — scoped to the ACTIVE network) -->
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <div class="flex items-center justify-between">
-            <span class="text-sm text-gray-500 dark:text-gray-400">Realized P&amp;L</span>
+            <span class="text-sm text-gray-500 dark:text-gray-400">Realized P&amp;L
+                <button type="button" id="gtb-pnl-eye" onclick="gtbTogglePnl()" title="Hide / show all P&amp;L" class="ml-1 text-gray-400 hover:text-primary align-middle"><i class="fas fa-eye"></i></button>
+            </span>
             <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full <?= $isTestnet ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' ?>">
                 <?= $isTestnet ? 'Testnet · paper' : 'Live · real funds' ?>
             </span>
         </div>
-        <div class="mt-2 text-2xl font-bold <?= $pnlPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' ?>">
+        <div class="mt-2 text-2xl font-bold gtb-pnl <?= $pnlPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' ?>">
             <?= htmlspecialchars($pnlText) ?>
         </div>
         <div class="mt-1 text-xs text-gray-400 dark:text-gray-500"><?= $isTestnet ? 'Testnet (paper) trades only' : 'Real-money trades only' ?></div>
@@ -290,9 +292,9 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h3 class="text-lg font-semibold text-gray-900 dark:text-white">
             <i class="fas fa-layer-group text-primary mr-2"></i>Active Trades
-            <span id="gtb-port-summary" class="ml-2 text-xs font-normal text-gray-400 dark:text-gray-500"></span>
+            <span id="gtb-port-summary" class="gtb-pnl ml-2 text-xs font-normal text-gray-400 dark:text-gray-500"></span>
         </h3>
-        <span id="gtb-port-unreal" class="text-sm font-bold"></span>
+        <span id="gtb-port-unreal" class="gtb-pnl text-sm font-bold"></span>
     </div>
     <div id="gtb-trades-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         <div data-empty class="col-span-full py-10 text-center text-gray-400 dark:text-gray-500 text-sm">
@@ -367,7 +369,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                                 </td>
                                 <td class="py-2.5 pr-4 text-right tabular-nums">$<?= number_format($bought, 2) ?></td>
                                 <td class="py-2.5 pr-4 text-right tabular-nums"><?= $sold !== null ? '$' . number_format($sold, 2) : '<span class="text-amber-600 dark:text-amber-400">holding</span>' ?></td>
-                                <td class="py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ((float) $pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
+                                <td class="gtb-pnl py-2.5 text-right tabular-nums font-semibold <?= $pnl === null ? 'text-gray-400' : ((float) $pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-green-600 dark:text-green-400') ?>">
                                     <?php if ($pnl !== null): $pv = (float) $pnl; ?>
                                         <span class="inline-flex items-center justify-end gap-1" title="<?= $pv >= 0 ? 'Win' : 'Loss' ?>">
                                             <i class="fas fa-<?= $pv >= 0 ? 'caret-up' : 'caret-down' ?>"></i><?= ($pv >= 0 ? '+$' : '−$') . htmlspecialchars(number_format(abs($pv), 4)) ?>
@@ -1054,8 +1056,8 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                     : '<span title="No exchange stop yet" class="text-[9px] text-red-500"><i class="fas fa-triangle-exclamation"></i></span>') : ''}
                </div>
                <div class="text-right leading-tight shrink-0 pr-8">
-                 <span data-pnl class="block text-sm font-bold whitespace-nowrap"></span>
-                 <span data-pct class="block text-[11px] whitespace-nowrap"></span>
+                 <span data-pnl class="gtb-pnl block text-sm font-bold whitespace-nowrap"></span>
+                 <span data-pct class="gtb-pnl block text-[11px] whitespace-nowrap"></span>
                </div>
              </div>
              <div data-chart title="Click to expand & sell" class="w-full rounded overflow-hidden cursor-pointer" style="height:140px"></div>
@@ -1064,7 +1066,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                <div class="text-red-500">SL<br><span data-sl></span></div>
                <div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>
              </div>
-             <div data-rr class="mt-1 text-[10px] text-center text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap"></div>
+             <div data-rr class="gtb-pnl mt-1 text-[10px] text-center text-gray-500 dark:text-gray-400 tabular-nums whitespace-nowrap"></div>
              <button data-close class="mt-1.5 w-full text-[11px] font-medium py-1 rounded border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-red-400 hover:text-red-500 transition-colors">
                <i class="fas fa-xmark mr-1"></i>Close now
              </button>`;
@@ -1156,7 +1158,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                </div>
                <div class="px-4 py-3">
                  <div class="flex items-end justify-between mb-2 gap-2">
-                   <div class="min-w-0"><span data-m-pnl class="block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="block text-xs whitespace-nowrap"></span></div>
+                   <div class="min-w-0"><span data-m-pnl class="gtb-pnl block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="gtb-pnl block text-xs whitespace-nowrap"></span></div>
                    <div class="text-right text-[11px] text-gray-400 shrink-0">
                      <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-700" data-m-interval>
                        <button type="button" data-iv="1s" class="px-2 py-0.5 font-semibold">1s</button>
@@ -1379,7 +1381,22 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
     document.addEventListener('keydown', e => { if (e.key === 'Escape') gtbCloseTradeModal(); });
 
+    // Eye toggle: blur/reveal every P&L figure (works on testnet and live). Remembered per browser.
+    function gtbTogglePnl() {
+        const hidden = document.body.classList.toggle('gtb-pnl-hidden');
+        try { localStorage.setItem('gtbHidePnl', hidden ? '1' : '0'); } catch (e) {}
+        const ic = document.querySelector('#gtb-pnl-eye i');
+        if (ic) ic.className = hidden ? 'fas fa-eye-slash' : 'fas fa-eye';
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
+        // Restore the hide-P&L preference before anything paints.
+        try {
+            if (localStorage.getItem('gtbHidePnl') === '1') {
+                document.body.classList.add('gtb-pnl-hidden');
+                const ic = document.querySelector('#gtb-pnl-eye i'); if (ic) ic.className = 'fas fa-eye-slash';
+            }
+        } catch (e) {}
         gtbInitChart();
         document.getElementById('gtb-chart-icon').innerHTML = gtbCoinIcon(GTB.base || 'BTC', 24);
         gtbInitIntervals();
@@ -1397,4 +1414,6 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 
 <style>
     .gtb-pair-active { background: rgba(99,102,241,0.10); box-shadow: inset 2px 0 0 #6366f1; }
+    /* Privacy: eye toggle blurs every P&L figure (totals, cards, modal, history). */
+    body.gtb-pnl-hidden .gtb-pnl { filter: blur(8px); user-select: none; cursor: default; }
 </style>
