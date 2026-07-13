@@ -165,6 +165,10 @@
                 <div id="lab-modal-pnl" class="mb-2 text-sm"></div>
                 <div id="lab-modal-chart" class="w-full rounded-lg overflow-hidden" style="height:340px"></div>
                 <div id="lab-modal-meta" class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] tabular-nums"></div>
+                <div class="mt-4">
+                    <div class="text-xs font-bold uppercase tracking-wide text-primary mb-2"><i class="fas fa-brain mr-1"></i>Why the bot is in this trade</div>
+                    <div id="lab-modal-why" class="space-y-2 text-sm"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -346,6 +350,8 @@ function labRender(d) {
     }
 
     var th = d.thoughts || [], tw = document.getElementById('lab-thoughts');
+    LAB.thoughts = th;   // keep for per-trade reasoning in the modal
+    if (LABM.symbol) labModalWhy(LABM.symbol);   // refresh open modal's reasoning live
     if (!th.length) { tw.innerHTML = '<div class="py-8 text-center text-gray-400 text-sm">The bot hasn\'t spoken yet.</div>'; }
     else {
         tw.innerHTML = th.map(function (t) {
@@ -474,6 +480,29 @@ function labExpandTrade(symbol, base, entry, sl, tp) {
             if (d.candles.length) labModalPnl(entry, +d.candles[d.candles.length - 1].close);
             labModalStream(symbol, entry);
         }).catch(function () {});
+    labModalWhy(symbol);
+}
+
+// Show the class bot's actual reasoning for this specific coin (filtered from its live thought stream).
+function labModalWhy(symbol) {
+    var box = document.getElementById('lab-modal-why'); if (!box) return;
+    var base = (symbol || '').replace(/USDT$/, '');
+    var mine = (LAB.thoughts || []).filter(function (t) {
+        var m = (t.message || '').toUpperCase();
+        return m.indexOf(base.toUpperCase()) !== -1 || m.indexOf(symbol.toUpperCase()) !== -1;
+    });
+    if (!mine.length) {
+        box.innerHTML = '<div class="text-gray-400 text-xs">No recent notes on ' + base + ' yet. The bot logs its reasoning as it evaluates and manages this trade — check back in a moment, or read the full stream in <b>The bot\'s mind</b> below.</div>';
+        return;
+    }
+    box.innerHTML = mine.slice(0, 8).map(function (t) {
+        var type = t.type || '', dotc = type === 'error' ? 'bg-red-500' : type === 'trade' ? 'bg-primary' : type === 'decision' ? 'bg-amber-400' : 'bg-gray-400';
+        var msg = (t.message || '').replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; });
+        return '<div class="flex gap-2 rounded-lg border border-gray-100 dark:border-gray-800 p-2.5">'
+            + '<span class="mt-1.5 w-1.5 h-1.5 rounded-full shrink-0 ' + dotc + '"></span>'
+            + '<div class="min-w-0"><div class="text-gray-700 dark:text-gray-300 leading-snug">' + msg + '</div>'
+            + '<div class="text-[10px] text-gray-400 mt-0.5">' + (t.created_at || '') + '</div></div></div>';
+    }).join('');
 }
 function labModalPnl(entry, mark) {
     var up = mark >= entry, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
