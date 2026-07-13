@@ -57,6 +57,67 @@ class AcademyController
         $this->redirect('/academy#pricing');       // no subscription → membership (on the landing)
     }
 
+    /** GET /academy/bot — read-only "Live Bot Lab": members watch the testnet bot trade live. */
+    public function bot(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/bot')); return; }
+        if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
+        View::view('academy/bot', ['title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true]);
+    }
+
+    /**
+     * GET /academy/bot/data — read-only snapshot of the TESTNET (paper) bot: open positions with
+     * live marks + the AI reasoning stream. Members only. Shared 5s cache so many learners watching
+     * at once don't each hit Binance.
+     */
+    public function botData(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId) || !$this->hasActiveSubscription((int) $userId)) {
+            http_response_code(403); echo json_encode(['ok' => false, 'error' => 'members only']); exit;
+        }
+        $cf = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_botdata.json';
+        if (is_file($cf) && (time() - filemtime($cf) < 5)) { echo (string) file_get_contents($cf); exit; }
+        try {
+            $trades = new \Ginto\Models\GtbTrade();
+            $client = new \Ginto\Services\BinanceClient();
+            $positions = []; $unreal = 0.0;
+            foreach ($trades->openPositions('paper') as $p) {   // always PAPER for the learning lab
+                $entry = (float) $p['price']; $qty = (float) $p['qty'];
+                $mark  = (float) ($client->price($p['symbol']) ?? $entry);
+                if ($mark <= 0) $mark = $entry;
+                $pnl = ($mark - $entry) * $qty; $unreal += $pnl;
+                $positions[] = [
+                    'symbol' => $p['symbol'], 'base' => substr($p['symbol'], 0, -4),
+                    'template' => $p['template'] ?? '', 'profile' => $p['profile'] ?? '',
+                    'entry' => $entry, 'mark' => $mark, 'qty' => $qty,
+                    'stop_loss' => (float) $p['stop_loss'],
+                    'take_profit' => $p['take_profit'] !== null ? (float) $p['take_profit'] : null,
+                    'pnlPct' => $entry > 0 ? ($mark - $entry) / $entry * 100 : 0,
+                    'unrealized' => round($pnl, 4), 'opened_at' => $p['created_at'] ?? null,
+                ];
+            }
+            $thoughts = (new \Ginto\Models\GtbThought())->recent(24);
+            $running  = false;
+            try { $running = (new \Ginto\Models\GtbBotState())->isEnabled(); } catch (\Throwable $e) {}
+            $out = json_encode([
+                'ok' => true, 'mode' => 'paper', 'running' => $running,
+                'realized' => round($trades->totalRealizedPnl('paper'), 4), 'unrealized' => round($unreal, 4),
+                'positions' => $positions, 'thoughts' => is_array($thoughts) ? $thoughts : [],
+            ]);
+            @file_put_contents($cf, $out);
+            echo $out;
+        } catch (\Throwable $e) {
+            error_log('Academy botData: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'unavailable']);
+        }
+        exit;
+    }
+
     /** GET /academy/learn — the branded lessons facility (preview lessons open; rest gated). */
     public function learn(): void
     {

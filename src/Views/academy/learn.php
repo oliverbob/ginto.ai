@@ -30,6 +30,19 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
 <section class="max-w-5xl mx-auto px-4 py-12">
     <h1 class="text-3xl font-extrabold">Your trading curriculum</h1>
     <p class="mt-2 text-gray-600 dark:text-gray-300">Work through the modules in order. <?= $hasAccess ? 'You have full access.' : 'Preview lessons are open — unlock the rest with a membership.' ?></p>
+    <?php if ($hasAccess): ?>
+    <a href="/academy/bot" class="mt-6 block rounded-2xl overflow-hidden border border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/10 hover:from-primary/20 hover:to-secondary/20 transition-colors">
+        <div class="p-5 flex items-center gap-4">
+            <span class="w-12 h-12 rounded-xl bg-primary/15 text-primary inline-flex items-center justify-center text-xl"><i class="fas fa-flask"></i></span>
+            <div class="flex-1 min-w-0">
+                <div class="text-[10px] font-bold uppercase tracking-wide text-primary">Live · testnet</div>
+                <div class="font-bold text-lg">Live Bot Lab</div>
+                <div class="text-sm text-gray-500 dark:text-gray-400">Watch the Ginto Trading Bot trade in real time on paper money — every entry, stop, target, and the AI's reasoning.</div>
+            </div>
+            <span class="shrink-0 text-primary font-semibold text-sm">Open <i class="fas fa-arrow-right ml-1"></i></span>
+        </div>
+    </a>
+    <?php endif; ?>
 
     <?php if (empty($lessons)): ?>
         <div class="mt-8 text-gray-400">Lessons are being added — check back soon.</div>

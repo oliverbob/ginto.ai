@@ -1687,6 +1687,8 @@ $router->get('/academy/subscribe', 'AcademyController@subscribe');
 $router->get('/academy/subscribe/success', 'AcademyController@success');
 $router->get('/academy/enter', 'AcademyController@enter');
 $router->get('/api/academy/movers', 'AcademyController@movers'); // server-side gainer/popular/loser for banner charts
+$router->get('/academy/bot', 'AcademyController@bot');            // members: read-only Live Bot Lab (testnet)
+$router->get('/academy/bot/data', 'AcademyController@botData');   // members: testnet bot snapshot JSON
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');
