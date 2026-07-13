@@ -429,6 +429,45 @@ class AcademyController
             'updated_at'         => $now,
         ]);
         error_log("Academy membership activated on-site: user={$userId} plan={$plan['id']} method={$method} pi={$ref}");
+
+        // Payment is confirmed and access granted — send the welcome/receipt email. Never let a
+        // mail failure break activation (the membership is already live either way).
+        try { $this->sendMembershipEmail((int) $userId, $plan, (float) $amount, (string) $currency, $expires); }
+        catch (\Throwable $e) { error_log('Academy membership email error: ' . $e->getMessage()); }
+    }
+
+    /** Send the post-payment confirmation / welcome email via the configured SMTP (MailHelper). */
+    private function sendMembershipEmail(int $userId, array $plan, float $amount, string $currency, string $expires): void
+    {
+        $db   = Database::getInstance();
+        $user = $db->get('users', ['email', 'fullname', 'username'], ['id' => $userId]);
+        $email = $user['email'] ?? '';
+        if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) return;
+        $name  = ($user['fullname'] ?? '') !== '' ? $user['fullname'] : ($user['username'] ?? 'there');
+        $plName = htmlspecialchars($plan['display_name'] ?? ($plan['name'] ?? 'Membership'));
+        $amt   = htmlspecialchars($currency . ' ' . number_format($amount, 2));
+        $exp   = htmlspecialchars(date('M j, Y', strtotime($expires)));
+        $base  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
+
+        $html = '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;color:#1f2937;">'
+              . '<div style="background:linear-gradient(135deg,#4f46e5,#8b5cf6);border-radius:14px 14px 0 0;padding:22px 24px;color:#fff;">'
+              . '<div style="font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;opacity:.85;">🎓 Ginto Trading Academy</div>'
+              . '<div style="font-size:20px;font-weight:800;margin-top:6px;">Payment confirmed — welcome aboard!</div></div>'
+              . '<div style="border:1px solid #e5e7eb;border-top:none;border-radius:0 0 14px 14px;padding:22px 24px;">'
+              . '<p>Hi ' . htmlspecialchars($name) . ',</p>'
+              . '<p>Your <strong>' . $plName . '</strong> membership is now <strong>active</strong>. Thank you for joining!</p>'
+              . '<table style="width:100%;border-collapse:collapse;font-size:14px;margin:16px 0;">'
+              . '<tr><td style="padding:6px 0;color:#6b7280;">Plan</td><td style="padding:6px 0;text-align:right;font-weight:600;">' . $plName . '</td></tr>'
+              . '<tr><td style="padding:6px 0;color:#6b7280;">Amount paid</td><td style="padding:6px 0;text-align:right;font-weight:600;">' . $amt . '</td></tr>'
+              . '<tr><td style="padding:6px 0;color:#6b7280;">Access until</td><td style="padding:6px 0;text-align:right;font-weight:600;">' . $exp . '</td></tr>'
+              . '</table>'
+              . '<a href="' . $base . '/academy/learn" style="display:inline-block;background:#4f46e5;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">Start learning →</a>'
+              . '<p style="font-size:13px;color:#6b7280;margin-top:18px;">Log in any time at <a href="' . $base . '/login">' . htmlspecialchars(preg_replace('#^https?://#', '', $base)) . '/login</a> with this email. This is a one-time payment; it does not auto-renew.</p>'
+              . '<p style="font-size:12px;color:#9ca3af;margin-top:16px;">Educational only — crypto trading carries real risk of loss.</p>'
+              . '</div></div>';
+        $text = "Hi {$name},\n\nYour {$plan['display_name']} membership is now active. Amount paid: {$amt}. Access until: {$exp}.\n\nStart learning: {$base}/academy/learn\nLog in with this email at {$base}/login.\n\nEducational only — crypto trading carries real risk of loss.";
+
+        \Ginto\Helpers\MailHelper::send($email, 'Your Ginto Trading Academy membership is active', $html, $text);
     }
 
     /**
