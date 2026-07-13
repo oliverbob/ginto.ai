@@ -429,7 +429,7 @@ class GtbController
 
         $symbol   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['symbol'] ?? 'BTCUSDT')));
         $interval = preg_replace('/[^0-9a-zA-Z]/', '', (string) ($_GET['interval'] ?? '1h'));
-        if (!in_array($interval, ['1m', '5m', '15m', '1h', '4h', '1d'], true)) {
+        if (!in_array($interval, ['1s', '1m', '5m', '15m', '1h', '4h', '1d'], true)) {
             $interval = '1h';
         }
         if ($symbol === '') $symbol = 'BTCUSDT';
@@ -612,6 +612,56 @@ class GtbController
         } catch (\Throwable $e) {
             http_response_code(500);
             echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
+    /** POST /gtb/bot/analyze-coin — AI analysis of ONE coin (advisory; records a thought). */
+    public function analyzeCoin(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->requireAdmin(true);
+
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($token) || empty($sessionToken) || !hash_equals($sessionToken, $token)) {
+            http_response_code(403); echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']); exit;
+        }
+
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
+        if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
+        $base = substr($symbol, 0, -4);
+
+        try {
+            $settings = new GtbSettings();
+            $brain    = new \Ginto\Services\GtbBrain();
+            $thoughts = new \Ginto\Models\GtbThought();
+            if (!$brain->isConfigured()) { echo json_encode(['ok' => false, 'error' => 'No Anthropic API key set. Add it on the API Settings page.']); exit; }
+
+            $client = new \Ginto\Services\BinanceClient();
+            $closes = []; $last = 0.0; $chg = 0.0;
+            $k = $client->klines($symbol, '15m', 48);
+            if (!empty($k['ok']) && is_array($k['data'] ?? null) && $k['data']) {
+                foreach ($k['data'] as $c) { $closes[] = round((float) $c['close'], 8); }
+                $first = (float) $k['data'][0]['close']; $last = (float) end($k['data'])['close'];
+                if ($first > 0) $chg = ($last - $first) / $first * 100;
+            }
+            $capital = (new \Ginto\Services\GtbStrategy())->capitalSummary();
+            $context = [
+                'env'     => $settings->isTestnet() ? 'testnet' : 'mainnet',
+                'capital' => $capital,
+                'focus'   => ['symbol' => $symbol, 'base' => $base, 'last' => $last, 'change_since_window' => round($chg, 2), 'recent_closes_15m' => $closes],
+                'note'    => "Analyze {$base}/USDT specifically for a momentum trade right now, then decide.",
+            ];
+            $res = $brain->reflect($context);
+            if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Analysis failed']); exit; }
+            $meta = array_merge(['model' => $res['model'] ?? $brain->model()], $res['usage'] ?? []);
+            $thoughts->add($res['text'], 'claude', 'reflect', null, $res['decision'] ?? null, $meta);
+            echo json_encode(['ok' => true, 'symbol' => $symbol, 'base' => $base, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+        } catch (\Throwable $e) {
+            http_response_code(500); echo json_encode(['ok' => false, 'error' => $e->getMessage()]);
         }
         exit;
     }

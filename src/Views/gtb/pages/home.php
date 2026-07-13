@@ -166,9 +166,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 </div>
             </div>
             <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:392px"></div>
-            <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                Candles from Binance public market data (mainnet) — real regardless of your testnet setting. Tap any coin to chart it.
-            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" id="gtb-analyze-coin-btn" onclick="gtbAnalyzeCoin()"
+                        class="inline-flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                    <i class="fas fa-brain"></i> <span id="gtb-analyze-coin-label">Analyze this coin</span>
+                </button>
+                <span class="text-[11px] text-gray-400 dark:text-gray-500">Candles from Binance mainnet · advisory only, no orders placed.</span>
+            </div>
+            <div id="gtb-analyze-coin-out" class="hidden mt-2 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
         </div>
         <!-- Markets tabs (integrated, divider to the chart) -->
         <div class="min-w-0 lg:border-l lg:border-gray-200 lg:dark:border-gray-700 lg:pl-4">
@@ -197,7 +202,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             <span id="gtb-spend-chip" title="Estimated AI spend" class="text-[11px] font-mono px-2.5 py-1 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-900 dark:text-gray-400"></span>
             <button type="button" id="gtb-reflect-btn" onclick="gtbReflect()"
                     class="inline-flex items-center gap-1.5 text-sm font-semibold px-3 py-1.5 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
-                <i class="fas fa-brain"></i> Reflect
+                <i class="fas fa-magnifying-glass-chart"></i> Analyze market
             </button>
         </div>
     </div>
@@ -938,6 +943,40 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         } finally {
             btn.disabled = false;
             btn.innerHTML = orig;
+        }
+    }
+
+    // Analyze the coin currently on the chart (advisory; also logs to the brain feed).
+    async function gtbAnalyzeCoin() {
+        const btn = document.getElementById('gtb-analyze-coin-btn');
+        const lbl = document.getElementById('gtb-analyze-coin-label');
+        const out = document.getElementById('gtb-analyze-coin-out');
+        if (!btn || btn.disabled) return;
+        btn.disabled = true; if (lbl) lbl.textContent = 'Thinking…';
+        out.classList.remove('hidden');
+        out.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-spinner fa-spin"></i> Analyzing ' + (GTB.base || 'BTC') + '/USDT…</div>';
+        try {
+            const res = await fetch('/gtb/bot/analyze-coin', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTB_CSRF },
+                body: JSON.stringify({ csrf_token: GTB_CSRF, symbol: GTB.symbol }),
+            });
+            const d = await res.json();
+            if (!d || !d.ok) { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400"><i class="fas fa-circle-info mr-1"></i>' + ((d && d.error) || 'Analysis unavailable.') + '</div>'; return; }
+            const dec = (d.decision || '').toUpperCase();
+            let cls = '', badge = '';
+            if (dec.indexOf('BUY') === 0) { cls = 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; badge = dec; }
+            else if (dec === 'HOLD') { cls = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'; badge = 'HOLD'; }
+            else if (dec === 'SKIP') { cls = 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; badge = 'SKIP'; }
+            const body = (d.text || '').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c])).replace(/\n/g, '<br>');
+            out.innerHTML = '<div class="flex items-center gap-2 mb-1.5 font-bold">' + gtbCoinIcon(d.base, 20) + d.base + '/USDT'
+                + (badge ? '<span class="ml-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + cls + '">' + badge + '</span>' : '')
+                + '<span class="ml-auto text-[10px] text-gray-400 font-normal">AI · advisory</span></div>'
+                + '<div class="text-gray-700 dark:text-gray-200 leading-relaxed">' + body + '</div>';
+            gtbLoadThoughts();
+        } catch (e) {
+            out.innerHTML = '<div class="text-amber-600 dark:text-amber-400">Network error — try again.</div>';
+        } finally {
+            btn.disabled = false; if (lbl) lbl.textContent = 'Analyze this coin';
         }
     }
 

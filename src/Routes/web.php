@@ -1786,7 +1786,8 @@ $router->get('/gtb/klines', 'GtbController@klines');            // OHLC candles 
 $router->get('/gtb/account', 'GtbController@account');          // signed: portfolio value, holdings, balances
 $router->get('/gtb/test-connection', 'GtbController@account');  // alias (Test connection button)
 $router->get('/gtb/thoughts', 'GtbController@thoughts');        // AI brain reflection stream
-$router->post('/gtb/bot/reflect', 'GtbController@reflect');     // ask the brain to reflect (advisory)
+$router->post('/gtb/bot/reflect', 'GtbController@reflect');     // ask the brain to analyze the market (advisory)
+$router->post('/gtb/bot/analyze-coin', 'GtbController@analyzeCoin'); // AI analysis of one coin (advisory)
 $router->post('/gtb/bot/step', 'GtbController@step');           // run one strategy cycle (paper/live)
 $router->get('/gtb/bot/positions', 'GtbController@positions');  // open positions + portfolio + bot state
 $router->post('/gtb/bot/control', 'GtbController@control');     // persist bot on/off (+ live arm)
