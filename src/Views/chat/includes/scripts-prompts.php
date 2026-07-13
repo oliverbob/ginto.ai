@@ -27,8 +27,8 @@ try {
       hintArea.innerHTML = `
         <div class="w-full max-w-4xl mx-auto">
           <a href="/academy" aria-label="Ginto Trading Academy" style="display:block;text-decoration:none;border-radius:16px;overflow:hidden;box-shadow:0 12px 40px rgba(99,102,241,0.25);">
-            <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed 55%,#8b5cf6);padding:26px;color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:22px;">
-              <div style="flex:1 1 260px;min-width:240px;">
+            <div style="background:linear-gradient(135deg,#4f46e5,#7c3aed 55%,#8b5cf6);padding:26px;color:#fff;">
+              <div style="max-width:640px;">
                 <div style="font-size:0.72rem;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;opacity:0.85;">🎓 Ginto Trading Academy</div>
                 <div style="font-size:1.65rem;font-weight:800;margin-top:8px;line-height:1.18;">Read the chart.<br>Trade with discipline.</div>
                 <div style="margin-top:10px;opacity:0.92;font-size:0.95rem;">Hands-on crypto trading lessons — taught on a real, live AI bot, not slides. Start with the basics of a candlestick.</div>
@@ -37,7 +37,7 @@ try {
                 </div>
                 <div style="margin-top:18px;display:inline-flex;align-items:center;gap:8px;background:#fff;color:#4f46e5;font-weight:800;padding:11px 20px;border-radius:12px;font-size:0.9rem;">Start learning <span>→</span></div>
               </div>
-              <div id="home-academy-charts" style="flex:1 1 260px;min-width:220px;display:flex;flex-direction:column;gap:24px;"></div>
+              <div id="home-academy-charts" style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px;"></div>
             </div>
           </a>
           <a href="/marketplace" aria-label="Visit Ginto Mall" style="display:block;margin-top:18px;border-radius:14px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.18);transition:transform 0.2s,box-shadow 0.2s;text-decoration:none;" onmouseover="this.style.transform='scale(1.015)';this.style.boxShadow='0 12px 40px rgba(0,0,0,0.28)';" onmouseout="this.style.transform='';this.style.boxShadow='0 8px 32px rgba(0,0,0,0.18)';">
