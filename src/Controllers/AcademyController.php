@@ -118,6 +118,63 @@ class AcademyController
         exit;
     }
 
+    /** True if the current session is a paid member (for the members-only market endpoints). */
+    private function requireMemberJson(): int
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId) || !$this->hasActiveSubscription((int) $userId)) {
+            http_response_code(403); echo json_encode(['ok' => false, 'error' => 'members only']); exit;
+        }
+        return (int) $userId;
+    }
+
+    /** GET /academy/markets — members: popular/gainers/losers pairs (same as /gtb, cached 30s). */
+    public function markets(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->requireMemberJson();
+        $cf = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_markets.json';
+        if (is_file($cf) && (time() - filemtime($cf) < 30)) { echo (string) file_get_contents($cf); exit; }
+        $stable = ['USDC','BUSD','TUSD','FDUSD','DAI','USDP','USTC','EUR','GBP','AEUR','USD1','EURI','XUSD'];
+        try {
+            $res = (new \Ginto\Services\BinanceClient())->allTickers24hr();
+            if (empty($res['ok']) || !is_array($res['data'] ?? null)) { echo json_encode(['ok' => false, 'error' => 'ticker failed']); exit; }
+            $items = [];
+            foreach ($res['data'] as $r) {
+                $sym = $r['symbol'] ?? '';
+                if (!str_ends_with($sym, 'USDT')) continue;
+                $base = substr($sym, 0, -4);
+                if ($base === '' || preg_match('/(UP|DOWN|BULL|BEAR)$/', $base) || in_array($base, $stable, true)) continue;
+                $items[] = ['symbol' => $sym, 'base' => $base, 'price' => (float) ($r['lastPrice'] ?? 0),
+                    'changePct' => (float) ($r['priceChangePercent'] ?? 0), 'quoteVolume' => (float) ($r['quoteVolume'] ?? 0)];
+            }
+            $liquid = array_values(array_filter($items, static fn($i) => $i['quoteVolume'] >= 5000000.0));
+            $hot = $items; usort($hot, static fn($a, $b) => $b['quoteVolume'] <=> $a['quoteVolume']); $hot = array_slice($hot, 0, 24);
+            $gainers = $liquid; usort($gainers, static fn($a, $b) => $b['changePct'] <=> $a['changePct']); $gainers = array_slice($gainers, 0, 24);
+            $losers = $liquid; usort($losers, static fn($a, $b) => $a['changePct'] <=> $b['changePct']); $losers = array_slice($losers, 0, 24);
+            $out = json_encode(['ok' => true, 'hot' => $hot, 'gainers' => $gainers, 'losers' => $losers]);
+            @file_put_contents($cf, $out); echo $out;
+        } catch (\Throwable $e) { echo json_encode(['ok' => false, 'error' => 'unavailable']); }
+        exit;
+    }
+
+    /** GET /academy/klines — members: OHLC candles for the TradingView chart (same as /gtb). */
+    public function klines(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->requireMemberJson();
+        $symbol   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
+        $interval = preg_replace('/[^0-9a-zA-Z]/', '', (string) ($_GET['interval'] ?? '15m'));
+        if (!in_array($interval, ['1s', '1m', '5m', '15m', '1h', '4h', '1d'], true)) $interval = '15m';
+        try {
+            $res = (new \Ginto\Services\BinanceClient())->klines($symbol, $interval, 300);
+            if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => 'klines failed']); exit; }
+            echo json_encode(['ok' => true, 'symbol' => $symbol, 'interval' => $interval, 'candles' => $res['data']]);
+        } catch (\Throwable $e) { echo json_encode(['ok' => false, 'error' => 'unavailable']); }
+        exit;
+    }
+
     /** GET /academy/learn — the branded lessons facility (preview lessons open; rest gated). */
     public function learn(): void
     {
