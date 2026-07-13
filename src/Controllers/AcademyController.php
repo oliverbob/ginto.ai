@@ -103,10 +103,14 @@ class AcademyController
                 ];
             }
             $thoughts = (new \Ginto\Models\GtbThought())->recent(24);
-            $running  = false;
-            try { $running = (new \Ginto\Models\GtbBotState())->isEnabled(); } catch (\Throwable $e) {}
+            $running  = false; $lastRun = null; $lastAction = null;
+            try {
+                $bs = (new \Ginto\Models\GtbBotState())->status();
+                $running = !empty($bs['enabled']); $lastRun = $bs['last_run_at'] ?? null; $lastAction = $bs['last_action'] ?? null;
+            } catch (\Throwable $e) {}
             $out = json_encode([
                 'ok' => true, 'mode' => 'paper', 'running' => $running,
+                'last_run_at' => $lastRun, 'last_action' => $lastAction,
                 'realized' => round($trades->totalRealizedPnl('paper'), 4), 'unrealized' => round($unreal, 4),
                 'positions' => $positions, 'thoughts' => is_array($thoughts) ? $thoughts : [],
             ]);

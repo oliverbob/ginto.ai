@@ -128,7 +128,8 @@
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="text-base font-extrabold flex items-center gap-2"><i class="fas fa-robot text-primary"></i>Your AI trading bot</h2>
-                <p id="lab-bot-note" class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Turn this on and your <strong>$10,000 paper wallet automatically follows the class bot</strong> — the same <a href="/gtb" class="hidden"></a>momentum strategy templates, entries, stops and take-profits. Watch the AI trade for you, risk-free, and learn by following.</p>
+                <p id="lab-bot-note" class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Turn this on and your <strong>$10,000 paper wallet automatically follows the class bot</strong> — the same momentum strategy templates, entries, stops and take-profits. Watch the AI trade for you, risk-free, and learn by following.</p>
+                <div id="lab-heartbeat" class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5"></div>
             </div>
             <button type="button" id="lab-bot-toggle" onclick="labToggleBot()"
                     class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
@@ -320,9 +321,25 @@ function labLoadMarkets() {
         }).catch(function () {});
 }
 
+function labHeartbeat(d) {
+    var el = document.getElementById('lab-heartbeat'); if (!el) return;
+    if (!d.running) { el.innerHTML = '<span class="w-2 h-2 rounded-full bg-gray-400"></span> Class bot is paused.'; return; }
+    var ago = '', act = (d.last_action || '').replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; });
+    if (d.last_run_at) {
+        var t = new Date(d.last_run_at.replace(' ', 'T') + 'Z'), s = Math.max(0, Math.round((Date.now() - t) / 1000));
+        ago = s < 60 ? s + 's ago' : Math.round(s / 60) + 'm ago';
+    }
+    var stale = ago && parseInt(ago) > 5 && ago.indexOf('m') !== -1;   // >5m since last scan → likely stalled
+    el.innerHTML = '<span class="w-2 h-2 rounded-full ' + (stale ? 'bg-amber-400' : 'bg-green-500 animate-pulse') + '"></span> '
+        + '<span class="font-semibold ' + (stale ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400') + '">Class bot active</span>'
+        + (ago ? ' · last scan ' + ago : '')
+        + (act ? ' · <span class="text-gray-600 dark:text-gray-300">' + act + '</span>' : '');
+}
+
 function labRender(d) {
     document.getElementById('lab-run').textContent = d.running ? 'Live · trading' : 'Paused';
     document.getElementById('lab-run').className = 'text-[11px] font-bold px-2.5 py-1 rounded-full ' + (d.running ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400');
+    labHeartbeat(d);
     document.getElementById('lab-open').textContent = (d.positions || []).length;
     labApplyVal('lab-unreal', labFmt(d.unrealized), 'mt-1 text-2xl font-extrabold ' + ((+d.unrealized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'));
     labApplyVal('lab-realized', labFmt(d.realized), 'mt-1 text-2xl font-extrabold ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'));
