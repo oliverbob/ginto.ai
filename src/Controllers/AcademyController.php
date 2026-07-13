@@ -195,6 +195,7 @@ class AcademyController
         }
 
         $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $scope  = ($input['scope'] ?? 'coin') === 'market' ? 'market' : 'coin';
         $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
         if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
         $base = substr($symbol, 0, -4);
@@ -205,33 +206,41 @@ class AcademyController
             @touch($stamp);   // start the cooldown now (before the slow AI call)
 
             $client = new \Ginto\Services\BinanceClient();
-            // Recent price action for the focus coin (compact — closes only).
-            $closes = []; $last = 0.0; $chg = 0.0;
-            $k = $client->klines($symbol, '15m', 48);
-            if (!empty($k['ok']) && is_array($k['data'] ?? null) && $k['data']) {
-                foreach ($k['data'] as $c) { $closes[] = round((float) $c['close'], 8); }
-                $first = (float) $k['data'][0]['close']; $last = (float) end($k['data'])['close'];
-                if ($first > 0) $chg = ($last - $first) / $first * 100;
-            }
-            // A small movers snapshot for context (reuse the members cache if warm).
-            $movers = [];
+            // Movers snapshot for context (reuse the members cache if warm).
+            $gainers = []; $losers = [];
             $mc = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_markets.json';
             if (is_file($mc)) {
                 $md = json_decode((string) file_get_contents($mc), true);
-                foreach (array_slice($md['gainers'] ?? [], 0, 8) as $g) {
-                    $movers[] = ['symbol' => $g['symbol'], 'changePct' => round((float) $g['changePct'], 2), 'price' => (float) $g['price']];
-                }
+                $pick = static fn($rows, $n) => array_map(static fn($g) => ['symbol' => $g['symbol'], 'changePct' => round((float) $g['changePct'], 2), 'price' => (float) $g['price']], array_slice($rows ?? [], 0, $n));
+                $gainers = $pick($md['gainers'] ?? [], $scope === 'market' ? 12 : 6);
+                $losers  = $pick($md['losers'] ?? [], $scope === 'market' ? 6 : 0);
             }
-            $context = [
-                'env'   => 'testnet',
-                'focus' => ['symbol' => $symbol, 'base' => $base, 'last' => $last, 'change_since_window' => round($chg, 2), 'recent_closes_15m' => $closes],
-                'movers' => $movers,
-                'note'  => "A student is studying {$base}/USDT. Analyze THIS coin's momentum specifically, then decide.",
-            ];
+
+            if ($scope === 'market') {
+                $context = [
+                    'env' => 'testnet', 'top_gainers' => $gainers, 'top_losers' => $losers,
+                    'note' => 'Scan the whole market. Name the single best momentum trade to take right now (or SKIP if nothing is clean), and explain why it beats the alternatives.',
+                ];
+            } else {
+                // Recent price action for the focus coin (compact — closes only).
+                $closes = []; $last = 0.0; $chg = 0.0;
+                $k = $client->klines($symbol, '15m', 48);
+                if (!empty($k['ok']) && is_array($k['data'] ?? null) && $k['data']) {
+                    foreach ($k['data'] as $c) { $closes[] = round((float) $c['close'], 8); }
+                    $first = (float) $k['data'][0]['close']; $last = (float) end($k['data'])['close'];
+                    if ($first > 0) $chg = ($last - $first) / $first * 100;
+                }
+                $context = [
+                    'env' => 'testnet',
+                    'focus' => ['symbol' => $symbol, 'base' => $base, 'last' => $last, 'change_since_window' => round($chg, 2), 'recent_closes_15m' => $closes],
+                    'movers' => $gainers,
+                    'note' => "A student is studying {$base}/USDT. Analyze THIS coin's momentum specifically, then decide.",
+                ];
+            }
 
             $res = $brain->reflect($context);
             if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Analysis failed']); exit; }
-            echo json_encode(['ok' => true, 'symbol' => $symbol, 'base' => $base, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+            echo json_encode(['ok' => true, 'scope' => $scope, 'symbol' => $symbol, 'base' => $base, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
         } catch (\Throwable $e) {
             error_log('Academy analyze: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.']);

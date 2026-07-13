@@ -54,13 +54,13 @@
     <!-- Bot controls (prominent) -->
     <div class="mt-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-4">
         <div class="flex flex-wrap items-center gap-2">
-            <button type="button" id="lab-analyze-btn" onclick="labAnalyze()"
+            <button type="button" id="lab-anz-mkt-btn" onclick="labAnalyzeMarket()"
                     class="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
-                <i class="fas fa-brain"></i> <span id="lab-analyze-label">Analyze market with AI</span>
+                <i class="fas fa-magnifying-glass-chart"></i> <span id="lab-anz-mkt-label">Analyze market with AI</span>
             </button>
-            <span id="lab-analyze-hint" class="text-xs text-gray-400">Analyses the coin shown on the chart below — advisory, no orders placed.</span>
+            <span class="text-xs text-gray-400">Scans today's movers and names the single best momentum setup — advisory, no orders placed.</span>
         </div>
-        <div id="lab-analysis" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
+        <div id="lab-anz-mkt-out" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
     </div>
 
     <!-- The shared class bot the learner studies (clearly separated from their own money) -->
@@ -101,6 +101,15 @@
                 </div>
             </div>
             <div id="lab-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
+            <!-- Analyze the specific coin on the chart (original placement) -->
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <button type="button" id="lab-anz-coin-btn" onclick="labAnalyzeCoin()"
+                        class="inline-flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                    <i class="fas fa-brain"></i> <span id="lab-anz-coin-label">Analyze this coin with AI</span>
+                </button>
+                <span class="text-[11px] text-gray-400">Advisory only — the bot reasons out loud; no orders are placed.</span>
+            </div>
+            <div id="lab-anz-coin-out" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
         </div>
         <!-- Markets -->
         <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
@@ -349,29 +358,33 @@ function labLoadWallet() {
         }).catch(function () {});
 }
 
-function labAnalyze() {
-    var btn = document.getElementById('lab-analyze-btn'), lbl = document.getElementById('lab-analyze-label'), out = document.getElementById('lab-analysis');
+function labAnalyzeCoin() { labAnalyzeRun({ scope: 'coin', btn: 'lab-anz-coin-btn', label: 'lab-anz-coin-label', out: 'lab-anz-coin-out', reset: 'Analyze this coin with AI' }); }
+function labAnalyzeMarket() { labAnalyzeRun({ scope: 'market', btn: 'lab-anz-mkt-btn', label: 'lab-anz-mkt-label', out: 'lab-anz-mkt-out', reset: 'Analyze market with AI' }); }
+
+function labAnalyzeRun(o) {
+    var btn = document.getElementById(o.btn), lbl = document.getElementById(o.label), out = document.getElementById(o.out);
     if (!btn || btn.disabled) return;
     btn.disabled = true; lbl.textContent = 'Thinking…';
     out.classList.remove('hidden');
-    out.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-spinner fa-spin"></i> The bot is analysing ' + LAB.base + '/USDT…</div>';
-    fetch('/academy/bot/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol }) })
-        .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
-        .then(function (x) {
-            var d = x.d;
+    var what = o.scope === 'market' ? "today's market" : (LAB.base + '/USDT');
+    out.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-spinner fa-spin"></i> The bot is analysing ' + what + '…</div>';
+    fetch('/academy/bot/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol, scope: o.scope }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
             if (!d || !d.ok) { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400"><i class="fas fa-circle-info mr-1"></i>' + ((d && d.error) || 'Analysis unavailable.') + '</div>'; return; }
             var dec = (d.decision || '').toUpperCase(), badge = '', cls = '';
             if (dec.indexOf('BUY') === 0) { cls = 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; badge = dec; }
             else if (dec === 'HOLD') { cls = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'; badge = 'HOLD'; }
             else if (dec === 'SKIP') { cls = 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; badge = 'SKIP'; }
+            var head = o.scope === 'market' ? '<i class="fas fa-magnifying-glass-chart text-primary"></i> Market scan' : (labCoinIcon(d.base, 20) + d.base + '/USDT');
             var body = (d.text || '').replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }).replace(/\n/g, '<br>');
-            out.innerHTML = '<div class="flex items-center gap-2 mb-1.5 font-bold">' + labCoinIcon(d.base, 20) + d.base + '/USDT'
+            out.innerHTML = '<div class="flex items-center gap-2 mb-1.5 font-bold">' + head
                 + (badge ? '<span class="ml-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + cls + '">' + badge + '</span>' : '')
                 + '<span class="ml-auto text-[10px] text-gray-400 font-normal">AI · advisory</span></div>'
                 + '<div class="text-gray-700 dark:text-gray-200 leading-relaxed">' + body + '</div>';
         })
         .catch(function () { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400">Network error — try again.</div>'; })
-        .finally(function () { btn.disabled = false; lbl.textContent = 'Analyze this coin with AI'; });
+        .finally(function () { btn.disabled = false; lbl.textContent = o.reset; });
 }
 
 var labTimer = null;
