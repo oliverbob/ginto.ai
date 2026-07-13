@@ -408,6 +408,7 @@ $csrf = $csrf_token ?? '';
                 piId = d.pi_id;
                 if (d.requires_action && d.next_action_url) { el('card-pay-status').innerHTML = '<i class="fas fa-shield-halved mr-1 text-primary"></i> Complete the bank verification…'; gtaOpen3ds(d.next_action_url); startPoll(); }
                 else if (d.status === 'succeeded') { finalize(); }
+                else if (d.status === 'awaiting_next_action') { showErr('This card couldn\'t start bank verification (3DS). Prepaid or virtual/issued cards often can\'t be charged here — please try a different debit/credit card.'); }
                 else { el('card-pay-status').innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Confirming your payment…'; startPoll(); }
             })
             .catch(function () { if (btn) { btn.disabled = false; btn.innerHTML = 'Pay ' + peso(curTotal); } showErr('Network error — please try again.'); });
@@ -428,7 +429,13 @@ $csrf = $csrf_token ?? '';
     // ---- shared poll + finalize (QR or card) ----
     function startPoll() {
         if (pollTimer) clearInterval(pollTimer);
+        var tries = 0;
         pollTimer = setInterval(function () {
+            if (++tries > 40) {   // ~2 min — give up rather than spin forever
+                clearInterval(pollTimer); pollTimer = null;
+                showErr('We couldn\'t confirm the payment in time. If you weren\'t charged, please try again or use another card.');
+                return;
+            }
             fetch('/api/payments/paymongo-qrph-status?pi_id=' + encodeURIComponent(piId), { headers: { 'X-Requested-With': 'XMLHttpRequest' }, credentials: 'same-origin' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) { if (d.paid) { clearInterval(pollTimer); pollTimer = null; finalize(); } })
