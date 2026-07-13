@@ -101,16 +101,18 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         <div id="gtb-holdings-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Non-zero assets</div>
     </div>
 
-    <!-- Realized P&L (real, from DB) -->
+    <!-- Realized P&L (real, from DB — scoped to the ACTIVE network) -->
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500 dark:text-gray-400">Realized P&amp;L</span>
-            <i class="fas fa-chart-line text-primary"></i>
+            <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full <?= $isTestnet ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400' : 'bg-red-100 text-red-700 dark:bg-red-500/20 dark:text-red-400' ?>">
+                <?= $isTestnet ? 'Testnet · paper' : 'Live · real funds' ?>
+            </span>
         </div>
         <div class="mt-2 text-2xl font-bold <?= $pnlPositive ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' ?>">
             <?= htmlspecialchars($pnlText) ?>
         </div>
-        <div class="mt-1 text-xs text-gray-400 dark:text-gray-500">From recorded trades</div>
+        <div class="mt-1 text-xs text-gray-400 dark:text-gray-500"><?= $isTestnet ? 'Testnet (paper) trades only' : 'Real-money trades only' ?></div>
     </div>
 </section>
 
