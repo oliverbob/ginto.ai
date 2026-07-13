@@ -17,7 +17,10 @@ if ($video !== '') {
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? 'Lesson') ?></title>
-    <script>(function(){const t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&true));})();</script>
+    <script>
+      (function(){const t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&true));})();
+      function gtaToggleTheme(){const d=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',d);try{localStorage.setItem('theme',d?'dark':'light');}catch(e){}}
+    </script>
     <script src="/assets/js/tailwindcss.js"></script>
     <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#6366f1'}}}};</script>
     <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css">
@@ -27,7 +30,10 @@ if ($video !== '') {
 <header class="border-b border-gray-200 dark:border-gray-800">
     <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy/learn" class="text-sm text-gray-500 hover:text-primary"><i class="fas fa-arrow-left mr-1"></i> All lessons</a>
-        <a href="/academy" class="flex items-center gap-2 font-bold text-sm"><i class="fas fa-graduation-cap text-primary"></i> Ginto Trading Academy</a>
+        <div class="flex items-center gap-3">
+            <a href="/academy" class="flex items-center gap-2 font-bold text-sm"><i class="fas fa-graduation-cap text-primary"></i> Ginto Trading Academy</a>
+            <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
+        </div>
     </div>
 </header>
 
