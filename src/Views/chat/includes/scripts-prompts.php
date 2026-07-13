@@ -99,12 +99,12 @@ try {
   }
   function homeMiniHtml(m) {
     var up = (+m.chg) >= 0, col = up ? '#22c55e' : '#ef4444';
-    return '<div style="border-radius:10px;overflow:hidden;background:rgba(12,10,32,0.30);border:1px solid rgba(255,255,255,0.12);box-shadow:0 1px 3px rgba(0,0,0,0.18);">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 11px 4px;">'
-      +   '<span style="font-size:9.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:rgba(255,255,255,0.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.tag + ' · ' + m.base + '</span>'
-      +   '<span style="font-size:11px;font-weight:800;color:' + col + ';white-space:nowrap;">' + (up ? '+' : '') + m.chg + '%</span>'
+    return '<div style="border-radius:8px;overflow:hidden;background:rgba(12,10,32,0.26);">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 8px 1px;">'
+      +   '<span style="font-size:9px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:rgba(255,255,255,0.72);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.tag + ' · ' + m.base + '</span>'
+      +   '<span style="font-size:10px;font-weight:800;color:' + col + ';white-space:nowrap;">' + (up ? '+' : '') + m.chg + '%</span>'
       + '</div>'
-      + '<div style="position:relative;height:34px;">' + homeSparkline(m.closes || [], col) + '</div>'
+      + '<div style="position:relative;height:30px;">' + homeSparkline(m.closes || [], col) + '</div>'
       + '</div>';
   }
 
