@@ -93,17 +93,19 @@ try {
     });
     var id = 'g' + Math.random().toString(36).slice(2, 7);
     return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" width="100%" height="100%" style="position:absolute;top:0;left:0;width:100%;height:100%;display:block;">'
-      + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity="0.35"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>'
+      + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity="0.28"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>'
       + '<path d="M0,' + h + ' L' + pts.join(' L') + ' L' + w + ',' + h + ' Z" fill="url(#' + id + ')"/>'
-      + '<path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
+      + '<path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="1.75" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>';
   }
   function homeMiniHtml(m) {
     var up = (+m.chg) >= 0, col = up ? '#22c55e' : '#ef4444';
-    return '<div style="position:relative;height:56px;border-radius:8px;overflow:hidden;background:rgba(0,0,0,0.2);">'
-      + homeSparkline(m.closes || [], col)
-      + '<div style="position:absolute;inset:0;display:flex;justify-content:space-between;align-items:flex-start;padding:4px 8px;font-size:10px;font-weight:700;color:#fff;pointer-events:none;">'
-      + '<span style="opacity:.85">' + m.tag + ' · ' + m.base + '</span>'
-      + '<span style="color:' + col + '">' + (up ? '+' : '') + m.chg + '%</span></div></div>';
+    return '<div style="border-radius:10px;overflow:hidden;background:rgba(12,10,32,0.30);border:1px solid rgba(255,255,255,0.12);box-shadow:0 1px 3px rgba(0,0,0,0.18);">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 11px 4px;">'
+      +   '<span style="font-size:9.5px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:rgba(255,255,255,0.78);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + m.tag + ' · ' + m.base + '</span>'
+      +   '<span style="font-size:11px;font-weight:800;color:' + col + ';white-space:nowrap;">' + (up ? '+' : '') + m.chg + '%</span>'
+      + '</div>'
+      + '<div style="position:relative;height:34px;">' + homeSparkline(m.closes || [], col) + '</div>'
+      + '</div>';
   }
 
   // Example prompts: fetch role-based prompts from server and render
