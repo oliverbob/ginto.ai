@@ -423,16 +423,16 @@ class AcademyController
             $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_wallets (
                 user_id INT PRIMARY KEY,
                 balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
-                starting DECIMAL(18,8) NOT NULL DEFAULT 10000,
+                start_balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             $w = $db->get('academy_wallets', '*', ['user_id' => $userId]);
             if (!is_array($w)) {
-                $db->insert('academy_wallets', ['user_id' => $userId, 'balance' => 10000, 'starting' => 10000]);
+                $db->insert('academy_wallets', ['user_id' => $userId, 'balance' => 10000, 'start_balance' => 10000]);
                 return ['balance' => 10000.0, 'starting' => 10000.0];
             }
-            return ['balance' => (float) $w['balance'], 'starting' => (float) $w['starting']];
+            return ['balance' => (float) $w['balance'], 'starting' => (float) $w['start_balance']];
         } catch (\Throwable $e) {
             error_log('Academy walletFor: ' . $e->getMessage());
             return ['balance' => 10000.0, 'starting' => 10000.0];
