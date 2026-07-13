@@ -2,8 +2,19 @@
 /**
  * Example Prompts Loading and Rendering Scripts
  */
+// Inline the cached movers so the homepage charts render from the page itself — no dependency on a
+// client-side fetch that can silently fail (which is why the charts kept vanishing for guests).
+$__moversInline = 'null';
+try {
+    $__cf = (defined('STORAGE_PATH') ? rtrim(STORAGE_PATH, '/') : sys_get_temp_dir()) . '/academy_movers.json';
+    if (is_file($__cf) && (time() - filemtime($__cf) < 600)) {
+        $__raw = trim((string) @file_get_contents($__cf));
+        if ($__raw !== '' && $__raw[0] === '{') $__moversInline = $__raw;
+    }
+} catch (\Throwable $e) {}
 ?>
 <script>
+  window.GTB_MOVERS_INLINE = <?= $__moversInline ?>;
   // ========================================
   // Example Prompts for Welcome Screen
   // ========================================
@@ -45,21 +56,31 @@
 
   // Live gainer / popular / loser mini charts — data via our own server (reliable),
   // drawn as pure SVG sparklines (no external library, no client-side Binance call).
+  function gtbPaintMovers(wrap, movers) {
+    if (!wrap || !Array.isArray(movers) || !movers.length) return false;
+    try { wrap.innerHTML = movers.map(homeMiniHtml).join(''); wrap.style.display = ''; return true; }
+    catch (e) { return false; }
+  }
   function renderHomeAcademyCharts(attempt) {
-    const wrap = document.getElementById('home-academy-charts');
-    if (!wrap) return;
+    // There can be more than one #home-academy-charts (guest banner + logged-in ad card); paint every one.
+    const wraps = Array.prototype.slice.call(document.querySelectorAll('#home-academy-charts'));
+    if (!wraps.length) return;
     attempt = attempt || 0;
+    // 1) Immediate paint from server-inlined data (no fetch) so the charts are never empty.
+    if (attempt === 0) {
+      const inl = window.GTB_MOVERS_INLINE;
+      if (inl && inl.ok && Array.isArray(inl.movers)) wraps.forEach(function (w) { gtbPaintMovers(w, inl.movers); });
+    }
+    // 2) Refresh from the live endpoint (also covers a cold cache); retry transient failures.
     fetch('/api/academy/movers', { cache: 'no-store', credentials: 'same-origin' })
       .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) {
         if (!d || !d.ok || !Array.isArray(d.movers) || !d.movers.length) throw new Error('no data');
-        wrap.innerHTML = d.movers.map(homeMiniHtml).join('');
-        wrap.style.display = '';   // ensure visible (in case a prior attempt hid it)
+        wraps.forEach(function (w) { gtbPaintMovers(w, d.movers); });
       })
       .catch(function () {
-        // A single network blip shouldn't kill the charts — retry a few times before giving up.
         if (attempt < 4) { setTimeout(function () { renderHomeAcademyCharts(attempt + 1); }, 1500 + attempt * 1000); }
-        else { wrap.style.display = 'none'; }
+        else { wraps.forEach(function (w) { if (!w.children.length) w.style.display = 'none'; }); }  // only hide if still empty
       });
   }
   function homeSparkline(vals, col) {
