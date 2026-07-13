@@ -145,44 +145,42 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     endforeach; ?>
 </section>
 
-<!-- Markets: live chart + tabbed movers (Popular / Gainers / Losers) — elegant single view -->
-<section class="mt-6 grid lg:grid-cols-3 gap-4">
-    <!-- Chart -->
-    <div class="lg:col-span-2 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
-        <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-            <div class="flex items-center gap-2 min-w-0">
-                <span id="gtb-chart-icon" class="inline-flex"></span>
-                <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
-                <span id="gtb-chart-price" class="text-base font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
-                <span id="gtb-chart-change" class="text-sm font-semibold"></span>
-                <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">● LIVE</span>
+<!-- Markets: one integrated panel — chart with Popular / Gainers / Losers tabs -->
+<section class="mt-6 rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
+    <div class="grid lg:grid-cols-3 gap-4">
+        <!-- Chart -->
+        <div class="lg:col-span-2 min-w-0">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span id="gtb-chart-icon" class="inline-flex"></span>
+                    <span id="gtb-chart-symbol" class="text-lg font-bold text-gray-900 dark:text-white">BTC/USDT</span>
+                    <span id="gtb-chart-price" class="text-base font-semibold tabular-nums text-gray-700 dark:text-gray-200"></span>
+                    <span id="gtb-chart-change" class="text-sm font-semibold"></span>
+                    <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">● LIVE</span>
+                </div>
+                <div id="gtb-intervals" class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
+                    <?php foreach (['1m','5m','15m','1h','4h','1d'] as $iv): ?>
+                        <button type="button" data-interval="<?= $iv ?>"
+                                class="gtb-iv px-3 py-1.5 <?= $iv==='1h' ? 'bg-primary text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' ?>"><?= $iv ?></button>
+                    <?php endforeach; ?>
+                </div>
             </div>
-            <div id="gtb-intervals" class="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs">
-                <?php foreach (['1m','5m','15m','1h','4h','1d'] as $iv): ?>
-                    <button type="button" data-interval="<?= $iv ?>"
-                            class="gtb-iv px-3 py-1.5 <?= $iv==='1h' ? 'bg-primary text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700' ?>"><?= $iv ?></button>
-                <?php endforeach; ?>
+            <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:392px"></div>
+            <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
+                Candles from Binance public market data (mainnet) — real regardless of your testnet setting. Tap any coin to chart it.
+            </p>
+        </div>
+        <!-- Markets tabs (integrated, divider to the chart) -->
+        <div class="min-w-0 lg:border-l lg:border-gray-200 lg:dark:border-gray-700 lg:pl-4">
+            <div id="gtb-mtabs" class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-2 text-xs font-bold">
+                <button type="button" data-mtab="hot" class="flex-1 py-1.5">Popular</button>
+                <button type="button" data-mtab="gainers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Gainers</button>
+                <button type="button" data-mtab="losers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Losers</button>
             </div>
+            <div id="gtb-hot" class="gtb-mlist space-y-0.5 overflow-y-auto pr-1" style="max-height:404px"><div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm"><i class="fas fa-spinner fa-spin"></i></div></div>
+            <div id="gtb-gainers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:404px"></div>
+            <div id="gtb-losers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:404px"></div>
         </div>
-        <div id="gtb-chart" class="w-full rounded-lg overflow-hidden" style="height:380px"></div>
-        <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-            Candles from Binance public market data (mainnet) — real regardless of your testnet setting. Tap any coin to chart it.
-        </p>
-    </div>
-    <!-- Markets (tabbed, like the Academy) -->
-    <div class="rounded-2xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4">
-        <div class="flex items-center justify-between mb-2">
-            <h3 class="text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-chart-line mr-1"></i>Markets</h3>
-            <span class="text-[11px] text-gray-400 dark:text-gray-500">24h · live</span>
-        </div>
-        <div id="gtb-mtabs" class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-2 text-xs font-bold">
-            <button type="button" data-mtab="hot" class="flex-1 py-1.5">Popular</button>
-            <button type="button" data-mtab="gainers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Gainers</button>
-            <button type="button" data-mtab="losers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Losers</button>
-        </div>
-        <div id="gtb-hot" class="gtb-mlist space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"><div class="py-6 text-center text-gray-400 dark:text-gray-500 text-sm"><i class="fas fa-spinner fa-spin"></i></div></div>
-        <div id="gtb-gainers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"></div>
-        <div id="gtb-losers" class="gtb-mlist hidden space-y-0.5 overflow-y-auto pr-1" style="max-height:392px"></div>
     </div>
 </section>
 
