@@ -69,10 +69,9 @@
         <span class="font-normal normal-case">— a shared teaching bot you watch. Its wins and losses are the lesson, not your balance.</span>
         <span id="lab-updated" class="ml-auto font-normal normal-case">—</span>
     </div>
-    <div class="mt-2 grid grid-cols-3 gap-3">
+    <div class="mt-2 grid grid-cols-2 gap-3">
         <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Open positions</span><button type="button" id="eye-lab-open" onclick="labEye('lab-open',['lab-open'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-open" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Unrealized</span><button type="button" id="eye-lab-unreal" onclick="labEye('lab-unreal',['lab-unreal'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Track record</span><button type="button" id="eye-lab-realized" onclick="labEye('lab-realized',['lab-realized'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-realized" class="mt-1 text-2xl font-extrabold">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="flex items-center justify-between"><span class="text-xs text-gray-500 dark:text-gray-400">Open-trade P&amp;L (live)</span><button type="button" id="eye-lab-unreal" onclick="labEye('lab-unreal',['lab-unreal'])" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button></div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
     </div>
 
     <!-- Live chart + markets (same engine as /gtb, testnet-only) -->
@@ -124,16 +123,49 @@
         </div>
     </div>
 
+    <!-- Start AI bot trading: the learner's wallet follows the class bot -->
+    <div class="mt-8 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-secondary/5 p-4 sm:p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <h2 class="text-base font-extrabold flex items-center gap-2"><i class="fas fa-robot text-primary"></i>Your AI trading bot</h2>
+                <p id="lab-bot-note" class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Turn this on and your <strong>$10,000 paper wallet automatically follows the class bot</strong> — the same <a href="/gtb" class="hidden"></a>momentum strategy templates, entries, stops and take-profits. Watch the AI trade for you, risk-free, and learn by following.</p>
+            </div>
+            <button type="button" id="lab-bot-toggle" onclick="labToggleBot()"
+                    class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
+                <i class="fas fa-play"></i> <span id="lab-bot-toggle-label">Start AI bot trading</span>
+            </button>
+        </div>
+        <div id="lab-my-positions" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+    </div>
+
     <div class="mt-8 grid lg:grid-cols-3 gap-6">
-        <!-- Positions -->
+        <!-- Demo bot positions -->
         <div class="lg:col-span-2">
-            <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-primary">What the bot is trading</h2>
+            <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-primary">What the class bot is trading</h2>
             <div id="lab-positions" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
         </div>
         <!-- AI reasoning stream -->
         <div>
             <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-brain mr-1"></i>The bot's mind</h2>
             <div id="lab-thoughts" class="space-y-2 max-h-[520px] overflow-y-auto pr-1 text-sm"></div>
+        </div>
+    </div>
+
+    <!-- Expandable live trade modal (same idea as /gtb) -->
+    <div id="lab-modal" class="hidden fixed inset-0 z-[70] bg-black/70 items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#0b1020] rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+                <div id="lab-modal-title" class="flex items-center gap-2 font-bold min-w-0"></div>
+                <div class="flex items-center gap-3">
+                    <span id="lab-modal-live" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">…</span>
+                    <button type="button" onclick="labModalClose()" class="text-gray-400 hover:text-primary"><i class="fas fa-xmark text-lg"></i></button>
+                </div>
+            </div>
+            <div class="p-4 overflow-y-auto">
+                <div id="lab-modal-pnl" class="mb-2 text-sm"></div>
+                <div id="lab-modal-chart" class="w-full rounded-lg overflow-hidden" style="height:340px"></div>
+                <div id="lab-modal-meta" class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] tabular-nums"></div>
+            </div>
         </div>
     </div>
 
@@ -362,7 +394,106 @@ function labLoadWallet() {
             labApplyVal('lab-wallet', '$' + eq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'mt-1 text-4xl font-extrabold tabular-nums');
             labApplyVal('lab-wallet-pnl', (pnl >= 0 ? '+' : '−') + '$' + Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 'text-lg font-bold ' + (pnl > 0 ? 'text-green-600 dark:text-green-400' : pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400'));
+            LAB.botOn = !!d.bot_enabled;
+            labSetToggle();
+            labRenderMyPositions(d.positions || []);
         }).catch(function () {});
+}
+
+function labSetToggle() {
+    var b = document.getElementById('lab-bot-toggle'), l = document.getElementById('lab-bot-toggle-label');
+    if (!b) return;
+    if (LAB.botOn) { b.className = 'inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-red-500 text-white hover:bg-red-600 disabled:opacity-60'; b.querySelector('i').className = 'fas fa-stop'; l.textContent = 'Stop AI bot trading'; }
+    else { b.className = 'inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60'; b.querySelector('i').className = 'fas fa-play'; l.textContent = 'Start AI bot trading'; }
+}
+
+function labToggleBot() {
+    var b = document.getElementById('lab-bot-toggle'); if (!b || b.disabled) return;
+    b.disabled = true;
+    fetch('/academy/bot/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, on: !LAB.botOn }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) { if (d && d.ok) { LAB.botOn = !!d.bot_enabled; labSetToggle(); labLoadWallet(); } })
+        .catch(function () {})
+        .finally(function () { b.disabled = false; });
+}
+
+function labRenderMyPositions(pos) {
+    var wrap = document.getElementById('lab-my-positions'); if (!wrap) return;
+    if (!pos.length) {
+        wrap.innerHTML = '<div class="col-span-full py-8 text-center text-sm text-gray-400">'
+            + (LAB.botOn ? 'Bot is on — waiting for the next clean setup. Your trades will appear here automatically.' : 'Bot is off. Press <b>Start AI bot trading</b> and your paper wallet will follow the class bot.')
+            + '</div>';
+        return;
+    }
+    wrap.innerHTML = pos.map(function (p) {
+        var up = (+p.pnlPct) >= 0, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+        return '<button type="button" onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" '
+            + 'class="text-left rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3 hover:border-primary transition-colors">'
+            + '<div class="flex items-center justify-between gap-2 mb-2">'
+            +   '<div class="flex items-center gap-1.5 font-bold min-w-0">' + labCoinIcon(p.base, 20) + '<span class="truncate">' + p.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>'
+            +     (p.template ? '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + p.template + '</span>' : '') + '</div>'
+            +   '<div class="text-right shrink-0"><div class="text-sm font-bold ' + col + '">' + labFmt(p.unrealized) + '</div><div class="text-[11px] ' + col + '">' + (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%</div></div>'
+            + '</div>'
+            + '<div class="grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
+            +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.entry).toPrecision(6) + '</span></div>'
+            +   '<div class="text-red-500">SL<br><span>' + (p.stop_loss ? '$' + (+p.stop_loss).toPrecision(6) : '—') + '</span></div>'
+            +   '<div class="text-green-600 dark:text-green-400">TP<br><span>' + (p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail') + '</span></div>'
+            + '</div>'
+            + '<div class="mt-1 text-[10px] text-center text-primary"><i class="fas fa-expand mr-1"></i>tap to expand · $' + (+p.spent).toFixed(0) + ' paper</div>'
+            + '</button>';
+    }).join('');
+}
+
+// ---- Expandable live trade modal (own chart + Binance WS) ---------------------
+var LABM = { chart: null, series: null, ws: null, symbol: '' };
+function labModalClose() {
+    var o = document.getElementById('lab-modal'); if (!o) return;
+    if (LABM.ws) { try { LABM.ws.onclose = null; LABM.ws.close(); } catch (e) {} LABM.ws = null; }
+    if (LABM.chart) { try { LABM.chart.remove(); } catch (e) {} LABM.chart = null; LABM.series = null; }
+    o.classList.add('hidden'); o.classList.remove('flex');
+}
+function labExpandTrade(symbol, base, entry, sl, tp) {
+    var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
+    LABM.symbol = symbol;
+    document.getElementById('lab-modal-title').innerHTML = labCoinIcon(base, 22) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>';
+    document.getElementById('lab-modal-meta').innerHTML =
+        '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+entry).toPrecision(6) + '</span></div>'
+        + '<div class="text-red-500">stop-loss<br><span>' + (sl ? '$' + (+sl).toPrecision(6) : '—') + '</span></div>'
+        + '<div class="text-green-600 dark:text-green-400">take-profit<br><span>' + (tp ? '$' + (+tp).toPrecision(6) : 'trailing') + '</span></div>';
+    o.classList.remove('hidden'); o.classList.add('flex');
+    var el = document.getElementById('lab-modal-chart'); el.innerHTML = '';
+    LABM.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 340 }, labChartTheme()));
+    LABM.series = LABM.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
+    new ResizeObserver(function () { if (LABM.chart) LABM.chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+    fetch('/academy/klines?symbol=' + encodeURIComponent(symbol) + '&interval=15m', { credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d.ok || !Array.isArray(d.candles) || !LABM.series) return;
+            LABM.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
+            LABM.chart.timeScale().fitContent();
+            if (d.candles.length) labModalPnl(entry, +d.candles[d.candles.length - 1].close);
+            labModalStream(symbol, entry);
+        }).catch(function () {});
+}
+function labModalPnl(entry, mark) {
+    var up = mark >= entry, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+    var pct = entry > 0 ? (mark - entry) / entry * 100 : 0;
+    document.getElementById('lab-modal-pnl').innerHTML = 'Mark <span class="font-bold tabular-nums">$' + mark.toPrecision(6) + '</span> · <span class="font-bold ' + col + '">' + (up ? '+' : '') + pct.toFixed(2) + '%</span>';
+}
+function labModalStream(symbol, entry) {
+    if (LABM.ws) { try { LABM.ws.onclose = null; LABM.ws.close(); } catch (e) {} LABM.ws = null; }
+    var el = document.getElementById('lab-modal-live');
+    if (typeof WebSocket === 'undefined') { el.textContent = 'offline'; return; }
+    var ws; try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@kline_15m'); } catch (e) { return; }
+    LABM.ws = ws; el.textContent = 'connecting…';
+    ws.onopen = function () { if (LABM.symbol === symbol) { el.textContent = '● LIVE'; el.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; } };
+    ws.onmessage = function (ev) {
+        if (LABM.symbol !== symbol || !LABM.series) return;
+        var m; try { m = JSON.parse(ev.data); } catch (e) { return; } var k = m && m.k; if (!k) return;
+        try { LABM.series.update({ time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {}
+        labModalPnl(entry, +k.c);
+    };
+    ws.onclose = function () { if (LABM.symbol === symbol && LABM.ws === ws) { LABM.ws = null; } };
 }
 
 function labAnalyzeCoin() { labAnalyzeRun({ scope: 'coin', btn: 'lab-anz-coin-btn', label: 'lab-anz-coin-label', out: 'lab-anz-coin-out', reset: 'Analyze this coin with AI' }); }

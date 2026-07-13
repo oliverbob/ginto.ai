@@ -1693,7 +1693,8 @@ $router->get('/academy/bot/data', 'AcademyController@botData');   // members: te
 $router->get('/academy/markets', 'AcademyController@markets');    // members: popular/gainers/losers pairs
 $router->get('/academy/klines', 'AcademyController@klines');      // members: OHLC candles (TradingView chart)
 $router->post('/academy/bot/analyze', 'AcademyController@analyze'); // members: AI analysis of a chosen coin (advisory)
-$router->get('/academy/wallet', 'AcademyController@wallet');      // members: this learner's own $10k paper wallet
+$router->get('/academy/wallet', 'AcademyController@wallet');      // members: this learner's own $10k paper wallet + positions
+$router->post('/academy/bot/toggle', 'AcademyController@botToggle'); // members: start/stop follow-the-bot trading
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');

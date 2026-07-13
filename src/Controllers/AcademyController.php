@@ -421,42 +421,182 @@ class AcademyController
         }
     }
 
-    /** True if the user has a current, non-expired active subscription. */
+    /** Ensure the per-user wallet + positions schema exists (idempotent). */
+    private function ensureTradingSchema(): void
+    {
+        $db = Database::getInstance();
+        $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_wallets (
+            user_id INT PRIMARY KEY,
+            balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
+            start_balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
+            bot_enabled TINYINT NOT NULL DEFAULT 0,
+            bot_since DATETIME NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        foreach (['bot_enabled TINYINT NOT NULL DEFAULT 0', 'bot_since DATETIME NULL'] as $col) {
+            try { $db->pdo->exec("ALTER TABLE academy_wallets ADD COLUMN IF NOT EXISTS $col"); } catch (\Throwable $e) {}
+        }
+        $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_positions (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            ref_trade_id INT NULL,
+            symbol VARCHAR(32) NOT NULL,
+            base VARCHAR(24) NOT NULL,
+            qty DECIMAL(28,10) NOT NULL,
+            entry DECIMAL(28,10) NOT NULL,
+            spent DECIMAL(18,8) NOT NULL,
+            stop_loss DECIMAL(28,10) NULL,
+            take_profit DECIMAL(28,10) NULL,
+            template VARCHAR(32) NULL,
+            status VARCHAR(8) NOT NULL DEFAULT 'open',
+            exit_price DECIMAL(28,10) NULL,
+            realized DECIMAL(18,8) NULL,
+            opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            closed_at DATETIME NULL,
+            INDEX idx_user_status (user_id, status)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /**
      * Each member gets their own $10,000 paper wallet (the practice balance). Lazily creates the
-     * table + the member's row on first touch. Returns ['balance'=>float,'starting'=>float].
+     * schema + the member's row on first touch.
      */
     private function walletFor(int $userId): array
     {
         try {
+            $this->ensureTradingSchema();
             $db = Database::getInstance();
-            $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_wallets (
-                user_id INT PRIMARY KEY,
-                balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
-                start_balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
             $w = $db->get('academy_wallets', '*', ['user_id' => $userId]);
             if (!is_array($w)) {
                 $db->insert('academy_wallets', ['user_id' => $userId, 'balance' => 10000, 'start_balance' => 10000]);
-                return ['balance' => 10000.0, 'starting' => 10000.0];
+                $w = ['balance' => 10000, 'start_balance' => 10000, 'bot_enabled' => 0, 'bot_since' => null];
             }
-            return ['balance' => (float) $w['balance'], 'starting' => (float) $w['start_balance']];
+            return [
+                'balance' => (float) $w['balance'], 'starting' => (float) $w['start_balance'],
+                'bot_enabled' => (int) ($w['bot_enabled'] ?? 0), 'bot_since' => $w['bot_since'] ?? null,
+            ];
         } catch (\Throwable $e) {
             error_log('Academy walletFor: ' . $e->getMessage());
-            return ['balance' => 10000.0, 'starting' => 10000.0];
+            return ['balance' => 10000.0, 'starting' => 10000.0, 'bot_enabled' => 0, 'bot_since' => null];
         }
     }
 
-    /** GET /academy/wallet — members: this learner's own paper wallet (per-user, not cached/shared). */
+    /**
+     * Follow-the-bot sync: mirror each of the class bot's open PAPER trades into this learner's wallet
+     * (enter at the bot's entry, fixed $ size), and close a mirror when the bot closes — realizing P&L
+     * into the wallet. Runs on each wallet poll; no per-user AI, so it stays token-free.
+     */
+    private function reconcileBot(int $userId, array $wallet): array
+    {
+        $UNIT = 200.0; $SLOTS = 8;   // paper $ per mirrored trade; max concurrent mirrors
+        $db = Database::getInstance();
+        $client = new \Ginto\Services\BinanceClient();
+        $balance = (float) $wallet['balance'];
+        $enabled = !empty($wallet['bot_enabled']);
+
+        $botOpen = [];
+        try { foreach ((new \Ginto\Models\GtbTrade())->openPositions('paper') as $p) { $botOpen[(int) $p['id']] = $p; } } catch (\Throwable $e) {}
+
+        // 1) Close mirrors whose bot trade has closed — realize at the bot's exit (or live mark).
+        $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
+        if (!is_array($open)) $open = [];
+        foreach ($open as $u) {
+            $ref = $u['ref_trade_id'] !== null ? (int) $u['ref_trade_id'] : 0;
+            if ($ref && !isset($botOpen[$ref])) {
+                $bt = $db->get('gtb_trades', ['exit_price'], ['id' => $ref]);
+                $exit = (is_array($bt) && $bt['exit_price'] !== null) ? (float) $bt['exit_price'] : (float) ($client->price($u['symbol']) ?? $u['entry']);
+                if ($exit <= 0) $exit = (float) $u['entry'];
+                $proceeds = (float) $u['qty'] * $exit; $balance += $proceeds;
+                $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $exit, 'realized' => round($proceeds - (float) $u['spent'], 8), 'closed_at' => date('Y-m-d H:i:s')], ['id' => $u['id']]);
+            }
+        }
+
+        // 2) Open a mirror for each bot trade we don't hold yet.
+        if ($enabled) {
+            $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
+            if (!is_array($open)) $open = [];
+            $held = []; foreach ($open as $u) { if ($u['ref_trade_id'] !== null) $held[(int) $u['ref_trade_id']] = true; }
+            $slots = $SLOTS - count($open);
+            foreach ($botOpen as $id => $p) {
+                if ($slots <= 0 || $balance < $UNIT) break;
+                if (isset($held[$id])) continue;
+                $entry = (float) $p['price']; if ($entry <= 0) continue;
+                $db->insert('academy_positions', [
+                    'user_id' => $userId, 'ref_trade_id' => $id, 'symbol' => $p['symbol'], 'base' => substr($p['symbol'], 0, -4),
+                    'qty' => $UNIT / $entry, 'entry' => $entry, 'spent' => $UNIT,
+                    'stop_loss' => $p['stop_loss'] ?? null, 'take_profit' => $p['take_profit'] ?? null, 'template' => $p['template'] ?? null, 'status' => 'open',
+                ]);
+                $balance -= $UNIT; $slots--;
+            }
+        }
+
+        if (abs($balance - (float) $wallet['balance']) > 1e-9) {
+            $db->update('academy_wallets', ['balance' => round($balance, 8)], ['user_id' => $userId]);
+        }
+
+        // 3) Live positions view.
+        $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ORDER' => ['id' => 'DESC']]);
+        if (!is_array($open)) $open = [];
+        $positions = []; $unreal = 0.0; $marks = 0.0;
+        foreach ($open as $u) {
+            $entry = (float) $u['entry']; $qty = (float) $u['qty'];
+            $mark = (float) ($client->price($u['symbol']) ?? $entry); if ($mark <= 0) $mark = $entry;
+            $pnl = ($mark - $entry) * $qty; $unreal += $pnl; $marks += $mark * $qty;
+            $positions[] = [
+                'id' => (int) $u['id'], 'symbol' => $u['symbol'], 'base' => $u['base'], 'template' => $u['template'],
+                'entry' => $entry, 'mark' => $mark, 'qty' => $qty, 'spent' => (float) $u['spent'],
+                'stop_loss' => $u['stop_loss'] !== null ? (float) $u['stop_loss'] : null,
+                'take_profit' => $u['take_profit'] !== null ? (float) $u['take_profit'] : null,
+                'pnlPct' => $entry > 0 ? ($mark - $entry) / $entry * 100 : 0, 'unrealized' => round($pnl, 4),
+            ];
+        }
+        return ['balance' => round($balance, 8), 'positions' => $positions, 'unrealized' => round($unreal, 4), 'equity' => round($balance + $marks, 4)];
+    }
+
+    /** GET /academy/wallet — this learner's own paper wallet + live follow-the-bot positions. */
     public function wallet(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         $userId = $this->requireMemberJson();
         $w = $this->walletFor($userId);
-        // Equity = cash balance (per-user open positions not yet built — will add unrealized here).
-        echo json_encode(['ok' => true, 'balance' => $w['balance'], 'starting' => $w['starting'], 'equity' => $w['balance']]);
+        $r = $this->reconcileBot($userId, $w);
+        echo json_encode([
+            'ok' => true, 'balance' => $r['balance'], 'starting' => $w['starting'], 'equity' => $r['equity'],
+            'unrealized' => $r['unrealized'], 'bot_enabled' => (bool) $w['bot_enabled'], 'positions' => $r['positions'],
+        ]);
+        exit;
+    }
+
+    /** POST /academy/bot/toggle — start/stop this learner's follow-the-bot trading. */
+    public function botToggle(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        $this->ensureTradingSchema();
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $on = !empty($input['on']);
+        $db = Database::getInstance();
+        try {
+            if ($on) {
+                $db->update('academy_wallets', ['bot_enabled' => 1, 'bot_since' => date('Y-m-d H:i:s')], ['user_id' => $userId]);
+            } else {
+                // Stop = flatten every open mirror at the current mark, then disable.
+                $client = new \Ginto\Services\BinanceClient();
+                $w = $this->walletFor($userId); $balance = (float) $w['balance'];
+                $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
+                if (is_array($open)) foreach ($open as $u) {
+                    $mark = (float) ($client->price($u['symbol']) ?? $u['entry']); if ($mark <= 0) $mark = (float) $u['entry'];
+                    $proceeds = (float) $u['qty'] * $mark; $balance += $proceeds;
+                    $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $mark, 'realized' => round($proceeds - (float) $u['spent'], 8), 'closed_at' => date('Y-m-d H:i:s')], ['id' => $u['id']]);
+                }
+                $db->update('academy_wallets', ['bot_enabled' => 0, 'balance' => round($balance, 8)], ['user_id' => $userId]);
+            }
+            echo json_encode(['ok' => true, 'bot_enabled' => $on]);
+        } catch (\Throwable $e) {
+            error_log('Academy botToggle: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not update the bot.']);
+        }
         exit;
     }
 
