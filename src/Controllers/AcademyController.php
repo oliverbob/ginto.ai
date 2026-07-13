@@ -557,6 +557,7 @@ class AcademyController
             $pnl = ($mark - $entry) * $qty; $unreal += $pnl; $marks += $mark * $qty;
             $positions[] = [
                 'id' => (int) $u['id'], 'symbol' => $u['symbol'], 'base' => $u['base'], 'template' => $u['template'],
+                'auto' => $u['ref_trade_id'] !== null,   // true = bot-followed, false = manual
                 'entry' => $entry, 'mark' => $mark, 'qty' => $qty, 'spent' => (float) $u['spent'],
                 'stop_loss' => $u['stop_loss'] !== null ? (float) $u['stop_loss'] : null,
                 'take_profit' => $u['take_profit'] !== null ? (float) $u['take_profit'] : null,
@@ -596,7 +597,8 @@ class AcademyController
                 // Stop = flatten every open mirror at the current mark, then disable.
                 $client = new \Ginto\Services\BinanceClient();
                 $w = $this->walletFor($userId); $balance = (float) $w['balance'];
-                $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
+                // Only flatten BOT-followed positions (ref_trade_id set). Manual trades stay open.
+                $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ref_trade_id[!]' => null]);
                 if (is_array($open)) foreach ($open as $u) {
                     $mark = (float) ($client->price($u['symbol']) ?? $u['entry']); if ($mark <= 0) $mark = (float) $u['entry'];
                     $proceeds = (float) $u['qty'] * $mark; $balance += $proceeds;
@@ -608,6 +610,65 @@ class AcademyController
         } catch (\Throwable $e) {
             error_log('Academy botToggle: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'Could not update the bot.']);
+        }
+        exit;
+    }
+
+    /** POST /academy/trade/buy — open a MANUAL paper position on the charted coin (all members). */
+    public function tradeBuy(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        $this->ensureTradingSchema();
+        $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? ''))) ?: '';
+        if ($symbol === '') { echo json_encode(['ok' => false, 'error' => 'Pick a coin first.']); exit; }
+        if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
+        $base   = substr($symbol, 0, -4);
+        $amount = round((float) ($input['amount'] ?? 0), 2);
+        try {
+            $w = $this->walletFor($userId); $balance = (float) $w['balance'];
+            if ($amount < 10) { echo json_encode(['ok' => false, 'error' => 'Minimum trade is $10.']); exit; }
+            if ($amount > $balance) { echo json_encode(['ok' => false, 'error' => 'Not enough paper balance ($' . number_format($balance, 2) . ').']); exit; }
+            $price = (float) ((new \Ginto\Services\BinanceClient())->price($symbol) ?? 0);
+            if ($price <= 0) { echo json_encode(['ok' => false, 'error' => 'Could not get a live price for ' . $base . '.']); exit; }
+            $db = Database::getInstance();
+            $db->insert('academy_positions', [
+                'user_id' => $userId, 'ref_trade_id' => null, 'symbol' => $symbol, 'base' => $base,
+                'qty' => $amount / $price, 'entry' => $price, 'spent' => $amount, 'template' => 'manual', 'status' => 'open',
+            ]);
+            $db->update('academy_wallets', ['balance' => round($balance - $amount, 8)], ['user_id' => $userId]);
+            echo json_encode(['ok' => true, 'symbol' => $symbol, 'base' => $base, 'entry' => $price, 'spent' => $amount, 'balance' => round($balance - $amount, 8)]);
+        } catch (\Throwable $e) {
+            error_log('Academy tradeBuy: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not place the trade.']);
+        }
+        exit;
+    }
+
+    /** POST /academy/trade/sell — close a MANUAL paper position at the live mark (all members). */
+    public function tradeSell(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        $this->ensureTradingSchema();
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $id    = (int) ($input['id'] ?? 0);
+        try {
+            $db = Database::getInstance();
+            // Manual positions only (ref_trade_id NULL) — bot-followed trades are managed by the bot.
+            $p = $db->get('academy_positions', '*', ['id' => $id, 'user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null]);
+            if (!is_array($p)) { echo json_encode(['ok' => false, 'error' => 'Trade not found (or it is bot-managed).']); exit; }
+            $mark = (float) ((new \Ginto\Services\BinanceClient())->price($p['symbol']) ?? $p['entry']);
+            if ($mark <= 0) $mark = (float) $p['entry'];
+            $proceeds = (float) $p['qty'] * $mark; $realized = $proceeds - (float) $p['spent'];
+            $w = $this->walletFor($userId);
+            $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $mark, 'realized' => round($realized, 8), 'closed_at' => date('Y-m-d H:i:s')], ['id' => $id]);
+            $db->update('academy_wallets', ['balance' => round((float) $w['balance'] + $proceeds, 8)], ['user_id' => $userId]);
+            echo json_encode(['ok' => true, 'realized' => round($realized, 4), 'balance' => round((float) $w['balance'] + $proceeds, 8)]);
+        } catch (\Throwable $e) {
+            error_log('Academy tradeSell: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not close the trade.']);
         }
         exit;
     }

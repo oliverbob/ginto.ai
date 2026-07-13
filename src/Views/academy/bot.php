@@ -114,6 +114,20 @@ $isPro   = !empty($isPro);
                 <span class="text-[11px] text-gray-400">Advisory only — the bot reasons out loud; no orders are placed.</span>
             </div>
             <div id="lab-anz-coin-out" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
+            <!-- Manual paper trade (Starter + Pro) — trade the coin on the chart -->
+            <div class="mt-3 rounded-xl border border-green-200 dark:border-green-500/30 bg-green-50/50 dark:bg-green-500/5 p-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-sm font-bold"><i class="fas fa-hand-pointer text-green-600 mr-1"></i>Trade <span id="lab-trade-sym">BTC</span>/USDT yourself</span>
+                    <span class="text-[11px] text-gray-400">manual paper trade — you pick the entry, you close it</span>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <div class="flex items-center gap-1"><span class="text-gray-400">$</span>
+                        <input id="lab-trade-amt" type="number" min="10" step="10" value="100" class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none">
+                    </div>
+                    <button type="button" id="lab-buy-btn" onclick="labBuy()" class="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"><i class="fas fa-cart-plus"></i> Buy on paper</button>
+                    <span id="lab-trade-status" class="text-xs text-gray-400"></span>
+                </div>
+            </div>
         </div>
         <!-- Markets -->
         <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
@@ -132,16 +146,25 @@ $isPro   = !empty($isPro);
     <div class="mt-8 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/5 to-secondary/5 p-4 sm:p-5">
         <div class="flex flex-wrap items-center justify-between gap-3">
             <div>
-                <h2 class="text-base font-extrabold flex items-center gap-2"><i class="fas fa-robot text-primary"></i>Your AI trading bot</h2>
+                <h2 class="text-base font-extrabold flex items-center gap-2"><i class="fas fa-robot text-primary"></i>Your AI trading bot <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full <?= $isPro ? 'bg-primary/15 text-primary' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' ?>"><?= $isPro ? 'Pro' : 'Pro only' ?></span></h2>
+                <?php if ($isPro): ?>
                 <p id="lab-bot-note" class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Turn this on and your <strong>$10,000 paper wallet automatically follows the class bot</strong> — the same momentum strategy templates, entries, stops and take-profits. Watch the AI trade for you, risk-free, and learn by following.</p>
+                <?php else: ?>
+                <p class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Hands-free automation — the bot trades your paper wallet for you — is a <strong>Pro Trader</strong> feature. On Starter you trade manually (with AI assistance) using the <strong>Buy on paper</strong> panel under the chart above.</p>
+                <?php endif; ?>
                 <div id="lab-heartbeat" class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5"></div>
             </div>
             <div class="flex flex-col items-end gap-2">
+                <?php if ($isPro): ?>
                 <button type="button" id="lab-bot-toggle" onclick="labToggleBot()"
                         class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
                     <i class="fas fa-play"></i> <span id="lab-bot-toggle-label">Start AI bot trading</span>
                 </button>
-                <a href="/academy/settings" class="text-xs text-gray-500 hover:text-primary"><i class="fas fa-sliders mr-1"></i>Bot settings<?= $isPro ? '' : ' (Pro)' ?></a>
+                <a href="/academy/settings" class="text-xs text-gray-500 hover:text-primary"><i class="fas fa-sliders mr-1"></i>Bot settings</a>
+                <?php else: ?>
+                <a href="/academy#pricing" class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-primary text-white hover:bg-primary/90"><i class="fas fa-crown"></i> Upgrade to Pro</a>
+                <a href="/academy/settings" class="text-xs text-gray-500 hover:text-primary"><i class="fas fa-sliders mr-1"></i>Preview templates</a>
+                <?php endif; ?>
             </div>
         </div>
         <div id="lab-my-positions" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
@@ -154,10 +177,10 @@ $isPro   = !empty($isPro);
             </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 <?php foreach ($catalog as $key => $t): ?>
-                <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5">
-                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span></div>
+                <a href="/academy/settings" class="block rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5 hover:border-primary hover:shadow-sm transition-colors group">
+                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span><i class="fas fa-arrow-right text-[10px] text-gray-300 group-hover:text-primary ml-auto"></i></div>
                     <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug"><?= htmlspecialchars($t['description'] ?? '') ?></div>
-                </div>
+                </a>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -232,7 +255,7 @@ function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) r
 function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
 // ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
-var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot' };
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?> };
 
 function labChartTheme() {
     var dark = document.documentElement.classList.contains('dark');
@@ -301,6 +324,7 @@ function labOpenStream() {
 function labSelectSymbol(symbol, base, price, chg) {
     LAB.symbol = symbol; LAB.base = base;
     document.getElementById('lab-chart-symbol').textContent = base + '/USDT';
+    var ts = document.getElementById('lab-trade-sym'); if (ts) ts.textContent = base;
     var ico = document.getElementById('lab-chart-icon'); if (ico) ico.innerHTML = labCoinIcon(base, 22);
     if (price != null) labSetPrice(price);
     var up = (+chg) >= 0, chgEl = document.getElementById('lab-chart-change');
@@ -468,28 +492,62 @@ function labToggleBot() {
 function labRenderMyPositions(pos) {
     var wrap = document.getElementById('lab-my-positions'); if (!wrap) return;
     if (!pos.length) {
-        wrap.innerHTML = '<div class="col-span-full py-8 text-center text-sm text-gray-400">'
-            + (LAB.botOn ? 'Bot is on — waiting for the next clean setup. Your trades will appear here automatically.' : 'Bot is off. Press <b>Start AI bot trading</b> and your paper wallet will follow the class bot.')
-            + '</div>';
+        var msg = LAB.botOn ? 'Bot is on — waiting for the next clean setup. Your followed trades will appear here automatically.'
+            : (LAB.isPro ? 'No open trades. Buy a coin on paper below the chart, or press <b>Start AI bot trading</b> to follow the class bot.'
+                         : 'No open trades yet. Pick a coin, then use <b>Buy on paper</b> under the chart to open your first manual trade.');
+        wrap.innerHTML = '<div class="col-span-full py-8 text-center text-sm text-gray-400">' + msg + '</div>';
         return;
     }
     wrap.innerHTML = pos.map(function (p) {
         var up = (+p.pnlPct) >= 0, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
-        return '<button type="button" onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" '
-            + 'class="text-left rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3 hover:border-primary transition-colors">'
+        var tag = p.auto ? '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + (p.template || 'bot') + '</span>'
+                         : '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">manual</span>';
+        var foot = p.auto
+            ? '<div class="mt-1 text-[10px] text-center text-primary"><i class="fas fa-expand mr-1"></i>tap to expand · bot-managed · $' + (+p.spent).toFixed(0) + '</div>'
+            : '<div class="mt-2 flex items-center justify-between gap-2">'
+                + '<button type="button" onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" class="text-[10px] text-primary hover:underline"><i class="fas fa-expand mr-1"></i>expand</button>'
+                + '<button type="button" onclick="labSell(' + p.id + ',this)" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600">Close · sell</button></div>';
+        var onclick = p.auto ? ' onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" class="cursor-pointer"' : '';
+        return '<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">'
+            + '<div' + onclick + '>'
             + '<div class="flex items-center justify-between gap-2 mb-2">'
-            +   '<div class="flex items-center gap-1.5 font-bold min-w-0">' + labCoinIcon(p.base, 20) + '<span class="truncate">' + p.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>'
-            +     (p.template ? '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + p.template + '</span>' : '') + '</div>'
+            +   '<div class="flex items-center gap-1.5 font-bold min-w-0">' + labCoinIcon(p.base, 20) + '<span class="truncate">' + p.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>' + tag + '</div>'
             +   '<div class="text-right shrink-0"><div class="text-sm font-bold ' + col + '">' + labFmt(p.unrealized) + '</div><div class="text-[11px] ' + col + '">' + (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%</div></div>'
             + '</div>'
             + '<div class="grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
             +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.entry).toPrecision(6) + '</span></div>'
-            +   '<div class="text-red-500">SL<br><span>' + (p.stop_loss ? '$' + (+p.stop_loss).toPrecision(6) : '—') + '</span></div>'
-            +   '<div class="text-green-600 dark:text-green-400">TP<br><span>' + (p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail') + '</span></div>'
-            + '</div>'
-            + '<div class="mt-1 text-[10px] text-center text-primary"><i class="fas fa-expand mr-1"></i>tap to expand · $' + (+p.spent).toFixed(0) + ' paper</div>'
-            + '</button>';
+            +   '<div class="text-gray-500 dark:text-gray-400">mark<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.mark).toPrecision(6) + '</span></div>'
+            +   '<div class="text-gray-500 dark:text-gray-400">size<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.spent).toFixed(0) + '</span></div>'
+            + '</div></div>'
+            + foot
+            + '</div>';
     }).join('');
+}
+
+function labBuy() {
+    var btn = document.getElementById('lab-buy-btn'), st = document.getElementById('lab-trade-status');
+    if (!btn || btn.disabled) return;
+    var amt = +document.getElementById('lab-trade-amt').value;
+    if (!(amt >= 10)) { st.textContent = 'Minimum $10.'; st.className = 'text-xs text-amber-500'; return; }
+    btn.disabled = true; st.textContent = 'Placing…'; st.className = 'text-xs text-gray-400';
+    fetch('/academy/trade/buy', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol, amount: amt }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.ok) { st.textContent = '✓ Bought ' + d.base + ' at $' + (+d.entry).toPrecision(6); st.className = 'text-xs text-green-600 dark:text-green-400'; labLoadWallet(); }
+            else { st.textContent = (d && d.error) || 'Could not buy.'; st.className = 'text-xs text-amber-500'; }
+        }).catch(function () { st.textContent = 'Network error.'; st.className = 'text-xs text-amber-500'; })
+        .finally(function () { btn.disabled = false; });
+}
+
+function labSell(id, btn) {
+    if (btn) btn.disabled = true;
+    fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, id: id }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            var st = document.getElementById('lab-trade-status');
+            if (d && d.ok) { if (st) { st.textContent = '✓ Closed · P&L ' + labFmt(d.realized); st.className = 'text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); } labLoadWallet(); }
+            else { if (st) { st.textContent = (d && d.error) || 'Could not close.'; st.className = 'text-xs text-amber-500'; } if (btn) btn.disabled = false; }
+        }).catch(function () { if (btn) btn.disabled = false; });
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
