@@ -279,6 +279,13 @@ $csrf = $csrf_token ?? '';
         <!-- Pane 3b: on-site card payment -->
         <div id="join-card-pane" class="hidden space-y-3">
             <div>
+                <div class="flex items-center justify-between mb-1">
+                    <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400">Name on card</label>
+                    <button type="button" onclick="gtaUseMyName()" class="text-[11px] text-primary hover:underline"><i class="fas fa-user mr-0.5"></i>Use my registered name</button>
+                </div>
+                <input id="card-name" type="text" autocomplete="cc-name" maxlength="100" value="<?= htmlspecialchars($userFullname ?? '') ?>" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Juan D. Cruz">
+            </div>
+            <div>
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Card number</label>
                 <input id="card-number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" class="w-full rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent px-3 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="1234 5678 9012 3456">
             </div>
@@ -358,8 +365,10 @@ $csrf = $csrf_token ?? '';
         if (!guestValid()) { showErr('Enter your name, a valid email, and a 6+ character password.'); return; }
         hide('join-form-pane'); show('join-method-pane');
     };
+    var GTA_MYNAME = <?= json_encode($userFullname ?? '') ?>;
+    window.gtaUseMyName = function () { var n = GTA_MYNAME || (el('join-name') && el('join-name').value) || ''; if (el('card-name')) { el('card-name').value = n; el('card-name').focus(); } };
     window.gtaPickQr = function () { hide('join-method-pane'); gtaStartPay(); };
-    window.gtaPickCard = function () { clearErr(); hide('join-method-pane'); show('join-card-pane'); };
+    window.gtaPickCard = function () { clearErr(); hide('join-method-pane'); show('join-card-pane'); if (el('card-name') && !el('card-name').value.trim()) { el('card-name').value = GTA_MYNAME || (el('join-name') && el('join-name').value) || ''; } };
     window.gtaCloseJoin = function () {
         if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
         gtaClose3ds();
@@ -393,8 +402,11 @@ $csrf = $csrf_token ?? '';
         var mm = (el('card-mm').value || '').replace(/\D/g, ''), yy = (el('card-yy').value || '').replace(/\D/g, ''), cvc = (el('card-cvc').value || '').replace(/\D/g, '');
         if (digits.length < 13 || digits.length > 19) { showErr('Please enter a valid card number.'); return; }
         if (+mm < 1 || +mm > 12 || yy.length < 2 || cvc.length < 3) { showErr('Please check the card expiry and CVC.'); return; }
+        var cardName = (el('card-name') && el('card-name').value || '').trim();
+        if (cardName.length < 2) { showErr('Please enter the name on the card.'); return; }
         var fd = new FormData();
         fd.append('csrf_token', CSRF); fd.append('plan', plan);
+        fd.append('card_name', cardName);
         fd.append('card_number', digits); fd.append('exp_month', mm); fd.append('exp_year', yy); fd.append('cvc', cvc);
         if (el('card-autorenew') && el('card-autorenew').checked) fd.append('auto_renew', '1');
         appendGuest(fd);
@@ -408,7 +420,7 @@ $csrf = $csrf_token ?? '';
                 piId = d.pi_id;
                 if (d.requires_action && d.next_action_url) { el('card-pay-status').innerHTML = '<i class="fas fa-shield-halved mr-1 text-primary"></i> Complete the bank verification…'; gtaOpen3ds(d.next_action_url); startPoll(); }
                 else if (d.status === 'succeeded') { finalize(); }
-                else if (d.status === 'awaiting_next_action') { showErr('This card couldn\'t start bank verification (3DS). Prepaid or virtual/issued cards often can\'t be charged here — please try a different debit/credit card.'); }
+                else if (d.status === 'awaiting_next_action') { showErr('We couldn\'t complete card verification (3DS) — this is a limitation on our side that we\'re fixing, not a problem with your card. Please pay with QR Ph (GCash / Maya / bank) for now — tap the QR Ph option above; it works instantly.'); }
                 else { el('card-pay-status').innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1 text-primary"></i> Confirming your payment…'; startPoll(); }
             })
             .catch(function () { if (btn) { btn.disabled = false; btn.innerHTML = 'Pay ' + peso(curTotal); } showErr('Network error — please try again.'); });

@@ -103,6 +103,8 @@ $isPro   = !empty($isPro);
                     <button data-iv="1h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1h</button>
                     <button data-iv="4h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">4h</button>
                     <button data-iv="1d" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1d</button>
+                    <button data-iv="1w" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1w</button>
+                    <button data-iv="1M" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1M</button>
                 </div>
             </div>
             <div id="lab-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
@@ -221,7 +223,20 @@ $isPro   = !empty($isPro);
                 </div>
             </div>
             <div class="p-4 overflow-y-auto">
-                <div id="lab-modal-pnl" class="mb-2 text-sm"></div>
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div id="lab-modal-pnl" class="text-sm"></div>
+                    <div id="lab-modal-iv" class="inline-flex flex-wrap rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[11px] font-semibold">
+                        <button data-miv="1s" class="px-2 py-1">1s</button>
+                        <button data-miv="1m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1m</button>
+                        <button data-miv="5m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">5m</button>
+                        <button data-miv="15m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">15m</button>
+                        <button data-miv="1h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1h</button>
+                        <button data-miv="4h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">4h</button>
+                        <button data-miv="1d" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1d</button>
+                        <button data-miv="1w" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1w</button>
+                        <button data-miv="1M" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1M</button>
+                    </div>
+                </div>
                 <div id="lab-modal-chart" class="w-full rounded-lg overflow-hidden" style="height:340px"></div>
                 <div id="lab-modal-meta" class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] tabular-nums"></div>
                 <div class="mt-4">
@@ -602,7 +617,7 @@ function labActivateStrategy(key, name, btn) {
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
-var LABM = { chart: null, series: null, ws: null, symbol: '', posId: 0 };
+var LABM = { chart: null, series: null, ws: null, symbol: '', base: '', entry: 0, interval: '15m', posId: 0 };
 function labModalSell() {
     if (!LABM.posId) return;
     labSell(LABM.posId, document.getElementById('lab-modal-sell'), true);
@@ -615,7 +630,8 @@ function labModalClose() {
 }
 function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
-    LABM.symbol = symbol; LABM.posId = posId || 0;
+    LABM.symbol = symbol; LABM.base = base; LABM.entry = +entry; LABM.posId = posId || 0;
+    if (!LABM.interval) LABM.interval = '15m';
     var sellBtn = document.getElementById('lab-modal-sell');
     if (sellBtn) sellBtn.classList.toggle('hidden', !LABM.posId);
     document.getElementById('lab-modal-title').innerHTML = labCoinIcon(base, 22) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>';
@@ -628,16 +644,29 @@ function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     LABM.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 340 }, labChartTheme()));
     LABM.series = LABM.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
     new ResizeObserver(function () { if (LABM.chart) LABM.chart.applyOptions({ width: el.clientWidth }); }).observe(el);
-    fetch('/academy/klines?symbol=' + encodeURIComponent(symbol) + '&interval=15m', { credentials: 'same-origin' })
+    labModalHighlightIv();
+    labModalLoad();
+    labModalWhy(symbol);
+}
+
+function labModalHighlightIv() {
+    document.querySelectorAll('#lab-modal-iv button').forEach(function (b) {
+        var on = b.dataset.miv === LABM.interval;
+        b.classList.toggle('bg-primary', on); b.classList.toggle('text-white', on);
+    });
+}
+function labModalSetIv(iv) { LABM.interval = iv; labModalHighlightIv(); labModalLoad(); }
+function labModalLoad() {
+    if (!LABM.series) return;
+    fetch('/academy/klines?symbol=' + encodeURIComponent(LABM.symbol) + '&interval=' + LABM.interval, { credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (d) {
             if (!d.ok || !Array.isArray(d.candles) || !LABM.series) return;
             LABM.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
             LABM.chart.timeScale().fitContent();
-            if (d.candles.length) labModalPnl(entry, +d.candles[d.candles.length - 1].close);
-            labModalStream(symbol, entry);
+            if (d.candles.length) labModalPnl(LABM.entry, +d.candles[d.candles.length - 1].close);
+            labModalStream(LABM.symbol, LABM.entry);
         }).catch(function () {});
-    labModalWhy(symbol);
 }
 
 // Show the class bot's actual reasoning for this specific coin (filtered from its live thought stream).
@@ -668,18 +697,18 @@ function labModalPnl(entry, mark) {
 }
 function labModalStream(symbol, entry) {
     if (LABM.ws) { try { LABM.ws.onclose = null; LABM.ws.close(); } catch (e) {} LABM.ws = null; }
-    var el = document.getElementById('lab-modal-live');
+    var el = document.getElementById('lab-modal-live'), iv = LABM.interval || '15m';
     if (typeof WebSocket === 'undefined') { el.textContent = 'offline'; return; }
-    var ws; try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@kline_15m'); } catch (e) { return; }
+    var ws; try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@kline_' + iv); } catch (e) { return; }
     LABM.ws = ws; el.textContent = 'connecting…';
-    ws.onopen = function () { if (LABM.symbol === symbol) { el.textContent = '● LIVE'; el.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; } };
+    ws.onopen = function () { if (LABM.symbol === symbol && LABM.interval === iv) { el.textContent = '● LIVE'; el.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; } };
     ws.onmessage = function (ev) {
-        if (LABM.symbol !== symbol || !LABM.series) return;
+        if (LABM.symbol !== symbol || LABM.interval !== iv || !LABM.series) return;
         var m; try { m = JSON.parse(ev.data); } catch (e) { return; } var k = m && m.k; if (!k) return;
         try { LABM.series.update({ time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {}
         labModalPnl(entry, +k.c);
     };
-    ws.onclose = function () { if (LABM.symbol === symbol && LABM.ws === ws) { LABM.ws = null; } };
+    ws.onclose = function () { if (LABM.symbol === symbol && LABM.interval === iv && LABM.ws === ws) { LABM.ws = null; } };
 }
 
 function labAnalyzeCoin() { labAnalyzeRun({ scope: 'coin', btn: 'lab-anz-coin-btn', label: 'lab-anz-coin-label', out: 'lab-anz-coin-out', reset: 'Analyze this coin with AI' }); }
@@ -738,6 +767,10 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
     var iv15 = document.querySelector('#lab-iv button[data-iv="15m"]'); if (iv15) { iv15.classList.add('bg-primary', 'text-white'); }
+    // Modal interval selector
+    document.querySelectorAll('#lab-modal-iv button').forEach(function (b) {
+        b.addEventListener('click', function () { labModalSetIv(b.dataset.miv); });
+    });
     // Tabs
     document.querySelectorAll('#lab-tabs button').forEach(function (b) {
         b.addEventListener('click', function () { labSetTab(b.dataset.tab); });

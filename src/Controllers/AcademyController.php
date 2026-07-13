@@ -174,7 +174,7 @@ class AcademyController
         $this->requireMemberJson();
         $symbol   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
         $interval = preg_replace('/[^0-9a-zA-Z]/', '', (string) ($_GET['interval'] ?? '15m'));
-        if (!in_array($interval, ['1s', '1m', '5m', '15m', '1h', '4h', '1d'], true)) $interval = '15m';
+        if (!in_array($interval, ['1s', '1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'], true)) $interval = '15m';
         try {
             $res = (new \Ginto\Services\BinanceClient())->klines($symbol, $interval, 300);
             if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => 'klines failed']); exit; }
@@ -1149,6 +1149,10 @@ class AcademyController
                 $payName  = ($u['fullname'] ?? '') !== '' ? $u['fullname'] : ($u['username'] ?? 'Ginto Learner');
                 if ($payEmail === '') { echo json_encode(['success' => false, 'message' => 'Your account has no email on file.']); exit; }
             }
+
+            // Name on the card (billing name) — prefer what the payer typed, else their account name.
+            $cardName = trim((string) ($_POST['card_name'] ?? ''));
+            if ($cardName !== '') $payName = mb_substr($cardName, 0, 100);
 
             $card = [
                 'number'    => preg_replace('/[^0-9]/', '', (string) ($_POST['card_number'] ?? '')),
