@@ -45,16 +45,22 @@
 
   // Live gainer / popular / loser mini charts — data via our own server (reliable),
   // drawn as pure SVG sparklines (no external library, no client-side Binance call).
-  function renderHomeAcademyCharts() {
+  function renderHomeAcademyCharts(attempt) {
     const wrap = document.getElementById('home-academy-charts');
     if (!wrap) return;
-    fetch('/api/academy/movers')
-      .then(function (r) { return r.json(); })
+    attempt = attempt || 0;
+    fetch('/api/academy/movers', { cache: 'no-store', credentials: 'same-origin' })
+      .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
       .then(function (d) {
-        if (!d || !d.ok || !Array.isArray(d.movers) || !d.movers.length) { wrap.style.display = 'none'; return; }
+        if (!d || !d.ok || !Array.isArray(d.movers) || !d.movers.length) throw new Error('no data');
         wrap.innerHTML = d.movers.map(homeMiniHtml).join('');
+        wrap.style.display = '';   // ensure visible (in case a prior attempt hid it)
       })
-      .catch(function () { wrap.style.display = 'none'; });
+      .catch(function () {
+        // A single network blip shouldn't kill the charts — retry a few times before giving up.
+        if (attempt < 4) { setTimeout(function () { renderHomeAcademyCharts(attempt + 1); }, 1500 + attempt * 1000); }
+        else { wrap.style.display = 'none'; }
+      });
   }
   function homeSparkline(vals, col) {
     if (!vals || vals.length < 2) return '';
@@ -65,7 +71,7 @@
       return x.toFixed(1) + ',' + y.toFixed(1);
     });
     var id = 'g' + Math.random().toString(36).slice(2, 7);
-    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" width="100%" height="100%" style="position:absolute;inset:0;">'
+    return '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" width="100%" height="100%" style="position:absolute;top:0;left:0;width:100%;height:100%;display:block;">'
       + '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity="0.35"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>'
       + '<path d="M0,' + h + ' L' + pts.join(' L') + ' L' + w + ',' + h + ' Z" fill="url(#' + id + ')"/>'
       + '<path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>';
