@@ -1138,8 +1138,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     }
 
     // ---- Expanded live trade view (on-demand; polls slowly; destroys itself on close) ----
-    const GTB_MODAL = { el: null, chart: null, series: null, timer: null, id: null, ms: 15000 };
-    try { const s = parseInt(localStorage.getItem('gtbModalMs')); if ([5000, 10000, 15000, 20000].includes(s)) GTB_MODAL.ms = s; } catch (e) {}
+    // Real-time expanded view: streams live candles straight from Binance's public WebSocket
+    // (no AJAX polling). The toggle selects the candle interval, Binance-style.
+    const GTB_MODAL = { el: null, chart: null, series: null, ws: null, id: null, interval: '1s' };
+    try { const s = localStorage.getItem('gtbModalInterval'); if (['1s', '1m', '5m', '15m'].includes(s)) GTB_MODAL.interval = s; } catch (e) {}
 
     function gtbBuildModal() {
         if (GTB_MODAL.el) return GTB_MODAL.el;
@@ -1156,13 +1158,13 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                  <div class="flex items-end justify-between mb-2 gap-2">
                    <div class="min-w-0"><span data-m-pnl class="block text-2xl font-extrabold whitespace-nowrap"></span><span data-m-pct class="block text-xs whitespace-nowrap"></span></div>
                    <div class="text-right text-[11px] text-gray-400 shrink-0">
-                     <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-700" data-m-cadence>
-                       <button type="button" data-ms="5000" class="px-2 py-0.5 font-semibold">5s</button>
-                       <button type="button" data-ms="10000" class="px-2 py-0.5 font-semibold">10s</button>
-                       <button type="button" data-ms="15000" class="px-2 py-0.5 font-semibold">15s</button>
-                       <button type="button" data-ms="20000" class="px-2 py-0.5 font-semibold">20s</button>
+                     <div class="inline-flex rounded-md overflow-hidden border border-gray-300 dark:border-gray-700" data-m-interval>
+                       <button type="button" data-iv="1s" class="px-2 py-0.5 font-semibold">1s</button>
+                       <button type="button" data-iv="1m" class="px-2 py-0.5 font-semibold">1m</button>
+                       <button type="button" data-iv="5m" class="px-2 py-0.5 font-semibold">5m</button>
+                       <button type="button" data-iv="15m" class="px-2 py-0.5 font-semibold">15m</button>
                      </div>
-                     <div class="mt-0.5"><span data-m-ago>loading…</span></div>
+                     <div class="mt-0.5"><span data-m-status>connecting…</span></div>
                    </div>
                  </div>
                  <div data-m-fee class="mb-2 text-[11px] font-semibold px-2 py-1 rounded text-center"></div>
@@ -1187,31 +1189,37 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         o.addEventListener('click', e => { if (e.target === o) gtbCloseTradeModal(); });
         o.querySelector('[data-m-x]').addEventListener('click', gtbCloseTradeModal);
         o.querySelector('[data-m-hold]').addEventListener('click', gtbCloseTradeModal);
-        o.querySelectorAll('[data-m-cadence] button').forEach(b => b.addEventListener('click', () => gtbModalSetCadence(parseInt(b.dataset.ms))));
+        o.querySelectorAll('[data-m-interval] button').forEach(b => b.addEventListener('click', () => gtbModalSetInterval(b.dataset.iv)));
         GTB_MODAL.el = o;
         return o;
     }
 
-    function gtbModalApplyCadence() {
+    function gtbModalApplyInterval() {
         const o = GTB_MODAL.el; if (!o) return;
-        o.querySelectorAll('[data-m-cadence] button').forEach(b => {
-            const on = parseInt(b.dataset.ms) === GTB_MODAL.ms;
+        o.querySelectorAll('[data-m-interval] button').forEach(b => {
+            const on = b.dataset.iv === GTB_MODAL.interval;
             b.className = 'px-2 py-0.5 font-semibold ' + (b.previousElementSibling ? 'border-l border-gray-300 dark:border-gray-700 ' : '')
                 + (on ? 'bg-primary text-white' : 'text-gray-500 dark:text-gray-400 hover:text-primary');
         });
     }
 
-    function gtbModalSetCadence(ms) {
-        if (![5000, 10000, 15000, 20000].includes(ms)) return;
-        GTB_MODAL.ms = ms;
-        try { localStorage.setItem('gtbModalMs', String(ms)); } catch (e) {}
-        gtbModalApplyCadence();
-        // Restart the running poll at the new speed (if a trade view is open).
-        if (GTB_MODAL.timer && GTB_MODAL.id != null) {
-            clearInterval(GTB_MODAL.timer);
+    function gtbModalSetStatus(text, live) {
+        const el = GTB_MODAL.el && GTB_MODAL.el.querySelector('[data-m-status]');
+        if (!el) return;
+        const dot = live ? '<span class="inline-block w-1.5 h-1.5 rounded-full bg-green-500 mr-1 align-middle"></span>'
+                         : '<span class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 mr-1 align-middle"></span>';
+        el.innerHTML = dot + text;
+    }
+
+    function gtbModalSetInterval(iv) {
+        if (!['1s', '1m', '5m', '15m'].includes(iv)) return;
+        GTB_MODAL.interval = iv;
+        try { localStorage.setItem('gtbModalInterval', iv); } catch (e) {}
+        gtbModalApplyInterval();
+        if (GTB_MODAL.id != null) {
             const card = GTB_TRADES.cards[String(GTB_MODAL.id)];
             const p = card ? card.p : null;
-            if (p) GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL.ms);
+            if (p) { gtbModalCloseStream(); gtbModalBackfill(p).then(() => gtbModalOpenStream(p)); }
         }
     }
 
@@ -1261,38 +1269,69 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         }
     }
 
+    function gtbModalCloseStream() {
+        if (GTB_MODAL.ws) { try { GTB_MODAL.ws.onclose = null; GTB_MODAL.ws.onerror = null; GTB_MODAL.ws.close(); } catch (e) {} }
+        GTB_MODAL.ws = null;
+    }
+
     function gtbModalDestroyChart() {
         if (GTB_MODAL.chart) { try { GTB_MODAL.chart.remove(); } catch (e) {} }
         GTB_MODAL.chart = null; GTB_MODAL.series = null;
     }
 
     function gtbCloseTradeModal() {
-        if (GTB_MODAL.timer) { clearInterval(GTB_MODAL.timer); GTB_MODAL.timer = null; }
+        gtbModalCloseStream();       // close the live socket so nothing streams in the background
         gtbModalDestroyChart();
         GTB_MODAL.id = null;
         if (GTB_MODAL.el) { GTB_MODAL.el.classList.add('hidden'); GTB_MODAL.el.classList.remove('flex'); }
         document.body.style.overflow = '';
     }
 
-    function gtbModalRefresh(p) {
-        if (GTB_MODAL.id !== p.id) return;  // stale (modal closed or switched)
-        fetch(`/gtb/klines?symbol=${encodeURIComponent(p.symbol)}&interval=1m`)
+    // Recompute mark-based P&L (NET of round-trip fee) and repaint.
+    function gtbModalApplyMark(p, mark) {
+        const e = +p.entry, q = +p.qty || 0, fee = GTB_FEE_RATE || 0.001;
+        p.mark = mark;
+        p.pnlPct = e > 0 ? (mark - e) / e * 100 : 0;
+        p.unrealized = (mark - e) * q - fee * q * (e + mark);
+        gtbModalSetPnl(p);
+    }
+
+    // One-time history backfill for the current interval, so the chart isn't empty before the stream.
+    function gtbModalBackfill(p) {
+        return fetch(`/gtb/klines?symbol=${encodeURIComponent(p.symbol)}&interval=${GTB_MODAL.interval}`)
             .then(r => r.json()).then(d => {
                 if (GTB_MODAL.id !== p.id || !GTB_MODAL.series) return;
-                if (d.ok && Array.isArray(d.candles)) {
-                    const candles = d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }));
-                    GTB_MODAL.series.setData(candles);
-                    const last = candles[candles.length - 1];
-                    if (last) {
-                        const mark = +last.close, e = +p.entry, q = +p.qty || 0, fee = GTB_FEE_RATE || 0.001;
-                        p.mark = mark;
-                        p.pnlPct = e > 0 ? (mark - e) / e * 100 : 0;
-                        p.unrealized = (mark - e) * q - fee * q * (e + mark);  // NET of round-trip fee — keeps the fee badge honest
-                        gtbModalSetPnl(p);
-                    }
-                    const ago = GTB_MODAL.el.querySelector('[data-m-ago]'); if (ago) ago.textContent = 'updated ' + new Date().toLocaleTimeString();
+                if (d.ok && Array.isArray(d.candles) && d.candles.length) {
+                    GTB_MODAL.series.setData(d.candles.map(c => ({ time: c.time, open: c.open, high: c.high, low: c.low, close: c.close })));
+                    gtbModalApplyMark(p, +d.candles[d.candles.length - 1].close);
                 }
             }).catch(() => {});
+    }
+
+    // Live candles straight from Binance's public WebSocket (real-time; auto-reconnects).
+    function gtbModalOpenStream(p) {
+        gtbModalCloseStream();
+        if (typeof WebSocket === 'undefined') { gtbModalSetStatus('live unavailable', false); return; }
+        let ws;
+        try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + p.symbol.toLowerCase() + '@kline_' + GTB_MODAL.interval); }
+        catch (e) { gtbModalSetStatus('live unavailable', false); return; }
+        GTB_MODAL.ws = ws;
+        gtbModalSetStatus('connecting…', false);
+        ws.onopen = () => { if (GTB_MODAL.id === p.id) gtbModalSetStatus('LIVE', true); };
+        ws.onmessage = (ev) => {
+            if (GTB_MODAL.id !== p.id || !GTB_MODAL.series) return;
+            let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+            const k = m && m.k; if (!k) return;
+            try { GTB_MODAL.series.update({ time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {}
+            gtbModalApplyMark(p, +k.c);
+        };
+        ws.onerror = () => { if (GTB_MODAL.id === p.id) gtbModalSetStatus('reconnecting…', false); };
+        ws.onclose = () => {
+            if (GTB_MODAL.id === p.id && GTB_MODAL.ws === ws) {   // unexpected drop — retry
+                gtbModalSetStatus('reconnecting…', false);
+                setTimeout(() => { if (GTB_MODAL.id === p.id) gtbModalOpenStream(p); }, 2000);
+            }
+        };
     }
 
     function gtbOpenTradeModal(p) {
@@ -1316,16 +1355,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         if (typeof LightweightCharts !== 'undefined') {
             const prec = gtbPricePrecision(p.entry || p.mark || 1);
             GTB_MODAL.chart = LightweightCharts.createChart(el, Object.assign({ autoSize: true, crosshair: { mode: 1 },
-                rightPriceScale: { visible: true }, timeScale: { visible: true, timeVisible: true, secondsVisible: false } }, gtbChartTheme()));
+                rightPriceScale: { visible: true }, timeScale: { visible: true, timeVisible: true, secondsVisible: GTB_MODAL.interval === '1s' } }, gtbChartTheme()));
             GTB_MODAL.series = GTB_MODAL.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444',
                 priceFormat: { type: 'price', precision: prec, minMove: Math.pow(10, -prec) } });
             GTB_MODAL.series.createPriceLine({ price: +p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
             GTB_MODAL.series.createPriceLine({ price: +p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
             if (p.take_profit) GTB_MODAL.series.createPriceLine({ price: +p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
         }
-        gtbModalApplyCadence();
-        gtbModalRefresh(p);  // first paint immediately
-        GTB_MODAL.timer = setInterval(() => gtbModalRefresh(p), GTB_MODAL.ms);
+        gtbModalApplyInterval();
+        gtbModalBackfill(p).then(() => gtbModalOpenStream(p));  // history, then live stream
     }
 
     async function gtbModalSell(id, symbol) {
