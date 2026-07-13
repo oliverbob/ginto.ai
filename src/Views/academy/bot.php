@@ -199,7 +199,7 @@ function labSparkline(vals, col) {
         + '<path d="M0,' + h + ' L' + pts.join(' L') + ' L' + w + ',' + h + ' Z" fill="url(#' + id + ')"/>'
         + '<path d="M' + pts.join(' L') + '" fill="none" stroke="' + col + '" stroke-width="1.75" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></svg>';
 }
-function labFmt(n, d) { n = +n; return (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(d == null ? 4 : d).replace('-', ''); }
+function labFmt(n, d) { n = +n; return (n < 0 ? '−' : '+') + '$' + Math.abs(n).toFixed(d == null ? 4 : d); }
 function labPrec(p) { p = Math.abs(+p) || 1; return p >= 1000 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 6 : 8; }
 
 function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 }); if (p >= 1) return p.toFixed(4); if (p >= 0.01) return p.toFixed(6); return p.toPrecision(4); }
