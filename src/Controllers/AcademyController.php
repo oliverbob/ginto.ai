@@ -65,7 +65,10 @@ class AcademyController
         if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/bot')); return; }
         if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
         $csrf = function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? '');
-        View::view('academy/bot', ['title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true, 'csrf_token' => $csrf]);
+        View::view('academy/bot', [
+            'title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true, 'csrf_token' => $csrf,
+            'isPro' => $this->isPro((int) $userId), 'catalog' => \Ginto\Services\GtbStrategy::catalog(),
+        ]);
     }
 
     /**
@@ -493,7 +496,10 @@ class AcademyController
      */
     private function reconcileBot(int $userId, array $wallet): array
     {
-        $UNIT = 200.0; $SLOTS = 8;   // paper $ per mirrored trade; max concurrent mirrors
+        $set = $this->botSettings($userId);
+        $UNIT = max(10.0, min(2000.0, (float) $set['trade_size']));   // paper $ per mirrored trade
+        $SLOTS = max(1, min(20, (int) $set['max_slots']));            // max concurrent mirrors
+        $enabledTpls = array_flip(array_filter(array_map('trim', explode(',', (string) $set['templates']))));
         $db = Database::getInstance();
         $client = new \Ginto\Services\BinanceClient();
         $balance = (float) $wallet['balance'];
@@ -525,6 +531,8 @@ class AcademyController
             foreach ($botOpen as $id => $p) {
                 if ($slots <= 0 || $balance < $UNIT) break;
                 if (isset($held[$id])) continue;
+                // Only follow templates the learner enabled in their settings.
+                if ($enabledTpls && !isset($enabledTpls[$p['template'] ?? ''])) continue;
                 $entry = (float) $p['price']; if ($entry <= 0) continue;
                 $db->insert('academy_positions', [
                     'user_id' => $userId, 'ref_trade_id' => $id, 'symbol' => $p['symbol'], 'base' => substr($p['symbol'], 0, -4),
@@ -600,6 +608,97 @@ class AcademyController
         } catch (\Throwable $e) {
             error_log('Academy botToggle: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'Could not update the bot.']);
+        }
+        exit;
+    }
+
+    /** The active plan's machine name for this user ('academy_pro', 'academy_trader', or ''). */
+    private function planName(int $userId): string
+    {
+        try {
+            $db  = Database::getInstance();
+            $sub = $db->get('user_subscriptions', ['plan_id', 'expires_at'], ['user_id' => $userId, 'status' => 'active', 'ORDER' => ['id' => 'DESC']]);
+            if (!is_array($sub)) return '';
+            $exp = $sub['expires_at'] ?? null;
+            if (!empty($exp) && strtotime((string) $exp) <= time()) return '';
+            $plan = $db->get('subscription_plans', ['name'], ['id' => $sub['plan_id']]);
+            return is_array($plan) ? (string) ($plan['name'] ?? '') : '';
+        } catch (\Throwable $e) { return ''; }
+    }
+
+    private function isPro(int $userId): bool { return $this->planName($userId) === 'academy_pro'; }
+
+    private const DEFAULT_TEMPLATES = 'gainers,scalp,breakout,trend,pullback';
+
+    private function ensureBotSettingsTable(): void
+    {
+        Database::getInstance()->pdo->exec("CREATE TABLE IF NOT EXISTS academy_bot_settings (
+            user_id INT PRIMARY KEY,
+            templates VARCHAR(255) NOT NULL DEFAULT '" . self::DEFAULT_TEMPLATES . "',
+            trade_size DECIMAL(18,8) NOT NULL DEFAULT 200,
+            max_slots INT NOT NULL DEFAULT 8,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    /** Per-user, DB-driven bot settings (not .env). Returns defaults if unset. */
+    private function botSettings(int $userId): array
+    {
+        $defaults = ['templates' => self::DEFAULT_TEMPLATES, 'trade_size' => 200.0, 'max_slots' => 8];
+        try {
+            $this->ensureBotSettingsTable();
+            $r = Database::getInstance()->get('academy_bot_settings', '*', ['user_id' => $userId]);
+            if (!is_array($r)) return $defaults;
+            return [
+                'templates'  => (string) ($r['templates'] ?? $defaults['templates']),
+                'trade_size' => (float) ($r['trade_size'] ?? 200),
+                'max_slots'  => (int) ($r['max_slots'] ?? 8),
+            ];
+        } catch (\Throwable $e) { return $defaults; }
+    }
+
+    /** GET /academy/settings — per-user, DB-driven bot settings (templates, size, slots). Pro-gated. */
+    public function settings(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/settings')); return; }
+        if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
+        $csrf = function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? '');
+        View::view('academy/settings', [
+            'title'      => 'Bot Settings — Ginto Trading Academy',
+            'isPro'      => $this->isPro((int) $userId),
+            'catalog'    => \Ginto\Services\GtbStrategy::catalog(),
+            'settings'   => $this->botSettings((int) $userId),
+            'csrf_token' => $csrf,
+        ]);
+    }
+
+    /** POST /academy/settings/save — persist per-user bot settings to the DB. Pro-gated. */
+    public function settingsSave(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        if (!$this->isPro($userId)) { echo json_encode(['ok' => false, 'error' => 'Bot settings are a Pro Trader feature. Upgrade to configure your own strategy.']); exit; }
+        $this->ensureBotSettingsTable();
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $valid = array_keys(\Ginto\Services\GtbStrategy::catalog());
+        $tpls  = array_values(array_intersect($valid, (array) ($input['templates'] ?? [])));
+        if (!$tpls) $tpls = $valid;
+        $size  = max(10.0, min(2000.0, (float) ($input['trade_size'] ?? 200)));
+        $slots = max(1, min(20, (int) ($input['max_slots'] ?? 8)));
+        $row   = ['templates' => implode(',', $tpls), 'trade_size' => $size, 'max_slots' => $slots];
+        try {
+            $db = Database::getInstance();
+            if (is_array($db->get('academy_bot_settings', ['user_id'], ['user_id' => $userId]))) {
+                $db->update('academy_bot_settings', $row, ['user_id' => $userId]);
+            } else {
+                $db->insert('academy_bot_settings', array_merge(['user_id' => $userId], $row));
+            }
+            echo json_encode(['ok' => true, 'settings' => $row]);
+        } catch (\Throwable $e) {
+            error_log('Academy settingsSave: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not save settings.']);
         }
         exit;
     }

@@ -1,4 +1,7 @@
-<?php // academy/bot.php — read-only "Live Bot Lab" for Academy members (watch the testnet bot). ?>
+<?php // academy/bot.php — "Live Bot Lab" for Academy members (watch + follow the testnet bot).
+$catalog = $catalog ?? [];
+$isPro   = !empty($isPro);
+?>
 <!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -19,8 +22,10 @@
         <a href="/academy/learn" class="flex items-center gap-2 font-bold"><i class="fas fa-graduation-cap text-primary"></i> Ginto <span class="text-primary">Trading Academy</span></a>
         <div class="flex items-center gap-3 text-sm">
             <a href="/academy/learn" class="text-gray-500 hover:text-primary"><i class="fas fa-book-open mr-1"></i>Lessons</a>
+            <a href="/academy/settings" class="text-gray-500 hover:text-primary" title="Bot settings"><i class="fas fa-sliders"></i></a>
             <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
-            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">Member</span>
+            <span class="hidden sm:inline text-gray-500 dark:text-gray-400"><?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['username'] ?? 'Member') ?></span>
+            <a href="/logout" class="inline-flex items-center gap-1 text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
         </div>
     </div>
 </header>
@@ -131,12 +136,32 @@
                 <p id="lab-bot-note" class="mt-1 text-sm text-gray-600 dark:text-gray-300 max-w-xl">Turn this on and your <strong>$10,000 paper wallet automatically follows the class bot</strong> — the same momentum strategy templates, entries, stops and take-profits. Watch the AI trade for you, risk-free, and learn by following.</p>
                 <div id="lab-heartbeat" class="mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1.5"></div>
             </div>
-            <button type="button" id="lab-bot-toggle" onclick="labToggleBot()"
-                    class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
-                <i class="fas fa-play"></i> <span id="lab-bot-toggle-label">Start AI bot trading</span>
-            </button>
+            <div class="flex flex-col items-end gap-2">
+                <button type="button" id="lab-bot-toggle" onclick="labToggleBot()"
+                        class="inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60">
+                    <i class="fas fa-play"></i> <span id="lab-bot-toggle-label">Start AI bot trading</span>
+                </button>
+                <a href="/academy/settings" class="text-xs text-gray-500 hover:text-primary"><i class="fas fa-sliders mr-1"></i>Bot settings<?= $isPro ? '' : ' (Pro)' ?></a>
+            </div>
         </div>
         <div id="lab-my-positions" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+
+        <?php if ($catalog): ?>
+        <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-800">
+            <div class="flex items-center justify-between mb-2">
+                <div class="text-xs font-bold uppercase tracking-wide text-primary">Strategy templates the bot uses</div>
+                <a href="/academy/settings" class="text-xs text-primary hover:underline">Choose yours <i class="fas fa-arrow-right ml-0.5"></i></a>
+            </div>
+            <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                <?php foreach ($catalog as $key => $t): ?>
+                <div class="rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5">
+                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span></div>
+                    <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug"><?= htmlspecialchars($t['description'] ?? '') ?></div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 
     <div class="mt-8 grid lg:grid-cols-3 gap-6">

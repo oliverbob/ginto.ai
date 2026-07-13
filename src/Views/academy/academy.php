@@ -51,10 +51,12 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
             <button onclick="gtaToggleTheme()" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <?php if ($hasAccess): ?>
                 <a href="/academy/enter" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Enter Academy</a>
+                <a href="/logout" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-500 px-2" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
             <?php elseif ($isLoggedIn): ?>
                 <a href="#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Subscribe</a>
+                <a href="/logout" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-500 px-2" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
             <?php else: ?>
-                <a href="/login" class="hidden sm:inline text-sm text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2">Log in</a>
+                <a href="/login?redirect=<?= urlencode('/academy') ?>" class="hidden sm:inline text-sm text-gray-600 dark:text-gray-300 hover:text-primary px-3 py-2">Log in</a>
                 <a href="#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Get started</a>
             <?php endif; ?>
         </div>

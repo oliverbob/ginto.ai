@@ -26,9 +26,12 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
     <div class="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy" class="flex items-center gap-2 font-bold"><i class="fas fa-graduation-cap text-primary"></i> Ginto <span class="text-primary">Trading Academy</span></a>
         <div class="flex items-center gap-3">
+        <?php if ($hasAccess): ?><a href="/academy/bot" class="text-sm text-gray-500 hover:text-primary"><i class="fas fa-flask mr-1"></i>Bot Lab</a><?php endif; ?>
         <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
         <?php if ($hasAccess): ?><span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">Member</span>
-        <?php else: ?><a href="/academy#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Become a member</a><?php endif; ?>
+        <?php endif; ?>
+        <?php if ($isLoggedIn): ?><a href="/logout" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
+        <?php else: ?><a href="/login?redirect=<?= urlencode('/academy/learn') ?>" class="text-sm text-gray-500 hover:text-primary">Log in</a><a href="/academy#pricing" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Become a member</a><?php endif; ?>
         </div>
     </div>
 </header>

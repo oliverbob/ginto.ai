@@ -1695,6 +1695,8 @@ $router->get('/academy/klines', 'AcademyController@klines');      // members: OH
 $router->post('/academy/bot/analyze', 'AcademyController@analyze'); // members: AI analysis of a chosen coin (advisory)
 $router->get('/academy/wallet', 'AcademyController@wallet');      // members: this learner's own $10k paper wallet + positions
 $router->post('/academy/bot/toggle', 'AcademyController@botToggle'); // members: start/stop follow-the-bot trading
+$router->get('/academy/settings', 'AcademyController@settings');   // members: per-user DB-driven bot settings (Pro)
+$router->post('/academy/settings/save', 'AcademyController@settingsSave'); // members: save bot settings (Pro)
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');
