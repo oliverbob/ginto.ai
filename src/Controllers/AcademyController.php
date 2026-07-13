@@ -614,6 +614,34 @@ class AcademyController
         exit;
     }
 
+    /** POST /academy/bot/activate — pick ONE strategy template and start the follow-bot (Pro). */
+    public function botActivate(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        if (!$this->isPro($userId)) { echo json_encode(['ok' => false, 'upgrade' => true, 'error' => 'Automated trading is a Pro Trader feature.']); exit; }
+        $this->ensureTradingSchema(); $this->ensureBotSettingsTable();
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $valid = array_keys(\Ginto\Services\GtbStrategy::catalog());
+        $tpl   = (string) ($input['template'] ?? '');
+        if (!in_array($tpl, $valid, true)) { echo json_encode(['ok' => false, 'error' => 'Unknown strategy.']); exit; }
+        try {
+            $db  = Database::getInstance();
+            $row = ['templates' => $tpl, 'trade_size' => 200, 'max_slots' => 8];
+            if (is_array($db->get('academy_bot_settings', ['user_id'], ['user_id' => $userId]))) {
+                $db->update('academy_bot_settings', ['templates' => $tpl], ['user_id' => $userId]);
+            } else {
+                $db->insert('academy_bot_settings', array_merge(['user_id' => $userId], $row));
+            }
+            $db->update('academy_wallets', ['bot_enabled' => 1, 'bot_since' => date('Y-m-d H:i:s')], ['user_id' => $userId]);
+            echo json_encode(['ok' => true, 'template' => $tpl, 'bot_enabled' => true]);
+        } catch (\Throwable $e) {
+            error_log('Academy botActivate: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not activate the bot.']);
+        }
+        exit;
+    }
+
     /** POST /academy/trade/buy — open a MANUAL paper position on the charted coin (all members). */
     public function tradeBuy(): void
     {

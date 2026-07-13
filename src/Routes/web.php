@@ -1697,6 +1697,7 @@ $router->get('/academy/wallet', 'AcademyController@wallet');      // members: th
 $router->post('/academy/bot/toggle', 'AcademyController@botToggle'); // members: start/stop follow-the-bot trading
 $router->get('/academy/settings', 'AcademyController@settings');   // members: per-user DB-driven bot settings (Pro)
 $router->post('/academy/settings/save', 'AcademyController@settingsSave'); // members: save bot settings (Pro)
+$router->post('/academy/bot/activate', 'AcademyController@botActivate'); // Pro: pick a strategy + start the bot
 $router->post('/academy/trade/buy', 'AcademyController@tradeBuy');  // members: manual paper buy on the charted coin
 $router->post('/academy/trade/sell', 'AcademyController@tradeSell'); // members: manual paper close
 $router->get('/academy/learn', 'AcademyController@learn');

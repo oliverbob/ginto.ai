@@ -173,15 +173,23 @@ $isPro   = !empty($isPro);
         <?php if ($catalog): ?>
         <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-800">
             <div class="flex items-center justify-between mb-2">
-                <div class="text-xs font-bold uppercase tracking-wide text-primary">Strategy templates the bot uses</div>
-                <a href="/academy/settings" class="text-xs text-primary hover:underline">Choose yours <i class="fas fa-arrow-right ml-0.5"></i></a>
+                <div class="text-xs font-bold uppercase tracking-wide text-primary"><?= $isPro ? 'Tap a strategy to activate your bot' : 'Strategy templates the bot uses' ?></div>
+                <a href="/academy/settings" class="text-xs text-primary hover:underline">Fine-tune <i class="fas fa-arrow-right ml-0.5"></i></a>
             </div>
             <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                <?php foreach ($catalog as $key => $t): ?>
-                <a href="/academy/settings" class="block rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5 hover:border-primary hover:shadow-sm transition-colors group">
-                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span><i class="fas fa-arrow-right text-[10px] text-gray-300 group-hover:text-primary ml-auto"></i></div>
+                <?php foreach ($catalog as $key => $t):
+                    $nm = htmlspecialchars($t['name'] ?? $key, ENT_QUOTES); ?>
+                <?php if ($isPro): ?>
+                <button type="button" data-tpl="<?= htmlspecialchars($key) ?>" onclick="labActivateStrategy('<?= htmlspecialchars($key) ?>','<?= $nm ?>',this)" class="lab-tpl text-left block rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5 hover:border-primary hover:shadow-sm transition-colors group">
+                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span><i class="fas fa-play text-[10px] text-gray-300 group-hover:text-primary ml-auto"></i></div>
+                    <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug"><?= htmlspecialchars($t['description'] ?? '') ?></div>
+                </button>
+                <?php else: ?>
+                <a href="/academy#pricing" class="block rounded-lg border border-gray-200 dark:border-gray-800 bg-white/60 dark:bg-white/5 p-2.5 hover:border-primary transition-colors group">
+                    <div class="font-bold text-sm flex items-center gap-1.5"><?= htmlspecialchars($t['name'] ?? $key) ?><span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary"><?= htmlspecialchars($key) ?></span><i class="fas fa-lock text-[10px] text-gray-300 group-hover:text-primary ml-auto"></i></div>
                     <div class="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-snug"><?= htmlspecialchars($t['description'] ?? '') ?></div>
                 </a>
+                <?php endif; ?>
                 <?php endforeach; ?>
             </div>
         </div>
@@ -565,24 +573,39 @@ function labBuy() {
         .finally(function () { btn.disabled = false; });
 }
 
-function labSell(id, btn) {
+function labSell(id, btn, fromModal) {
+    if (!window.confirm('Close this trade now at the current market price?')) return;
     if (btn) btn.disabled = true;
     fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, id: id }) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
             var st = document.getElementById('lab-trade-status');
-            if (d && d.ok) { if (st) { st.textContent = '✓ Closed · P&L ' + labFmt(d.realized); st.className = 'text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); } labLoadWallet(); }
+            if (d && d.ok) { if (st) { st.textContent = '✓ Closed · P&L ' + labFmt(d.realized); st.className = 'text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); } labLoadWallet(); if (fromModal) labModalClose(); }
             else { if (st) { st.textContent = (d && d.error) || 'Could not close.'; st.className = 'text-xs text-amber-500'; } if (btn) btn.disabled = false; }
         }).catch(function () { if (btn) btn.disabled = false; });
+}
+
+function labActivateStrategy(key, name, btn) {
+    if (btn && btn.disabled) return;
+    if (btn) btn.classList.add('opacity-60');
+    fetch('/academy/bot/activate', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, template: key }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.ok) {
+                LAB.botOn = true; labSetToggle(); labLoadWallet();
+                document.querySelectorAll('.lab-tpl').forEach(function (b) { var on = b.dataset.tpl === key; b.classList.toggle('border-primary', on); b.classList.toggle('ring-1', on); b.classList.toggle('ring-primary', on); });
+                var hb = document.getElementById('lab-heartbeat'); if (hb) hb.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> <span class="font-semibold text-green-600 dark:text-green-400">Bot started on ' + name + '</span> — trades will follow this strategy.';
+            } else if (d && d.upgrade) { window.location.href = '/academy#pricing'; }
+            else if (d) { alert(d.error || 'Could not activate the bot.'); }
+        }).catch(function () {})
+        .finally(function () { if (btn) btn.classList.remove('opacity-60'); });
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
 var LABM = { chart: null, series: null, ws: null, symbol: '', posId: 0 };
 function labModalSell() {
     if (!LABM.posId) return;
-    var b = document.getElementById('lab-modal-sell');
-    labSell(LABM.posId, b);
-    labModalClose();
+    labSell(LABM.posId, document.getElementById('lab-modal-sell'), true);
 }
 function labModalClose() {
     var o = document.getElementById('lab-modal'); if (!o) return;
