@@ -75,11 +75,15 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
 <?php endif; ?>
 
 <!-- Stat cards -->
+<style>.gtb-blur{filter:blur(8px);user-select:none}</style>
 <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500 dark:text-gray-400">Portfolio Value</span>
-            <i class="fas fa-wallet text-primary"></i>
+            <span class="flex items-center gap-2">
+                <button type="button" id="gtb-eye-portfolio" onclick="gtbEye('portfolio','gtb-portfolio-value')" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button>
+                <i class="fas fa-wallet text-primary"></i>
+            </span>
         </div>
         <div id="gtb-portfolio-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
         <div id="gtb-portfolio-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Connect API to load</div>
@@ -87,7 +91,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500 dark:text-gray-400">Available Balance</span>
-            <i class="fas fa-money-bill-wave text-primary"></i>
+            <span class="flex items-center gap-2">
+                <button type="button" id="gtb-eye-balance" onclick="gtbEye('balance','gtb-balance-value')" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button>
+                <i class="fas fa-money-bill-wave text-primary"></i>
+            </span>
         </div>
         <div id="gtb-balance-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
         <div id="gtb-balance-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Free USDT</div>
@@ -95,7 +102,10 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
     <div class="rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-5">
         <div class="flex items-center justify-between">
             <span class="text-sm text-gray-500 dark:text-gray-400">Open Holdings</span>
-            <i class="fas fa-layer-group text-primary"></i>
+            <span class="flex items-center gap-2">
+                <button type="button" id="gtb-eye-holdings" onclick="gtbEye('holdings','gtb-holdings-value')" title="Hide / show" class="text-gray-400 hover:text-primary"><i class="fas fa-eye"></i></button>
+                <i class="fas fa-layer-group text-primary"></i>
+            </span>
         </div>
         <div id="gtb-holdings-value" class="mt-2 text-2xl font-bold text-gray-400 dark:text-gray-500">—</div>
         <div id="gtb-holdings-note" class="mt-1 text-xs text-gray-400 dark:text-gray-500">Non-zero assets</div>
@@ -644,13 +654,14 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
             const bvn = document.getElementById('gtb-balance-note');
             const hv = document.getElementById('gtb-holdings-value');
             if (!d.ok) { pvn.textContent = d.error || 'Not connected'; return; }
-            pv.textContent = gtbFmtUsd(d.portfolioUsdt); pv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            const keep = el => el.classList.contains('gtb-blur') ? ' gtb-blur' : '';
+            pv.textContent = gtbFmtUsd(d.portfolioUsdt); pv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white' + keep(pv);
             pvn.textContent = (d.testnet ? 'Testnet' : 'Mainnet') + ' · est. USDT (incl. Earn)';
-            bv.textContent = gtbFmtUsd(d.freeUsdt); bv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            bv.textContent = gtbFmtUsd(d.freeUsdt); bv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white' + keep(bv);
             bvn.textContent = (+d.earnUsdt > 0)
                 ? `Free to trade · ${gtbFmtUsd(d.earnUsdt)} in Earn`
                 : 'Free USDT (spot)';
-            hv.textContent = d.holdingsCount; hv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white';
+            hv.textContent = d.holdingsCount; hv.className = 'mt-2 text-2xl font-bold text-gray-900 dark:text-white' + keep(hv);
         } catch (e) { /* leave placeholders */ }
     }
 
@@ -1425,6 +1436,25 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
         if (ic) ic.className = hidden ? 'fas fa-eye-slash' : 'fas fa-eye';
     }
 
+    // Per-card eye toggle: blur/reveal a single stat card's value. Remembered per browser.
+    function gtbEye(key, id) {
+        const el = document.getElementById(id), btn = document.getElementById('gtb-eye-' + key), i = btn && btn.querySelector('i');
+        if (!el) return;
+        const hide = !(i && i.classList.contains('fa-eye-slash'));
+        el.classList.toggle('gtb-blur', hide);
+        if (i) i.className = hide ? 'fas fa-eye-slash' : 'fas fa-eye';
+        try { localStorage.setItem('gtbeye_' + key, hide ? '1' : '0'); } catch (e) {}
+    }
+    function gtbInitEyes() {
+        [['portfolio', 'gtb-portfolio-value'], ['balance', 'gtb-balance-value'], ['holdings', 'gtb-holdings-value']].forEach(g => {
+            let on = false; try { on = localStorage.getItem('gtbeye_' + g[0]) === '1'; } catch (e) {}
+            if (on) {
+                const el = document.getElementById(g[1]); if (el) el.classList.add('gtb-blur');
+                const i = document.querySelector('#gtb-eye-' + g[0] + ' i'); if (i) i.className = 'fas fa-eye-slash';
+            }
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
         // Restore the hide-P&L preference before anything paints.
         try {
@@ -1433,6 +1463,7 @@ $pnlText = ($pnlPositive ? '+' : '-') . '$' . number_format(abs($realizedPnl), 2
                 const ic = document.querySelector('#gtb-pnl-eye i'); if (ic) ic.className = 'fas fa-eye-slash';
             }
         } catch (e) {}
+        gtbInitEyes();
         gtbInitChart();
         document.getElementById('gtb-chart-icon').innerHTML = gtbCoinIcon(GTB.base || 'BTC', 24);
         gtbInitIntervals();
