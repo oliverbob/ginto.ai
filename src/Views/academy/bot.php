@@ -96,7 +96,8 @@ $isPro   = !empty($isPro);
                     <span id="lab-chart-live" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">…</span>
                 </div>
                 <div id="lab-iv" class="inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-semibold">
-                    <button data-iv="1m" class="px-2 py-1">1m</button>
+                    <button data-iv="1s" class="px-2 py-1">1s</button>
+                    <button data-iv="1m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1m</button>
                     <button data-iv="5m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">5m</button>
                     <button data-iv="15m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">15m</button>
                     <button data-iv="1h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1h</button>
@@ -206,6 +207,7 @@ $isPro   = !empty($isPro);
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200 dark:border-gray-800">
                 <div id="lab-modal-title" class="flex items-center gap-2 font-bold min-w-0"></div>
                 <div class="flex items-center gap-3">
+                    <button type="button" id="lab-modal-sell" onclick="labModalSell()" class="hidden text-[11px] font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600"><i class="fas fa-xmark mr-1"></i>Sell now</button>
                     <span id="lab-modal-live" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">…</span>
                     <button type="button" onclick="labModalClose()" class="text-gray-400 hover:text-primary"><i class="fas fa-xmark text-lg"></i></button>
                 </div>
@@ -255,7 +257,7 @@ function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) r
 function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
 // ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
-var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?> };
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {} };
 
 function labChartTheme() {
     var dark = document.documentElement.classList.contains('dark');
@@ -394,26 +396,7 @@ function labRender(d) {
     labApplyVal('lab-realized', labFmt(d.realized), 'mt-1 text-2xl font-extrabold ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'));
     document.getElementById('lab-updated').textContent = new Date().toLocaleTimeString();
 
-    var pos = d.positions || [], pw = document.getElementById('lab-positions');
-    if (!pos.length) { pw.innerHTML = '<div class="col-span-full py-10 text-center text-gray-400 text-sm">No open positions right now — the bot is waiting for a clean setup. Keep watching.</div>'; }
-    else {
-        pw.innerHTML = pos.map(function (p) {
-            var up = (+p.pnlPct) >= 0, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400', prec = labPrec(p.entry);
-            return '<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">'
-                + '<div class="flex items-center justify-between gap-2 mb-2">'
-                +   '<div class="flex items-center gap-1.5 font-bold min-w-0">' + labCoinIcon(p.base, 20) + '<span class="truncate">' + p.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>'
-                +     '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + (p.template || '') + '</span></div>'
-                +   '<div class="text-right shrink-0"><div class="text-sm font-bold ' + col + '">' + labFmt(p.unrealized) + '</div><div class="text-[11px] ' + col + '">' + (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%</div></div>'
-                + '</div>'
-                + '<div class="grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
-                +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.entry).toPrecision(6) + '</span></div>'
-                +   '<div class="text-red-500">SL<br><span>$' + (+p.stop_loss).toPrecision(6) + '</span></div>'
-                +   '<div class="text-green-600 dark:text-green-400">TP<br><span>' + (p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail') + '</span></div>'
-                + '</div>'
-                + '<div class="mt-1 text-[10px] text-center text-gray-400">mark $' + (+p.mark).toPrecision(6) + '</div>'
-                + '</div>';
-        }).join('');
-    }
+    labRenderTradeCards('lab-positions', d.positions || [], false, 'No open positions right now — the bot is waiting for a clean setup. Keep watching.');
 
     var th = d.thoughts || [], tw = document.getElementById('lab-thoughts');
     LAB.thoughts = th;   // keep for per-trade reasoning in the modal
@@ -490,38 +473,81 @@ function labToggleBot() {
 }
 
 function labRenderMyPositions(pos) {
-    var wrap = document.getElementById('lab-my-positions'); if (!wrap) return;
-    if (!pos.length) {
-        var msg = LAB.botOn ? 'Bot is on — waiting for the next clean setup. Your followed trades will appear here automatically.'
-            : (LAB.isPro ? 'No open trades. Buy a coin on paper below the chart, or press <b>Start AI bot trading</b> to follow the class bot.'
-                         : 'No open trades yet. Pick a coin, then use <b>Buy on paper</b> under the chart to open your first manual trade.');
-        wrap.innerHTML = '<div class="col-span-full py-8 text-center text-sm text-gray-400">' + msg + '</div>';
-        return;
+    var empty = LAB.botOn ? 'Bot is on — waiting for the next clean setup. Your followed trades will appear here automatically.'
+        : (LAB.isPro ? 'No open trades. Buy a coin on paper below the chart, or press <b>Start AI bot trading</b> to follow the class bot.'
+                     : 'No open trades yet. Pick a coin, then use <b>Buy on paper</b> under the chart to open your first manual trade.');
+    labRenderTradeCards('lab-my-positions', pos, true, empty);
+}
+
+function labKey(gridId, p) { return gridId + '|' + (p.id != null ? p.id : (p.symbol + '-' + p.entry)); }
+
+// Rich, /gtb-style trade cards: mini candlestick + entry/SL/TP price lines + live P&L (+ sell if manual).
+// Cards are rebuilt only when the set of positions changes; otherwise updated in place (no chart flicker).
+function labRenderTradeCards(gridId, pos, sellable, emptyMsg) {
+    var wrap = document.getElementById(gridId); if (!wrap) return;
+    pos = pos || [];
+    var cleanup = function () { Object.keys(LAB.cards).forEach(function (k) { if (k.indexOf(gridId + '|') === 0) { try { LAB.cards[k].chart && LAB.cards[k].chart.remove(); } catch (e) {} delete LAB.cards[k]; } }); };
+    if (!pos.length) { wrap.innerHTML = '<div class="col-span-full py-8 text-center text-sm text-gray-400">' + emptyMsg + '</div>'; LAB.sig[gridId] = ''; cleanup(); return; }
+    var sig = pos.map(function (p) { return p.id != null ? p.id : (p.symbol + p.entry); }).join(',');
+    if (LAB.sig[gridId] !== sig) { cleanup(); wrap.innerHTML = ''; pos.forEach(function (p) { labBuildTradeCard(wrap, gridId, p, sellable); }); LAB.sig[gridId] = sig; }
+    pos.forEach(function (p) { labUpdateTradeCard(gridId, p); });
+}
+
+function labBuildTradeCard(wrap, gridId, p, sellable) {
+    var base = p.base || p.symbol.replace('USDT', '');
+    var isManual = sellable && p.id != null && !p.auto;
+    var root = document.createElement('div');
+    root.className = 'relative rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3 overflow-hidden min-w-0';
+    root.innerHTML =
+        '<button data-expand title="Expand" class="absolute top-2 right-2 z-20 w-6 h-6 rounded-md bg-black/5 dark:bg-white/10 text-gray-500 dark:text-gray-300 hover:text-primary flex items-center justify-center text-xs"><i class="fas fa-up-right-and-down-left-from-center"></i></button>'
+        + '<div class="flex items-start justify-between gap-2 mb-1">'
+        +   '<div class="min-w-0 flex flex-wrap items-center gap-1 font-bold">' + labCoinIcon(base, 18) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>'
+        +     (p.template ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + p.template + '</span>' : '')
+        +     (isManual ? '<span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">manual</span>' : '')
+        +   '</div>'
+        +   '<div class="text-right leading-tight shrink-0 pr-7"><span data-pnl class="block text-sm font-bold whitespace-nowrap"></span><span data-pct class="block text-[11px] whitespace-nowrap"></span></div>'
+        + '</div>'
+        + '<div data-chart title="Click to expand" class="w-full rounded overflow-hidden cursor-pointer" style="height:120px"></div>'
+        + '<div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
+        +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>'
+        +   '<div class="text-red-500">SL<br><span data-sl></span></div>'
+        +   '<div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>'
+        + '</div>'
+        + (isManual ? '<button data-sell class="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600"><i class="fas fa-xmark mr-1"></i>Close · sell now</button>'
+                    : '<div class="mt-1.5 text-[10px] text-center text-gray-400">bot-managed</div>');
+    wrap.appendChild(root);
+    var card = { root: root, chart: null, series: null, p: p };
+    LAB.cards[labKey(gridId, p)] = card;
+    var chartEl = root.querySelector('[data-chart]');
+    var open = function () { labExpandTrade(p.symbol, base, +p.entry, p.stop_loss || 0, p.take_profit || 0, isManual ? p.id : 0); };
+    chartEl.addEventListener('click', open);
+    root.querySelector('[data-expand]').addEventListener('click', function (e) { e.stopPropagation(); open(); });
+    if (isManual) root.querySelector('[data-sell]').addEventListener('click', function () { labSell(p.id, this); });
+    if (typeof LightweightCharts !== 'undefined') {
+        card.chart = LightweightCharts.createChart(chartEl, Object.assign({ autoSize: true, crosshair: { mode: 0 }, handleScale: false, handleScroll: false, rightPriceScale: { visible: true }, timeScale: { visible: false } }, labChartTheme()));
+        var prec = labPrec(p.entry || p.mark || 1);
+        card.series = card.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444', priceFormat: { type: 'price', precision: prec, minMove: Math.pow(10, -prec) } });
+        if (p.entry) card.series.createPriceLine({ price: +p.entry, color: '#3b82f6', lineWidth: 1, lineStyle: 2, title: 'entry' });
+        if (p.stop_loss) card.series.createPriceLine({ price: +p.stop_loss, color: '#ef4444', lineWidth: 1, lineStyle: 2, title: 'SL' });
+        if (p.take_profit) card.series.createPriceLine({ price: +p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
+        fetch('/academy/klines?symbol=' + encodeURIComponent(p.symbol) + '&interval=5m', { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d.ok && card.series && Array.isArray(d.candles)) { card.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; })); card.chart.timeScale().fitContent(); } })
+            .catch(function () {});
     }
-    wrap.innerHTML = pos.map(function (p) {
-        var up = (+p.pnlPct) >= 0, col = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
-        var tag = p.auto ? '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">' + (p.template || 'bot') + '</span>'
-                         : '<span class="ml-1 text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">manual</span>';
-        var foot = p.auto
-            ? '<div class="mt-1 text-[10px] text-center text-primary"><i class="fas fa-expand mr-1"></i>tap to expand · bot-managed · $' + (+p.spent).toFixed(0) + '</div>'
-            : '<div class="mt-2 flex items-center justify-between gap-2">'
-                + '<button type="button" onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" class="text-[10px] text-primary hover:underline"><i class="fas fa-expand mr-1"></i>expand</button>'
-                + '<button type="button" onclick="labSell(' + p.id + ',this)" class="text-[11px] font-bold px-2.5 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600">Close · sell</button></div>';
-        var onclick = p.auto ? ' onclick="labExpandTrade(\'' + p.symbol + '\',\'' + p.base + '\',' + (+p.entry) + ',' + (p.stop_loss || 0) + ',' + (p.take_profit || 0) + ')" class="cursor-pointer"' : '';
-        return '<div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">'
-            + '<div' + onclick + '>'
-            + '<div class="flex items-center justify-between gap-2 mb-2">'
-            +   '<div class="flex items-center gap-1.5 font-bold min-w-0">' + labCoinIcon(p.base, 20) + '<span class="truncate">' + p.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>' + tag + '</div>'
-            +   '<div class="text-right shrink-0"><div class="text-sm font-bold ' + col + '">' + labFmt(p.unrealized) + '</div><div class="text-[11px] ' + col + '">' + (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%</div></div>'
-            + '</div>'
-            + '<div class="grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
-            +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.entry).toPrecision(6) + '</span></div>'
-            +   '<div class="text-gray-500 dark:text-gray-400">mark<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.mark).toPrecision(6) + '</span></div>'
-            +   '<div class="text-gray-500 dark:text-gray-400">size<br><span class="text-gray-800 dark:text-gray-200">$' + (+p.spent).toFixed(0) + '</span></div>'
-            + '</div></div>'
-            + foot
-            + '</div>';
-    }).join('');
+}
+
+function labUpdateTradeCard(gridId, p) {
+    var card = LAB.cards[labKey(gridId, p)]; if (!card) return;
+    card.p = p;
+    var up = (+p.unrealized) >= 0, cls = up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+    var pnl = card.root.querySelector('[data-pnl]'), pct = card.root.querySelector('[data-pct]');
+    if (pnl) { pnl.textContent = labFmt(p.unrealized); pnl.className = 'block text-sm font-bold ' + cls; }
+    if (pct) { pct.textContent = (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%'; pct.className = 'block text-[11px] ' + cls; }
+    var e = card.root.querySelector('[data-entry]'), s = card.root.querySelector('[data-sl]'), t = card.root.querySelector('[data-tp]');
+    if (e) e.textContent = '$' + (+p.entry).toPrecision(6);
+    if (s) s.textContent = p.stop_loss ? '$' + (+p.stop_loss).toPrecision(6) : '—';
+    if (t) t.textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
 }
 
 function labBuy() {
@@ -551,16 +577,24 @@ function labSell(id, btn) {
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
-var LABM = { chart: null, series: null, ws: null, symbol: '' };
+var LABM = { chart: null, series: null, ws: null, symbol: '', posId: 0 };
+function labModalSell() {
+    if (!LABM.posId) return;
+    var b = document.getElementById('lab-modal-sell');
+    labSell(LABM.posId, b);
+    labModalClose();
+}
 function labModalClose() {
     var o = document.getElementById('lab-modal'); if (!o) return;
     if (LABM.ws) { try { LABM.ws.onclose = null; LABM.ws.close(); } catch (e) {} LABM.ws = null; }
     if (LABM.chart) { try { LABM.chart.remove(); } catch (e) {} LABM.chart = null; LABM.series = null; }
     o.classList.add('hidden'); o.classList.remove('flex');
 }
-function labExpandTrade(symbol, base, entry, sl, tp) {
+function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
-    LABM.symbol = symbol;
+    LABM.symbol = symbol; LABM.posId = posId || 0;
+    var sellBtn = document.getElementById('lab-modal-sell');
+    if (sellBtn) sellBtn.classList.toggle('hidden', !LABM.posId);
     document.getElementById('lab-modal-title').innerHTML = labCoinIcon(base, 22) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>';
     document.getElementById('lab-modal-meta').innerHTML =
         '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+entry).toPrecision(6) + '</span></div>'
