@@ -89,7 +89,7 @@
               <div class="shrink-0 inline-flex items-center gap-1 text-xs font-semibold bg-white/15 group-hover:bg-white/25 rounded-lg px-3 py-1.5 transition-colors">Explore <span aria-hidden="true">→</span></div>
             </div>
             <!-- Live gainer / popular / loser mini-charts (filled by renderHomeAcademyCharts) -->
-            <div id="home-academy-charts" class="mt-3 grid grid-cols-3 gap-3"></div>
+            <div id="home-academy-charts" class="mt-3 grid grid-cols-3 gap-4"></div>
           </div>
         </a>
 
