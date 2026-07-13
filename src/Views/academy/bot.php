@@ -10,6 +10,7 @@
     </script>
     <script src="/assets/js/tailwindcss.js"></script>
     <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#6366f1',secondary:'#8b5cf6'}}}};</script>
+    <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
     <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css"><style>.dark{color-scheme:dark}</style>
 </head>
 <body class="bg-white dark:bg-[#0b1020] text-gray-900 dark:text-gray-100 min-h-screen">
@@ -44,9 +45,45 @@
         <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Updated</div><div id="lab-updated" class="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 pt-2">—</div></div>
     </div>
 
-    <!-- Live market movers -->
-    <h2 class="mt-8 mb-3 text-sm font-bold uppercase tracking-wide text-primary">Today's market</h2>
-    <div id="lab-movers" class="grid grid-cols-1 sm:grid-cols-3 gap-3"></div>
+    <!-- Live chart + markets (same engine as /gtb, testnet-only) -->
+    <div class="mt-8 flex items-center justify-between">
+        <h2 class="text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-chart-line mr-1"></i>Live charts &amp; markets</h2>
+        <span class="text-[11px] text-gray-400">Real Binance prices · practice testnet</span>
+    </div>
+    <div class="mt-3 grid lg:grid-cols-3 gap-4">
+        <!-- Chart -->
+        <div class="lg:col-span-2 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
+            <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                <div class="flex items-center gap-2 min-w-0">
+                    <span id="lab-chart-icon"></span>
+                    <span id="lab-chart-symbol" class="font-bold truncate">BTC/USDT</span>
+                    <span id="lab-chart-price" class="text-sm tabular-nums text-gray-500 dark:text-gray-300">—</span>
+                    <span id="lab-chart-change" class="text-sm font-semibold">—</span>
+                    <span id="lab-chart-live" class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-400 dark:bg-gray-800">…</span>
+                </div>
+                <div id="lab-iv" class="inline-flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs font-semibold">
+                    <button data-iv="1m" class="px-2 py-1">1m</button>
+                    <button data-iv="5m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">5m</button>
+                    <button data-iv="15m" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">15m</button>
+                    <button data-iv="1h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1h</button>
+                    <button data-iv="4h" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">4h</button>
+                    <button data-iv="1d" class="px-2 py-1 border-l border-gray-200 dark:border-gray-700">1d</button>
+                </div>
+            </div>
+            <div id="lab-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
+        </div>
+        <!-- Markets -->
+        <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
+            <div id="lab-tabs" class="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mb-2 text-xs font-bold">
+                <button data-tab="hot" class="flex-1 py-1.5">Popular</button>
+                <button data-tab="gainers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Gainers</button>
+                <button data-tab="losers" class="flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700">Losers</button>
+            </div>
+            <div id="lab-market-list" class="space-y-0.5 overflow-y-auto pr-1" style="max-height:352px">
+                <div class="py-10 text-center text-gray-400 text-sm">Loading markets…</div>
+            </div>
+        </div>
+    </div>
 
     <div class="mt-8 grid lg:grid-cols-3 gap-6">
         <!-- Positions -->
@@ -89,20 +126,121 @@ function labSparkline(vals, col) {
 function labFmt(n, d) { n = +n; return (n >= 0 ? '+' : '') + '$' + Math.abs(n).toFixed(d == null ? 4 : d).replace('-', ''); }
 function labPrec(p) { p = Math.abs(+p) || 1; return p >= 1000 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 6 : 8; }
 
-function labRenderMovers() {
-    var wrap = document.getElementById('lab-movers'); if (!wrap) return;
-    fetch('/api/academy/movers', { cache: 'no-store', credentials: 'same-origin' })
+function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 }); if (p >= 1) return p.toFixed(4); if (p >= 0.01) return p.toFixed(6); return p.toPrecision(4); }
+function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
+
+// ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot' };
+
+function labChartTheme() {
+    var dark = document.documentElement.classList.contains('dark');
+    var grid = dark ? 'rgba(148,163,184,0.12)' : 'rgba(0,0,0,0.06)';
+    return {
+        layout: { background: { color: 'transparent' }, textColor: dark ? '#94a3b8' : '#475569' },
+        grid: { vertLines: { color: grid }, horzLines: { color: grid } },
+        rightPriceScale: { borderColor: grid },
+        timeScale: { borderColor: grid, timeVisible: true, secondsVisible: false },
+    };
+}
+function labApplyChartTheme() { if (LAB.chart) LAB.chart.applyOptions(labChartTheme()); }
+
+function labInitChart() {
+    var el = document.getElementById('lab-chart');
+    if (!el || typeof LightweightCharts === 'undefined') return;
+    LAB.chart = LightweightCharts.createChart(el, Object.assign({
+        width: el.clientWidth, height: 360,
+        crosshair: { mode: LightweightCharts.CrosshairMode ? LightweightCharts.CrosshairMode.Normal : 0 },
+        handleScale: true, handleScroll: true,
+    }, labChartTheme()));
+    LAB.series = LAB.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
+    new ResizeObserver(function () { if (LAB.chart) LAB.chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+}
+
+function labLoadChart() {
+    if (!LAB.series) return;
+    fetch('/academy/klines?symbol=' + encodeURIComponent(LAB.symbol) + '&interval=' + LAB.interval, { cache: 'no-store', credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-            if (!d || !d.ok || !d.movers || !d.movers.length) return;
-            wrap.innerHTML = d.movers.map(function (m) {
-                var up = (+m.chg) >= 0, col = up ? '#22c55e' : '#ef4444';
-                return '<div style="border-radius:10px;overflow:hidden;" class="border border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-white/5">'
-                    + '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px 3px;font-size:11px;font-weight:700;">'
-                    + '<span class="text-gray-500 dark:text-gray-400">' + m.tag + ' · ' + m.base + '</span>'
-                    + '<span style="color:' + col + ';">' + (up ? '+' : '') + m.chg + '%</span></div>'
-                    + '<div style="position:relative;height:44px;">' + labSparkline(m.closes || [], col) + '</div></div>';
-            }).join('');
+            if (!d.ok || !Array.isArray(d.candles)) return;
+            LAB.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
+            LAB.chart.timeScale().fitContent();
+            if (d.candles.length) labSetPrice(+d.candles[d.candles.length - 1].close);
+            labOpenStream();
+        }).catch(function () {});
+}
+
+function labSetPrice(px) { var el = document.getElementById('lab-chart-price'); if (el) el.textContent = '$' + labFmtPrice(px); }
+function labSetLive(txt, on) {
+    var el = document.getElementById('lab-chart-live'); if (!el) return;
+    el.textContent = txt;
+    el.className = 'text-[10px] font-bold px-1.5 py-0.5 rounded-full ' + (on ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800');
+}
+
+function labCloseStream() { if (LAB.ws) { try { LAB.ws.onclose = null; LAB.ws.close(); } catch (e) {} LAB.ws = null; } }
+function labOpenStream() {
+    labCloseStream();
+    if (typeof WebSocket === 'undefined') { labSetLive('offline', false); return; }
+    var sym = LAB.symbol, iv = LAB.interval, ws;
+    try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + sym.toLowerCase() + '@kline_' + iv); }
+    catch (e) { labSetLive('offline', false); return; }
+    LAB.ws = ws; labSetLive('connecting…', false);
+    ws.onopen = function () { if (LAB.symbol === sym && LAB.interval === iv) labSetLive('● LIVE', true); };
+    ws.onmessage = function (ev) {
+        if (LAB.symbol !== sym || LAB.interval !== iv || !LAB.series) return;
+        var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        var k = m && m.k; if (!k) return;
+        try { LAB.series.update({ time: Math.floor(k.t / 1000), open: +k.o, high: +k.h, low: +k.l, close: +k.c }); } catch (e) {}
+        labSetPrice(+k.c);
+    };
+    ws.onerror = function () { if (LAB.symbol === sym && LAB.interval === iv) labSetLive('reconnecting…', false); };
+    ws.onclose = function () { if (LAB.symbol === sym && LAB.interval === iv && LAB.ws === ws) { labSetLive('reconnecting…', false); setTimeout(function () { if (LAB.symbol === sym && LAB.interval === iv) labOpenStream(); }, 2000); } };
+}
+
+function labSelectSymbol(symbol, base, price, chg) {
+    LAB.symbol = symbol; LAB.base = base;
+    document.getElementById('lab-chart-symbol').textContent = base + '/USDT';
+    var ico = document.getElementById('lab-chart-icon'); if (ico) ico.innerHTML = labCoinIcon(base, 22);
+    if (price != null) labSetPrice(price);
+    var up = (+chg) >= 0, chgEl = document.getElementById('lab-chart-change');
+    chgEl.textContent = (up ? '+' : '') + (+chg).toFixed(2) + '%';
+    chgEl.className = 'text-sm font-semibold ' + labChgClass(up);
+    document.querySelectorAll('.lab-pair').forEach(function (b) { b.classList.toggle('bg-primary/10', b.dataset.symbol === symbol); });
+    labLoadChart();
+}
+
+function labRenderMarketList() {
+    var wrap = document.getElementById('lab-market-list'); if (!wrap) return;
+    var list = LAB.markets[LAB.tab] || [];
+    if (!list.length) { wrap.innerHTML = '<div class="py-10 text-center text-gray-400 text-sm">No markets.</div>'; return; }
+    wrap.innerHTML = list.map(function (m) {
+        var up = (+m.changePct) >= 0;
+        return '<button type="button" class="lab-pair w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700/60 text-left ' + (m.symbol === LAB.symbol ? 'bg-primary/10' : '') + '"'
+            + ' data-symbol="' + m.symbol + '" data-base="' + m.base + '" data-price="' + m.price + '" data-change="' + m.changePct + '">'
+            + '<span class="flex items-center gap-2 font-medium text-sm min-w-0">' + labCoinIcon(m.base, 20) + '<span class="truncate">' + m.base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span></span>'
+            + '<span class="text-right leading-tight shrink-0"><span class="block text-xs tabular-nums text-gray-800 dark:text-gray-100">$' + labFmtPrice(m.price) + '</span>'
+            + '<span class="block text-[11px] ' + labChgClass(up) + '">' + (up ? '+' : '') + (+m.changePct).toFixed(2) + '%</span></span></button>';
+    }).join('');
+    wrap.querySelectorAll('.lab-pair').forEach(function (b) {
+        b.addEventListener('click', function () { labSelectSymbol(b.dataset.symbol, b.dataset.base, +b.dataset.price, +b.dataset.change); });
+    });
+}
+
+function labSetTab(tab) {
+    LAB.tab = tab;
+    document.querySelectorAll('#lab-tabs button').forEach(function (b) {
+        var on = b.dataset.tab === tab;
+        b.className = (b.dataset.tab === 'hot' ? 'flex-1 py-1.5 ' : 'flex-1 py-1.5 border-l border-gray-200 dark:border-gray-700 ') + (on ? 'bg-primary text-white' : 'text-gray-500 dark:text-gray-400');
+    });
+    labRenderMarketList();
+}
+
+function labLoadMarkets() {
+    fetch('/academy/markets', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d || !d.ok) return;
+            LAB.markets = { hot: d.hot || [], gainers: d.gainers || [], losers: d.losers || [] };
+            labRenderMarketList();
         }).catch(function () {});
 }
 
@@ -157,9 +295,34 @@ function labPoll() {
         .catch(function () {});
 }
 document.addEventListener('DOMContentLoaded', function () {
-    labRenderMovers(); labPoll();
+    labInitChart();
+    document.getElementById('lab-chart-icon').innerHTML = labCoinIcon('BTC', 22);
+    labSetTab('hot');
+    labLoadMarkets();
+    labLoadChart();            // default BTCUSDT / 15m
+    // Interval selector
+    document.querySelectorAll('#lab-iv button').forEach(function (b) {
+        b.addEventListener('click', function () {
+            LAB.interval = b.dataset.iv;
+            document.querySelectorAll('#lab-iv button').forEach(function (x) {
+                x.classList.toggle('bg-primary', x.dataset.iv === LAB.interval);
+                x.classList.toggle('text-white', x.dataset.iv === LAB.interval);
+            });
+            labLoadChart();
+        });
+    });
+    var iv15 = document.querySelector('#lab-iv button[data-iv="15m"]'); if (iv15) { iv15.classList.add('bg-primary', 'text-white'); }
+    // Tabs
+    document.querySelectorAll('#lab-tabs button').forEach(function (b) {
+        b.addEventListener('click', function () { labSetTab(b.dataset.tab); });
+    });
+    // Re-theme chart when the light/dark toggle flips
+    var _toggle = window.gtaToggleTheme;
+    window.gtaToggleTheme = function () { if (_toggle) _toggle(); labApplyChartTheme(); };
+    // Bot state / positions / reasoning
+    labPoll();
     labTimer = setInterval(labPoll, 6000);
-    setInterval(labRenderMovers, 60000);
+    setInterval(labLoadMarkets, 60000);
 });
 </script>
 </body>
