@@ -1691,6 +1691,8 @@ $router->get('/academy/bot', 'AcademyController@bot');            // members: re
 $router->get('/academy/bot/data', 'AcademyController@botData');   // members: testnet bot snapshot JSON
 $router->get('/academy/markets', 'AcademyController@markets');    // members: popular/gainers/losers pairs
 $router->get('/academy/klines', 'AcademyController@klines');      // members: OHLC candles (TradingView chart)
+$router->post('/academy/bot/analyze', 'AcademyController@analyze'); // members: AI analysis of a chosen coin (advisory)
+$router->get('/academy/wallet', 'AcademyController@wallet');      // members: this learner's own $10k paper wallet
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');

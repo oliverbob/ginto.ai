@@ -175,6 +175,69 @@ class AcademyController
         exit;
     }
 
+    /**
+     * POST /academy/bot/analyze — members: run the AI brain on a chosen coin and return its
+     * reasoning + a BUY/HOLD/SKIP decision (advisory only, no orders — same brain as /gtb Reflect).
+     * Per-user cooldown keeps token spend sane when many learners click.
+     */
+    public function analyze(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+
+        // Per-user cooldown (seconds) — one analysis at a time, protects the AI budget.
+        $cool = 12;
+        $stamp = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_analyze_' . $userId . '.txt';
+        if (is_file($stamp)) {
+            $wait = $cool - (time() - (int) filemtime($stamp));
+            if ($wait > 0) { http_response_code(429); echo json_encode(['ok' => false, 'error' => 'Hold on ' . $wait . 's — one analysis at a time.']); exit; }
+        }
+
+        $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
+        if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
+        $base = substr($symbol, 0, -4);
+
+        try {
+            $brain = new \Ginto\Services\GtbBrain();
+            if (!$brain->isConfigured()) { echo json_encode(['ok' => false, 'error' => 'The AI brain is not configured yet. Try again later.']); exit; }
+            @touch($stamp);   // start the cooldown now (before the slow AI call)
+
+            $client = new \Ginto\Services\BinanceClient();
+            // Recent price action for the focus coin (compact — closes only).
+            $closes = []; $last = 0.0; $chg = 0.0;
+            $k = $client->klines($symbol, '15m', 48);
+            if (!empty($k['ok']) && is_array($k['data'] ?? null) && $k['data']) {
+                foreach ($k['data'] as $c) { $closes[] = round((float) $c['close'], 8); }
+                $first = (float) $k['data'][0]['close']; $last = (float) end($k['data'])['close'];
+                if ($first > 0) $chg = ($last - $first) / $first * 100;
+            }
+            // A small movers snapshot for context (reuse the members cache if warm).
+            $movers = [];
+            $mc = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_markets.json';
+            if (is_file($mc)) {
+                $md = json_decode((string) file_get_contents($mc), true);
+                foreach (array_slice($md['gainers'] ?? [], 0, 8) as $g) {
+                    $movers[] = ['symbol' => $g['symbol'], 'changePct' => round((float) $g['changePct'], 2), 'price' => (float) $g['price']];
+                }
+            }
+            $context = [
+                'env'   => 'testnet',
+                'focus' => ['symbol' => $symbol, 'base' => $base, 'last' => $last, 'change_since_window' => round($chg, 2), 'recent_closes_15m' => $closes],
+                'movers' => $movers,
+                'note'  => "A student is studying {$base}/USDT. Analyze THIS coin's momentum specifically, then decide.",
+            ];
+
+            $res = $brain->reflect($context);
+            if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Analysis failed']); exit; }
+            echo json_encode(['ok' => true, 'symbol' => $symbol, 'base' => $base, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+        } catch (\Throwable $e) {
+            error_log('Academy analyze: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.']);
+        }
+        exit;
+    }
+
     /** GET /academy/learn — the branded lessons facility (preview lessons open; rest gated). */
     public function learn(): void
     {
@@ -349,6 +412,44 @@ class AcademyController
     }
 
     /** True if the user has a current, non-expired active subscription. */
+    /**
+     * Each member gets their own $10,000 paper wallet (the practice balance). Lazily creates the
+     * table + the member's row on first touch. Returns ['balance'=>float,'starting'=>float].
+     */
+    private function walletFor(int $userId): array
+    {
+        try {
+            $db = Database::getInstance();
+            $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_wallets (
+                user_id INT PRIMARY KEY,
+                balance DECIMAL(18,8) NOT NULL DEFAULT 10000,
+                starting DECIMAL(18,8) NOT NULL DEFAULT 10000,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $w = $db->get('academy_wallets', '*', ['user_id' => $userId]);
+            if (!is_array($w)) {
+                $db->insert('academy_wallets', ['user_id' => $userId, 'balance' => 10000, 'starting' => 10000]);
+                return ['balance' => 10000.0, 'starting' => 10000.0];
+            }
+            return ['balance' => (float) $w['balance'], 'starting' => (float) $w['starting']];
+        } catch (\Throwable $e) {
+            error_log('Academy walletFor: ' . $e->getMessage());
+            return ['balance' => 10000.0, 'starting' => 10000.0];
+        }
+    }
+
+    /** GET /academy/wallet — members: this learner's own paper wallet (per-user, not cached/shared). */
+    public function wallet(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        $w = $this->walletFor($userId);
+        // Equity = cash balance (per-user open positions not yet built — will add unrealized here).
+        echo json_encode(['ok' => true, 'balance' => $w['balance'], 'starting' => $w['starting'], 'equity' => $w['balance']]);
+        exit;
+    }
+
     private function hasActiveSubscription(int $userId): bool
     {
         try {

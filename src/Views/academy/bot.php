@@ -37,12 +37,29 @@
         </div>
     </div>
 
-    <!-- Stats -->
-    <div class="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <!-- Your own paper wallet (per-user) -->
+    <div class="mt-6 rounded-2xl border border-primary/30 bg-gradient-to-br from-primary/10 to-secondary/10 p-5 flex flex-wrap items-center justify-between gap-4">
+        <div>
+            <div class="text-xs font-bold uppercase tracking-wide text-primary"><i class="fas fa-wallet mr-1"></i>Your paper wallet</div>
+            <div id="lab-wallet" class="mt-1 text-4xl font-extrabold tabular-nums">$10,000.00</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mt-1">Your practice balance — real market prices, zero real risk. This account is yours alone.</div>
+        </div>
+        <div class="text-right">
+            <div id="lab-wallet-pnl" class="text-lg font-bold text-gray-400">$0.00</div>
+            <div class="text-[11px] text-gray-400">vs $10,000 start</div>
+        </div>
+    </div>
+
+    <!-- The shared class bot the learner studies (clearly separated from their own money) -->
+    <div class="mt-5 flex flex-wrap items-center gap-2 text-xs font-bold uppercase tracking-wide text-gray-400">
+        <i class="fas fa-robot"></i> The class demo bot
+        <span class="font-normal normal-case">— a shared teaching bot you watch. Its wins and losses are the lesson, not your balance.</span>
+        <span id="lab-updated" class="ml-auto font-normal normal-case">—</span>
+    </div>
+    <div class="mt-2 grid grid-cols-3 gap-3">
         <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Open positions</div><div id="lab-open" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Unrealized (paper)</div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Realized (paper)</div><div id="lab-realized" class="mt-1 text-2xl font-extrabold">—</div></div>
-        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Updated</div><div id="lab-updated" class="mt-1 text-sm font-semibold text-gray-500 dark:text-gray-400 pt-2">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Unrealized</div><div id="lab-unreal" class="mt-1 text-2xl font-extrabold">—</div></div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4"><div class="text-xs text-gray-500 dark:text-gray-400">Track record</div><div id="lab-realized" class="mt-1 text-2xl font-extrabold">—</div></div>
     </div>
 
     <!-- Live chart + markets (same engine as /gtb, testnet-only) -->
@@ -71,6 +88,15 @@
                 </div>
             </div>
             <div id="lab-chart" class="w-full rounded-lg overflow-hidden" style="height:360px"></div>
+            <!-- AI analysis (advisory, same brain as /gtb Reflect) -->
+            <div class="mt-3 flex items-center gap-2">
+                <button type="button" id="lab-analyze-btn" onclick="labAnalyze()"
+                        class="inline-flex items-center gap-1.5 text-sm font-semibold px-3.5 py-2 rounded-lg bg-primary text-white hover:bg-primary/90 disabled:opacity-60">
+                    <i class="fas fa-brain"></i> <span id="lab-analyze-label">Analyze this coin with AI</span>
+                </button>
+                <span class="text-[11px] text-gray-400">Advisory only — the bot reasons out loud; no orders are placed.</span>
+            </div>
+            <div id="lab-analysis" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
         </div>
         <!-- Markets -->
         <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
@@ -287,6 +313,44 @@ function labRender(d) {
     }
 }
 
+function labLoadWallet() {
+    fetch('/academy/wallet', { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (!d || !d.ok) return;
+            var eq = +d.equity, start = +d.starting || 10000, pnl = eq - start;
+            document.getElementById('lab-wallet').textContent = '$' + eq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            var p = document.getElementById('lab-wallet-pnl');
+            p.textContent = (pnl >= 0 ? '+' : '−') + '$' + Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            p.className = 'text-lg font-bold ' + (pnl > 0 ? 'text-green-600 dark:text-green-400' : pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400');
+        }).catch(function () {});
+}
+
+function labAnalyze() {
+    var btn = document.getElementById('lab-analyze-btn'), lbl = document.getElementById('lab-analyze-label'), out = document.getElementById('lab-analysis');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true; lbl.textContent = 'Thinking…';
+    out.classList.remove('hidden');
+    out.innerHTML = '<div class="flex items-center gap-2 text-gray-500"><i class="fas fa-spinner fa-spin"></i> The bot is analysing ' + LAB.base + '/USDT…</div>';
+    fetch('/academy/bot/analyze', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify({ symbol: LAB.symbol }) })
+        .then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
+        .then(function (x) {
+            var d = x.d;
+            if (!d || !d.ok) { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400"><i class="fas fa-circle-info mr-1"></i>' + ((d && d.error) || 'Analysis unavailable.') + '</div>'; return; }
+            var dec = (d.decision || '').toUpperCase(), badge = '', cls = '';
+            if (dec.indexOf('BUY') === 0) { cls = 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400'; badge = dec; }
+            else if (dec === 'HOLD') { cls = 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-400'; badge = 'HOLD'; }
+            else if (dec === 'SKIP') { cls = 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; badge = 'SKIP'; }
+            var body = (d.text || '').replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }).replace(/\n/g, '<br>');
+            out.innerHTML = '<div class="flex items-center gap-2 mb-1.5 font-bold">' + labCoinIcon(d.base, 20) + d.base + '/USDT'
+                + (badge ? '<span class="ml-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + cls + '">' + badge + '</span>' : '')
+                + '<span class="ml-auto text-[10px] text-gray-400 font-normal">AI · advisory</span></div>'
+                + '<div class="text-gray-700 dark:text-gray-200 leading-relaxed">' + body + '</div>';
+        })
+        .catch(function () { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400">Network error — try again.</div>'; })
+        .finally(function () { btn.disabled = false; lbl.textContent = 'Analyze this coin with AI'; });
+}
+
 var labTimer = null;
 function labPoll() {
     fetch('/academy/bot/data', { cache: 'no-store', credentials: 'same-origin' })
@@ -298,6 +362,7 @@ document.addEventListener('DOMContentLoaded', function () {
     labInitChart();
     document.getElementById('lab-chart-icon').innerHTML = labCoinIcon('BTC', 22);
     labSetTab('hot');
+    labLoadWallet();          // this learner's own $10k paper wallet
     labLoadMarkets();
     labLoadChart();            // default BTCUSDT / 15m
     // Interval selector
