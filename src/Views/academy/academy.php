@@ -3,6 +3,7 @@
 $isLoggedIn   = $isLoggedIn ?? false;
 $isAdmin      = $isAdmin ?? false;
 $hasAccess    = $hasAccess ?? false;
+$currentPlan  = $currentPlan ?? '';
 $userFullname = $userFullname ?? null;
 $plans        = $plans ?? [];
 $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float) $v)) ? 0 : 2);
@@ -50,6 +51,7 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
         <div class="flex items-center gap-2">
             <button onclick="gtaToggleTheme()" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <?php if ($hasAccess): ?>
+                <?php if ($currentPlan !== 'academy_pro'): ?><a href="#pricing" class="hidden sm:inline text-sm font-semibold text-primary hover:underline px-2"><i class="fas fa-crown mr-0.5"></i>Upgrade</a><?php endif; ?>
                 <a href="/academy/enter" class="text-sm font-semibold px-4 py-2 rounded-lg bg-primary text-white hover:bg-primary/90">Enter Academy</a>
                 <a href="/logout" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-500 px-2" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
             <?php elseif ($isLoggedIn): ?>
@@ -175,16 +177,25 @@ $csrf = $csrf_token ?? '';
         <div class="mt-6 max-w-lg mx-auto rounded-lg border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300"><i class="fas fa-circle-exclamation mr-1"></i> <?= htmlspecialchars($err) ?></div>
     <?php endif; ?>
     <?php if ($hasAccess): ?>
-        <div class="mt-6 max-w-lg mx-auto rounded-lg bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 px-4 py-3 text-sm text-center"><i class="fas fa-circle-check mr-1"></i> You're a member — <a href="/academy/enter" class="underline font-semibold">enter the Academy</a>.</div>
+        <div class="mt-6 max-w-lg mx-auto rounded-lg bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 px-4 py-3 text-sm text-center"><i class="fas fa-circle-check mr-1"></i> You're a member — <a href="/academy/enter" class="underline font-semibold">enter the Academy</a><?php if ($currentPlan !== 'academy_pro'): ?> · <a href="#pricing" class="underline font-semibold">upgrade to Pro</a> for automated trading<?php endif; ?>.</div>
     <?php endif; ?>
 
+    <?php
+        $currentPlan = $currentPlan ?? '';
+        $curPrice = 0.0;
+        if ($hasAccess && $currentPlan !== '') {
+            foreach ($plans as $pp) { if (($pp['name'] ?? '') === $currentPlan) { $curPrice = (float) ($pp['price_monthly'] ?? 0); break; } }
+        }
+    ?>
     <?php if (!empty($plans)): ?>
         <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-<?= min(3, max(1, count($plans))) ?> gap-5 max-w-4xl mx-auto">
             <?php foreach ($plans as $i => $p):
                 $pname = $p['name'] ?? '';
                 $name  = $p['display_name'] ?? ($pname ?: 'Plan');
                 $price = $p['price_monthly'] ?? 0;
-                $featured = $pname === 'academy_pro'; ?>
+                $featured  = $pname === 'academy_pro';
+                $isCurrent = $hasAccess && $currentPlan === $pname;
+                $isUpgrade = $hasAccess && !$isCurrent && (float) $price > $curPrice; ?>
                 <div class="rounded-2xl border p-6 flex flex-col <?= $featured ? 'border-primary ring-2 ring-primary/30 bg-primary/5' : 'border-gray-200 dark:border-gray-800' ?>">
                     <?php if ($featured): ?><div class="text-[10px] font-bold uppercase text-primary mb-2">Most popular</div><?php endif; ?>
                     <h3 class="font-bold text-lg"><?= htmlspecialchars($name) ?></h3>
@@ -197,8 +208,12 @@ $csrf = $csrf_token ?? '';
                         <li><i class="fas fa-check text-green-500 mr-1.5"></i>Full curriculum</li>
                         <li><i class="fas fa-check text-green-500 mr-1.5"></i>Live bot walkthroughs</li>
                     </ul>
-                    <?php if ($hasAccess): ?>
-                        <a href="/academy/enter" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary">Enter the Academy</a>
+                    <?php if ($isCurrent): ?>
+                        <a href="/academy/enter" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 hover:opacity-90"><i class="fas fa-circle-check mr-1"></i>Your plan — Enter</a>
+                    <?php elseif ($isUpgrade): ?>
+                        <button type="button" onclick="gtaBuy('<?= htmlspecialchars($pname) ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($peso($price)) ?>', false)" class="mt-6 w-full px-4 py-2.5 rounded-lg font-semibold bg-primary text-white hover:bg-primary/90"><i class="fas fa-crown mr-1"></i>Upgrade to <?= htmlspecialchars($name) ?> — <?= $peso($price) ?>/mo</button>
+                    <?php elseif ($hasAccess): ?>
+                        <a href="/academy/enter" class="mt-6 block text-center px-4 py-2.5 rounded-lg font-semibold border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary">Included — Enter the Academy</a>
                     <?php else: ?>
                         <button type="button" onclick="gtaBuy('<?= htmlspecialchars($pname) ?>', '<?= htmlspecialchars($name, ENT_QUOTES) ?>', '<?= htmlspecialchars($peso($price)) ?>', <?= $isLoggedIn ? 'false' : 'true' ?>)" class="mt-6 w-full px-4 py-2.5 rounded-lg font-semibold <?= $featured ? 'bg-primary text-white hover:bg-primary/90' : 'border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary' ?>"><?= $isLoggedIn ? 'Subscribe' : 'Get ' . htmlspecialchars($name) ?> — <?= $peso($price) ?>/mo</button>
                     <?php endif; ?>

@@ -32,6 +32,7 @@ class AcademyController
             'username'     => $_SESSION['username'] ?? null,
             'userFullname' => $_SESSION['fullname'] ?? $_SESSION['username'] ?? null,
             'hasAccess'    => $hasAccess,
+            'currentPlan'  => $hasAccess ? $this->planName((int) $userId) : '',
             'plans'        => $plans,
             'csrf_token'   => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
         ]);
