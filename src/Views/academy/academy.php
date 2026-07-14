@@ -232,7 +232,7 @@ $csrf = $csrf_token ?? '';
     </div>
 </section>
 
-<?php if (!$hasAccess && !empty($plans)): ?>
+<?php if (!empty($plans) && $currentPlan !== 'academy_pro'): /* render for guests + non-Pro members (so upgrade works) */ ?>
 <!-- On-site sign-up + QR Ph payment — the QR is generated and paid on ginto.ai (no PayMongo redirect). -->
 <div id="join-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60" onclick="if(event.target===this)gtaCloseJoin()">
     <div class="w-full max-w-md rounded-2xl bg-white dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-6 shadow-2xl">
