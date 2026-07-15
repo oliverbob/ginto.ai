@@ -1,8 +1,9 @@
 <?php
 // academy/learn.php — branded Academy lessons facility.
-$hasAccess  = $hasAccess ?? false;
-$isLoggedIn = $isLoggedIn ?? false;
-$lessons    = $lessons ?? [];
+$hasAccess    = $hasAccess ?? false;
+$isLoggedIn   = $isLoggedIn ?? false;
+$lessons      = $lessons ?? [];
+$referralLink = $referralLink ?? '';
 // Group by module, preserving order.
 $byModule = [];
 foreach ($lessons as $l) { $byModule[$l['module'] ?? 'Lessons'][] = $l; }
@@ -51,6 +52,29 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
             <span class="shrink-0 text-primary font-semibold text-sm">Open <i class="fas fa-arrow-right ml-1"></i></span>
         </div>
     </a>
+    <?php endif; ?>
+
+    <?php if ($hasAccess && $referralLink !== ''): ?>
+    <div class="mt-4 rounded-2xl border border-gray-200 dark:border-gray-800 p-5">
+        <div class="flex items-center gap-2 font-semibold"><i class="fas fa-user-plus text-primary"></i> Your Academy invite link</div>
+        <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">Anyone who subscribes through this link is credited to you.</p>
+        <div class="mt-3 flex gap-2">
+            <input id="gtaRefLink" type="text" readonly value="<?= htmlspecialchars($referralLink) ?>" onclick="this.select()"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] text-gray-900 dark:text-gray-100">
+            <button type="button" onclick="gtaCopyRef(this)" class="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm bg-primary text-white hover:bg-primary/90"><i class="fas fa-copy mr-1"></i>Copy</button>
+        </div>
+    </div>
+    <script>
+    function gtaCopyRef(btn) {
+        const input = document.getElementById('gtaRefLink');
+        const done = () => { const h = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied'; setTimeout(() => btn.innerHTML = h, 1500); };
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+        } else {
+            input.select(); document.execCommand('copy'); done();
+        }
+    }
+    </script>
     <?php endif; ?>
 
     <?php if (empty($lessons)): ?>

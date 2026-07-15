@@ -18,6 +18,7 @@ class AcademyController
     public function index(): void
     {
         if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $this->captureRef();
 
         $userId     = $_SESSION['user_id'] ?? null;
         $isLoggedIn = !empty($userId);
@@ -34,8 +35,58 @@ class AcademyController
             'hasAccess'    => $hasAccess,
             'currentPlan'  => $hasAccess ? $this->planName((int) $userId) : '',
             'plans'        => $plans,
+            'referralLink' => $hasAccess ? $this->referralLink((int) $userId) : '',
             'csrf_token'   => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
         ]);
+    }
+
+    /**
+     * Remember a sponsor from ?ref= for the rest of the visit, exactly like /register does
+     * (same session key), so the sponsor survives the whole funnel: landing → sign-up → pay.
+     */
+    private function captureRef(): void
+    {
+        if (isset($_GET['ref']) && is_string($_GET['ref']) && trim($_GET['ref']) !== '') {
+            $_SESSION['referral_code'] = trim($_GET['ref']);
+        }
+    }
+
+    /**
+     * Resolve the remembered sponsor to a user id. Mirrors UserController::registerAction:
+     * accepts a numeric id, a username, or a public_id, and falls back to user 2 so an
+     * Academy sign-up is never left dangling outside the network.
+     */
+    private function resolveReferrerId(): int
+    {
+        $raw = trim((string) ($_SESSION['referral_code'] ?? $_GET['ref'] ?? ''));
+        if ($raw === '') return 2;
+        try {
+            $db = Database::getInstance();
+            $id = ctype_digit($raw)
+                ? $db->get('users', 'id', ['id' => (int) $raw])
+                : ($db->get('users', 'id', ['username' => $raw]) ?: $db->get('users', 'id', ['public_id' => $raw]));
+            return $id ? (int) $id : 2;
+        } catch (\Throwable $e) {
+            return 2;
+        }
+    }
+
+    /** The member's shareable Academy invite: /academy?ref=<public_id>, same shape as /register?ref=. */
+    private function referralLink(int $userId): string
+    {
+        try {
+            $publicId = Database::getInstance()->get('users', 'public_id', ['id' => $userId]);
+            if (empty($publicId)) return '';
+            return $this->baseUrl() . '/academy?ref=' . rawurlencode((string) $publicId);
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    private function baseUrl(): string
+    {
+        $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
     }
 
     /**
@@ -263,10 +314,11 @@ class AcademyController
         $userId    = $_SESSION['user_id'] ?? null;
         $hasAccess = !empty($userId) && $this->hasActiveSubscription((int) $userId);
         View::view('academy/learn', [
-            'title'      => 'Learn — Ginto Trading Academy',
-            'isLoggedIn' => !empty($userId),
-            'hasAccess'  => $hasAccess,
-            'lessons'    => $this->publishedLessons(),
+            'title'        => 'Learn — Ginto Trading Academy',
+            'isLoggedIn'   => !empty($userId),
+            'hasAccess'    => $hasAccess,
+            'lessons'      => $this->publishedLessons(),
+            'referralLink' => $hasAccess ? $this->referralLink((int) $userId) : '',
         ]);
     }
 
@@ -1031,6 +1083,7 @@ class AcademyController
                 'password_hash' => $passwordHash,
                 'status'        => 'active',
                 'role_id'       => 5,
+                'referrer_id'   => $this->resolveReferrerId(),
                 'created_at'    => date('Y-m-d H:i:s'),
             ]);
             $id = $db->id();

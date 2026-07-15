@@ -6,6 +6,7 @@ $hasAccess    = $hasAccess ?? false;
 $currentPlan  = $currentPlan ?? '';
 $userFullname = $userFullname ?? null;
 $plans        = $plans ?? [];
+$referralLink = $referralLink ?? '';
 $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float) $v)) ? 0 : 2);
 ?>
 <!DOCTYPE html>
@@ -178,6 +179,30 @@ $csrf = $csrf_token ?? '';
     <?php endif; ?>
     <?php if ($hasAccess): ?>
         <div class="mt-6 max-w-lg mx-auto rounded-lg bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300 px-4 py-3 text-sm text-center"><i class="fas fa-circle-check mr-1"></i> You're a member — <a href="/academy/enter" class="underline font-semibold">enter the Academy</a><?php if ($currentPlan !== 'academy_pro'): ?> · <a href="#pricing" class="underline font-semibold">upgrade to Pro</a> for automated trading<?php endif; ?>.</div>
+    <?php endif; ?>
+
+    <?php if ($hasAccess && $referralLink !== ''): ?>
+        <div class="mt-6 max-w-lg mx-auto rounded-2xl border border-primary/30 bg-primary/5 p-5">
+            <div class="flex items-center gap-2 font-semibold"><i class="fas fa-user-plus text-primary"></i> Invite others to the Academy</div>
+            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-400">Share your link. Anyone who subscribes through it — Starter Trader or Trader Pro — is credited to you, just like your /register link.</p>
+            <div class="mt-3 flex gap-2">
+                <input id="gtaRefLink" type="text" readonly value="<?= htmlspecialchars($referralLink) ?>"
+                       onclick="this.select()"
+                       class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] text-gray-900 dark:text-gray-100">
+                <button type="button" onclick="gtaCopyRef(this)" class="shrink-0 px-4 py-2 rounded-lg font-semibold text-sm bg-primary text-white hover:bg-primary/90"><i class="fas fa-copy mr-1"></i>Copy</button>
+            </div>
+        </div>
+        <script>
+        function gtaCopyRef(btn) {
+            const input = document.getElementById('gtaRefLink');
+            const done = () => { const h = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check mr-1"></i>Copied'; setTimeout(() => btn.innerHTML = h, 1500); };
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+            } else {
+                input.select(); document.execCommand('copy'); done();
+            }
+        }
+        </script>
     <?php endif; ?>
 
     <?php
