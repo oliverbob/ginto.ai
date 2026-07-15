@@ -1703,6 +1703,8 @@ $router->post('/academy/trade/sell', 'AcademyController@tradeSell'); // members:
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');
+$router->get('/academy/admin/subscriptions', 'AcademyController@adminGrantPage'); // admin: manual grant tool
+$router->post('/academy/admin/grant', 'AcademyController@grantSubscription');      // admin: grant a membership
 $router->req('/academy/admin/save', 'AcademyController@adminSave', ['POST']);
 
 // Courses

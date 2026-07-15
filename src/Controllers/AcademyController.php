@@ -310,6 +310,89 @@ class AcademyController
         ]);
     }
 
+    /** GET /academy/admin/subscriptions — admin tool: manually grant a paid subscription. */
+    public function adminGrantPage(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        if (!$this->isAdmin()) { $this->redirect('/academy'); return; }
+        $db = Database::getInstance();
+        $recent = [];
+        try {
+            $recent = $db->pdo->query(
+                "SELECT us.expires_at, us.amount_paid, us.currency, us.created_at, us.payment_method,
+                        u.email, u.username, u.fullname, sp.display_name AS plan
+                 FROM user_subscriptions us
+                 JOIN users u ON u.id = us.user_id
+                 LEFT JOIN subscription_plans sp ON sp.id = us.plan_id
+                 WHERE us.payment_method = 'manual' AND us.status = 'active'
+                 ORDER BY us.id DESC LIMIT 25"
+            )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { error_log('Academy adminGrantPage: ' . $e->getMessage()); }
+        View::view('academy/admin_grant', [
+            'title'      => 'Manual subscription grant',
+            'plans'      => $this->subscriptionPlans(),
+            'recent'     => $recent,
+            'csrf_token' => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
+        ]);
+    }
+
+    /** POST /academy/admin/grant — admin: grant/refresh a membership for a personally-paid customer. */
+    public function grantSubscription(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        if (!$this->isAdmin()) { http_response_code(403); echo json_encode(['ok' => false, 'error' => 'Admins only.']); exit; }
+        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $token = $_SERVER['HTTP_X_CSRF_TOKEN'] ?? $input['csrf_token'] ?? '';
+        if (empty($token) || empty($_SESSION['csrf_token']) || !hash_equals($_SESSION['csrf_token'], $token)) {
+            http_response_code(403); echo json_encode(['ok' => false, 'error' => 'Invalid CSRF token']); exit;
+        }
+        $email    = strtolower(trim((string) ($input['email'] ?? '')));
+        $name     = trim((string) ($input['name'] ?? ''));
+        $planName = (string) ($input['plan'] ?? 'academy_pro');
+        $months   = max(1, min(36, (int) ($input['months'] ?? 1)));
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) { echo json_encode(['ok' => false, 'error' => 'Enter a valid email.']); exit; }
+        try {
+            $db   = Database::getInstance();
+            $plan = $db->get('subscription_plans', '*', ['name' => $planName, 'plan_type' => 'academy']);
+            if (!$plan) { echo json_encode(['ok' => false, 'error' => 'Unknown plan.']); exit; }
+            $amount = ($input['amount'] ?? '') !== '' ? (float) $input['amount'] : (float) ($plan['price_monthly'] ?? 0);
+
+            $u = $db->get('users', ['id', 'username'], ['email' => $email]);
+            $created = false; $temp = null; $username = '';
+            if (is_array($u)) {
+                $userId = (int) $u['id']; $username = (string) $u['username'];
+            } else {
+                if ($name === '') { echo json_encode(['ok' => false, 'error' => 'No account with that email — add a full name to create one.']); exit; }
+                $temp   = bin2hex(random_bytes(4));
+                $userId = $this->insertLearner($name, $email, password_hash($temp, PASSWORD_DEFAULT));
+                if (!$userId) { echo json_encode(['ok' => false, 'error' => 'Could not create the account.']); exit; }
+                $created = true;
+                $row = $db->get('users', ['username'], ['id' => $userId]); $username = is_array($row) ? (string) $row['username'] : '';
+            }
+
+            $now = date('Y-m-d H:i:s'); $expires = date('Y-m-d H:i:s', strtotime("+{$months} month"));
+            $ref = 'MANUAL-' . date('Ymd-His');
+            $db->insert('academy_orders', ['user_id' => $userId, 'plan_id' => $plan['id'], 'checkout_session_id' => $ref, 'amount' => $amount, 'currency' => 'PHP', 'status' => 'completed']);
+            $db->update('user_subscriptions', ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now], ['user_id' => $userId, 'status' => 'active']);
+            $db->insert('user_subscriptions', [
+                'user_id' => $userId, 'plan_id' => $plan['id'], 'status' => 'active',
+                'started_at' => $now, 'expires_at' => $expires, 'payment_method' => 'manual',
+                'payment_reference' => $ref, 'amount_paid' => $amount, 'currency' => 'PHP',
+                'auto_renew' => 0, 'created_at' => $now, 'updated_at' => $now,
+            ]);
+            error_log("Academy MANUAL grant by admin: user={$userId} plan={$plan['id']} amount={$amount} until {$expires}");
+            echo json_encode([
+                'ok' => true, 'user_id' => $userId, 'username' => $username, 'created' => $created,
+                'temp_password' => $temp, 'plan' => $plan['display_name'] ?? $planName, 'expires' => $expires, 'amount' => $amount,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('Academy grantSubscription: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Grant failed — check the server log.']);
+        }
+        exit;
+    }
+
     /** POST /academy/admin/save — save plan prices or create/update a lesson (admin only). */
     public function adminSave(): void
     {
