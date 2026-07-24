@@ -711,6 +711,14 @@ class ChatController
      */
     public function index(): void
     {
+        // Referral capture: the short root invite link (https://ginto.ai/?ref=<public_id>) stores the
+        // same session key /register uses, so a later sign-up or Academy subscription is attributed to
+        // the referrer without forcing the visitor onto /register first.
+        if (isset($_GET['ref']) && is_string($_GET['ref']) && trim($_GET['ref']) !== '') {
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+            $_SESSION['referral_code'] = trim($_GET['ref']);
+        }
+
         // Check if user is logged in
         $isLoggedIn = !empty($_SESSION['user_id']);
         
