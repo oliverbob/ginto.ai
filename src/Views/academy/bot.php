@@ -291,6 +291,23 @@ $isPro   = !empty($isPro);
         </div>
     </div>
 
+    <!-- Neat confirm / notice dialog (replaces native confirm()/alert()) -->
+    <div id="lab-dialog" class="hidden fixed inset-0 z-[80] bg-black/70 items-center justify-center p-4">
+        <div class="bg-white dark:bg-[#0b1020] rounded-2xl border border-gray-200 dark:border-gray-700 w-full max-w-sm overflow-hidden shadow-2xl">
+            <div class="p-5 flex items-start gap-3">
+                <span id="lab-dialog-icon" class="w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0"></span>
+                <div class="min-w-0">
+                    <div id="lab-dialog-title" class="font-bold text-lg"></div>
+                    <div id="lab-dialog-msg" class="mt-1 text-sm text-gray-600 dark:text-gray-300"></div>
+                </div>
+            </div>
+            <div class="flex gap-2 px-5 pb-5">
+                <button type="button" id="lab-dialog-cancel" class="flex-1 px-4 py-2.5 rounded-xl font-semibold text-sm border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5">Cancel</button>
+                <button type="button" id="lab-dialog-ok" class="flex-1 px-4 py-2.5 rounded-xl font-bold text-sm text-white"></button>
+            </div>
+        </div>
+    </div>
+
     <div class="mt-8 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
         <i class="fas fa-circle-info mr-1"></i> Educational only. This is a paper (testnet) simulation on live prices — no real money is at stake here. Crypto trading carries real risk of loss; the Academy teaches disciplined, risk-first methods, never guaranteed returns.
     </div>
@@ -298,6 +315,33 @@ $isPro   = !empty($isPro);
 
 <script>
 const LAB_CSRF = <?= json_encode($csrf_token ?? '') ?>;
+
+// ---- Themed confirm / notice dialog (replaces native confirm()/alert()) -------
+function labDialog(opts) {
+    opts = opts || {};
+    return new Promise(function (resolve) {
+        var o = document.getElementById('lab-dialog'); if (!o) { resolve(!opts.notice ? window.confirm(opts.message || '') : true); return; }
+        var danger = !!opts.danger, notice = !!opts.notice;
+        var icon = document.getElementById('lab-dialog-icon');
+        icon.className = 'w-10 h-10 rounded-full flex items-center justify-center text-lg shrink-0 ' + (danger ? 'bg-red-100 text-red-600 dark:bg-red-500/20 dark:text-red-400' : 'bg-primary/10 text-primary');
+        icon.innerHTML = '<i class="fas ' + (opts.icon || (danger ? 'fa-triangle-exclamation' : 'fa-circle-question')) + '"></i>';
+        document.getElementById('lab-dialog-title').textContent = opts.title || 'Are you sure?';
+        document.getElementById('lab-dialog-msg').innerHTML = opts.message || '';
+        var ok = document.getElementById('lab-dialog-ok'), cancel = document.getElementById('lab-dialog-cancel');
+        ok.textContent = opts.confirmText || (notice ? 'OK' : 'Confirm');
+        ok.className = 'flex-1 px-4 py-2.5 rounded-xl font-bold text-sm text-white ' + (danger ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:bg-primary/90');
+        cancel.style.display = notice ? 'none' : '';
+        o.classList.remove('hidden'); o.classList.add('flex');
+        function done(v) { o.classList.add('hidden'); o.classList.remove('flex'); ok.onclick = cancel.onclick = o.onclick = null; document.removeEventListener('keydown', key); resolve(v); }
+        function key(e) { if (e.key === 'Escape') done(false); else if (e.key === 'Enter') done(true); }
+        ok.onclick = function () { done(true); };
+        cancel.onclick = function () { done(false); };
+        o.onclick = function (e) { if (e.target === o) done(false); };
+        document.addEventListener('keydown', key);
+    });
+}
+function labConfirm(opts) { return labDialog(opts); }
+function labNotice(opts) { return labDialog(Object.assign({ notice: true }, opts || {})); }
 function labCoinIcon(base, size) {
     var b = String(base || '').toLowerCase(), up = String(base || '').toUpperCase().slice(0, 3);
     var h = 0; for (var i = 0; i < b.length; i++) h = (h * 31 + b.charCodeAt(i)) & 0xffffffff;
@@ -544,14 +588,26 @@ function labSetToggle() {
     else { b.className = 'inline-flex items-center gap-2 text-sm font-bold px-5 py-3 rounded-xl bg-green-600 text-white hover:bg-green-700 disabled:opacity-60'; b.querySelector('i').className = 'fas fa-play'; l.textContent = 'Start AI bot trading'; }
 }
 
-function labToggleBot() {
-    var b = document.getElementById('lab-bot-toggle'); if (!b || b.disabled) return;
+function labDoToggle(b) {
     b.disabled = true;
     fetch('/academy/bot/toggle', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, on: !LAB.botOn }) })
         .then(function (r) { return r.json(); })
-        .then(function (d) { if (d && d.ok) { LAB.botOn = !!d.bot_enabled; labSetToggle(); labLoadWallet(); } })
+        .then(function (d) {
+            if (d && d.ok) { LAB.botOn = !!d.bot_enabled; labSetToggle(); labLoadWallet(); }
+            else if (d && d.error) { labNotice({ title: 'Bot not started', message: d.error, danger: !!d.halted }); }
+        })
         .catch(function () {})
         .finally(function () { b.disabled = false; });
+}
+function labToggleBot() {
+    var b = document.getElementById('lab-bot-toggle'); if (!b || b.disabled) return;
+    // Stopping flattens every bot-followed trade — confirm first with a neat dialog.
+    if (LAB.botOn) {
+        labConfirm({ title: 'Stop the bot?', message: 'This closes all bot-followed trades at the current market price. Your manual trades stay open.', confirmText: 'Stop bot', danger: true, icon: 'fa-stop' })
+            .then(function (go) { if (go) labDoToggle(b); });
+        return;
+    }
+    labDoToggle(b);
 }
 
 function labRenderMyPositions(pos) {
@@ -681,15 +737,17 @@ function labSellHolding() {
     var btn = document.getElementById('lab-order-btn'), st = document.getElementById('lab-trade-status');
     if (!btn || btn.disabled) return;
     if (LAB.holdQty <= 0) { st.textContent = 'You have no ' + LAB.base + ' to sell.'; st.className = 'mt-1.5 text-xs text-amber-500'; return; }
-    if (!window.confirm('Sell your entire ' + LAB.base + ' paper holding at the current market price?')) return;
-    btn.disabled = true; st.textContent = 'Placing sell…'; st.className = 'mt-1.5 text-xs text-gray-400';
-    fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol }) })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            if (d && d.ok) { st.textContent = '✓ Sold ' + (d.closed || 1) + ' · P&L ' + labFmt(d.realized); st.className = 'mt-1.5 text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); labLoadWallet(); }
-            else { st.textContent = (d && d.error) || 'Could not sell.'; st.className = 'mt-1.5 text-xs text-amber-500'; }
-        }).catch(function () { st.textContent = 'Network error.'; st.className = 'mt-1.5 text-xs text-amber-500'; })
-        .finally(function () { btn.disabled = false; });
+    labConfirm({ title: 'Sell your ' + LAB.base + '?', message: 'Close your entire ' + LAB.base + ' paper holding at the current market price.', confirmText: 'Sell ' + LAB.base, danger: true, icon: 'fa-money-bill-wave' }).then(function (go) {
+        if (!go) return;
+        btn.disabled = true; st.textContent = 'Placing sell…'; st.className = 'mt-1.5 text-xs text-gray-400';
+        fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol }) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                if (d && d.ok) { st.textContent = '✓ Sold ' + (d.closed || 1) + ' · P&L ' + labFmt(d.realized); st.className = 'mt-1.5 text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); labLoadWallet(); }
+                else { st.textContent = (d && d.error) || 'Could not sell.'; st.className = 'mt-1.5 text-xs text-amber-500'; }
+            }).catch(function () { st.textContent = 'Network error.'; st.className = 'mt-1.5 text-xs text-amber-500'; })
+            .finally(function () { btn.disabled = false; });
+    });
 }
 
 // ---- Live order book (Binance partial-depth stream) — bids (buyers) / asks (sellers) ----
@@ -736,15 +794,17 @@ function labRenderBook(bids, asks) {
 }
 
 function labSell(id, btn, fromModal) {
-    if (!window.confirm('Close this trade now at the current market price?')) return;
-    if (btn) btn.disabled = true;
-    fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, id: id }) })
-        .then(function (r) { return r.json(); })
-        .then(function (d) {
-            var st = document.getElementById('lab-trade-status');
-            if (d && d.ok) { if (st) { st.textContent = '✓ Closed · P&L ' + labFmt(d.realized); st.className = 'text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); } labLoadWallet(); if (fromModal) labModalClose(); }
-            else { if (st) { st.textContent = (d && d.error) || 'Could not close.'; st.className = 'text-xs text-amber-500'; } if (btn) btn.disabled = false; }
-        }).catch(function () { if (btn) btn.disabled = false; });
+    labConfirm({ title: 'Close this trade?', message: 'Sell now at the current market price.', confirmText: 'Sell now', danger: true, icon: 'fa-money-bill-wave' }).then(function (go) {
+        if (!go) return;
+        if (btn) btn.disabled = true;
+        fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, id: id }) })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var st = document.getElementById('lab-trade-status');
+                if (d && d.ok) { if (st) { st.textContent = '✓ Closed · P&L ' + labFmt(d.realized); st.className = 'text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); } labLoadWallet(); if (fromModal) labModalClose(); }
+                else { if (st) { st.textContent = (d && d.error) || 'Could not close.'; st.className = 'text-xs text-amber-500'; } if (btn) btn.disabled = false; }
+            }).catch(function () { if (btn) btn.disabled = false; });
+    });
 }
 
 function labActivateStrategy(key, name, btn) {
@@ -758,7 +818,7 @@ function labActivateStrategy(key, name, btn) {
                 document.querySelectorAll('.lab-tpl').forEach(function (b) { var on = b.dataset.tpl === key; b.classList.toggle('border-primary', on); b.classList.toggle('ring-1', on); b.classList.toggle('ring-primary', on); });
                 var hb = document.getElementById('lab-heartbeat'); if (hb) hb.innerHTML = '<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span> <span class="font-semibold text-green-600 dark:text-green-400">Bot started on ' + name + '</span> — trades will follow this strategy.';
             } else if (d && d.upgrade) { window.location.href = '/academy#pricing'; }
-            else if (d) { alert(d.error || 'Could not activate the bot.'); }
+            else if (d) { labNotice({ title: 'Could not activate', message: d.error || 'Could not activate the bot.', danger: true }); }
         }).catch(function () {})
         .finally(function () { if (btn) btn.classList.remove('opacity-60'); });
 }
