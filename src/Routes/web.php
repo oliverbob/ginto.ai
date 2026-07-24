@@ -1700,6 +1700,10 @@ $router->post('/academy/settings/save', 'AcademyController@settingsSave'); // me
 $router->post('/academy/bot/activate', 'AcademyController@botActivate'); // Pro: pick a strategy + start the bot
 $router->post('/academy/trade/buy', 'AcademyController@tradeBuy');  // members: manual paper buy on the charted coin
 $router->post('/academy/trade/sell', 'AcademyController@tradeSell'); // members: manual paper close
+$router->get('/academy/history', 'AcademyController@history');            // members: their paper-trade transaction history
+$router->get('/academy/history/data', 'AcademyController@historyData');   // members: JSON page of their trades
+$router->get('/academy/thoughts', 'AcademyController@thoughts');          // members: full class-bot reasoning history
+$router->get('/academy/thoughts/data', 'AcademyController@thoughtsData'); // members: JSON page of bot thoughts
 $router->get('/academy/learn', 'AcademyController@learn');
 $router->get('/academy/lesson/{slug}', 'AcademyController@lesson');
 $router->get('/academy/admin', 'AcademyController@admin');

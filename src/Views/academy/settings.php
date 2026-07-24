@@ -36,7 +36,7 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
 
     <?php if (!$isPro): ?>
     <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4 text-sm text-amber-800 dark:text-amber-200">
-        <i class="fas fa-lock mr-1"></i> Customising the bot is a <strong>Pro Trader</strong> feature. You can explore the strategy templates below, but saving is disabled on Starter.
+        <i class="fas fa-lock mr-1"></i> Your <strong>loss guardrails</strong> below are saveable on Starter. Customising the bot's <strong>strategy templates and sizing</strong> is a <strong>Pro Trader</strong> feature.
         <a href="/academy#pricing" class="font-semibold underline">Upgrade to Pro</a> to run your own configuration.
     </div>
     <?php endif; ?>
@@ -59,8 +59,30 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
         <?php endforeach; ?>
     </div>
 
+    <!-- Loss guardrails (available to EVERY member — they protect manual trades too) -->
+    <h2 class="mt-8 mb-1 text-sm font-bold uppercase tracking-wide text-primary">Loss guardrails</h2>
+    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Automatic safety limits on your paper wallet. These apply to <strong>all</strong> your trades — manual, AI, and bot — and are saveable on any plan.</p>
+    <div class="grid sm:grid-cols-2 gap-4">
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <label class="text-sm font-semibold">Per-trade stop-loss</label>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">Auto-close any single position once it drops this % below entry (0.1–50%).</div>
+            <div class="flex items-center gap-2">
+                <input id="set-stop" type="number" min="0.1" max="50" step="0.1" value="<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($settings['stop_loss_pct'] ?? 1), 2), '0'), '.')) ?>"
+                       class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none"><span class="text-gray-400">%</span>
+            </div>
+        </div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <label class="text-sm font-semibold">Daily-loss halt</label>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">If your wallet is down this % on the day, close everything &amp; pause the bot until tomorrow (0.1–50%).</div>
+            <div class="flex items-center gap-2">
+                <input id="set-daily" type="number" min="0.1" max="50" step="0.1" value="<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($settings['max_daily_loss_pct'] ?? 1), 2), '0'), '.')) ?>"
+                       class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none"><span class="text-gray-400">%</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Sizing -->
-    <h2 class="mt-8 mb-3 text-sm font-bold uppercase tracking-wide text-primary">Risk &amp; sizing</h2>
+    <h2 class="mt-8 mb-3 text-sm font-bold uppercase tracking-wide text-primary">Bot sizing<?= $isPro ? '' : ' <span class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">Pro</span>' ?></h2>
     <div class="grid sm:grid-cols-2 gap-4">
         <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <label class="text-sm font-semibold">Paper size per trade</label>
@@ -78,25 +100,35 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
         </div>
     </div>
 
-    <?php if ($isPro): ?>
     <div class="mt-6 flex items-center gap-3">
         <button type="button" id="set-save" onclick="gtaSaveSettings()" class="inline-flex items-center gap-2 text-sm font-bold px-5 py-2.5 rounded-xl bg-primary text-white hover:bg-primary/90 disabled:opacity-60"><i class="fas fa-floppy-disk"></i> Save settings</button>
         <span id="set-status" class="text-sm text-gray-400"></span>
     </div>
-    <?php endif; ?>
 </section>
 
 <script>
 const GTA_CSRF = <?= json_encode($csrf_token ?? '') ?>;
+const GTA_IS_PRO = <?= $isPro ? 'true' : 'false' ?>;
 function gtaSaveSettings() {
     var btn = document.getElementById('set-save'), st = document.getElementById('set-status');
     if (!btn || btn.disabled) return;
-    var tpls = Array.prototype.slice.call(document.querySelectorAll('.tpl-check:checked')).map(function (c) { return c.value; });
-    if (!tpls.length) { st.textContent = 'Pick at least one strategy.'; st.className = 'text-sm text-amber-500'; return; }
+    // Everyone saves risk guardrails; Pro also saves strategy templates + sizing.
+    var payload = {
+        csrf_token: GTA_CSRF,
+        stop_loss_pct: +document.getElementById('set-stop').value,
+        max_daily_loss_pct: +document.getElementById('set-daily').value,
+    };
+    if (GTA_IS_PRO) {
+        var tpls = Array.prototype.slice.call(document.querySelectorAll('.tpl-check:checked')).map(function (c) { return c.value; });
+        if (!tpls.length) { st.textContent = 'Pick at least one strategy.'; st.className = 'text-sm text-amber-500'; return; }
+        payload.templates = tpls;
+        payload.trade_size = +document.getElementById('set-size').value;
+        payload.max_slots = +document.getElementById('set-slots').value;
+    }
     btn.disabled = true; st.textContent = 'Saving…'; st.className = 'text-sm text-gray-400';
     fetch('/academy/settings/save', {
         method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': GTA_CSRF }, credentials: 'same-origin',
-        body: JSON.stringify({ csrf_token: GTA_CSRF, templates: tpls, trade_size: +document.getElementById('set-size').value, max_slots: +document.getElementById('set-slots').value }),
+        body: JSON.stringify(payload),
     }).then(function (r) { return r.json(); }).then(function (d) {
         if (d && d.ok) { st.textContent = '✓ Saved — your bot will use these on its next trade.'; st.className = 'text-sm text-green-600 dark:text-green-400'; }
         else { st.textContent = (d && d.error) || 'Could not save.'; st.className = 'text-sm text-amber-500'; }

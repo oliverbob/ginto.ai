@@ -21,8 +21,10 @@ $isPro   = !empty($isPro);
     <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy/learn" class="flex items-center gap-2 font-bold"><i class="fas fa-graduation-cap text-primary"></i> Ginto <span class="text-primary">Trading Academy</span></a>
         <div class="flex items-center gap-3 text-sm">
-            <a href="/academy/learn" class="text-gray-500 hover:text-primary"><i class="fas fa-book-open mr-1"></i>Lessons</a>
-            <a href="/academy/settings" class="text-gray-500 hover:text-primary" title="Bot settings"><i class="fas fa-sliders"></i></a>
+            <a href="/academy/learn" class="hidden sm:inline text-gray-500 hover:text-primary"><i class="fas fa-book-open mr-1"></i>Lessons</a>
+            <a href="/academy/history" class="text-gray-500 hover:text-primary" title="My trade history"><i class="fas fa-clock-rotate-left mr-1"></i><span class="hidden sm:inline">History</span></a>
+            <a href="/academy/thoughts" class="text-gray-500 hover:text-primary" title="Bot's mind — full reasoning history"><i class="fas fa-brain mr-1"></i><span class="hidden sm:inline">Bot's mind</span></a>
+            <a href="/academy/settings" class="text-gray-500 hover:text-primary" title="Bot &amp; risk settings"><i class="fas fa-sliders"></i></a>
             <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <span class="hidden sm:inline text-gray-500 dark:text-gray-400"><?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['username'] ?? 'Member') ?></span>
             <a href="/logout" class="inline-flex items-center gap-1 text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
@@ -54,6 +56,11 @@ $isPro   = !empty($isPro);
             <div id="lab-wallet-pnl" class="text-lg font-bold text-gray-400">$0.00</div>
             <div class="text-[11px] text-gray-400">vs $10,000 start</div>
         </div>
+    </div>
+
+    <!-- Daily-loss circuit breaker banner (shown only when today's limit has tripped) -->
+    <div id="lab-halt" class="hidden mt-3 rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-4 py-3 text-sm text-red-700 dark:text-red-300">
+        <i class="fas fa-hand mr-1"></i> <strong>Daily loss limit reached.</strong> To protect your wallet, all positions were closed and the bot is paused until tomorrow. You can adjust this in <a href="/academy/settings" class="underline font-semibold">settings</a>.
     </div>
 
     <!-- Bot controls (prominent) -->
@@ -117,18 +124,48 @@ $isPro   = !empty($isPro);
                 <span class="text-[11px] text-gray-400">Advisory only — the bot reasons out loud; no orders are placed.</span>
             </div>
             <div id="lab-anz-coin-out" class="hidden mt-3 rounded-xl border border-primary/30 bg-primary/5 p-3 text-sm"></div>
-            <!-- Manual paper trade (Starter + Pro) — trade the coin on the chart -->
-            <div class="mt-3 rounded-xl border border-green-200 dark:border-green-500/30 bg-green-50/50 dark:bg-green-500/5 p-3">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="text-sm font-bold"><i class="fas fa-hand-pointer text-green-600 mr-1"></i>Trade <span id="lab-trade-sym">BTC</span>/USDT yourself</span>
-                    <span class="text-[11px] text-gray-400">manual paper trade — you pick the entry, you close it</span>
+            <!-- Binance-style paper order ticket (Starter + Pro) — market Buy / Sell on the charted coin -->
+            <div class="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <span class="text-sm font-bold"><i class="fas fa-arrow-right-arrow-left text-primary mr-1"></i>Trade <span id="lab-trade-sym">BTC</span>/USDT</span>
+                    <span class="text-[11px] text-gray-400">market order · paper</span>
                 </div>
-                <div class="mt-2 flex flex-wrap items-center gap-2">
-                    <div class="flex items-center gap-1"><span class="text-gray-400">$</span>
-                        <input id="lab-trade-amt" type="number" min="10" step="10" value="100" class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none">
+                <!-- Buy / Sell side selector -->
+                <div class="mt-2 grid grid-cols-2 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-sm font-bold">
+                    <button type="button" id="lab-side-buy" onclick="labSetSide('buy')" class="py-2 bg-green-600 text-white">Buy</button>
+                    <button type="button" id="lab-side-sell" onclick="labSetSide('sell')" class="py-2 text-gray-500 dark:text-gray-400 border-l border-gray-200 dark:border-gray-700">Sell</button>
+                </div>
+                <!-- Holding line -->
+                <div class="mt-2 text-[11px] text-gray-500 dark:text-gray-400">Holding: <span id="lab-hold" class="font-semibold text-gray-700 dark:text-gray-200">0</span> <span id="lab-hold-base">BTC</span> <span id="lab-hold-val" class="text-gray-400"></span></div>
+                <!-- Amount + quick sizing -->
+                <div class="mt-2 flex items-center gap-1"><span class="text-gray-400">$</span>
+                    <input id="lab-trade-amt" type="number" min="10" step="10" value="100" class="flex-1 min-w-0 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none">
+                </div>
+                <div id="lab-pct" class="mt-2 grid grid-cols-4 gap-1 text-[11px] font-semibold">
+                    <button type="button" data-pct="25" class="py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:border-primary hover:text-primary">25%</button>
+                    <button type="button" data-pct="50" class="py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:border-primary hover:text-primary">50%</button>
+                    <button type="button" data-pct="75" class="py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:border-primary hover:text-primary">75%</button>
+                    <button type="button" data-pct="100" class="py-1.5 rounded border border-gray-200 dark:border-gray-700 text-gray-500 hover:border-primary hover:text-primary">Max</button>
+                </div>
+                <button type="button" id="lab-order-btn" onclick="labSubmitOrder()" class="mt-2 w-full inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"><i class="fas fa-cart-plus"></i> <span id="lab-order-label">Buy BTC on paper</span></button>
+                <div id="lab-trade-status" class="mt-1.5 text-xs text-gray-400"></div>
+            </div>
+
+            <!-- Live order book — buyers (bids) left, sellers (asks) right -->
+            <div class="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400"><i class="fas fa-book text-primary mr-1"></i>Order book</span>
+                    <span id="lab-book-spread" class="text-[10px] text-gray-400 tabular-nums">—</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-green-600 dark:text-green-400 mb-1"><span><i class="fas fa-arrow-trend-up mr-0.5"></i>Buyers</span><span class="text-gray-400 font-normal">size</span></div>
+                        <div id="lab-book-bids" class="space-y-0.5 text-[11px] tabular-nums"></div>
                     </div>
-                    <button type="button" id="lab-buy-btn" onclick="labBuy()" class="inline-flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"><i class="fas fa-cart-plus"></i> Buy on paper</button>
-                    <span id="lab-trade-status" class="text-xs text-gray-400"></span>
+                    <div>
+                        <div class="flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-red-500 dark:text-red-400 mb-1"><span class="text-gray-400 font-normal">size</span><span>Sellers<i class="fas fa-arrow-trend-down ml-0.5"></i></span></div>
+                        <div id="lab-book-asks" class="space-y-0.5 text-[11px] tabular-nums"></div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -170,7 +207,11 @@ $isPro   = !empty($isPro);
                 <?php endif; ?>
             </div>
         </div>
-        <div id="lab-my-positions" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+        <div class="mt-4 flex items-center justify-between">
+            <div class="text-xs font-bold uppercase tracking-wide text-gray-400">Your open trades</div>
+            <a href="/academy/history" class="text-xs text-primary hover:underline">Trade history <i class="fas fa-arrow-right ml-0.5"></i></a>
+        </div>
+        <div id="lab-my-positions" class="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
 
         <?php if ($catalog): ?>
         <div class="mt-5 pt-4 border-t border-gray-200 dark:border-gray-800">
@@ -206,7 +247,10 @@ $isPro   = !empty($isPro);
         </div>
         <!-- AI reasoning stream -->
         <div>
-            <h2 class="mb-3 text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-brain mr-1"></i>The bot's mind</h2>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-sm font-bold uppercase tracking-wide text-primary"><i class="fas fa-brain mr-1"></i>The bot's mind</h2>
+                <a href="/academy/thoughts" class="text-xs text-primary hover:underline">Full history <i class="fas fa-arrow-right ml-0.5"></i></a>
+            </div>
             <div id="lab-thoughts" class="space-y-2 max-h-[520px] overflow-y-auto pr-1 text-sm"></div>
         </div>
     </div>
@@ -280,7 +324,7 @@ function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) r
 function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
 // ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
-var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {} };
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {}, side: 'buy', balance: 10000, holdQty: 0, holdSpent: 0, lastPx: 0, bookWs: null };
 
 function labChartTheme() {
     var dark = document.documentElement.classList.contains('dark');
@@ -319,7 +363,7 @@ function labLoadChart() {
         }).catch(function () {});
 }
 
-function labSetPrice(px) { var el = document.getElementById('lab-chart-price'); if (el) el.textContent = '$' + labFmtPrice(px); }
+function labSetPrice(px) { LAB.lastPx = +px; var el = document.getElementById('lab-chart-price'); if (el) el.textContent = '$' + labFmtPrice(px); labUpdateHoldValue(); }
 function labSetLive(txt, on) {
     var el = document.getElementById('lab-chart-live'); if (!el) return;
     el.textContent = txt;
@@ -350,13 +394,17 @@ function labSelectSymbol(symbol, base, price, chg) {
     LAB.symbol = symbol; LAB.base = base;
     document.getElementById('lab-chart-symbol').textContent = base + '/USDT';
     var ts = document.getElementById('lab-trade-sym'); if (ts) ts.textContent = base;
+    var hb = document.getElementById('lab-hold-base'); if (hb) hb.textContent = base;
     var ico = document.getElementById('lab-chart-icon'); if (ico) ico.innerHTML = labCoinIcon(base, 22);
     if (price != null) labSetPrice(price);
     var up = (+chg) >= 0, chgEl = document.getElementById('lab-chart-change');
     chgEl.textContent = (up ? '+' : '') + (+chg).toFixed(2) + '%';
     chgEl.className = 'text-sm font-semibold ' + labChgClass(up);
     document.querySelectorAll('.lab-pair').forEach(function (b) { b.classList.toggle('bg-primary/10', b.dataset.symbol === symbol); });
+    labSetSide(LAB.side);          // refresh order-ticket labels for the new coin
     labLoadChart();
+    labOpenBook();                 // reconnect the order-book stream to the new coin
+    labLoadWallet();               // refresh holding for the new coin
 }
 
 function labRenderMarketList() {
@@ -469,12 +517,23 @@ function labLoadWallet() {
         .then(function (d) {
             if (!d || !d.ok) return;
             var eq = +d.equity, start = +d.starting || 10000, pnl = eq - start;
+            LAB.balance = +d.balance || 0;
             labApplyVal('lab-wallet', '$' + eq.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }), 'mt-1 text-4xl font-extrabold tabular-nums');
             labApplyVal('lab-wallet-pnl', (pnl >= 0 ? '+' : '−') + '$' + Math.abs(pnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
                 'text-lg font-bold ' + (pnl > 0 ? 'text-green-600 dark:text-green-400' : pnl < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400'));
             LAB.botOn = !!d.bot_enabled;
             labSetToggle();
             labRenderMyPositions(d.positions || []);
+
+            // Holding of the charted coin = sum of my MANUAL open positions on that symbol (what Sell closes).
+            var q = 0, sp = 0;
+            (d.positions || []).forEach(function (p) { if (!p.auto && p.symbol === LAB.symbol) { q += +p.qty; sp += +p.spent; } });
+            labSetHolding(q, sp);
+
+            // Daily-loss circuit breaker banner.
+            var halt = document.getElementById('lab-halt');
+            if (halt) halt.classList.toggle('hidden', !d.halted);
+            if (d.just_halted) { var ts = document.getElementById('lab-trade-status'); if (ts) { ts.textContent = 'Daily loss limit hit — positions closed, bot paused until tomorrow.'; ts.className = 'mt-1.5 text-xs text-red-500'; } }
         }).catch(function () {});
 }
 
@@ -573,19 +632,107 @@ function labUpdateTradeCard(gridId, p) {
     if (t) t.textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
 }
 
-function labBuy() {
-    var btn = document.getElementById('lab-buy-btn'), st = document.getElementById('lab-trade-status');
+// ---- Binance-style paper order ticket (market Buy / Sell) ---------------------
+function labSetSide(side) {
+    LAB.side = side === 'sell' ? 'sell' : 'buy';
+    var buy = document.getElementById('lab-side-buy'), sell = document.getElementById('lab-side-sell');
+    var btn = document.getElementById('lab-order-btn'), lbl = document.getElementById('lab-order-label');
+    if (buy) buy.className = 'py-2 ' + (LAB.side === 'buy' ? 'bg-green-600 text-white' : 'text-gray-500 dark:text-gray-400');
+    if (sell) sell.className = 'py-2 border-l border-gray-200 dark:border-gray-700 ' + (LAB.side === 'sell' ? 'bg-red-500 text-white' : 'text-gray-500 dark:text-gray-400');
+    if (btn) btn.className = 'mt-2 w-full inline-flex items-center justify-center gap-1.5 text-sm font-bold px-4 py-2.5 rounded-lg text-white disabled:opacity-60 ' + (LAB.side === 'buy' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-500 hover:bg-red-600');
+    if (btn) btn.querySelector('i').className = LAB.side === 'buy' ? 'fas fa-cart-plus' : 'fas fa-money-bill-wave';
+    if (lbl) lbl.textContent = (LAB.side === 'buy' ? 'Buy ' : 'Sell ') + LAB.base + ' on paper';
+    var amtWrap = document.getElementById('lab-trade-amt').parentElement, pct = document.getElementById('lab-pct');
+    // Sell closes the whole holding at market — amount input isn't used for sell.
+    if (amtWrap) amtWrap.style.opacity = LAB.side === 'sell' ? '0.4' : '1';
+    if (pct) pct.style.opacity = LAB.side === 'sell' ? '0.4' : '1';
+}
+function labUpdateHoldValue() {
+    var v = document.getElementById('lab-hold-val');
+    if (v) v.textContent = (LAB.holdQty > 0 && LAB.lastPx > 0) ? '(≈ $' + (LAB.holdQty * LAB.lastPx).toFixed(2) + ')' : '';
+}
+function labSetHolding(qty, spent) {
+    LAB.holdQty = +qty || 0; LAB.holdSpent = +spent || 0;
+    var h = document.getElementById('lab-hold'); if (h) h.textContent = LAB.holdQty > 0 ? LAB.holdQty.toPrecision(6) : '0';
+    labUpdateHoldValue();
+}
+function labApplyPct(pct) {
+    var input = document.getElementById('lab-trade-amt');
+    if (!input || LAB.side !== 'buy') return;
+    var amt = Math.floor((LAB.balance * pct / 100) * 100) / 100;
+    input.value = amt >= 10 ? amt : 10;
+}
+function labSubmitOrder() {
+    if (LAB.side === 'sell') return labSellHolding();
+    var btn = document.getElementById('lab-order-btn'), st = document.getElementById('lab-trade-status');
     if (!btn || btn.disabled) return;
     var amt = +document.getElementById('lab-trade-amt').value;
-    if (!(amt >= 10)) { st.textContent = 'Minimum $10.'; st.className = 'text-xs text-amber-500'; return; }
-    btn.disabled = true; st.textContent = 'Placing…'; st.className = 'text-xs text-gray-400';
+    if (!(amt >= 10)) { st.textContent = 'Minimum $10.'; st.className = 'mt-1.5 text-xs text-amber-500'; return; }
+    btn.disabled = true; st.textContent = 'Placing buy…'; st.className = 'mt-1.5 text-xs text-gray-400';
     fetch('/academy/trade/buy', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol, amount: amt }) })
         .then(function (r) { return r.json(); })
         .then(function (d) {
-            if (d && d.ok) { st.textContent = '✓ Bought ' + d.base + ' at $' + (+d.entry).toPrecision(6); st.className = 'text-xs text-green-600 dark:text-green-400'; labLoadWallet(); }
-            else { st.textContent = (d && d.error) || 'Could not buy.'; st.className = 'text-xs text-amber-500'; }
-        }).catch(function () { st.textContent = 'Network error.'; st.className = 'text-xs text-amber-500'; })
+            if (d && d.ok) { st.textContent = '✓ Bought ' + d.base + ' at $' + (+d.entry).toPrecision(6) + ' · stop $' + (+d.stop_loss).toPrecision(6); st.className = 'mt-1.5 text-xs text-green-600 dark:text-green-400'; labLoadWallet(); }
+            else { st.textContent = (d && d.error) || 'Could not buy.'; st.className = 'mt-1.5 text-xs text-amber-500'; }
+        }).catch(function () { st.textContent = 'Network error.'; st.className = 'mt-1.5 text-xs text-amber-500'; })
         .finally(function () { btn.disabled = false; });
+}
+function labSellHolding() {
+    var btn = document.getElementById('lab-order-btn'), st = document.getElementById('lab-trade-status');
+    if (!btn || btn.disabled) return;
+    if (LAB.holdQty <= 0) { st.textContent = 'You have no ' + LAB.base + ' to sell.'; st.className = 'mt-1.5 text-xs text-amber-500'; return; }
+    if (!window.confirm('Sell your entire ' + LAB.base + ' paper holding at the current market price?')) return;
+    btn.disabled = true; st.textContent = 'Placing sell…'; st.className = 'mt-1.5 text-xs text-gray-400';
+    fetch('/academy/trade/sell', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LAB_CSRF }, credentials: 'same-origin', body: JSON.stringify({ csrf_token: LAB_CSRF, symbol: LAB.symbol }) })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+            if (d && d.ok) { st.textContent = '✓ Sold ' + (d.closed || 1) + ' · P&L ' + labFmt(d.realized); st.className = 'mt-1.5 text-xs ' + ((+d.realized) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'); labLoadWallet(); }
+            else { st.textContent = (d && d.error) || 'Could not sell.'; st.className = 'mt-1.5 text-xs text-amber-500'; }
+        }).catch(function () { st.textContent = 'Network error.'; st.className = 'mt-1.5 text-xs text-amber-500'; })
+        .finally(function () { btn.disabled = false; });
+}
+
+// ---- Live order book (Binance partial-depth stream) — bids (buyers) / asks (sellers) ----
+function labCloseBook() { if (LAB.bookWs) { try { LAB.bookWs.onclose = null; LAB.bookWs.close(); } catch (e) {} LAB.bookWs = null; } }
+function labOpenBook() {
+    labCloseBook();
+    if (typeof WebSocket === 'undefined') return;
+    var sym = LAB.symbol, ws;
+    try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + sym.toLowerCase() + '@depth20@100ms'); }
+    catch (e) { return; }
+    LAB.bookWs = ws;
+    ws.onmessage = function (ev) {
+        if (LAB.symbol !== sym) return;
+        var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+        if (m && m.bids && m.asks) labRenderBook(m.bids, m.asks);
+    };
+    ws.onclose = function () { if (LAB.symbol === sym && LAB.bookWs === ws) { LAB.bookWs = null; setTimeout(function () { if (LAB.symbol === sym) labOpenBook(); }, 2500); } };
+}
+function labRenderBook(bids, asks) {
+    var N = 12;
+    bids = (bids || []).slice(0, N); asks = (asks || []).slice(0, N);
+    var maxQ = 0;
+    bids.concat(asks).forEach(function (r) { var q = +r[1]; if (q > maxQ) maxQ = q; });
+    if (maxQ <= 0) maxQ = 1;
+    var bidRow = function (r, side) {
+        var px = +r[0], q = +r[1], w = Math.min(100, q / maxQ * 100);
+        var bar = side === 'bid'
+            ? 'background:linear-gradient(to left,rgba(22,163,74,0.18) ' + w + '%,transparent ' + w + '%);'
+            : 'background:linear-gradient(to right,rgba(239,68,68,0.18) ' + w + '%,transparent ' + w + '%);';
+        var priceCls = side === 'bid' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+        if (side === 'bid')
+            return '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="' + priceCls + '">' + labFmtPrice(px) + '</span><span class="text-gray-500 dark:text-gray-400">' + q.toPrecision(4) + '</span></div>';
+        return '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="text-gray-500 dark:text-gray-400">' + q.toPrecision(4) + '</span><span class="' + priceCls + '">' + labFmtPrice(px) + '</span></div>';
+    };
+    var be = document.getElementById('lab-book-bids'), ae = document.getElementById('lab-book-asks');
+    if (be) be.innerHTML = bids.map(function (r) { return bidRow(r, 'bid'); }).join('');
+    if (ae) ae.innerHTML = asks.map(function (r) { return bidRow(r, 'ask'); }).join('');
+    var sp = document.getElementById('lab-book-spread');
+    if (sp && bids.length && asks.length) {
+        var bestBid = +bids[0][0], bestAsk = +asks[0][0], mid = (bestBid + bestAsk) / 2;
+        var spr = mid > 0 ? (bestAsk - bestBid) / mid * 100 : 0;
+        sp.textContent = 'spread ' + spr.toFixed(3) + '%';
+    }
 }
 
 function labSell(id, btn, fromModal) {
@@ -617,7 +764,7 @@ function labActivateStrategy(key, name, btn) {
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
-var LABM = { chart: null, series: null, ws: null, symbol: '', base: '', entry: 0, interval: '15m', posId: 0 };
+var LABM = { chart: null, series: null, ws: null, ro: null, symbol: '', base: '', entry: 0, interval: '15m', posId: 0 };
 function labModalSell() {
     if (!LABM.posId) return;
     labSell(LABM.posId, document.getElementById('lab-modal-sell'), true);
@@ -625,8 +772,12 @@ function labModalSell() {
 function labModalClose() {
     var o = document.getElementById('lab-modal'); if (!o) return;
     if (LABM.ws) { try { LABM.ws.onclose = null; LABM.ws.close(); } catch (e) {} LABM.ws = null; }
+    if (LABM.ro) { try { LABM.ro.disconnect(); } catch (e) {} LABM.ro = null; }
     if (LABM.chart) { try { LABM.chart.remove(); } catch (e) {} LABM.chart = null; LABM.series = null; }
+    // Clear the symbol so the 6s poll (labRender) stops updating a closed modal.
+    LABM.symbol = ''; LABM.base = ''; LABM.posId = 0;
     o.classList.add('hidden'); o.classList.remove('flex');
+    var el = document.getElementById('lab-modal-chart'); if (el) el.innerHTML = '';
 }
 function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
@@ -643,7 +794,9 @@ function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     var el = document.getElementById('lab-modal-chart'); el.innerHTML = '';
     LABM.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 340 }, labChartTheme()));
     LABM.series = LABM.chart.addCandlestickSeries({ upColor: '#16a34a', downColor: '#ef4444', borderVisible: false, wickUpColor: '#16a34a', wickDownColor: '#ef4444' });
-    new ResizeObserver(function () { if (LABM.chart) LABM.chart.applyOptions({ width: el.clientWidth }); }).observe(el);
+    if (LABM.ro) { try { LABM.ro.disconnect(); } catch (e) {} }
+    LABM.ro = new ResizeObserver(function () { if (LABM.chart) LABM.chart.applyOptions({ width: el.clientWidth }); });
+    LABM.ro.observe(el);
     labModalHighlightIv();
     labModalLoad();
     labModalWhy(symbol);
@@ -731,10 +884,21 @@ function labAnalyzeRun(o) {
             else if (dec === 'SKIP') { cls = 'bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300'; badge = 'SKIP'; }
             var head = o.scope === 'market' ? '<i class="fas fa-magnifying-glass-chart text-primary"></i> Market scan' : (labCoinIcon(d.base, 20) + d.base + '/USDT');
             var body = (d.text || '').replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }).replace(/\n/g, '<br>');
+            // Hands-free: if the bot auto-executed a buy off this verdict, show it and refresh the wallet.
+            var autoNote = '';
+            if (d.auto && d.auto.executed) {
+                autoNote = '<div class="mt-2 rounded-lg bg-green-100 text-green-800 dark:bg-green-500/20 dark:text-green-300 px-2.5 py-1.5 text-xs font-semibold"><i class="fas fa-robot mr-1"></i>Auto-bought ' + (d.auto.base || d.auto.symbol) + ' at $' + (+d.auto.entry).toPrecision(6) + ' ($' + (+d.auto.spent).toFixed(0) + ' paper).</div>';
+                labLoadWallet();
+            } else if (d.auto && d.auto.reason === 'already_open') {
+                autoNote = '<div class="mt-2 text-[11px] text-gray-400"><i class="fas fa-robot mr-1"></i>Bot already holds ' + LAB.base + ' — no new order.</div>';
+            } else if (d.auto && d.auto.reason === 'halted') {
+                autoNote = '<div class="mt-2 text-[11px] text-red-500"><i class="fas fa-hand mr-1"></i>Daily loss limit hit — auto-buy paused until tomorrow.</div>';
+            }
+            var flag = (LAB.isPro && LAB.botOn) ? 'AI · auto-trading' : 'AI · advisory';
             out.innerHTML = '<div class="flex items-center gap-2 mb-1.5 font-bold">' + head
                 + (badge ? '<span class="ml-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ' + cls + '">' + badge + '</span>' : '')
-                + '<span class="ml-auto text-[10px] text-gray-400 font-normal">AI · advisory</span></div>'
-                + '<div class="text-gray-700 dark:text-gray-200 leading-relaxed">' + body + '</div>';
+                + '<span class="ml-auto text-[10px] text-gray-400 font-normal">' + flag + '</span></div>'
+                + '<div class="text-gray-700 dark:text-gray-200 leading-relaxed">' + body + '</div>' + autoNote;
         })
         .catch(function () { out.innerHTML = '<div class="text-amber-600 dark:text-amber-400">Network error — try again.</div>'; })
         .finally(function () { btn.disabled = false; lbl.textContent = o.reset; });
@@ -752,9 +916,19 @@ document.addEventListener('DOMContentLoaded', function () {
     labInitEyes();
     document.getElementById('lab-chart-icon').innerHTML = labCoinIcon('BTC', 22);
     labSetTab('hot');
+    labSetSide('buy');         // default the order ticket to Buy
     labLoadWallet();          // this learner's own $10k paper wallet
     labLoadMarkets();
     labLoadChart();            // default BTCUSDT / 15m
+    labOpenBook();             // live order book for BTCUSDT
+    // Quick-size percent buttons (Buy side sizes off the paper balance).
+    document.querySelectorAll('#lab-pct button').forEach(function (b) {
+        b.addEventListener('click', function () { labApplyPct(+b.dataset.pct); });
+    });
+    // Close the expandable chart modal on backdrop click or Escape (not just the ✕).
+    var modal = document.getElementById('lab-modal');
+    if (modal) modal.addEventListener('click', function (e) { if (e.target === modal) labModalClose(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { var m = document.getElementById('lab-modal'); if (m && !m.classList.contains('hidden')) labModalClose(); } });
     // Interval selector
     document.querySelectorAll('#lab-iv button').forEach(function (b) {
         b.addEventListener('click', function () {

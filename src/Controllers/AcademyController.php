@@ -71,13 +71,18 @@ class AcademyController
         }
     }
 
-    /** The member's shareable Academy invite: /academy?ref=<public_id>, same shape as /register?ref=. */
+    /**
+     * The member's shareable referral link — the short root form https://ginto.ai/?ref=<public_id>.
+     * Landing anywhere with this ?ref (root, /register, or /academy) stores the same
+     * $_SESSION['referral_code'], so an Academy sign-up is attributed to this member either way —
+     * without forcing the invitee onto /register first.
+     */
     private function referralLink(int $userId): string
     {
         try {
             $publicId = Database::getInstance()->get('users', 'public_id', ['id' => $userId]);
             if (empty($publicId)) return '';
-            return $this->baseUrl() . '/academy?ref=' . rawurlencode((string) $publicId);
+            return $this->baseUrl() . '/?ref=' . rawurlencode((string) $publicId);
         } catch (\Throwable $e) {
             return '';
         }
@@ -299,7 +304,12 @@ class AcademyController
 
             $res = $brain->reflect($context);
             if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Analysis failed']); exit; }
-            echo json_encode(['ok' => true, 'scope' => $scope, 'symbol' => $symbol, 'base' => $base, 'text' => $res['text'], 'decision' => $res['decision'] ?? null]);
+            // Pro + bot ON: a BUY verdict auto-executes a paper trade for THIS user only.
+            $auto = $this->autoBuyFromDecision($userId, $scope, $symbol, $res);
+            echo json_encode([
+                'ok' => true, 'scope' => $scope, 'symbol' => $symbol, 'base' => $base,
+                'text' => $res['text'], 'decision' => $res['decision'] ?? null, 'auto' => $auto,
+            ]);
         } catch (\Throwable $e) {
             error_log('Academy analyze: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.']);
@@ -577,7 +587,12 @@ class AcademyController
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        foreach (['bot_enabled TINYINT NOT NULL DEFAULT 0', 'bot_since DATETIME NULL'] as $col) {
+        foreach ([
+            'bot_enabled TINYINT NOT NULL DEFAULT 0', 'bot_since DATETIME NULL',
+            'day_anchor DECIMAL(18,8) NULL',   // equity at the first poll of the current day
+            'day_anchor_date DATE NULL',       // which day that anchor belongs to
+            'halt_date DATE NULL',             // day the daily-loss circuit breaker last tripped
+        ] as $col) {
             try { $db->pdo->exec("ALTER TABLE academy_wallets ADD COLUMN IF NOT EXISTS $col"); } catch (\Throwable $e) {}
         }
         $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_positions (
@@ -595,10 +610,13 @@ class AcademyController
             status VARCHAR(8) NOT NULL DEFAULT 'open',
             exit_price DECIMAL(28,10) NULL,
             realized DECIMAL(18,8) NULL,
+            close_reason VARCHAR(16) NULL,
             opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             closed_at DATETIME NULL,
             INDEX idx_user_status (user_id, status)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Backfill on pre-existing installs.
+        try { $db->pdo->exec("ALTER TABLE academy_positions ADD COLUMN IF NOT EXISTS close_reason VARCHAR(16) NULL"); } catch (\Throwable $e) {}
     }
 
     /**
@@ -618,10 +636,14 @@ class AcademyController
             return [
                 'balance' => (float) $w['balance'], 'starting' => (float) $w['start_balance'],
                 'bot_enabled' => (int) ($w['bot_enabled'] ?? 0), 'bot_since' => $w['bot_since'] ?? null,
+                'day_anchor' => isset($w['day_anchor']) && $w['day_anchor'] !== null ? (float) $w['day_anchor'] : null,
+                'day_anchor_date' => $w['day_anchor_date'] ?? null,
+                'halt_date' => $w['halt_date'] ?? null,
             ];
         } catch (\Throwable $e) {
             error_log('Academy walletFor: ' . $e->getMessage());
-            return ['balance' => 10000.0, 'starting' => 10000.0, 'bot_enabled' => 0, 'bot_since' => null];
+            return ['balance' => 10000.0, 'starting' => 10000.0, 'bot_enabled' => 0, 'bot_since' => null,
+                    'day_anchor' => null, 'day_anchor_date' => null, 'halt_date' => null];
         }
     }
 
@@ -635,31 +657,59 @@ class AcademyController
         $set = $this->botSettings($userId);
         $UNIT = max(10.0, min(2000.0, (float) $set['trade_size']));   // paper $ per mirrored trade
         $SLOTS = max(1, min(20, (int) $set['max_slots']));            // max concurrent mirrors
+        $stopPct  = (float) $set['stop_loss_pct'];                    // per-trade guardrail
+        $dailyPct = (float) $set['max_daily_loss_pct'];               // account guardrail
         $enabledTpls = array_flip(array_filter(array_map('trim', explode(',', (string) $set['templates']))));
         $db = Database::getInstance();
         $client = new \Ginto\Services\BinanceClient();
         $balance = (float) $wallet['balance'];
         $enabled = !empty($wallet['bot_enabled']);
+        $today   = date('Y-m-d');
+        $halted  = (($wallet['halt_date'] ?? null) === $today);   // daily breaker already tripped today
+
+        $mark = function (string $symbol, float $fallback) use ($client): float {
+            $m = (float) ($client->price($symbol) ?? $fallback);
+            return $m > 0 ? $m : $fallback;
+        };
+        // Close one open position at $exit; realize into balance. Returns proceeds.
+        $close = function (array $u, float $exit, string $reason = '') use ($db, &$balance): void {
+            if ($exit <= 0) $exit = (float) $u['entry'];
+            $proceeds = (float) $u['qty'] * $exit; $balance += $proceeds;
+            $db->update('academy_positions', [
+                'status' => 'closed', 'exit_price' => $exit,
+                'realized' => round($proceeds - (float) $u['spent'], 8),
+                'close_reason' => $reason !== '' ? $reason : null, 'closed_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $u['id']]);
+        };
 
         $botOpen = [];
         try { foreach ((new \Ginto\Models\GtbTrade())->openPositions('paper') as $p) { $botOpen[(int) $p['id']] = $p; } } catch (\Throwable $e) {}
 
-        // 1) Close mirrors whose bot trade has closed — realize at the bot's exit (or live mark).
+        // 1) Close mirrors whose class-bot trade has closed — realize at the bot's exit (or live mark).
         $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
         if (!is_array($open)) $open = [];
         foreach ($open as $u) {
             $ref = $u['ref_trade_id'] !== null ? (int) $u['ref_trade_id'] : 0;
             if ($ref && !isset($botOpen[$ref])) {
                 $bt = $db->get('gtb_trades', ['exit_price'], ['id' => $ref]);
-                $exit = (is_array($bt) && $bt['exit_price'] !== null) ? (float) $bt['exit_price'] : (float) ($client->price($u['symbol']) ?? $u['entry']);
-                if ($exit <= 0) $exit = (float) $u['entry'];
-                $proceeds = (float) $u['qty'] * $exit; $balance += $proceeds;
-                $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $exit, 'realized' => round($proceeds - (float) $u['spent'], 8), 'closed_at' => date('Y-m-d H:i:s')], ['id' => $u['id']]);
+                $exit = (is_array($bt) && $bt['exit_price'] !== null) ? (float) $bt['exit_price'] : $mark($u['symbol'], (float) $u['entry']);
+                $close($u, $exit, 'bot_exit');
             }
         }
 
-        // 2) Open a mirror for each bot trade we don't hold yet.
-        if ($enabled) {
+        // 2) GUARDRAIL A — per-trade stop-loss. Any open position (manual OR bot) down >= stop% from
+        //    entry is auto-closed at the live mark. Applies to every member.
+        $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
+        if (!is_array($open)) $open = [];
+        foreach ($open as $u) {
+            $entry = (float) $u['entry']; if ($entry <= 0) continue;
+            $m = $mark($u['symbol'], $entry);
+            if (($m - $entry) / $entry * 100 <= -$stopPct) { $close($u, $m, 'stop_loss'); }
+        }
+
+        // 3) Open a mirror for each class-bot trade we don't hold yet — only if the learner turned their
+        //    own bot on AND the daily breaker hasn't tripped today. Strictly per-user (scoped by user_id).
+        if ($enabled && !$halted) {
             $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open']);
             if (!is_array($open)) $open = [];
             $held = []; foreach ($open as $u) { if ($u['ref_trade_id'] !== null) $held[(int) $u['ref_trade_id']] = true; }
@@ -667,40 +717,78 @@ class AcademyController
             foreach ($botOpen as $id => $p) {
                 if ($slots <= 0 || $balance < $UNIT) break;
                 if (isset($held[$id])) continue;
-                // Only follow templates the learner enabled in their settings.
                 if ($enabledTpls && !isset($enabledTpls[$p['template'] ?? ''])) continue;
                 $entry = (float) $p['price']; if ($entry <= 0) continue;
+                // Honour the tighter of the class-bot's stop and the learner's own stop%.
+                $userStop = $entry * (1 - $stopPct / 100);
+                $botStop  = isset($p['stop_loss']) ? (float) $p['stop_loss'] : 0.0;
+                $sl = $botStop > 0 ? max($botStop, $userStop) : $userStop;
                 $db->insert('academy_positions', [
                     'user_id' => $userId, 'ref_trade_id' => $id, 'symbol' => $p['symbol'], 'base' => substr($p['symbol'], 0, -4),
                     'qty' => $UNIT / $entry, 'entry' => $entry, 'spent' => $UNIT,
-                    'stop_loss' => $p['stop_loss'] ?? null, 'take_profit' => $p['take_profit'] ?? null, 'template' => $p['template'] ?? null, 'status' => 'open',
+                    'stop_loss' => $sl, 'take_profit' => $p['take_profit'] ?? null, 'template' => $p['template'] ?? null, 'status' => 'open',
                 ]);
                 $balance -= $UNIT; $slots--;
             }
         }
 
-        if (abs($balance - (float) $wallet['balance']) > 1e-9) {
-            $db->update('academy_wallets', ['balance' => round($balance, 8)], ['user_id' => $userId]);
+        // 4) Compute live equity from what's still open, then run GUARDRAIL B — account daily-loss halt.
+        $loadOpen = function () use ($db, $userId, $mark) {
+            $rows = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ORDER' => ['id' => 'DESC']]);
+            if (!is_array($rows)) $rows = [];
+            $marks = 0.0;
+            foreach ($rows as &$r) { $r['_mark'] = $mark($r['symbol'], (float) $r['entry']); $marks += $r['_mark'] * (float) $r['qty']; }
+            return [$rows, $marks];
+        };
+        [$open, $marks] = $loadOpen();
+        $equity = $balance + $marks;
+
+        // Roll the day anchor forward on the first poll of a new day (a fresh day clears yesterday's halt).
+        $anchor = $wallet['day_anchor'];
+        $anchorDate = $wallet['day_anchor_date'] ?? null;
+        $walletPatch = [];
+        if ($anchorDate !== $today || $anchor === null || (float) $anchor <= 0) {
+            $anchor = $equity; $anchorDate = $today;
+            $walletPatch['day_anchor'] = round($anchor, 8);
+            $walletPatch['day_anchor_date'] = $today;
+            $halted = (($wallet['halt_date'] ?? null) === $today); // recompute (still false on a genuinely new day)
+        }
+        $justHalted = false;
+        if (!$halted && (float) $anchor > 0 && $equity <= (float) $anchor * (1 - $dailyPct / 100)) {
+            // Trip the breaker: flatten everything at the mark, pause the bot for the rest of the day.
+            foreach ($open as $u) { $close($u, (float) $u['_mark'], 'daily_halt'); }
+            $walletPatch['bot_enabled'] = 0;
+            $walletPatch['halt_date'] = $today;
+            $halted = true; $justHalted = true; $enabled = false;
+            [$open, $marks] = $loadOpen();
+            $equity = $balance + $marks;
         }
 
-        // 3) Live positions view.
-        $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ORDER' => ['id' => 'DESC']]);
-        if (!is_array($open)) $open = [];
-        $positions = []; $unreal = 0.0; $marks = 0.0;
+        if (abs($balance - (float) $wallet['balance']) > 1e-9) $walletPatch['balance'] = round($balance, 8);
+        if ($walletPatch) $db->update('academy_wallets', $walletPatch, ['user_id' => $userId]);
+
+        // 5) Live positions view.
+        $positions = []; $unreal = 0.0;
         foreach ($open as $u) {
-            $entry = (float) $u['entry']; $qty = (float) $u['qty'];
-            $mark = (float) ($client->price($u['symbol']) ?? $entry); if ($mark <= 0) $mark = $entry;
-            $pnl = ($mark - $entry) * $qty; $unreal += $pnl; $marks += $mark * $qty;
+            $entry = (float) $u['entry']; $qty = (float) $u['qty']; $m = (float) $u['_mark'];
+            $pnl = ($m - $entry) * $qty; $unreal += $pnl;
             $positions[] = [
                 'id' => (int) $u['id'], 'symbol' => $u['symbol'], 'base' => $u['base'], 'template' => $u['template'],
                 'auto' => $u['ref_trade_id'] !== null,   // true = bot-followed, false = manual
-                'entry' => $entry, 'mark' => $mark, 'qty' => $qty, 'spent' => (float) $u['spent'],
+                'entry' => $entry, 'mark' => $m, 'qty' => $qty, 'spent' => (float) $u['spent'],
                 'stop_loss' => $u['stop_loss'] !== null ? (float) $u['stop_loss'] : null,
                 'take_profit' => $u['take_profit'] !== null ? (float) $u['take_profit'] : null,
-                'pnlPct' => $entry > 0 ? ($mark - $entry) / $entry * 100 : 0, 'unrealized' => round($pnl, 4),
+                'pnlPct' => $entry > 0 ? ($m - $entry) / $entry * 100 : 0, 'unrealized' => round($pnl, 4),
             ];
         }
-        return ['balance' => round($balance, 8), 'positions' => $positions, 'unrealized' => round($unreal, 4), 'equity' => round($balance + $marks, 4)];
+        return [
+            'balance' => round($balance, 8), 'positions' => $positions,
+            'unrealized' => round($unreal, 4), 'equity' => round($equity, 4),
+            'bot_enabled' => $enabled && !$halted,
+            'halted' => $halted, 'just_halted' => $justHalted,
+            'stop_loss_pct' => $stopPct, 'max_daily_loss_pct' => $dailyPct,
+            'day_anchor' => round((float) $anchor, 4),
+        ];
     }
 
     /** GET /academy/wallet — this learner's own paper wallet + live follow-the-bot positions. */
@@ -712,7 +800,11 @@ class AcademyController
         $r = $this->reconcileBot($userId, $w);
         echo json_encode([
             'ok' => true, 'balance' => $r['balance'], 'starting' => $w['starting'], 'equity' => $r['equity'],
-            'unrealized' => $r['unrealized'], 'bot_enabled' => (bool) $w['bot_enabled'], 'positions' => $r['positions'],
+            'unrealized' => $r['unrealized'],
+            // reconcile is authoritative: the breaker may have flipped the bot off this poll.
+            'bot_enabled' => (bool) $r['bot_enabled'], 'positions' => $r['positions'],
+            'halted' => (bool) $r['halted'], 'just_halted' => (bool) $r['just_halted'],
+            'stop_loss_pct' => $r['stop_loss_pct'], 'max_daily_loss_pct' => $r['max_daily_loss_pct'],
         ]);
         exit;
     }
@@ -728,6 +820,11 @@ class AcademyController
         $db = Database::getInstance();
         try {
             if ($on) {
+                // Daily-loss breaker: block re-enabling for the rest of the day it tripped.
+                $w = $this->walletFor($userId);
+                if (($w['halt_date'] ?? null) === date('Y-m-d')) {
+                    echo json_encode(['ok' => false, 'halted' => true, 'error' => 'Daily loss limit hit — the bot is paused until tomorrow to protect your wallet.']); exit;
+                }
                 $db->update('academy_wallets', ['bot_enabled' => 1, 'bot_since' => date('Y-m-d H:i:s')], ['user_id' => $userId]);
             } else {
                 // Stop = flatten every open mirror at the current mark, then disable.
@@ -763,6 +860,11 @@ class AcademyController
         if (!in_array($tpl, $valid, true)) { echo json_encode(['ok' => false, 'error' => 'Unknown strategy.']); exit; }
         try {
             $db  = Database::getInstance();
+            // Daily-loss breaker: no re-arming until the next day.
+            $w = $this->walletFor($userId);
+            if (($w['halt_date'] ?? null) === date('Y-m-d')) {
+                echo json_encode(['ok' => false, 'halted' => true, 'error' => 'Daily loss limit hit — the bot is paused until tomorrow to protect your wallet.']); exit;
+            }
             $row = ['templates' => $tpl, 'trade_size' => 200, 'max_slots' => 8];
             if (is_array($db->get('academy_bot_settings', ['user_id'], ['user_id' => $userId]))) {
                 $db->update('academy_bot_settings', ['templates' => $tpl], ['user_id' => $userId]);
@@ -778,31 +880,94 @@ class AcademyController
         exit;
     }
 
+    /**
+     * Shared paper-buy: open a position at the live mark, size $amount, with the learner's stop-loss %
+     * baked in. Used by the manual Buy ticket AND the AI auto-buy. Returns a JSON-ready result array;
+     * never echoes. Enforces the daily-loss halt, min size, and balance.
+     */
+    private function placePaperBuy(int $userId, string $symbol, float $amount, string $template = 'manual'): array
+    {
+        $this->ensureTradingSchema();
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $symbol));
+        if ($symbol === '') return ['ok' => false, 'error' => 'Pick a coin first.'];
+        if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
+        $base   = substr($symbol, 0, -4);
+        $amount = round($amount, 2);
+        $w = $this->walletFor($userId);
+        if (($w['halt_date'] ?? null) === date('Y-m-d')) {
+            return ['ok' => false, 'halted' => true, 'error' => 'Daily loss limit hit — trading is paused until tomorrow.'];
+        }
+        $balance = (float) $w['balance'];
+        if ($amount < 10) return ['ok' => false, 'error' => 'Minimum trade is $10.'];
+        if ($amount > $balance) return ['ok' => false, 'error' => 'Not enough paper balance ($' . number_format($balance, 2) . ').'];
+        $price = (float) ((new \Ginto\Services\BinanceClient())->price($symbol) ?? 0);
+        if ($price <= 0) return ['ok' => false, 'error' => 'Could not get a live price for ' . $base . '.'];
+        $stopPct = (float) $this->botSettings($userId)['stop_loss_pct'];
+        $db = Database::getInstance();
+        $db->insert('academy_positions', [
+            'user_id' => $userId, 'ref_trade_id' => null, 'symbol' => $symbol, 'base' => $base,
+            'qty' => $amount / $price, 'entry' => $price, 'spent' => $amount,
+            'stop_loss' => $price * (1 - $stopPct / 100), 'template' => $template, 'status' => 'open',
+        ]);
+        $db->update('academy_wallets', ['balance' => round($balance - $amount, 8)], ['user_id' => $userId]);
+        return ['ok' => true, 'symbol' => $symbol, 'base' => $base, 'entry' => $price, 'spent' => $amount,
+                'stop_loss' => round($price * (1 - $stopPct / 100), 10), 'balance' => round($balance - $amount, 8)];
+    }
+
+    /**
+     * Hands-free execution: when a Pro member has their bot ON and an AI analysis returns BUY, open a
+     * paper position automatically. Strictly per-user — it only ever touches the calling user's wallet,
+     * never anyone else's. Skips on daily halt, duplicate holding, or full slots. Returns a result the
+     * analyze() response surfaces so the UI can say "auto-bought".
+     */
+    private function autoBuyFromDecision(int $userId, string $scope, string $focusSymbol, array $res): array
+    {
+        if (!$this->isPro($userId)) return ['executed' => false, 'reason' => 'not_pro'];
+        $w = $this->walletFor($userId);
+        if (empty($w['bot_enabled'])) return ['executed' => false, 'reason' => 'bot_off'];
+        if (($w['halt_date'] ?? null) === date('Y-m-d')) return ['executed' => false, 'reason' => 'halted'];
+
+        $blob = (string) ($res['decision'] ?? '') . ' ' . (string) ($res['text'] ?? '');
+        if (!preg_match('/\bBUY\b/i', (string) ($res['decision'] ?? '')) && !preg_match('/DECISION:\s*BUY/i', $blob)) {
+            return ['executed' => false, 'reason' => 'not_buy'];
+        }
+        // Resolve the coin: the focus coin for a single-coin analysis; parse it from the call for a market scan.
+        $target = $focusSymbol;
+        if ($scope === 'market') {
+            if (preg_match('/BUY\s+([A-Z0-9]{2,15})/i', $blob, $m)) {
+                $target = strtoupper($m[1]);
+                if (!str_ends_with($target, 'USDT')) $target .= 'USDT';
+            } else {
+                return ['executed' => false, 'reason' => 'no_symbol'];
+            }
+        }
+        try {
+            $db  = Database::getInstance();
+            $set = $this->botSettings($userId);
+            // Don't stack: skip if we already hold this coin, or we're at the slot cap.
+            if (is_array($db->get('academy_positions', ['id'], ['user_id' => $userId, 'status' => 'open', 'symbol' => $target]))) {
+                return ['executed' => false, 'reason' => 'already_open', 'symbol' => $target];
+            }
+            $openCount = (int) $db->count('academy_positions', ['user_id' => $userId, 'status' => 'open']);
+            if ($openCount >= max(1, min(20, (int) $set['max_slots']))) return ['executed' => false, 'reason' => 'slots_full'];
+
+            $r = $this->placePaperBuy($userId, $target, max(10.0, min(2000.0, (float) $set['trade_size'])), 'ai');
+            if (empty($r['ok'])) return ['executed' => false, 'reason' => $r['error'] ?? 'buy_failed', 'symbol' => $target];
+            return ['executed' => true, 'symbol' => $r['symbol'], 'base' => $r['base'], 'entry' => $r['entry'], 'spent' => $r['spent'], 'balance' => $r['balance']];
+        } catch (\Throwable $e) {
+            error_log('Academy autoBuy: ' . $e->getMessage());
+            return ['executed' => false, 'reason' => 'error'];
+        }
+    }
+
     /** POST /academy/trade/buy — open a MANUAL paper position on the charted coin (all members). */
     public function tradeBuy(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         $userId = $this->requireMemberJson();
-        $this->ensureTradingSchema();
         $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? ''))) ?: '';
-        if ($symbol === '') { echo json_encode(['ok' => false, 'error' => 'Pick a coin first.']); exit; }
-        if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
-        $base   = substr($symbol, 0, -4);
-        $amount = round((float) ($input['amount'] ?? 0), 2);
         try {
-            $w = $this->walletFor($userId); $balance = (float) $w['balance'];
-            if ($amount < 10) { echo json_encode(['ok' => false, 'error' => 'Minimum trade is $10.']); exit; }
-            if ($amount > $balance) { echo json_encode(['ok' => false, 'error' => 'Not enough paper balance ($' . number_format($balance, 2) . ').']); exit; }
-            $price = (float) ((new \Ginto\Services\BinanceClient())->price($symbol) ?? 0);
-            if ($price <= 0) { echo json_encode(['ok' => false, 'error' => 'Could not get a live price for ' . $base . '.']); exit; }
-            $db = Database::getInstance();
-            $db->insert('academy_positions', [
-                'user_id' => $userId, 'ref_trade_id' => null, 'symbol' => $symbol, 'base' => $base,
-                'qty' => $amount / $price, 'entry' => $price, 'spent' => $amount, 'template' => 'manual', 'status' => 'open',
-            ]);
-            $db->update('academy_wallets', ['balance' => round($balance - $amount, 8)], ['user_id' => $userId]);
-            echo json_encode(['ok' => true, 'symbol' => $symbol, 'base' => $base, 'entry' => $price, 'spent' => $amount, 'balance' => round($balance - $amount, 8)]);
+            echo json_encode($this->placePaperBuy($userId, (string) ($input['symbol'] ?? ''), (float) ($input['amount'] ?? 0), 'manual'));
         } catch (\Throwable $e) {
             error_log('Academy tradeBuy: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'Could not place the trade.']);
@@ -818,21 +983,124 @@ class AcademyController
         $this->ensureTradingSchema();
         $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
         $id    = (int) ($input['id'] ?? 0);
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? '')));
+        if ($symbol !== '' && !str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
         try {
             $db = Database::getInstance();
+            $client = new \Ginto\Services\BinanceClient();
             // Manual positions only (ref_trade_id NULL) — bot-followed trades are managed by the bot.
-            $p = $db->get('academy_positions', '*', ['id' => $id, 'user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null]);
-            if (!is_array($p)) { echo json_encode(['ok' => false, 'error' => 'Trade not found (or it is bot-managed).']); exit; }
-            $mark = (float) ((new \Ginto\Services\BinanceClient())->price($p['symbol']) ?? $p['entry']);
-            if ($mark <= 0) $mark = (float) $p['entry'];
-            $proceeds = (float) $p['qty'] * $mark; $realized = $proceeds - (float) $p['spent'];
-            $w = $this->walletFor($userId);
-            $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $mark, 'realized' => round($realized, 8), 'closed_at' => date('Y-m-d H:i:s')], ['id' => $id]);
-            $db->update('academy_wallets', ['balance' => round((float) $w['balance'] + $proceeds, 8)], ['user_id' => $userId]);
-            echo json_encode(['ok' => true, 'realized' => round($realized, 4), 'balance' => round((float) $w['balance'] + $proceeds, 8)]);
+            // Sell by id (one card) OR by symbol (the Buy/Sell ticket closes the whole holding).
+            if ($id > 0) {
+                $rows = ($p = $db->get('academy_positions', '*', ['id' => $id, 'user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null])) && is_array($p) ? [$p] : [];
+            } elseif ($symbol !== '') {
+                $rows = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null, 'symbol' => $symbol]);
+                if (!is_array($rows)) $rows = [];
+            } else {
+                $rows = [];
+            }
+            if (!$rows) { echo json_encode(['ok' => false, 'error' => 'No open manual position to close (bot trades are managed by the bot).']); exit; }
+            $balance = (float) $this->walletFor($userId)['balance'];
+            $realized = 0.0; $n = 0;
+            foreach ($rows as $p) {
+                $mark = (float) ($client->price($p['symbol']) ?? $p['entry']);
+                if ($mark <= 0) $mark = (float) $p['entry'];
+                $proceeds = (float) $p['qty'] * $mark; $r = $proceeds - (float) $p['spent'];
+                $realized += $r; $balance += $proceeds; $n++;
+                $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $mark, 'realized' => round($r, 8), 'close_reason' => 'manual', 'closed_at' => date('Y-m-d H:i:s')], ['id' => (int) $p['id']]);
+            }
+            $db->update('academy_wallets', ['balance' => round($balance, 8)], ['user_id' => $userId]);
+            echo json_encode(['ok' => true, 'closed' => $n, 'realized' => round($realized, 4), 'balance' => round($balance, 8)]);
         } catch (\Throwable $e) {
             error_log('Academy tradeSell: ' . $e->getMessage());
             echo json_encode(['ok' => false, 'error' => 'Could not close the trade.']);
+        }
+        exit;
+    }
+
+    /** GET /academy/history — this learner's paper-trading transaction history (full page). */
+    public function history(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/history')); return; }
+        if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
+        View::view('academy/history', [
+            'title' => 'Trade History — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true,
+        ]);
+    }
+
+    /**
+     * GET /academy/history/data — JSON page of this learner's trades (closed + open), newest first.
+     * Strictly scoped to the calling user. ?scope=closed|open|all & ?page=N.
+     */
+    public function historyData(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->requireMemberJson();
+        $this->ensureTradingSchema();
+        $scope = (string) ($_GET['scope'] ?? 'all');
+        $page  = max(1, (int) ($_GET['page'] ?? 1));
+        $per   = 25; $off = ($page - 1) * $per;
+        $where = ['user_id' => $userId];
+        if ($scope === 'closed') $where['status'] = 'closed';
+        elseif ($scope === 'open') $where['status'] = 'open';
+        try {
+            $db = Database::getInstance();
+            $total = (int) $db->count('academy_positions', $where);
+            $rows  = $db->select('academy_positions', '*', array_merge($where, ['ORDER' => ['id' => 'DESC'], 'LIMIT' => [$off, $per]]));
+            if (!is_array($rows)) $rows = [];
+            $reasons = ['manual' => 'You closed it', 'stop_loss' => 'Stop-loss', 'daily_halt' => 'Daily-loss halt', 'bot_exit' => 'Bot exit'];
+            $out = array_map(static function ($r) use ($reasons) {
+                $entry = (float) $r['entry']; $exit = $r['exit_price'] !== null ? (float) $r['exit_price'] : null;
+                $realized = $r['realized'] !== null ? (float) $r['realized'] : null;
+                return [
+                    'id' => (int) $r['id'], 'symbol' => $r['symbol'], 'base' => $r['base'],
+                    'side' => 'BUY', 'status' => $r['status'], 'template' => $r['template'],
+                    'auto' => $r['ref_trade_id'] !== null,
+                    'qty' => (float) $r['qty'], 'entry' => $entry, 'exit' => $exit, 'spent' => (float) $r['spent'],
+                    'realized' => $realized,
+                    'pnlPct' => ($exit !== null && $entry > 0) ? ($exit - $entry) / $entry * 100 : null,
+                    'reason' => $reasons[$r['close_reason'] ?? ''] ?? ($r['close_reason'] ?? null),
+                    'opened_at' => $r['opened_at'] ?? null, 'closed_at' => $r['closed_at'] ?? null,
+                ];
+            }, $rows);
+            echo json_encode(['ok' => true, 'page' => $page, 'per' => $per, 'total' => $total, 'rows' => $out]);
+        } catch (\Throwable $e) {
+            error_log('Academy historyData: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not load history.']);
+        }
+        exit;
+    }
+
+    /** GET /academy/thoughts — full, paginated history of the class demo bot's reasoning (members). */
+    public function thoughts(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = $_SESSION['user_id'] ?? null;
+        if (empty($userId)) { $this->redirect('/login?redirect=' . urlencode('/academy/thoughts')); return; }
+        if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
+        View::view('academy/thoughts', [
+            'title' => "The Bot's Mind — Ginto Trading Academy", 'isLoggedIn' => true, 'hasAccess' => true,
+        ]);
+    }
+
+    /** GET /academy/thoughts/data — JSON page of the shared class-bot thought stream. ?page=N. */
+    public function thoughtsData(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $this->requireMemberJson();
+        $page = max(1, (int) ($_GET['page'] ?? 1));
+        $per  = 50; $off = ($page - 1) * $per;
+        try {
+            $db = Database::getInstance();
+            $total = (int) $db->count('gtb_thoughts', []);
+            $rows  = $db->select('gtb_thoughts', ['id', 'message', 'phase', 'role', 'created_at'],
+                ['ORDER' => ['id' => 'DESC'], 'LIMIT' => [$off, $per]]);
+            if (!is_array($rows)) $rows = [];
+            echo json_encode(['ok' => true, 'page' => $page, 'per' => $per, 'total' => $total, 'rows' => $rows]);
+        } catch (\Throwable $e) {
+            error_log('Academy thoughtsData: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not load the thought history.']);
         }
         exit;
     }
@@ -855,21 +1123,38 @@ class AcademyController
 
     private const DEFAULT_TEMPLATES = 'gainers,scalp,breakout,trend,pullback';
 
+    // Default risk guardrails (percent). Applied to every member, manual or bot.
+    private const DEFAULT_STOP_LOSS_PCT = 1.0;   // per-trade: auto-close a position down this % from entry
+    private const DEFAULT_DAILY_LOSS_PCT = 1.0;  // account: flatten + pause the bot if the day is down this %
+
     private function ensureBotSettingsTable(): void
     {
-        Database::getInstance()->pdo->exec("CREATE TABLE IF NOT EXISTS academy_bot_settings (
+        $db = Database::getInstance();
+        $db->pdo->exec("CREATE TABLE IF NOT EXISTS academy_bot_settings (
             user_id INT PRIMARY KEY,
             templates VARCHAR(255) NOT NULL DEFAULT '" . self::DEFAULT_TEMPLATES . "',
             trade_size DECIMAL(18,8) NOT NULL DEFAULT 200,
             max_slots INT NOT NULL DEFAULT 8,
+            stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_STOP_LOSS_PCT . ",
+            max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_DAILY_LOSS_PCT . ",
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Backfill guardrail columns on pre-existing installs.
+        foreach ([
+            'stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_STOP_LOSS_PCT,
+            'max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_DAILY_LOSS_PCT,
+        ] as $col) {
+            try { $db->pdo->exec("ALTER TABLE academy_bot_settings ADD COLUMN IF NOT EXISTS $col"); } catch (\Throwable $e) {}
+        }
     }
 
     /** Per-user, DB-driven bot settings (not .env). Returns defaults if unset. */
     private function botSettings(int $userId): array
     {
-        $defaults = ['templates' => self::DEFAULT_TEMPLATES, 'trade_size' => 200.0, 'max_slots' => 8];
+        $defaults = [
+            'templates' => self::DEFAULT_TEMPLATES, 'trade_size' => 200.0, 'max_slots' => 8,
+            'stop_loss_pct' => self::DEFAULT_STOP_LOSS_PCT, 'max_daily_loss_pct' => self::DEFAULT_DAILY_LOSS_PCT,
+        ];
         try {
             $this->ensureBotSettingsTable();
             $r = Database::getInstance()->get('academy_bot_settings', '*', ['user_id' => $userId]);
@@ -878,8 +1163,19 @@ class AcademyController
                 'templates'  => (string) ($r['templates'] ?? $defaults['templates']),
                 'trade_size' => (float) ($r['trade_size'] ?? 200),
                 'max_slots'  => (int) ($r['max_slots'] ?? 8),
+                // Clamp to a sane 0.1%–50% band; 0/invalid falls back to the default.
+                'stop_loss_pct'      => $this->clampPct($r['stop_loss_pct'] ?? null, self::DEFAULT_STOP_LOSS_PCT),
+                'max_daily_loss_pct' => $this->clampPct($r['max_daily_loss_pct'] ?? null, self::DEFAULT_DAILY_LOSS_PCT),
             ];
         } catch (\Throwable $e) { return $defaults; }
+    }
+
+    /** Clamp a user-supplied guardrail percent into [0.1, 50]; fall back to $default when empty/invalid. */
+    private function clampPct($val, float $default): float
+    {
+        $v = (float) $val;
+        if ($v <= 0) return $default;
+        return max(0.1, min(50.0, $v));
     }
 
     /** GET /academy/settings — per-user, DB-driven bot settings (templates, size, slots). Pro-gated. */
@@ -899,20 +1195,33 @@ class AcademyController
         ]);
     }
 
-    /** POST /academy/settings/save — persist per-user bot settings to the DB. Pro-gated. */
+    /**
+     * POST /academy/settings/save — persist per-user bot settings.
+     * Risk guardrails (stop-loss %, daily-loss %) are saveable by EVERY member — they protect manual
+     * trades too. Strategy templates / sizing / slots remain a Pro Trader feature.
+     */
     public function settingsSave(): void
     {
         header('Content-Type: application/json; charset=utf-8');
         $userId = $this->requireMemberJson();
-        if (!$this->isPro($userId)) { echo json_encode(['ok' => false, 'error' => 'Bot settings are a Pro Trader feature. Upgrade to configure your own strategy.']); exit; }
         $this->ensureBotSettingsTable();
         $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $valid = array_keys(\Ginto\Services\GtbStrategy::catalog());
-        $tpls  = array_values(array_intersect($valid, (array) ($input['templates'] ?? [])));
-        if (!$tpls) $tpls = $valid;
-        $size  = max(10.0, min(2000.0, (float) ($input['trade_size'] ?? 200)));
-        $slots = max(1, min(20, (int) ($input['max_slots'] ?? 8)));
-        $row   = ['templates' => implode(',', $tpls), 'trade_size' => $size, 'max_slots' => $slots];
+        $isPro = $this->isPro($userId);
+
+        // Everyone: risk guardrails.
+        $row = [
+            'stop_loss_pct'      => $this->clampPct($input['stop_loss_pct'] ?? null, self::DEFAULT_STOP_LOSS_PCT),
+            'max_daily_loss_pct' => $this->clampPct($input['max_daily_loss_pct'] ?? null, self::DEFAULT_DAILY_LOSS_PCT),
+        ];
+        // Pro only: strategy templates + sizing.
+        if ($isPro) {
+            $valid = array_keys(\Ginto\Services\GtbStrategy::catalog());
+            $tpls  = array_values(array_intersect($valid, (array) ($input['templates'] ?? [])));
+            if (!$tpls) $tpls = $valid;
+            $row['templates']  = implode(',', $tpls);
+            $row['trade_size'] = max(10.0, min(2000.0, (float) ($input['trade_size'] ?? 200)));
+            $row['max_slots']  = max(1, min(20, (int) ($input['max_slots'] ?? 8)));
+        }
         try {
             $db = Database::getInstance();
             if (is_array($db->get('academy_bot_settings', ['user_id'], ['user_id' => $userId]))) {
