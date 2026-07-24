@@ -154,7 +154,7 @@ $isPro   = !empty($isPro);
             <!-- Live order book — buyers (bids) left, sellers (asks) right -->
             <div class="mt-3 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/5 p-3">
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400"><i class="fas fa-book text-primary mr-1"></i>Order book</span>
+                    <span class="text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400"><i class="fas fa-book text-primary mr-1"></i>Order book <span id="lab-book-sym" class="text-primary normal-case">BTC/USDT</span></span>
                     <span id="lab-book-spread" class="text-[10px] text-gray-400 tabular-nums">—</span>
                 </div>
                 <div class="grid grid-cols-2 gap-2">
@@ -282,6 +282,23 @@ $isPro   = !empty($isPro);
                     </div>
                 </div>
                 <div id="lab-modal-chart" class="w-full rounded-lg overflow-hidden" style="height:340px"></div>
+                <!-- This coin's own live order book -->
+                <div class="mt-3 rounded-lg border border-gray-200 dark:border-gray-800 p-2.5">
+                    <div class="flex items-center justify-between mb-1.5">
+                        <span class="text-[11px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400"><i class="fas fa-book text-primary mr-1"></i>Order book <span id="lab-modal-book-sym" class="text-primary normal-case"></span></span>
+                        <span id="lab-modal-book-spread" class="text-[10px] text-gray-400 tabular-nums">—</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-[11px] tabular-nums">
+                        <div>
+                            <div class="flex items-center justify-between text-[10px] font-bold uppercase text-green-600 dark:text-green-400 mb-1"><span>Buyers</span><span class="text-gray-400 font-normal">size</span></div>
+                            <div id="lab-modal-bids" class="space-y-0.5"></div>
+                        </div>
+                        <div>
+                            <div class="flex items-center justify-between text-[10px] font-bold uppercase text-red-500 dark:text-red-400 mb-1"><span class="text-gray-400 font-normal">size</span><span>Sellers</span></div>
+                            <div id="lab-modal-asks" class="space-y-0.5"></div>
+                        </div>
+                    </div>
+                </div>
                 <div id="lab-modal-meta" class="mt-3 grid grid-cols-3 gap-2 text-center text-[11px] tabular-nums"></div>
                 <div class="mt-4">
                     <div class="text-xs font-bold uppercase tracking-wide text-primary mb-2"><i class="fas fa-brain mr-1"></i>Why the bot is in this trade</div>
@@ -364,11 +381,26 @@ function labSparkline(vals, col) {
 function labFmt(n, d) { n = +n; return (n < 0 ? '−' : '+') + '$' + Math.abs(n).toFixed(d == null ? 4 : d); }
 function labPrec(p) { p = Math.abs(+p) || 1; return p >= 1000 ? 2 : p >= 1 ? 4 : p >= 0.01 ? 6 : 8; }
 
-function labFmtPrice(p) { p = +p; if (!isFinite(p)) return '0'; if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 }); if (p >= 1) return p.toFixed(4); if (p >= 0.01) return p.toFixed(6); return p.toPrecision(4); }
+function labFmtPrice(p) {
+    p = +p; if (!isFinite(p) || p <= 0) return '0';
+    if (p >= 1000) return p.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (p >= 1) return p.toFixed(4);
+    if (p >= 0.01) return p.toFixed(6);
+    // Tiny prices: show ~4 significant digits as a plain decimal (never 1.2e-7 exponential).
+    var d = Math.min(12, Math.max(6, Math.ceil(-Math.log10(p)) + 3));
+    return p.toFixed(d);
+}
+// Order-book / holding sizes as plain decimals — no scientific notation for huge or tiny quantities.
+function labFmtQty(q) {
+    q = +q; if (!isFinite(q) || q <= 0) return '0';
+    if (q >= 1000) return q.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (q >= 1) return q.toLocaleString(undefined, { maximumFractionDigits: 3 });
+    return q.toFixed(6).replace(/0+$/, '').replace(/\.$/, '');
+}
 function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
 // ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
-var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '15m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {}, side: 'buy', balance: 10000, holdQty: 0, holdSpent: 0, lastPx: 0, bookWs: null };
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '1m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {}, side: 'buy', balance: 10000, holdQty: 0, holdSpent: 0, lastPx: 0, bookWs: null };
 
 function labChartTheme() {
     var dark = document.documentElement.classList.contains('dark');
@@ -401,7 +433,7 @@ function labLoadChart() {
         .then(function (d) {
             if (!d.ok || !Array.isArray(d.candles)) return;
             LAB.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
-            LAB.chart.timeScale().fitContent();
+            labZoomRecent(LAB.chart, d.candles.length, LAB.interval);   // recent window, not zoomed-out to all 300 bars
             if (d.candles.length) labSetPrice(+d.candles[d.candles.length - 1].close);
             labOpenStream();
         }).catch(function () {});
@@ -670,7 +702,7 @@ function labBuildTradeCard(wrap, gridId, p, sellable) {
         if (p.take_profit) card.series.createPriceLine({ price: +p.take_profit, color: '#16a34a', lineWidth: 1, lineStyle: 2, title: 'TP' });
         fetch('/academy/klines?symbol=' + encodeURIComponent(p.symbol) + '&interval=5m', { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
-            .then(function (d) { if (d.ok && card.series && Array.isArray(d.candles)) { card.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; })); card.chart.timeScale().fitContent(); } })
+            .then(function (d) { if (d.ok && card.series && Array.isArray(d.candles)) { card.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; })); labZoomRecent(card.chart, d.candles.length, '5m', 48); } })
             .catch(function () {});
     }
 }
@@ -751,46 +783,55 @@ function labSellHolding() {
 }
 
 // ---- Live order book (Binance partial-depth stream) — bids (buyers) / asks (sellers) ----
-function labCloseBook() { if (LAB.bookWs) { try { LAB.bookWs.onclose = null; LAB.bookWs.close(); } catch (e) {} LAB.bookWs = null; } }
-function labOpenBook() {
-    labCloseBook();
-    if (typeof WebSocket === 'undefined') return;
-    var sym = LAB.symbol, ws;
-    try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + sym.toLowerCase() + '@depth20@100ms'); }
-    catch (e) { return; }
-    LAB.bookWs = ws;
-    ws.onmessage = function (ev) {
-        if (LAB.symbol !== sym) return;
-        var m; try { m = JSON.parse(ev.data); } catch (e) { return; }
-        if (m && m.bids && m.asks) labRenderBook(m.bids, m.asks);
-    };
-    ws.onclose = function () { if (LAB.symbol === sym && LAB.bookWs === ws) { LAB.bookWs = null; setTimeout(function () { if (LAB.symbol === sym) labOpenBook(); }, 2500); } };
+// One depth socket per chart: the main panel and the expanded modal each stream their OWN coin.
+function labDepthWs(symbol, onBook) {
+    if (typeof WebSocket === 'undefined') return null;
+    var ws;
+    try { ws = new WebSocket('wss://stream.binance.com:9443/ws/' + symbol.toLowerCase() + '@depth20@100ms'); }
+    catch (e) { return null; }
+    ws.onmessage = function (ev) { var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.bids && m.asks) onBook(m.bids, m.asks); };
+    return ws;
 }
-function labRenderBook(bids, asks) {
+function labRenderBook(bids, asks, bidsId, asksId, spreadId) {
     var N = 12;
     bids = (bids || []).slice(0, N); asks = (asks || []).slice(0, N);
-    var maxQ = 0;
-    bids.concat(asks).forEach(function (r) { var q = +r[1]; if (q > maxQ) maxQ = q; });
-    if (maxQ <= 0) maxQ = 1;
-    var bidRow = function (r, side) {
+    var maxQ = 0; bids.concat(asks).forEach(function (r) { var q = +r[1]; if (q > maxQ) maxQ = q; }); if (maxQ <= 0) maxQ = 1;
+    var row = function (r, side) {
         var px = +r[0], q = +r[1], w = Math.min(100, q / maxQ * 100);
         var bar = side === 'bid'
             ? 'background:linear-gradient(to left,rgba(22,163,74,0.18) ' + w + '%,transparent ' + w + '%);'
             : 'background:linear-gradient(to right,rgba(239,68,68,0.18) ' + w + '%,transparent ' + w + '%);';
-        var priceCls = side === 'bid' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
-        if (side === 'bid')
-            return '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="' + priceCls + '">' + labFmtPrice(px) + '</span><span class="text-gray-500 dark:text-gray-400">' + q.toPrecision(4) + '</span></div>';
-        return '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="text-gray-500 dark:text-gray-400">' + q.toPrecision(4) + '</span><span class="' + priceCls + '">' + labFmtPrice(px) + '</span></div>';
+        var pc = side === 'bid' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400';
+        return side === 'bid'
+            ? '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="' + pc + '">' + labFmtPrice(px) + '</span><span class="text-gray-500 dark:text-gray-400">' + labFmtQty(q) + '</span></div>'
+            : '<div class="flex items-center justify-between px-1 rounded" style="' + bar + '"><span class="text-gray-500 dark:text-gray-400">' + labFmtQty(q) + '</span><span class="' + pc + '">' + labFmtPrice(px) + '</span></div>';
     };
-    var be = document.getElementById('lab-book-bids'), ae = document.getElementById('lab-book-asks');
-    if (be) be.innerHTML = bids.map(function (r) { return bidRow(r, 'bid'); }).join('');
-    if (ae) ae.innerHTML = asks.map(function (r) { return bidRow(r, 'ask'); }).join('');
-    var sp = document.getElementById('lab-book-spread');
-    if (sp && bids.length && asks.length) {
-        var bestBid = +bids[0][0], bestAsk = +asks[0][0], mid = (bestBid + bestAsk) / 2;
-        var spr = mid > 0 ? (bestAsk - bestBid) / mid * 100 : 0;
-        sp.textContent = 'spread ' + spr.toFixed(3) + '%';
-    }
+    var be = document.getElementById(bidsId), ae = document.getElementById(asksId);
+    if (be) be.innerHTML = bids.map(function (r) { return row(r, 'bid'); }).join('');
+    if (ae) ae.innerHTML = asks.map(function (r) { return row(r, 'ask'); }).join('');
+    if (spreadId) { var sp = document.getElementById(spreadId); if (sp && bids.length && asks.length) { var bb = +bids[0][0], ba = +asks[0][0], mid = (bb + ba) / 2; sp.textContent = 'spread ' + (mid > 0 ? (ba - bb) / mid * 100 : 0).toFixed(3) + '%'; } }
+}
+function labCloseBook() { if (LAB.bookWs) { try { LAB.bookWs.onclose = null; LAB.bookWs.close(); } catch (e) {} LAB.bookWs = null; } }
+function labOpenBook() {
+    labCloseBook();
+    var sym = LAB.symbol;
+    var symEl = document.getElementById('lab-book-sym'); if (symEl) symEl.textContent = LAB.base + '/USDT';
+    var ws = labDepthWs(sym, function (bids, asks) { if (LAB.symbol === sym) labRenderBook(bids, asks, 'lab-book-bids', 'lab-book-asks', 'lab-book-spread'); });
+    if (!ws) return;
+    LAB.bookWs = ws;
+    ws.onclose = function () { if (LAB.symbol === sym && LAB.bookWs === ws) { LAB.bookWs = null; setTimeout(function () { if (LAB.symbol === sym) labOpenBook(); }, 2500); } };
+}
+
+// ---- Chart zoom: show a professional recent window per interval (not the whole 300-bar history) ----
+function labVisibleBars(iv) {
+    var map = { '1s': 90, '1m': 120, '5m': 110, '15m': 96, '30m': 90, '1h': 96, '2h': 84, '4h': 90, '1d': 90, '1w': 52, '1M': 36 };
+    return map[iv] || 100;
+}
+function labZoomRecent(chart, len, iv, override) {
+    if (!chart || !len) return;
+    var bars = override || labVisibleBars(iv);
+    try { chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, len - bars), to: len + 2 }); }
+    catch (e) { try { chart.timeScale().fitContent(); } catch (e2) {} }
 }
 
 function labSell(id, btn, fromModal) {
@@ -824,7 +865,17 @@ function labActivateStrategy(key, name, btn) {
 }
 
 // ---- Expandable live trade modal (own chart + Binance WS) ---------------------
-var LABM = { chart: null, series: null, ws: null, ro: null, symbol: '', base: '', entry: 0, interval: '15m', posId: 0 };
+var LABM = { chart: null, series: null, ws: null, ro: null, bookWs: null, symbol: '', base: '', entry: 0, interval: '1m', posId: 0 };
+function labModalCloseBook() { if (LABM.bookWs) { try { LABM.bookWs.onclose = null; LABM.bookWs.close(); } catch (e) {} LABM.bookWs = null; } }
+function labModalOpenBook(symbol, base) {
+    labModalCloseBook();
+    var sym = symbol;
+    var s = document.getElementById('lab-modal-book-sym'); if (s) s.textContent = base + '/USDT';
+    var ws = labDepthWs(sym, function (bids, asks) { if (LABM.symbol === sym) labRenderBook(bids, asks, 'lab-modal-bids', 'lab-modal-asks', 'lab-modal-book-spread'); });
+    if (!ws) return;
+    LABM.bookWs = ws;
+    ws.onclose = function () { if (LABM.symbol === sym && LABM.bookWs === ws) { LABM.bookWs = null; setTimeout(function () { if (LABM.symbol === sym) labModalOpenBook(sym, base); }, 2500); } };
+}
 function labModalSell() {
     if (!LABM.posId) return;
     labSell(LABM.posId, document.getElementById('lab-modal-sell'), true);
@@ -835,6 +886,7 @@ function labModalClose() {
     if (LABM.ro) { try { LABM.ro.disconnect(); } catch (e) {} LABM.ro = null; }
     if (LABM.chart) { try { LABM.chart.remove(); } catch (e) {} LABM.chart = null; LABM.series = null; }
     // Clear the symbol so the 6s poll (labRender) stops updating a closed modal.
+    labModalCloseBook();
     LABM.symbol = ''; LABM.base = ''; LABM.posId = 0;
     o.classList.add('hidden'); o.classList.remove('flex');
     var el = document.getElementById('lab-modal-chart'); if (el) el.innerHTML = '';
@@ -842,7 +894,7 @@ function labModalClose() {
 function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
     LABM.symbol = symbol; LABM.base = base; LABM.entry = +entry; LABM.posId = posId || 0;
-    if (!LABM.interval) LABM.interval = '15m';
+    if (!LABM.interval) LABM.interval = '1m';
     var sellBtn = document.getElementById('lab-modal-sell');
     if (sellBtn) sellBtn.classList.toggle('hidden', !LABM.posId);
     document.getElementById('lab-modal-title').innerHTML = labCoinIcon(base, 22) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>';
@@ -859,6 +911,7 @@ function labExpandTrade(symbol, base, entry, sl, tp, posId) {
     LABM.ro.observe(el);
     labModalHighlightIv();
     labModalLoad();
+    labModalOpenBook(symbol, base);   // this coin's own live order book in the modal
     labModalWhy(symbol);
 }
 
@@ -876,7 +929,7 @@ function labModalLoad() {
         .then(function (d) {
             if (!d.ok || !Array.isArray(d.candles) || !LABM.series) return;
             LABM.series.setData(d.candles.map(function (c) { return { time: c.time, open: c.open, high: c.high, low: c.low, close: c.close }; }));
-            LABM.chart.timeScale().fitContent();
+            labZoomRecent(LABM.chart, d.candles.length, LABM.interval);
             if (d.candles.length) labModalPnl(LABM.entry, +d.candles[d.candles.length - 1].close);
             labModalStream(LABM.symbol, LABM.entry);
         }).catch(function () {});
@@ -1000,7 +1053,7 @@ document.addEventListener('DOMContentLoaded', function () {
             labLoadChart();
         });
     });
-    var iv15 = document.querySelector('#lab-iv button[data-iv="15m"]'); if (iv15) { iv15.classList.add('bg-primary', 'text-white'); }
+    var ivDef = document.querySelector('#lab-iv button[data-iv="1m"]'); if (ivDef) { ivDef.classList.add('bg-primary', 'text-white'); }
     // Modal interval selector
     document.querySelectorAll('#lab-modal-iv button').forEach(function (b) {
         b.addEventListener('click', function () { labModalSetIv(b.dataset.miv); });
