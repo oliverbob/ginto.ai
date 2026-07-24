@@ -682,8 +682,8 @@ function labBuildTradeCard(wrap, gridId, p, sellable) {
         + '<div data-chart title="Click to expand" class="w-full rounded overflow-hidden cursor-pointer" style="height:120px"></div>'
         + '<div class="mt-1.5 grid grid-cols-3 gap-1 text-[10px] tabular-nums text-center">'
         +   '<div class="text-gray-500 dark:text-gray-400">entry<br><span data-entry class="text-gray-800 dark:text-gray-200"></span></div>'
-        +   '<div class="text-red-500">SL<br><span data-sl></span></div>'
-        +   '<div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span></div>'
+        +   '<div class="text-red-500">SL<br><span data-sl></span><br><span data-sl-usd class="text-[9px] opacity-90"></span></div>'
+        +   '<div class="text-green-600 dark:text-green-400">TP<br><span data-tp></span><br><span data-tp-usd class="text-[9px] opacity-90"></span></div>'
         + '</div>'
         + (isManual ? '<button data-sell class="mt-1.5 w-full text-[11px] font-bold py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600"><i class="fas fa-xmark mr-1"></i>Close · sell now</button>'
                     : '<div class="mt-1.5 text-[10px] text-center text-gray-400">bot-managed</div>');
@@ -691,7 +691,7 @@ function labBuildTradeCard(wrap, gridId, p, sellable) {
     var card = { root: root, chart: null, series: null, p: p };
     LAB.cards[labKey(gridId, p)] = card;
     var chartEl = root.querySelector('[data-chart]');
-    var open = function () { labExpandTrade(p.symbol, base, +p.entry, p.stop_loss || 0, p.take_profit || 0, isManual ? p.id : 0); };
+    var open = function () { labExpandTrade(p.symbol, base, +p.entry, p.stop_loss || 0, p.take_profit || 0, isManual ? p.id : 0, +p.qty || 0); };
     chartEl.addEventListener('click', open);
     root.querySelector('[data-expand]').addEventListener('click', function (e) { e.stopPropagation(); open(); });
     if (isManual) root.querySelector('[data-sell]').addEventListener('click', function () { labSell(p.id, this); });
@@ -717,9 +717,15 @@ function labUpdateTradeCard(gridId, p) {
     if (pnl) { pnl.textContent = labFmt(p.unrealized); pnl.className = 'block text-sm font-bold ' + cls; }
     if (pct) { pct.textContent = (up ? '+' : '') + (+p.pnlPct).toFixed(2) + '%'; pct.className = 'block text-[11px] ' + cls; }
     var e = card.root.querySelector('[data-entry]'), s = card.root.querySelector('[data-sl]'), t = card.root.querySelector('[data-tp]');
-    if (e) e.textContent = '$' + (+p.entry).toPrecision(6);
-    if (s) s.textContent = p.stop_loss ? '$' + (+p.stop_loss).toPrecision(6) : '—';
-    if (t) t.textContent = p.take_profit ? '$' + (+p.take_profit).toPrecision(6) : 'trail';
+    var su = card.root.querySelector('[data-sl-usd]'), tu = card.root.querySelector('[data-tp-usd]');
+    // Dollar equivalents (prefer server-computed; else derive from level/entry/qty).
+    var slUsd = p.sl_usd != null ? +p.sl_usd : (p.stop_loss != null && p.entry ? (p.stop_loss - p.entry) * p.qty : null);
+    var tpUsd = p.tp_usd != null ? +p.tp_usd : (p.take_profit != null && p.entry ? (p.take_profit - p.entry) * p.qty : null);
+    if (e) e.textContent = '$' + labFmtPrice(p.entry);
+    if (s) s.textContent = p.stop_loss ? '$' + labFmtPrice(p.stop_loss) : '—';
+    if (su) su.textContent = slUsd != null ? labFmt(slUsd, 2) : '';
+    if (t) t.textContent = p.take_profit ? '$' + labFmtPrice(p.take_profit) : (p.auto ? 'trail' : '—');
+    if (tu) tu.textContent = tpUsd != null ? labFmt(tpUsd, 2) : '';
 }
 
 // ---- Binance-style paper order ticket (market Buy / Sell) ---------------------
@@ -893,17 +899,20 @@ function labModalClose() {
     o.classList.add('hidden'); o.classList.remove('flex');
     var el = document.getElementById('lab-modal-chart'); if (el) el.innerHTML = '';
 }
-function labExpandTrade(symbol, base, entry, sl, tp, posId) {
+function labExpandTrade(symbol, base, entry, sl, tp, posId, qty) {
     var o = document.getElementById('lab-modal'); if (!o || typeof LightweightCharts === 'undefined') return;
     LABM.symbol = symbol; LABM.base = base; LABM.entry = +entry; LABM.posId = posId || 0;
     if (!LABM.interval) LABM.interval = '1m';
     var sellBtn = document.getElementById('lab-modal-sell');
     if (sellBtn) sellBtn.classList.toggle('hidden', !LABM.posId);
     document.getElementById('lab-modal-title').innerHTML = labCoinIcon(base, 22) + '<span class="truncate">' + base + '<span class="text-gray-400 text-xs font-normal">/USDT</span></span>';
+    var q = +qty || 0;
+    var slUsd = (sl && entry) ? (sl - entry) * q : null, tpUsd = (tp && entry) ? (tp - entry) * q : null;
+    var usdTag = function (v) { return v != null ? ' <span class="opacity-90">(' + labFmt(v, 2) + ')</span>' : ''; };
     document.getElementById('lab-modal-meta').innerHTML =
-        '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + (+entry).toPrecision(6) + '</span></div>'
-        + '<div class="text-red-500">stop-loss<br><span>' + (sl ? '$' + (+sl).toPrecision(6) : '—') + '</span></div>'
-        + '<div class="text-green-600 dark:text-green-400">take-profit<br><span>' + (tp ? '$' + (+tp).toPrecision(6) : 'trailing') + '</span></div>';
+        '<div class="text-gray-500 dark:text-gray-400">entry<br><span class="text-gray-800 dark:text-gray-200">$' + labFmtPrice(entry) + '</span></div>'
+        + '<div class="text-red-500">stop-loss<br><span>' + (sl ? '$' + labFmtPrice(sl) + usdTag(slUsd) : '—') + '</span></div>'
+        + '<div class="text-green-600 dark:text-green-400">take-profit<br><span>' + (tp ? '$' + labFmtPrice(tp) + usdTag(tpUsd) : (LABM.posId ? '—' : 'trailing')) + '</span></div>';
     o.classList.remove('hidden'); o.classList.add('flex');
     var el = document.getElementById('lab-modal-chart'); el.innerHTML = '';
     LABM.chart = LightweightCharts.createChart(el, Object.assign({ width: el.clientWidth, height: 340 }, labChartTheme()));

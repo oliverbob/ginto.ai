@@ -59,15 +59,23 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
         <?php endforeach; ?>
     </div>
 
-    <!-- Loss guardrails (available to EVERY member — they protect manual trades too) -->
-    <h2 class="mt-8 mb-1 text-sm font-bold uppercase tracking-wide text-primary">Loss guardrails</h2>
-    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Automatic safety limits on your paper wallet. These apply to <strong>all</strong> your trades — manual, AI, and bot — and are saveable on any plan.</p>
-    <div class="grid sm:grid-cols-2 gap-4">
+    <!-- Risk guardrails (available to EVERY member — they protect manual trades too) -->
+    <h2 class="mt-8 mb-1 text-sm font-bold uppercase tracking-wide text-primary">Risk guardrails</h2>
+    <p class="mb-3 text-sm text-gray-500 dark:text-gray-400">Automatic exit levels on your paper wallet. These apply to <strong>all</strong> your trades — manual, AI, and bot — and are saveable on any plan. Each open trade shows its stop-loss and take-profit in price and dollars on the chart.</p>
+    <div class="grid sm:grid-cols-3 gap-4">
         <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
             <label class="text-sm font-semibold">Per-trade stop-loss</label>
             <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">Auto-close any single position once it drops this % below entry (0.1–50%).</div>
             <div class="flex items-center gap-2">
                 <input id="set-stop" type="number" min="0.1" max="50" step="0.1" value="<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($settings['stop_loss_pct'] ?? 1), 2), '0'), '.')) ?>"
+                       class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none"><span class="text-gray-400">%</span>
+            </div>
+        </div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <label class="text-sm font-semibold">Per-trade take-profit</label>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">Auto-close your manual/AI trades once they rise this % above entry. Set <strong>0</strong> to let winners run (0–50%).</div>
+            <div class="flex items-center gap-2">
+                <input id="set-tp" type="number" min="0" max="50" step="0.1" value="<?= htmlspecialchars(rtrim(rtrim(number_format((float) ($settings['take_profit_pct'] ?? 2), 2), '0'), '.')) ?>"
                        class="w-28 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none"><span class="text-gray-400">%</span>
             </div>
         </div>
@@ -124,6 +132,7 @@ function gtaSaveSettings() {
     var payload = {
         csrf_token: GTA_CSRF,
         stop_loss_pct: +document.getElementById('set-stop').value,
+        take_profit_pct: +document.getElementById('set-tp').value,
         max_daily_loss_pct: +document.getElementById('set-daily').value,
     };
     if (GTA_IS_PRO) {

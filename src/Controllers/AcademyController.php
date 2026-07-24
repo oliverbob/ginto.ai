@@ -658,8 +658,9 @@ class AcademyController
         $set = $this->botSettings($userId);
         $UNIT = max(10.0, min(2000.0, (float) $set['trade_size']));   // paper $ per mirrored trade
         $SLOTS = max(1, min(20, (int) $set['max_slots']));            // max concurrent mirrors
-        $stopPct  = (float) $set['stop_loss_pct'];                    // per-trade guardrail
+        $stopPct  = (float) $set['stop_loss_pct'];                    // per-trade stop guardrail
         $dailyPct = (float) $set['max_daily_loss_pct'];               // account guardrail
+        $tpPct    = (float) $set['take_profit_pct'];                  // per-trade take-profit (0 = off)
         $enabledTpls = array_flip(array_filter(array_map('trim', explode(',', (string) $set['templates']))));
         $db = Database::getInstance();
         $client = new \Ginto\Services\BinanceClient();
@@ -706,6 +707,18 @@ class AcademyController
             $entry = (float) $u['entry']; if ($entry <= 0) continue;
             $m = $mark($u['symbol'], $entry);
             if (($m - $entry) / $entry * 100 <= -$stopPct) { $close($u, $m, 'stop_loss'); }
+        }
+
+        // 2b) TAKE-PROFIT — auto-close a MANUAL/AI trade once it's up >= take-profit% from entry.
+        //     Bot-followed trades keep the class bot's own (trailing) exit, so they're left alone.
+        if ($tpPct > 0) {
+            $open = $db->select('academy_positions', '*', ['user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null]);
+            if (!is_array($open)) $open = [];
+            foreach ($open as $u) {
+                $entry = (float) $u['entry']; if ($entry <= 0) continue;
+                $m = $mark($u['symbol'], $entry);
+                if (($m - $entry) / $entry * 100 >= $tpPct) { $close($u, $m, 'take_profit'); }
+            }
         }
 
         // 3) Open a mirror for each class-bot trade we don't hold yet — only if the learner turned their
@@ -768,17 +781,26 @@ class AcademyController
         if (abs($balance - (float) $wallet['balance']) > 1e-9) $walletPatch['balance'] = round($balance, 8);
         if ($walletPatch) $db->update('academy_wallets', $walletPatch, ['user_id' => $userId]);
 
-        // 5) Live positions view.
+        // 5) Live positions view. SL/TP reflect the CURRENT settings so the charts match the settings
+        //    at a glance: SL from stop-loss%, TP from take-profit% (manual/AI) or the bot's own TP.
         $positions = []; $unreal = 0.0;
         foreach ($open as $u) {
             $entry = (float) $u['entry']; $qty = (float) $u['qty']; $m = (float) $u['_mark'];
+            $isBot = $u['ref_trade_id'] !== null;
             $pnl = ($m - $entry) * $qty; $unreal += $pnl;
+            $slPrice = $entry * (1 - $stopPct / 100);   // settings stop guardrail (applies to all)
+            $tpPrice = $isBot
+                ? ($u['take_profit'] !== null ? (float) $u['take_profit'] : null)   // bot's own target
+                : ($tpPct > 0 ? $entry * (1 + $tpPct / 100) : null);                // settings target
             $positions[] = [
                 'id' => (int) $u['id'], 'symbol' => $u['symbol'], 'base' => $u['base'], 'template' => $u['template'],
-                'auto' => $u['ref_trade_id'] !== null,   // true = bot-followed, false = manual
+                'auto' => $isBot,   // true = bot-followed, false = manual
                 'entry' => $entry, 'mark' => $m, 'qty' => $qty, 'spent' => (float) $u['spent'],
-                'stop_loss' => $u['stop_loss'] !== null ? (float) $u['stop_loss'] : null,
-                'take_profit' => $u['take_profit'] !== null ? (float) $u['take_profit'] : null,
+                'stop_loss' => round($slPrice, 10),
+                'take_profit' => $tpPrice !== null ? round($tpPrice, 10) : null,
+                // Dollar equivalents for one-glance reference on the chart.
+                'sl_usd' => round(($slPrice - $entry) * $qty, 2),
+                'tp_usd' => $tpPrice !== null ? round(($tpPrice - $entry) * $qty, 2) : null,
                 'pnlPct' => $entry > 0 ? ($m - $entry) / $entry * 100 : 0, 'unrealized' => round($pnl, 4),
             ];
         }
@@ -787,7 +809,7 @@ class AcademyController
             'unrealized' => round($unreal, 4), 'equity' => round($equity, 4),
             'bot_enabled' => $enabled && !$halted,
             'halted' => $halted, 'just_halted' => $justHalted,
-            'stop_loss_pct' => $stopPct, 'max_daily_loss_pct' => $dailyPct,
+            'stop_loss_pct' => $stopPct, 'max_daily_loss_pct' => $dailyPct, 'take_profit_pct' => $tpPct,
             'bot_interval_sec' => (int) $set['bot_interval_sec'],
             'day_anchor' => round((float) $anchor, 4),
         ];
@@ -807,7 +829,7 @@ class AcademyController
             'bot_enabled' => (bool) $r['bot_enabled'], 'positions' => $r['positions'],
             'halted' => (bool) $r['halted'], 'just_halted' => (bool) $r['just_halted'],
             'stop_loss_pct' => $r['stop_loss_pct'], 'max_daily_loss_pct' => $r['max_daily_loss_pct'],
-            'bot_interval_sec' => $r['bot_interval_sec'],
+            'take_profit_pct' => $r['take_profit_pct'], 'bot_interval_sec' => $r['bot_interval_sec'],
         ]);
         exit;
     }
@@ -905,16 +927,21 @@ class AcademyController
         if ($amount > $balance) return ['ok' => false, 'error' => 'Not enough paper balance ($' . number_format($balance, 2) . ').'];
         $price = (float) ((new \Ginto\Services\BinanceClient())->price($symbol) ?? 0);
         if ($price <= 0) return ['ok' => false, 'error' => 'Could not get a live price for ' . $base . '.'];
-        $stopPct = (float) $this->botSettings($userId)['stop_loss_pct'];
+        $set = $this->botSettings($userId);
+        $stopPct = (float) $set['stop_loss_pct'];
+        $tpPct   = (float) $set['take_profit_pct'];
+        $slPrice = $price * (1 - $stopPct / 100);
+        $tpPrice = $tpPct > 0 ? $price * (1 + $tpPct / 100) : null;   // null = take-profit off (let it run)
         $db = Database::getInstance();
         $db->insert('academy_positions', [
             'user_id' => $userId, 'ref_trade_id' => null, 'symbol' => $symbol, 'base' => $base,
             'qty' => $amount / $price, 'entry' => $price, 'spent' => $amount,
-            'stop_loss' => $price * (1 - $stopPct / 100), 'template' => $template, 'status' => 'open',
+            'stop_loss' => $slPrice, 'take_profit' => $tpPrice, 'template' => $template, 'status' => 'open',
         ]);
         $db->update('academy_wallets', ['balance' => round($balance - $amount, 8)], ['user_id' => $userId]);
         return ['ok' => true, 'symbol' => $symbol, 'base' => $base, 'entry' => $price, 'spent' => $amount,
-                'stop_loss' => round($price * (1 - $stopPct / 100), 10), 'balance' => round($balance - $amount, 8)];
+                'stop_loss' => round($slPrice, 10), 'take_profit' => $tpPrice !== null ? round($tpPrice, 10) : null,
+                'balance' => round($balance - $amount, 8)];
     }
 
     /**
@@ -1052,7 +1079,7 @@ class AcademyController
             $total = (int) $db->count('academy_positions', $where);
             $rows  = $db->select('academy_positions', '*', array_merge($where, ['ORDER' => ['id' => 'DESC'], 'LIMIT' => [$off, $per]]));
             if (!is_array($rows)) $rows = [];
-            $reasons = ['manual' => 'You closed it', 'stop_loss' => 'Stop-loss', 'daily_halt' => 'Daily-loss halt', 'bot_exit' => 'Bot exit'];
+            $reasons = ['manual' => 'You closed it', 'stop_loss' => 'Stop-loss', 'take_profit' => 'Take-profit', 'daily_halt' => 'Daily-loss halt', 'bot_exit' => 'Bot exit'];
             $out = array_map(static function ($r) use ($reasons) {
                 $entry = (float) $r['entry']; $exit = $r['exit_price'] !== null ? (float) $r['exit_price'] : null;
                 $realized = $r['realized'] !== null ? (float) $r['realized'] : null;
@@ -1127,9 +1154,10 @@ class AcademyController
     private const DEFAULT_TEMPLATES = 'gainers,scalp,breakout,trend,pullback';
 
     // Default risk guardrails (percent). Applied to every member, manual or bot.
-    private const DEFAULT_STOP_LOSS_PCT = 1.0;   // per-trade: auto-close a position down this % from entry
-    private const DEFAULT_DAILY_LOSS_PCT = 1.0;  // account: flatten + pause the bot if the day is down this %
-    private const DEFAULT_BOT_INTERVAL_SEC = 15; // per-user (Pro): how often the wallet syncs/mirrors/auto-buys
+    private const DEFAULT_STOP_LOSS_PCT = 1.0;    // per-trade: auto-close a position down this % from entry
+    private const DEFAULT_DAILY_LOSS_PCT = 1.0;   // account: flatten + pause the bot if the day is down this %
+    private const DEFAULT_TAKE_PROFIT_PCT = 2.0;  // per-trade: auto-close a manual/AI trade up this % from entry (0 = off)
+    private const DEFAULT_BOT_INTERVAL_SEC = 15;  // per-user (Pro): how often the wallet syncs/mirrors/auto-buys
 
     private function ensureBotSettingsTable(): void
     {
@@ -1141,6 +1169,7 @@ class AcademyController
             max_slots INT NOT NULL DEFAULT 8,
             stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_STOP_LOSS_PCT . ",
             max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_DAILY_LOSS_PCT . ",
+            take_profit_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_TAKE_PROFIT_PCT . ",
             bot_interval_sec INT NOT NULL DEFAULT " . self::DEFAULT_BOT_INTERVAL_SEC . ",
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
@@ -1148,6 +1177,7 @@ class AcademyController
         foreach ([
             'stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_STOP_LOSS_PCT,
             'max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_DAILY_LOSS_PCT,
+            'take_profit_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_TAKE_PROFIT_PCT,
             'bot_interval_sec INT NOT NULL DEFAULT ' . self::DEFAULT_BOT_INTERVAL_SEC,
         ] as $col) {
             try { $db->pdo->exec("ALTER TABLE academy_bot_settings ADD COLUMN IF NOT EXISTS $col"); } catch (\Throwable $e) {}
@@ -1160,7 +1190,7 @@ class AcademyController
         $defaults = [
             'templates' => self::DEFAULT_TEMPLATES, 'trade_size' => 200.0, 'max_slots' => 8,
             'stop_loss_pct' => self::DEFAULT_STOP_LOSS_PCT, 'max_daily_loss_pct' => self::DEFAULT_DAILY_LOSS_PCT,
-            'bot_interval_sec' => self::DEFAULT_BOT_INTERVAL_SEC,
+            'take_profit_pct' => self::DEFAULT_TAKE_PROFIT_PCT, 'bot_interval_sec' => self::DEFAULT_BOT_INTERVAL_SEC,
         ];
         try {
             $this->ensureBotSettingsTable();
@@ -1173,6 +1203,8 @@ class AcademyController
                 // Clamp to a sane 0.1%–50% band; 0/invalid falls back to the default.
                 'stop_loss_pct'      => $this->clampPct($r['stop_loss_pct'] ?? null, self::DEFAULT_STOP_LOSS_PCT),
                 'max_daily_loss_pct' => $this->clampPct($r['max_daily_loss_pct'] ?? null, self::DEFAULT_DAILY_LOSS_PCT),
+                // Take-profit: 0 = off (let winners run); otherwise clamped 0.1–50%.
+                'take_profit_pct'    => $this->clampTp($r['take_profit_pct'] ?? null),
                 'bot_interval_sec'   => $this->clampInterval($r['bot_interval_sec'] ?? null),
             ];
         } catch (\Throwable $e) { return $defaults; }
@@ -1183,6 +1215,15 @@ class AcademyController
     {
         $v = (float) $val;
         if ($v <= 0) return $default;
+        return max(0.1, min(50.0, $v));
+    }
+
+    /** Take-profit percent: empty/null → default; explicit 0 (or negative) → 0 (off); else clamp [0.1, 50]. */
+    private function clampTp($val): float
+    {
+        if ($val === null || $val === '') return self::DEFAULT_TAKE_PROFIT_PCT;
+        $v = (float) $val;
+        if ($v <= 0) return 0.0;
         return max(0.1, min(50.0, $v));
     }
 
@@ -1224,10 +1265,11 @@ class AcademyController
         $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
         $isPro = $this->isPro($userId);
 
-        // Everyone: risk guardrails.
+        // Everyone: risk guardrails + take-profit target.
         $row = [
             'stop_loss_pct'      => $this->clampPct($input['stop_loss_pct'] ?? null, self::DEFAULT_STOP_LOSS_PCT),
             'max_daily_loss_pct' => $this->clampPct($input['max_daily_loss_pct'] ?? null, self::DEFAULT_DAILY_LOSS_PCT),
+            'take_profit_pct'    => $this->clampTp($input['take_profit_pct'] ?? null),
         ];
         // Pro only: strategy templates + sizing.
         if ($isPro) {
