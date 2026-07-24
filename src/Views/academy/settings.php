@@ -98,6 +98,14 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
             <input id="set-slots" type="number" min="1" max="20" step="1" value="<?= (int) ($settings['max_slots'] ?? 8) ?>" <?= $isPro ? '' : 'disabled' ?>
                    class="w-32 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none">
         </div>
+        <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <label class="text-sm font-semibold">Bot follow interval</label>
+            <div class="text-xs text-gray-500 dark:text-gray-400 mb-2">How often your bot syncs with the live bot — mirrors trades, auto-buys, and refreshes its thinking (5–300s).</div>
+            <div class="flex items-center gap-2">
+                <input id="set-interval" type="number" min="5" max="300" step="1" value="<?= (int) ($settings['bot_interval_sec'] ?? 15) ?>" <?= $isPro ? '' : 'disabled' ?>
+                       class="w-32 px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent tabular-nums focus:border-primary focus:outline-none"><span class="text-gray-400">sec</span>
+            </div>
+        </div>
     </div>
 
     <div class="mt-6 flex items-center gap-3">
@@ -124,6 +132,7 @@ function gtaSaveSettings() {
         payload.templates = tpls;
         payload.trade_size = +document.getElementById('set-size').value;
         payload.max_slots = +document.getElementById('set-slots').value;
+        payload.bot_interval_sec = +document.getElementById('set-interval').value;
     }
     btn.disabled = true; st.textContent = 'Saving…'; st.className = 'text-sm text-gray-400';
     fetch('/academy/settings/save', {

@@ -400,7 +400,7 @@ function labFmtQty(q) {
 function labChgClass(up) { return up ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'; }
 
 // ---- TradingView (Lightweight) candlestick chart + live Binance stream --------
-var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '1m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {}, side: 'buy', balance: 10000, holdQty: 0, holdSpent: 0, lastPx: 0, bookWs: null };
+var LAB = { chart: null, series: null, symbol: 'BTCUSDT', base: 'BTC', interval: '1m', ws: null, markets: { hot: [], gainers: [], losers: [] }, tab: 'hot', isPro: <?= $isPro ? 'true' : 'false' ?>, cards: {}, sig: {}, side: 'buy', balance: 10000, holdQty: 0, holdSpent: 0, lastPx: 0, bookWs: null, intervalSec: <?= (int) ($botInterval ?? 15) ?> };
 
 function labChartTheme() {
     var dark = document.documentElement.classList.contains('dark');
@@ -600,6 +600,8 @@ function labLoadWallet() {
             LAB.botOn = !!d.bot_enabled;
             labSetToggle();
             labRenderMyPositions(d.positions || []);
+            // Live re-arm if the follow interval was changed in settings (Pro).
+            if (d.bot_interval_sec && +d.bot_interval_sec !== LAB.intervalSec) labArmBotTimer(+d.bot_interval_sec);
 
             // Holding of the charted coin = sum of my MANUAL open positions on that symbol (what Sell closes).
             var q = 0, sp = 0;
@@ -1018,6 +1020,14 @@ function labAnalyzeRun(o) {
 }
 
 var labTimer = null;
+// (Re)arm the follow-timer at the given cadence (seconds). Runs the class-bot snapshot poll and
+// this learner's wallet sync together, so mirrored trades + auto-buy follow at the chosen speed.
+function labArmBotTimer(sec) {
+    sec = Math.max(5, Math.min(300, +sec || 15));
+    LAB.intervalSec = sec;
+    if (labTimer) clearInterval(labTimer);
+    labTimer = setInterval(function () { labPoll(); labLoadWallet(); }, sec * 1000);
+}
 function labPoll() {
     fetch('/academy/bot/data', { cache: 'no-store', credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
@@ -1065,9 +1075,10 @@ document.addEventListener('DOMContentLoaded', function () {
     // Re-theme chart when the light/dark toggle flips
     var _toggle = window.gtaToggleTheme;
     window.gtaToggleTheme = function () { if (_toggle) _toggle(); labApplyChartTheme(); };
-    // Bot state / positions / reasoning
+    // Bot state / positions / reasoning — the Pro follow interval drives BOTH the reasoning
+    // refresh and the wallet sync (mirror + auto-buy), so the bot follows live without interaction.
     labPoll();
-    labTimer = setInterval(labPoll, 6000);
+    labArmBotTimer(LAB.intervalSec);
     setInterval(labLoadMarkets, 60000);
 });
 </script>

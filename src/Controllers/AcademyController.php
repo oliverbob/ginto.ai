@@ -125,6 +125,7 @@ class AcademyController
         View::view('academy/bot', [
             'title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true, 'csrf_token' => $csrf,
             'isPro' => $this->isPro((int) $userId), 'catalog' => \Ginto\Services\GtbStrategy::catalog(),
+            'botInterval' => (int) $this->botSettings((int) $userId)['bot_interval_sec'],
         ]);
     }
 
@@ -787,6 +788,7 @@ class AcademyController
             'bot_enabled' => $enabled && !$halted,
             'halted' => $halted, 'just_halted' => $justHalted,
             'stop_loss_pct' => $stopPct, 'max_daily_loss_pct' => $dailyPct,
+            'bot_interval_sec' => (int) $set['bot_interval_sec'],
             'day_anchor' => round((float) $anchor, 4),
         ];
     }
@@ -805,6 +807,7 @@ class AcademyController
             'bot_enabled' => (bool) $r['bot_enabled'], 'positions' => $r['positions'],
             'halted' => (bool) $r['halted'], 'just_halted' => (bool) $r['just_halted'],
             'stop_loss_pct' => $r['stop_loss_pct'], 'max_daily_loss_pct' => $r['max_daily_loss_pct'],
+            'bot_interval_sec' => $r['bot_interval_sec'],
         ]);
         exit;
     }
@@ -1126,6 +1129,7 @@ class AcademyController
     // Default risk guardrails (percent). Applied to every member, manual or bot.
     private const DEFAULT_STOP_LOSS_PCT = 1.0;   // per-trade: auto-close a position down this % from entry
     private const DEFAULT_DAILY_LOSS_PCT = 1.0;  // account: flatten + pause the bot if the day is down this %
+    private const DEFAULT_BOT_INTERVAL_SEC = 15; // per-user (Pro): how often the wallet syncs/mirrors/auto-buys
 
     private function ensureBotSettingsTable(): void
     {
@@ -1137,12 +1141,14 @@ class AcademyController
             max_slots INT NOT NULL DEFAULT 8,
             stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_STOP_LOSS_PCT . ",
             max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT " . self::DEFAULT_DAILY_LOSS_PCT . ",
+            bot_interval_sec INT NOT NULL DEFAULT " . self::DEFAULT_BOT_INTERVAL_SEC . ",
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         // Backfill guardrail columns on pre-existing installs.
         foreach ([
             'stop_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_STOP_LOSS_PCT,
             'max_daily_loss_pct DECIMAL(6,3) NOT NULL DEFAULT ' . self::DEFAULT_DAILY_LOSS_PCT,
+            'bot_interval_sec INT NOT NULL DEFAULT ' . self::DEFAULT_BOT_INTERVAL_SEC,
         ] as $col) {
             try { $db->pdo->exec("ALTER TABLE academy_bot_settings ADD COLUMN IF NOT EXISTS $col"); } catch (\Throwable $e) {}
         }
@@ -1154,6 +1160,7 @@ class AcademyController
         $defaults = [
             'templates' => self::DEFAULT_TEMPLATES, 'trade_size' => 200.0, 'max_slots' => 8,
             'stop_loss_pct' => self::DEFAULT_STOP_LOSS_PCT, 'max_daily_loss_pct' => self::DEFAULT_DAILY_LOSS_PCT,
+            'bot_interval_sec' => self::DEFAULT_BOT_INTERVAL_SEC,
         ];
         try {
             $this->ensureBotSettingsTable();
@@ -1166,6 +1173,7 @@ class AcademyController
                 // Clamp to a sane 0.1%–50% band; 0/invalid falls back to the default.
                 'stop_loss_pct'      => $this->clampPct($r['stop_loss_pct'] ?? null, self::DEFAULT_STOP_LOSS_PCT),
                 'max_daily_loss_pct' => $this->clampPct($r['max_daily_loss_pct'] ?? null, self::DEFAULT_DAILY_LOSS_PCT),
+                'bot_interval_sec'   => $this->clampInterval($r['bot_interval_sec'] ?? null),
             ];
         } catch (\Throwable $e) { return $defaults; }
     }
@@ -1176,6 +1184,14 @@ class AcademyController
         $v = (float) $val;
         if ($v <= 0) return $default;
         return max(0.1, min(50.0, $v));
+    }
+
+    /** Clamp the per-user follow interval into [5, 300] seconds; default when empty/invalid. */
+    private function clampInterval($val): int
+    {
+        $v = (int) $val;
+        if ($v <= 0) return self::DEFAULT_BOT_INTERVAL_SEC;
+        return max(5, min(300, $v));
     }
 
     /** GET /academy/settings — per-user, DB-driven bot settings (templates, size, slots). Pro-gated. */
@@ -1221,6 +1237,7 @@ class AcademyController
             $row['templates']  = implode(',', $tpls);
             $row['trade_size'] = max(10.0, min(2000.0, (float) ($input['trade_size'] ?? 200)));
             $row['max_slots']  = max(1, min(20, (int) ($input['max_slots'] ?? 8)));
+            $row['bot_interval_sec'] = $this->clampInterval($input['bot_interval_sec'] ?? null);
         }
         try {
             $db = Database::getInstance();
