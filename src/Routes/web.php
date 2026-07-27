@@ -1723,6 +1723,9 @@ $router->post('/silverqueen/payment/cancel', 'SilverQueenController@paymentCance
 $router->post('/silverqueen/claim', 'SilverQueenController@claim');          // Transfer to Wallet
 $router->post('/silverqueen/enroll', 'SilverQueenController@enroll');        // join the AntFun tree under a sponsor
 $router->post('/silverqueen/admin/verify', 'SilverQueenController@adminVerify'); // elevated: confirm/reject a paid invoice
+$router->post('/silverqueen/admin/grant', 'SilverQueenController@adminGrant');   // elevated: grant a product outright (paid off-book / comped)
+$router->post('/silverqueen/admin/accept', 'SilverQueenController@adminAccept'); // elevated: accept payment on an invoice without a chain check
+$router->get('/silverqueen/admin/member', 'SilverQueenController@adminMemberLookup'); // elevated: resolve a member before granting
 $router->post('/silverqueen/admin/run', 'SilverQueenController@adminRun');   // elevated: force an accrual pass
 
 // Courses

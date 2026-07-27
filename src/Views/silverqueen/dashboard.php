@@ -584,6 +584,108 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
       <?php endforeach; ?>
     </div>
 
+    <!-- Manual override: grant a product without an invoice or a TxHash. -->
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="font-semibold text-sm">
+        <i class="fas fa-hand-holding-dollar mr-1.5 text-gray-400"></i>Manual grant
+      </div>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        For someone who paid you off-book — cash, GCash, bank, a transfer you reconciled yourself — or who is being comped.
+        Grants exactly like a verified payment: the allocation starts and referral overrides pay.
+      </p>
+
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantMember">Member</label>
+          <div class="flex gap-2">
+            <input id="sqGrantMember" type="text" placeholder="email, username, or user id" autocomplete="off"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <button type="button" onclick="sqLookupMember(this)"
+                    class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary">
+              <i class="fas fa-magnifying-glass"></i>
+            </button>
+          </div>
+          <div id="sqGrantWho" class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400"></div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantProduct">Product</label>
+          <select id="sqGrantProduct" onchange="sqGrantRecalc()"
+                  class="w-full px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <?php foreach ($products as $p): ?>
+              <option value="<?= htmlspecialchars((string) $p['code']) ?>"
+                      data-price="<?= (float) $p['price'] ?>"
+                      data-kind="<?= htmlspecialchars((string) $p['kind']) ?>">
+                <?= htmlspecialchars((string) $p['name']) ?> — <?= $money($p['price']) ?> USDT
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantUnits">Units</label>
+          <input id="sqGrantUnits" type="number" min="1" max="1000" value="1" oninput="sqGrantRecalc()"
+                 class="w-full px-3 py-2 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantNote">Note <span class="normal-case text-gray-400">(kept on the record)</span></label>
+          <input id="sqGrantNote" type="text" maxlength="255" placeholder="e.g. Paid ₱6,800 cash at the Cebu meetup, 27 Jul"
+                 class="w-full px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+        </div>
+
+        <label class="sm:col-span-2 flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
+          <input id="sqGrantComm" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded" style="accent-color:#6366f1">
+          <span>Pay the 15% / 5% referral overrides on this grant. Untick when comping — a free grant usually shouldn't pay the upline.</span>
+        </label>
+      </div>
+
+      <div class="mt-3 flex items-center justify-between gap-3 flex-wrap">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+          Order value <span class="font-bold sq-num text-gray-900 dark:text-gray-100" id="sqGrantTotal"><?= $money($products[0]['price'] ?? 0) ?></span> USDT
+        </div>
+        <button type="button" onclick="sqDoGrant(this)"
+                class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700">
+          <i class="fas fa-gift mr-1.5"></i>Grant now
+        </button>
+      </div>
+      <p class="mt-2 text-[11px] text-gray-400 leading-snug">
+        A grant skips the three-card qualification gate, so SQB engines can be granted to anyone. Duplicate cards are still refused.
+      </p>
+    </div>
+
+    <!-- Unpaid invoices: raised by a member, no transfer submitted yet. -->
+    <?php if (!empty($admin['unpaid_invoices'])): ?>
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="font-semibold text-sm">
+        <i class="fas fa-file-invoice mr-1.5 text-gray-400"></i>Unpaid invoices
+        <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"><?= count($admin['unpaid_invoices']) ?></span>
+      </div>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Raised but never paid on-chain. Accept one if the money reached you another way.</p>
+      <div class="mt-3 space-y-2">
+        <?php foreach ($admin['unpaid_invoices'] as $u): ?>
+          <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div class="min-w-0">
+              <div class="font-semibold text-sm truncate"><?= htmlspecialchars((string) $u['member']) ?></div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">
+                #<?= (int) $u['id'] ?> · <?= htmlspecialchars((string) $u['product_code']) ?>
+                <?php if ((int) $u['units'] > 1): ?> × <?= (int) $u['units'] ?><?php endif; ?>
+                · raised <?= htmlspecialchars(date('M j, H:i', strtotime((string) $u['created_at']))) ?>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <div class="font-bold sq-num text-sm"><?= $money($u['total']) ?> USDT</div>
+              <button type="button" onclick="sqAcceptInvoice(this,<?= (int) $u['id'] ?>)"
+                      class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+                <i class="fas fa-check mr-1"></i>Accept payment
+              </button>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <!-- Payment verification queue: confirming here is what grants the allocation. -->
     <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
       <div class="flex items-center justify-between gap-2 flex-wrap">
@@ -720,6 +822,37 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
         </table>
       </div>
     </div>
+
+    <?php if (!empty($admin['manual_grants'])): ?>
+    <details class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834]">
+      <summary class="p-4 cursor-pointer font-semibold text-sm select-none">
+        <i class="fas fa-clipboard-list mr-1.5 text-gray-400"></i>Manual grants &amp; accepted payments
+        <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><?= count($admin['manual_grants']) ?></span>
+      </summary>
+      <div class="px-4 pb-4 -mx-0 overflow-x-auto">
+        <table class="w-full text-sm min-w-[560px]">
+          <thead><tr class="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-gray-200 dark:border-gray-800">
+            <th class="pb-2 font-medium">When</th><th class="pb-2 font-medium">Member</th>
+            <th class="pb-2 font-medium">Product</th><th class="pb-2 font-medium text-right">Value</th>
+            <th class="pb-2 font-medium">Reason</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <?php foreach ($admin['manual_grants'] as $g): ?>
+              <tr>
+                <td class="py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(date('M j, H:i', strtotime((string) ($g['confirmed_at'] ?: $g['created_at'])))) ?></td>
+                <td class="py-2 truncate max-w-[10rem]"><?= htmlspecialchars((string) $g['member']) ?></td>
+                <td class="py-2 text-gray-500 dark:text-gray-400">
+                  <?= htmlspecialchars((string) $g['product_code']) ?><?php if ((int) $g['units'] > 1): ?> × <?= (int) $g['units'] ?><?php endif; ?>
+                </td>
+                <td class="py-2 text-right sq-num font-semibold"><?= $money($g['total']) ?></td>
+                <td class="py-2 text-gray-500 dark:text-gray-400 text-xs"><?= htmlspecialchars((string) ($g['verify_note'] ?? '')) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <?php endif; ?>
 
     <details class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834]">
       <summary class="p-4 cursor-pointer font-semibold text-sm select-none"><i class="fas fa-bug mr-1.5 text-gray-400"></i>Engine parameters &amp; worker state</summary>
@@ -1092,6 +1225,94 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     if (navigator.clipboard) {
       navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
     } else { input.select(); document.execCommand('copy'); done(); }
+  };
+
+  // ---- Manual override (elevated) -----------------------------------------
+  window.sqGrantRecalc = function () {
+    const sel = $('sqGrantProduct'), unitsEl = $('sqGrantUnits'), out = $('sqGrantTotal');
+    if (!sel || !out) return;
+    const opt   = sel.options[sel.selectedIndex];
+    const price = parseFloat(opt.getAttribute('data-price')) || 0;
+    const isCard = opt.getAttribute('data-kind') === 'card';
+    // Cards are one per member; lock the unit box so the total can't mislead.
+    if (unitsEl) { unitsEl.disabled = isCard; if (isCard) unitsEl.value = 1; }
+    const units = isCard ? 1 : Math.max(1, parseInt(unitsEl && unitsEl.value, 10) || 1);
+    out.textContent = (price * units).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  window.sqLookupMember = async function (btn) {
+    const q = ($('sqGrantMember').value || '').trim();
+    const who = $('sqGrantWho');
+    if (!q) { who.textContent = ''; return; }
+    who.textContent = 'Looking up…';
+    try {
+      const res = await fetch('/silverqueen/admin/member?q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+      const r = await res.json();
+      if (r.ok) {
+        who.innerHTML = '<span class="text-emerald-600 dark:text-emerald-400">'
+          + '<i class="fas fa-circle-check mr-1"></i>' + escapeHtml(r.name) + '</span>'
+          + ' · #' + r.user_id + (r.email ? ' · ' + escapeHtml(r.email) : '')
+          + ' · holds ' + r.cards.length + '/3 cards' + (r.qualified ? ' · qualified' : '');
+      } else {
+        who.innerHTML = '<span class="text-red-600 dark:text-red-400"><i class="fas fa-circle-xmark mr-1"></i>'
+          + escapeHtml(r.error || 'No match') + '</span>';
+      }
+    } catch (e) {
+      who.textContent = 'Lookup failed.';
+    }
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  window.sqDoGrant = async function (btn) {
+    const member = ($('sqGrantMember').value || '').trim();
+    if (!member) { toast('Enter an email, username, or user id first.', false); return; }
+    const code  = $('sqGrantProduct').value;
+    const units = Math.max(1, parseInt($('sqGrantUnits').value, 10) || 1);
+    const note  = ($('sqGrantNote').value || '').trim();
+    const comm  = $('sqGrantComm').checked;
+
+    const label = $('sqGrantProduct').options[$('sqGrantProduct').selectedIndex].text;
+    if (!window.confirm('Grant ' + label + (units > 1 ? ' × ' + units : '') + ' to "' + member + '"?'
+        + (comm ? '\n\nReferral overrides WILL be paid.' : '\n\nNo referral overrides will be paid.'))) return;
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Granting';
+    try {
+      const r = await post('/silverqueen/admin/grant', { member, code, units, note, commissions: comm });
+      if (r.ok) {
+        toast('Granted ' + r.product + ' to ' + r.member + '.'
+          + (r.commissions && r.commissions.length ? ' Overrides paid.' : ''));
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast(r.error || 'Grant failed.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqAcceptInvoice = async function (btn, purchaseId) {
+    const note = window.prompt('Accept this payment without an on-chain check?\nNote for the record:',
+                               'Payment reconciled manually.');
+    if (note === null) return;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    try {
+      const r = await post('/silverqueen/admin/accept', { purchase_id: purchaseId, note });
+      if (r.ok) { toast('Payment accepted — order granted.'); setTimeout(() => location.reload(), 1100); return; }
+      toast(r.error || 'Could not accept the payment.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
   };
 
   window.sqAdminRun = async function (btn) {

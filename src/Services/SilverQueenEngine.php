@@ -508,7 +508,7 @@ class SilverQueenEngine
      * creates an SQB allocation or pays a referral override, so nothing is ever
      * granted against unpaid funds. Re-confirming a completed invoice is a no-op.
      */
-    public function confirmPurchase(int $purchaseId, int $adminId): array
+    public function confirmPurchase(int $purchaseId, int $adminId, bool $withCommissions = true): array
     {
         $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId]);
         if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
@@ -573,8 +573,8 @@ class SilverQueenEngine
         }
 
         // Settled outside the transaction so a payout problem can never roll back a
-        // confirmation the buyer already paid for.
-        $paid = $this->payCommissions($purchaseId, $userId, $total);
+        // confirmation the buyer already paid for. A comped grant can skip them.
+        $paid = $withCommissions ? $this->payCommissions($purchaseId, $userId, $total) : [];
 
         return [
             'ok'            => true,
@@ -612,6 +612,173 @@ class SilverQueenEngine
             return ['ok' => false, 'error' => 'Could not reject the invoice.'];
         }
         return ['ok' => true, 'purchase_id' => $purchaseId, 'reason' => $reason];
+    }
+
+    // --------------------------------------------------------- manual override
+
+    /**
+     * Find a member by email, username, public_id, or numeric id — so an operator can
+     * type whatever they have to hand when granting.
+     */
+    public function resolveMember(string $identifier): ?array
+    {
+        $raw = trim($identifier);
+        if ($raw === '') return null;
+        try {
+            $cols = ['id', 'username', 'fullname', 'email'];
+            if (ctype_digit($raw)) {
+                $u = $this->db->get('users', $cols, ['id' => (int) $raw]);
+                if (is_array($u)) return $u;
+            }
+            foreach (['email' => strtolower($raw), 'username' => $raw, 'public_id' => $raw] as $field => $value) {
+                $u = $this->db->get('users', $cols, [$field => $value]);
+                if (is_array($u)) return $u;
+            }
+        } catch (\Throwable $e) {
+            error_log('SilverQueen resolveMember: ' . $e->getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Grant a product outright — the operator's override for someone who paid off-book
+     * (cash, GCash, bank, a direct transfer you reconciled yourself) or who is being
+     * comped. No invoice and no TxHash required.
+     *
+     * It routes through the same confirmPurchase() path as an on-chain settlement, so a
+     * granted order is indistinguishable downstream: the allocation is created and the
+     * referral overrides pay exactly as they would have. Only the audit trail differs —
+     * source 'manual_grant', payment_method 'manual', and the operator's note.
+     *
+     * Deliberately bypasses the three-card qualification gate: an override that still
+     * enforced the gate wouldn't be an override. Duplicate cards are still refused,
+     * because holding the same card twice is meaningless rather than merely unusual.
+     */
+    public function adminGrant(
+        int $adminId,
+        string $identifier,
+        string $code,
+        int $units = 1,
+        string $note = '',
+        bool $withCommissions = true
+    ): array {
+        $member = $this->resolveMember($identifier);
+        if (!$member) return ['ok' => false, 'error' => 'No account matches "' . $identifier . '".'];
+        $userId = (int) $member['id'];
+
+        $product = $this->product($code);
+        if (!$product) return ['ok' => false, 'error' => 'Unknown product.'];
+
+        $units = max(1, min(1000, $units));
+        $kind  = (string) $product['kind'];
+        if ($kind === 'card') {
+            $units = 1;
+            if ($this->db->count('sq_purchases', ['user_id' => $userId, 'product_code' => $code, 'status' => 'completed']) > 0) {
+                return ['ok' => false, 'error' => trim(($member['username'] ?: 'That member')) . ' already holds this card.'];
+            }
+        }
+
+        // Make sure they have a place in the tree before overrides are calculated.
+        $this->enroll($userId);
+
+        $unitPrice = (float) $product['price'];
+        $total     = round($unitPrice * $units, 8);
+        $note      = trim($note) !== '' ? substr(trim($note), 0, 255) : 'Granted manually by an administrator.';
+
+        try {
+            $this->db->insert('sq_purchases', [
+                'user_id'        => $userId,
+                'product_id'     => (int) $product['id'],
+                'product_code'   => $code,
+                'units'          => $units,
+                'unit_price'     => $unitPrice,
+                'total'          => $total,
+                'currency'       => 'USDT',
+                'status'         => 'pending',
+                'source'         => 'manual_grant',
+                'payment_method' => 'manual',
+                'verify_verdict' => 'manual',
+                'verify_note'    => $note,
+                'verify_checked_at' => date('Y-m-d H:i:s'),
+                'created_at'     => date('Y-m-d H:i:s'),
+            ]);
+            $purchaseId = (int) $this->db->pdo->lastInsertId();
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminGrant: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not create the grant.'];
+        }
+
+        $done = $this->confirmPurchase($purchaseId, $adminId, $withCommissions);
+        if (empty($done['ok'])) {
+            return ['ok' => false, 'error' => (string) ($done['error'] ?? 'Could not complete the grant.')];
+        }
+
+        return [
+            'ok'            => true,
+            'purchase_id'   => $purchaseId,
+            'allocation_id' => $done['allocation_id'] ?? null,
+            'user_id'       => $userId,
+            'member'        => trim((string) ($member['fullname'] ?: $member['username'] ?: ('Member #' . $userId))),
+            'email'         => (string) ($member['email'] ?? ''),
+            'product'       => (string) $product['name'],
+            'units'         => $units,
+            'total'         => $total,
+            'qualified'     => $this->isQualified($userId),
+            'commissions'   => $done['commissions'] ?? [],
+            'note'          => $note,
+        ];
+    }
+
+    /**
+     * Mark an existing invoice as paid without an on-chain check — the operator has
+     * reconciled the money some other way. Same grant path as a verified payment.
+     */
+    public function adminMarkPaid(int $purchaseId, int $adminId, string $note = '', bool $withCommissions = true): array
+    {
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId]);
+        if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
+        if (!in_array((string) $inv['status'], self::OPEN_STATUSES, true)) {
+            return ['ok' => false, 'error' => 'This invoice is not open.'];
+        }
+        $note = trim($note) !== '' ? substr(trim($note), 0, 255) : 'Payment accepted manually by an administrator.';
+        try {
+            $this->db->update('sq_purchases', [
+                'payment_method'    => 'manual',
+                'verify_verdict'    => 'manual',
+                'verify_note'       => $note,
+                'verify_checked_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $purchaseId]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminMarkPaid: ' . $e->getMessage());
+        }
+        return $this->confirmPurchase($purchaseId, $adminId, $withCommissions);
+    }
+
+    /** Unpaid invoices across every member — raised but no transfer submitted yet. */
+    public function unpaidInvoices(int $limit = 50): array
+    {
+        $rows = $this->db->select('sq_purchases', '*', [
+            'status' => 'pending', 'ORDER' => ['id' => 'DESC'], 'LIMIT' => $limit,
+        ]);
+        if (!is_array($rows)) $rows = [];
+        $names = $this->displayNames(array_column($rows, 'user_id'));
+        foreach ($rows as &$r) $r['member'] = $names[(int) $r['user_id']] ?? ('Member #' . $r['user_id']);
+        unset($r);
+        return $rows;
+    }
+
+    /** Recent manual grants / manual acceptances, for the audit trail. */
+    public function recentManualGrants(int $limit = 15): array
+    {
+        $rows = $this->db->select('sq_purchases', '*', [
+            'payment_method' => 'manual', 'status' => 'completed',
+            'ORDER' => ['id' => 'DESC'], 'LIMIT' => $limit,
+        ]);
+        if (!is_array($rows)) $rows = [];
+        $names = $this->displayNames(array_column($rows, 'user_id'));
+        foreach ($rows as &$r) $r['member'] = $names[(int) $r['user_id']] ?? ('Member #' . $r['user_id']);
+        unset($r);
+        return $rows;
     }
 
     /** The buyer walks away from an unpaid invoice. Only theirs, only if unpaid. */
@@ -1235,6 +1402,8 @@ class SilverQueenEngine
             'top_holders'      => $top,
             'by_product'       => $byProduct,
             'review_queue'     => $this->reviewQueue(),
+            'unpaid_invoices'  => $this->unpaidInvoices(),
+            'manual_grants'    => $this->recentManualGrants(),
             'awaiting_value'   => $sum('sq_purchases', 'total', ['status' => 'awaiting_confirmation']),
             'pending_value'    => $sum('sq_purchases', 'total', ['status' => 'pending']),
             'payment'          => $this->paymentConfig(),

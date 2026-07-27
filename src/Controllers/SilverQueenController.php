@@ -269,6 +269,100 @@ class SilverQueenController
     }
 
     /**
+     * POST /silverqueen/admin/grant — elevated: grant a product outright to a member
+     * who paid off-book, or who is being comped. No invoice or TxHash needed.
+     */
+    public function adminGrant(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $member = trim((string) ($input['member'] ?? ''));
+        $code   = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
+        $units  = (int) ($input['units'] ?? 1);
+        $note   = (string) ($input['note'] ?? '');
+        // Default to paying overrides — a granted order should behave like a paid one
+        // unless the operator deliberately says otherwise.
+        $withCommissions = !isset($input['commissions']) || (bool) $input['commissions'];
+
+        if ($member === '') { echo json_encode(['ok' => false, 'error' => 'Who is this for? Enter an email, username, or user id.']); exit; }
+        if ($code === '')   { echo json_encode(['ok' => false, 'error' => 'Pick a product.']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->adminGrant($userId, $member, $code, $units, $note, $withCommissions);
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminGrant: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not complete the grant.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/accept — elevated: accept payment on an existing invoice
+     * without an on-chain check, for money reconciled some other way.
+     */
+    public function adminAccept(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice?']); exit; }
+        $withCommissions = !isset($input['commissions']) || (bool) $input['commissions'];
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->adminMarkPaid($purchaseId, $userId, (string) ($input['note'] ?? ''), $withCommissions);
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminAccept: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not accept the payment.']);
+        }
+        exit;
+    }
+
+    /** GET /silverqueen/admin/member?q= — elevated: resolve who a grant would land on. */
+    public function adminMemberLookup(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+
+        $q = trim((string) ($_GET['q'] ?? ''));
+        if ($q === '') { echo json_encode(['ok' => false, 'error' => 'Nothing to look up.']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $m = $engine->resolveMember($q);
+            if (!$m) { echo json_encode(['ok' => false, 'error' => 'No account matches that.']); exit; }
+            $uid = (int) $m['id'];
+            echo json_encode([
+                'ok'        => true,
+                'user_id'   => $uid,
+                'name'      => trim((string) ($m['fullname'] ?: $m['username'] ?: ('Member #' . $uid))),
+                'username'  => (string) ($m['username'] ?? ''),
+                'email'     => (string) ($m['email'] ?? ''),
+                'cards'     => $engine->ownedCards($uid),
+                'qualified' => $engine->isQualified($uid),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminMemberLookup: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Lookup failed.']);
+        }
+        exit;
+    }
+
+    /**
      * POST /silverqueen/admin/run — force a platform-wide accrual + compounding pass.
      * Admin only; the same work the cron worker does, on demand.
      */
