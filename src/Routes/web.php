@@ -1711,6 +1711,16 @@ $router->get('/academy/admin/subscriptions', 'AcademyController@adminGrantPage')
 $router->post('/academy/admin/grant', 'AcademyController@grantSubscription');      // admin: grant a membership
 $router->req('/academy/admin/save', 'AcademyController@adminSave', ['POST']);
 
+// SilverQueen — tiered membership cards + SQB cloud-resource allocation console.
+// Every endpoint self-guards: anyone who isn't a logged-in Pro Trader (or an admin)
+// gets a 404, so the route is undiscoverable rather than merely forbidden.
+$router->get('/silverqueen', 'SilverQueenController@index');
+$router->get('/silverqueen/data', 'SilverQueenController@data');             // live snapshot for the yield tracker
+$router->post('/silverqueen/purchase', 'SilverQueenController@purchase');    // buy a card or N SQB units
+$router->post('/silverqueen/claim', 'SilverQueenController@claim');          // Transfer to Wallet
+$router->post('/silverqueen/enroll', 'SilverQueenController@enroll');        // join the AntFun tree under a sponsor
+$router->post('/silverqueen/admin/run', 'SilverQueenController@adminRun');   // elevated: force an accrual pass
+
 // Courses
 $router->req('/courses', 'CourseController@index');
 $router->req('/courses/pricing', 'CourseController@pricing');
