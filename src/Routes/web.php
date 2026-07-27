@@ -1716,9 +1716,12 @@ $router->req('/academy/admin/save', 'AcademyController@adminSave', ['POST']);
 // gets a 404, so the route is undiscoverable rather than merely forbidden.
 $router->get('/silverqueen', 'SilverQueenController@index');
 $router->get('/silverqueen/data', 'SilverQueenController@data');             // live snapshot for the yield tracker
-$router->post('/silverqueen/purchase', 'SilverQueenController@purchase');    // buy a card or N SQB units
+$router->post('/silverqueen/purchase', 'SilverQueenController@purchase');    // raise a USDT invoice for a card or N SQB units
+$router->post('/silverqueen/payment/submit', 'SilverQueenController@paymentSubmit'); // buyer submits the BEP20 TxHash
+$router->post('/silverqueen/payment/cancel', 'SilverQueenController@paymentCancel'); // buyer drops an unpaid invoice
 $router->post('/silverqueen/claim', 'SilverQueenController@claim');          // Transfer to Wallet
 $router->post('/silverqueen/enroll', 'SilverQueenController@enroll');        // join the AntFun tree under a sponsor
+$router->post('/silverqueen/admin/verify', 'SilverQueenController@adminVerify'); // elevated: confirm/reject a paid invoice
 $router->post('/silverqueen/admin/run', 'SilverQueenController@adminRun');   // elevated: force an accrual pass
 
 // Courses

@@ -80,7 +80,11 @@ class SilverQueenController
         exit;
     }
 
-    /** POST /silverqueen/purchase — buy a membership card or N SQB engine units. */
+    /**
+     * POST /silverqueen/purchase — raise a USDT invoice for a card or N SQB units.
+     * Grants nothing: the response is payment instructions, and the order only
+     * completes once the transfer is verified.
+     */
     public function purchase(): void
     {
         header('Content-Type: application/json; charset=utf-8');
@@ -95,12 +99,90 @@ class SilverQueenController
         try {
             $engine = $this->engine();
             $engine->enroll($userId, $this->pendingSponsorCode());
-            $result = $engine->purchase($userId, $code, $units);
+            $result = $engine->createInvoice($userId, $code, $units);
             if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
             echo json_encode($result);
         } catch (\Throwable $e) {
             error_log('SilverQueen purchase: ' . $e->getMessage());
-            echo json_encode(['ok' => false, 'error' => 'Could not complete the purchase.']);
+            echo json_encode(['ok' => false, 'error' => 'Could not raise the invoice.']);
+        }
+        exit;
+    }
+
+    /** POST /silverqueen/payment/submit — buyer hands over the BEP20 transaction hash. */
+    public function paymentSubmit(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        $txHash     = (string) ($input['tx_hash'] ?? '');
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice is this for?']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->submitPayment($userId, $purchaseId, $txHash);
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentSubmit: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not record the payment.']);
+        }
+        exit;
+    }
+
+    /** POST /silverqueen/payment/cancel — buyer abandons an unpaid invoice. */
+    public function paymentCancel(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->cancelInvoice($userId, (int) ($input['purchase_id'] ?? 0));
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentCancel: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not cancel the invoice.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/verify — elevated: confirm or reject a paid invoice
+     * after checking the transfer on-chain. Confirming is what actually grants the
+     * allocation and pays the referral overrides.
+     */
+    public function adminVerify(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        $decision   = (string) ($input['decision'] ?? '');
+        if ($purchaseId <= 0 || !in_array($decision, ['confirm', 'reject'], true)) {
+            echo json_encode(['ok' => false, 'error' => 'Say which invoice, and confirm or reject.']);
+            exit;
+        }
+
+        try {
+            $engine = $this->engine();
+            $result = $decision === 'confirm'
+                ? $engine->confirmPurchase($purchaseId, $userId)
+                : $engine->rejectPurchase($purchaseId, $userId, (string) ($input['reason'] ?? ''));
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminVerify: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not record the decision.']);
         }
         exit;
     }

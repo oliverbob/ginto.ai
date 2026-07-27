@@ -35,6 +35,9 @@ class SilverQueenEngine
     /** The three cards a member must hold before SQB units unlock. */
     public const REQUIRED_CARDS = ['card_virtual', 'card_physical', 'card_nft'];
 
+    /** Invoice states that are still live — raised or paid, but not yet settled. */
+    public const OPEN_STATUSES = ['pending', 'awaiting_confirmation'];
+
     /** Safety rail so a bogus/ancient anchor can't produce an absurd exponent. */
     private const MAX_COMPOUND_CYCLES = 3650;
 
@@ -80,14 +83,38 @@ class SilverQueenEngine
                 user_id INT UNSIGNED NOT NULL, product_id INT UNSIGNED NOT NULL,
                 product_code VARCHAR(40) NOT NULL, units INT UNSIGNED NOT NULL DEFAULT 1,
                 unit_price DECIMAL(20,8) NOT NULL, total DECIMAL(20,8) NOT NULL,
-                currency VARCHAR(10) NOT NULL DEFAULT 'USD',
-                status ENUM('pending','completed','cancelled') NOT NULL DEFAULT 'completed',
-                source VARCHAR(30) NOT NULL DEFAULT 'simulated',
+                currency VARCHAR(10) NOT NULL DEFAULT 'USDT',
+                status ENUM('pending','awaiting_confirmation','completed','cancelled','rejected') NOT NULL DEFAULT 'pending',
+                source VARCHAR(30) NOT NULL DEFAULT 'usdt_bep20',
+                payment_method VARCHAR(20) NOT NULL DEFAULT 'usdt_bep20',
+                wallet_address VARCHAR(100) NULL,
+                tx_hash VARCHAR(100) NULL,
+                paid_at DATETIME NULL,
+                confirmed_at DATETIME NULL,
+                confirmed_by INT UNSIGNED NULL,
+                rejection_reason VARCHAR(255) NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_sq_purchases_tx (tx_hash),
                 KEY idx_sq_purchases_user (user_id, status),
                 KEY idx_sq_purchases_code (user_id, product_code, status),
+                KEY idx_sq_purchases_review (status, paid_at),
                 KEY idx_sq_purchases_created (created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            // Upgrade path for installs created before USDT-only payments.
+            foreach ([
+                "MODIFY COLUMN status ENUM('pending','awaiting_confirmation','completed','cancelled','rejected') NOT NULL DEFAULT 'pending'",
+                "ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) NOT NULL DEFAULT 'usdt_bep20'",
+                "ADD COLUMN IF NOT EXISTS wallet_address VARCHAR(100) NULL",
+                "ADD COLUMN IF NOT EXISTS tx_hash VARCHAR(100) NULL",
+                "ADD COLUMN IF NOT EXISTS paid_at DATETIME NULL",
+                "ADD COLUMN IF NOT EXISTS confirmed_at DATETIME NULL",
+                "ADD COLUMN IF NOT EXISTS confirmed_by INT UNSIGNED NULL",
+                "ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(255) NULL",
+                "ADD UNIQUE KEY IF NOT EXISTS uq_sq_purchases_tx (tx_hash)",
+                "ADD KEY IF NOT EXISTS idx_sq_purchases_review (status, paid_at)",
+            ] as $change) {
+                try { $pdo->exec("ALTER TABLE sq_purchases $change"); } catch (\Throwable $e) {}
+            }
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS sq_allocations (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -179,7 +206,7 @@ class SilverQueenEngine
             if ($this->db->count('sq_products', ['code' => $code]) > 0) continue;
             $this->db->insert('sq_products', [
                 'code' => $code, 'name' => $name, 'kind' => $kind, 'price' => $price,
-                'currency' => 'USD', 'daily_rate' => $rate, 'term_days' => $term,
+                'currency' => 'USDT', 'daily_rate' => $rate, 'term_days' => $term,
                 'max_per_user' => $max, 'description' => $desc, 'sort_order' => $sort, 'is_active' => 1,
             ]);
         }
@@ -218,17 +245,40 @@ class SilverQueenEngine
         return count(array_intersect(self::REQUIRED_CARDS, $this->ownedCards($userId))) === count(self::REQUIRED_CARDS);
     }
 
+    // ---------------------------------------------------------------- payment
+
+    /**
+     * The one and only way to pay for SilverQueen: a USDT transfer on BNB Smart
+     * Chain to the SilverQueen wallet. Address and QR come from the shared crypto
+     * config so there is a single place to rotate them.
+     */
+    public function paymentConfig(): array
+    {
+        $fallback = [
+            'network' => 'BNB Smart Chain (BEP20)',
+            'token'   => 'USDT',
+            'address' => '',
+            'qr'      => '/assets/images/pay_usdt.jpeg',
+        ];
+        try {
+            $cfg = require dirname(__DIR__) . '/Views/payments/address.php';
+            $sq  = is_array($cfg) ? ($cfg['silverqueen_usdt_bep20'] ?? null) : null;
+            return is_array($sq) ? $sq + $fallback : $fallback;
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentConfig: ' . $e->getMessage());
+            return $fallback;
+        }
+    }
+
     // --------------------------------------------------------------- purchase
 
     /**
-     * Record a purchase, allocate SQB units if applicable, and pay the 2-level
-     * unilevel commissions. Returns ['ok' => bool, ...].
-     *
-     * Payment is simulated: the row lands as 'completed'. Wiring a real gateway
-     * (the Academy's PayMongo flow, say) means creating the row as 'pending' here
-     * and calling completePurchase() from the webhook instead.
+     * Raise an invoice. Nothing is granted here — the row lands as 'pending' with
+     * the exact USDT amount and the destination wallet, and the buyer settles it
+     * on-chain. Allocations and referral overrides happen in confirmPurchase(),
+     * once an admin has verified the transfer.
      */
-    public function purchase(int $userId, string $code, int $units = 1): array
+    public function createInvoice(int $userId, string $code, int $units = 1): array
     {
         $product = $this->product($code);
         if (!$product) return ['ok' => false, 'error' => 'Unknown product.'];
@@ -241,34 +291,136 @@ class SilverQueenEngine
             if ($this->db->count('sq_purchases', ['user_id' => $userId, 'product_code' => $code, 'status' => 'completed']) > 0) {
                 return ['ok' => false, 'error' => 'You already hold this card.'];
             }
+            // An open invoice for the same card would let one member pay twice.
+            if ($this->db->count('sq_purchases', ['user_id' => $userId, 'product_code' => $code, 'status' => self::OPEN_STATUSES]) > 0) {
+                return ['ok' => false, 'error' => 'You already have an open invoice for this card — settle or cancel it first.'];
+            }
         }
+        // Qualification is judged on cards actually paid for, never on open invoices.
         if ($kind === 'engine' && !$this->isQualified($userId)) {
             return ['ok' => false, 'error' => 'SQB engines unlock once you hold all three membership cards.'];
         }
 
+        $pay       = $this->paymentConfig();
         $unitPrice = (float) $product['price'];
         $total     = round($unitPrice * $units, 8);
-        $pdo       = $this->db->pdo;
+
+        try {
+            $this->db->insert('sq_purchases', [
+                'user_id'        => $userId,
+                'product_id'     => (int) $product['id'],
+                'product_code'   => $code,
+                'units'          => $units,
+                'unit_price'     => $unitPrice,
+                'total'          => $total,
+                'currency'       => 'USDT',
+                'status'         => 'pending',
+                'source'         => 'usdt_bep20',
+                'payment_method' => 'usdt_bep20',
+                'wallet_address' => (string) $pay['address'],
+                'created_at'     => date('Y-m-d H:i:s'),
+            ]);
+            $purchaseId = (int) $this->db->pdo->lastInsertId();
+        } catch (\Throwable $e) {
+            error_log('SilverQueen createInvoice: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not raise the invoice.'];
+        }
+
+        return [
+            'ok'          => true,
+            'purchase_id' => $purchaseId,
+            'product'     => (string) $product['name'],
+            'units'       => $units,
+            'amount'      => $total,
+            'currency'    => 'USDT',
+            'payment'     => $pay,
+            'status'      => 'pending',
+        ];
+    }
+
+    /**
+     * The buyer says they've sent the USDT and hands over the transaction hash.
+     * The invoice moves to awaiting_confirmation — still granting nothing — and
+     * joins the admin review queue. The hash is UNIQUE across purchases, so the
+     * same transfer cannot be claimed against two invoices.
+     */
+    public function submitPayment(int $userId, int $purchaseId, string $txHash): array
+    {
+        $txHash = trim($txHash);
+        // BEP20 hashes are 0x + 64 hex. Reject anything else rather than queueing junk.
+        if (!preg_match('/^0x[a-fA-F0-9]{64}$/', $txHash)) {
+            return ['ok' => false, 'error' => 'That does not look like a BEP20 transaction hash (0x followed by 64 characters).'];
+        }
+
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId, 'user_id' => $userId]);
+        if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
+        if (!in_array((string) $inv['status'], self::OPEN_STATUSES, true)) {
+            return ['ok' => false, 'error' => 'This invoice is no longer open.'];
+        }
+
+        if ($this->db->count('sq_purchases', ['tx_hash' => $txHash, 'id[!]' => $purchaseId]) > 0) {
+            return ['ok' => false, 'error' => 'That transaction hash has already been submitted for another order.'];
+        }
+
+        try {
+            $this->db->update('sq_purchases', [
+                'tx_hash' => $txHash,
+                'paid_at' => date('Y-m-d H:i:s'),
+                'status'  => 'awaiting_confirmation',
+                'rejection_reason' => null,
+            ], ['id' => $purchaseId, 'user_id' => $userId]);
+        } catch (\Throwable $e) {
+            // Unique-key collision beat the count() check above.
+            error_log('SilverQueen submitPayment: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'That transaction hash has already been submitted.'];
+        }
+
+        return ['ok' => true, 'purchase_id' => $purchaseId, 'status' => 'awaiting_confirmation',
+                'message' => 'Payment submitted. Your order unlocks once we verify the transfer on-chain.'];
+    }
+
+    /**
+     * Admin verified the transfer: complete the order. This is the only path that
+     * creates an SQB allocation or pays a referral override, so nothing is ever
+     * granted against unpaid funds. Re-confirming a completed invoice is a no-op.
+     */
+    public function confirmPurchase(int $purchaseId, int $adminId): array
+    {
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId]);
+        if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
+        if ((string) $inv['status'] === 'completed') {
+            return ['ok' => false, 'error' => 'This order is already completed.'];
+        }
+        if (!in_array((string) $inv['status'], self::OPEN_STATUSES, true)) {
+            return ['ok' => false, 'error' => 'This invoice is not open.'];
+        }
+
+        $userId  = (int) $inv['user_id'];
+        $total   = (float) $inv['total'];
+        $units   = (int) $inv['units'];
+        $product = $this->product((string) $inv['product_code']);
+        $isEngine = $product && $product['kind'] === 'engine';
+        $pdo = $this->db->pdo;
 
         try {
             $pdo->beginTransaction();
 
-            $this->db->insert('sq_purchases', [
-                'user_id'      => $userId,
-                'product_id'   => (int) $product['id'],
-                'product_code' => $code,
-                'units'        => $units,
-                'unit_price'   => $unitPrice,
-                'total'        => $total,
-                'currency'     => (string) $product['currency'],
+            // Guarded UPDATE: only an open row flips, so two admins clicking at once
+            // cannot both create an allocation.
+            $this->db->update('sq_purchases', [
                 'status'       => 'completed',
-                'source'       => 'simulated',
-                'created_at'   => date('Y-m-d H:i:s'),
-            ]);
-            $purchaseId = (int) $pdo->lastInsertId();
+                'confirmed_at' => date('Y-m-d H:i:s'),
+                'confirmed_by' => $adminId,
+            ], ['id' => $purchaseId, 'status' => self::OPEN_STATUSES]);
+
+            $fresh = $this->db->get('sq_purchases', 'status', ['id' => $purchaseId]);
+            if ((string) $fresh !== 'completed') {
+                $pdo->rollBack();
+                return ['ok' => false, 'error' => 'This invoice was just handled by someone else.'];
+            }
 
             $allocationId = null;
-            if ($kind === 'engine') {
+            if ($isEngine) {
                 $now  = time();
                 $term = (int) ($product['term_days'] ?: self::TERM_DAYS);
                 $rate = (float) ($product['daily_rate'] ?: self::DAILY_RATE);
@@ -280,6 +432,8 @@ class SilverQueenEngine
                     'daily_rate'  => $rate,
                     'term_days'   => $term,
                     'status'      => 'active',
+                    // The 365-day clock starts when the payment is verified, not when
+                    // the invoice was raised, so a slow confirmation costs no yield.
                     'start_at'    => date('Y-m-d H:i:s', $now),
                     'matures_at'  => date('Y-m-d H:i:s', $now + $term * self::DAY_SECS),
                     'created_at'  => date('Y-m-d H:i:s', $now),
@@ -290,24 +444,93 @@ class SilverQueenEngine
             $pdo->commit();
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            error_log('SilverQueen purchase: ' . $e->getMessage());
-            return ['ok' => false, 'error' => 'Could not complete the purchase.'];
+            error_log('SilverQueen confirmPurchase: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not confirm the payment.'];
         }
 
-        // Commissions are settled outside the purchase transaction so a payout
-        // problem can never roll back a purchase the member already made.
+        // Settled outside the transaction so a payout problem can never roll back a
+        // confirmation the buyer already paid for.
         $paid = $this->payCommissions($purchaseId, $userId, $total);
 
         return [
             'ok'            => true,
             'purchase_id'   => $purchaseId,
             'allocation_id' => $allocationId,
-            'product'       => $product['name'],
-            'units'         => $units,
-            'total'         => $total,
+            'user_id'       => $userId,
+            'product'       => $product['name'] ?? (string) $inv['product_code'],
+            'amount'        => $total,
             'qualified'     => $this->isQualified($userId),
             'commissions'   => $paid,
         ];
+    }
+
+    /** Admin could not find the transfer: bounce the invoice back with a reason. */
+    public function rejectPurchase(int $purchaseId, int $adminId, string $reason = ''): array
+    {
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId]);
+        if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
+        if (!in_array((string) $inv['status'], self::OPEN_STATUSES, true)) {
+            return ['ok' => false, 'error' => 'This invoice is not open.'];
+        }
+        $reason = trim($reason) !== '' ? substr(trim($reason), 0, 255) : 'Transfer could not be verified on-chain.';
+
+        try {
+            $this->db->update('sq_purchases', [
+                'status'           => 'rejected',
+                'rejection_reason' => $reason,
+                'confirmed_by'     => $adminId,
+                'confirmed_at'     => date('Y-m-d H:i:s'),
+                // Free the hash so a corrected one can be submitted on a new invoice.
+                'tx_hash'          => null,
+            ], ['id' => $purchaseId, 'status' => self::OPEN_STATUSES]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen rejectPurchase: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not reject the invoice.'];
+        }
+        return ['ok' => true, 'purchase_id' => $purchaseId, 'reason' => $reason];
+    }
+
+    /** The buyer walks away from an unpaid invoice. Only theirs, only if unpaid. */
+    public function cancelInvoice(int $userId, int $purchaseId): array
+    {
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId, 'user_id' => $userId]);
+        if (!is_array($inv)) return ['ok' => false, 'error' => 'Invoice not found.'];
+        if ((string) $inv['status'] !== 'pending') {
+            return ['ok' => false, 'error' => 'Only an unpaid invoice can be cancelled.'];
+        }
+        $this->db->update('sq_purchases', ['status' => 'cancelled'], ['id' => $purchaseId, 'user_id' => $userId, 'status' => 'pending']);
+        return ['ok' => true, 'purchase_id' => $purchaseId];
+    }
+
+    /** This member's open invoices — what they still owe or are waiting on. */
+    public function openInvoices(int $userId): array
+    {
+        $rows = $this->db->select('sq_purchases', '*', [
+            'user_id' => $userId, 'status' => self::OPEN_STATUSES, 'ORDER' => ['id' => 'DESC'],
+        ]);
+        return is_array($rows) ? $rows : [];
+    }
+
+    /** Recently rejected invoices, so the buyer sees why and can retry. */
+    public function rejectedInvoices(int $userId, int $limit = 5): array
+    {
+        $rows = $this->db->select('sq_purchases', '*', [
+            'user_id' => $userId, 'status' => 'rejected', 'ORDER' => ['id' => 'DESC'], 'LIMIT' => $limit,
+        ]);
+        return is_array($rows) ? $rows : [];
+    }
+
+    /** The admin verification queue: paid invoices waiting on an on-chain check. */
+    public function reviewQueue(int $limit = 50): array
+    {
+        $rows = $this->db->select('sq_purchases', '*', [
+            'status' => 'awaiting_confirmation', 'ORDER' => ['paid_at' => 'ASC'], 'LIMIT' => $limit,
+        ]);
+        if (!is_array($rows)) $rows = [];
+        $names = $this->displayNames(array_column($rows, 'user_id'));
+        foreach ($rows as &$r) $r['member'] = $names[(int) $r['user_id']] ?? ('Member #' . $r['user_id']);
+        unset($r);
+        return $rows;
     }
 
     // ---------------------------------------------------------------- accrual
@@ -821,6 +1044,9 @@ class SilverQueenEngine
             'commissions'      => $this->commissionSummary($userId),
             'referral'         => $this->referralRow($userId),
             'downline'         => $this->downline($userId),
+            'payment'          => $this->paymentConfig(),
+            'open_invoices'    => $this->openInvoices($userId),
+            'rejected'         => $this->rejectedInvoices($userId),
         ];
     }
 
@@ -878,6 +1104,10 @@ class SilverQueenEngine
             'worker_last_run'  => $workerStamp ? date('c', $workerStamp) : null,
             'top_holders'      => $top,
             'by_product'       => $byProduct,
+            'review_queue'     => $this->reviewQueue(),
+            'awaiting_value'   => $sum('sq_purchases', 'total', ['status' => 'awaiting_confirmation']),
+            'pending_value'    => $sum('sq_purchases', 'total', ['status' => 'pending']),
+            'payment'          => $this->paymentConfig(),
             'params'           => [
                 'daily_rate'          => self::DAILY_RATE,
                 'term_days'           => self::TERM_DAYS,

@@ -20,6 +20,14 @@ $referral   = $snapshot['referral'] ?? [];
 $txns       = $snapshot['transactions'] ?? [];
 $ratePct    = rtrim(rtrim(number_format(((float) ($snapshot['daily_rate'] ?? 0.005)) * 100, 3), '0'), '.');
 
+// USDT (BEP20) is the only accepted payment method — see Views/payments/address.php.
+$payment    = $snapshot['payment'] ?? ['address' => '', 'network' => 'BNB Smart Chain (BEP20)', 'token' => 'USDT', 'qr' => '/assets/images/pay_usdt.jpeg'];
+$openInv    = $snapshot['open_invoices'] ?? [];
+$rejected   = $snapshot['rejected'] ?? [];
+// product_code => open invoice, so a card with a live invoice can't be re-ordered.
+$openByCode = [];
+foreach ($openInv as $inv) $openByCode[(string) $inv['product_code']] = $inv;
+
 $cardLabels = ['card_virtual' => 'Virtual', 'card_physical' => 'Physical', 'card_nft' => 'NFT Tracker'];
 $money = static fn($n, $d = 2) => number_format((float) $n, $d);
 ?>
@@ -199,13 +207,19 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
 
   <!-- ── Catalogue ───────────────────────────────────────────────────────── -->
   <section>
-    <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-layer-group text-primary"></i> Products</h2>
+    <div class="flex items-baseline justify-between gap-3 flex-wrap">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-layer-group text-primary"></i> Products</h2>
+      <span class="text-xs text-gray-500 dark:text-gray-400">
+        <i class="fab fa-bitcoin text-amber-500 mr-1"></i>Paid in USDT on <?= htmlspecialchars((string) $payment['network']) ?> — the only accepted method
+      </span>
+    </div>
     <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       <?php foreach ($products as $p):
-        $code   = (string) $p['code'];
-        $isCard = $p['kind'] === 'card';
-        $has    = $isCard && in_array($code, $owned, true);
-        $locked = !$isCard && !$qualified; ?>
+        $code    = (string) $p['code'];
+        $isCard  = $p['kind'] === 'card';
+        $has     = $isCard && in_array($code, $owned, true);
+        $locked  = !$isCard && !$qualified;
+        $pending = $openByCode[$code] ?? null; ?>
         <article class="rounded-2xl border p-5 flex flex-col <?= $has
               ? 'border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-500/5'
               : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834]' ?>">
@@ -218,6 +232,10 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
               <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
                 <i class="fas fa-check mr-1"></i>Owned
               </span>
+            <?php elseif ($pending): ?>
+              <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                <i class="fas fa-hourglass-half mr-1"></i><?= $pending['status'] === 'awaiting_confirmation' ? 'Verifying' : 'Unpaid' ?>
+              </span>
             <?php elseif ($locked): ?>
               <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
                 <i class="fas fa-lock mr-1"></i>Locked
@@ -229,8 +247,8 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex-1"><?= htmlspecialchars((string) ($p['description'] ?? '')) ?></p>
 
           <div class="mt-3 flex items-baseline gap-1">
-            <span class="text-2xl font-extrabold sq-num">$<?= $money($p['price']) ?></span>
-            <?php if (!$isCard): ?><span class="text-xs text-gray-400">/ unit</span><?php endif; ?>
+            <span class="text-2xl font-extrabold sq-num"><?= $money($p['price']) ?></span>
+            <span class="text-xs font-semibold text-gray-400">USDT<?= $isCard ? '' : ' / unit' ?></span>
           </div>
           <?php if (!$isCard): ?>
             <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
@@ -241,23 +259,103 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
               <input id="sqUnitsInput" type="number" min="1" max="1000" value="1" <?= $locked ? 'disabled' : '' ?>
                      class="w-20 px-2 py-1.5 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] disabled:opacity-40"
                      oninput="sqUpdateEngineTotal()">
-              <span class="text-xs text-gray-500 dark:text-gray-400 sq-num" id="sqEngineTotal">= $<?= $money($p['price']) ?></span>
+              <span class="text-xs text-gray-500 dark:text-gray-400 sq-num" id="sqEngineTotal">= <?= $money($p['price']) ?> USDT</span>
             </div>
           <?php endif; ?>
 
-          <button type="button" onclick="sqBuy(this,'<?= htmlspecialchars($code) ?>',<?= $isCard ? 'false' : 'true' ?>)"
-                  class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm transition <?= ($has || $locked)
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
-                    : ($isCard ? 'bg-primary text-white hover:bg-primary/90' : 'bg-secondary text-white hover:bg-secondary/90') ?>"
-                  <?= ($has || $locked) ? 'disabled' : '' ?>>
-            <?php if ($has): ?><i class="fas fa-check mr-1.5"></i>In your account
-            <?php elseif ($locked): ?><i class="fas fa-lock mr-1.5"></i>Hold all three cards
-            <?php else: ?><i class="fas fa-cart-shopping mr-1.5"></i>Purchase<?php endif; ?>
-          </button>
+          <?php if ($pending): ?>
+            <button type="button" onclick='sqOpenPay(<?= json_encode([
+                      "purchase_id" => (int) $pending["id"], "product" => (string) $p["name"],
+                      "amount" => (float) $pending["total"], "units" => (int) $pending["units"],
+                      "status" => (string) $pending["status"],
+                    ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                    class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm bg-amber-500 text-white hover:bg-amber-600 transition">
+              <i class="fas fa-qrcode mr-1.5"></i><?= $pending['status'] === 'awaiting_confirmation' ? 'View payment' : 'Pay now' ?>
+            </button>
+          <?php else: ?>
+            <button type="button" onclick="sqBuy(this,'<?= htmlspecialchars($code) ?>',<?= $isCard ? 'false' : 'true' ?>)"
+                    class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm transition <?= ($has || $locked)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                      : ($isCard ? 'bg-primary text-white hover:bg-primary/90' : 'bg-secondary text-white hover:bg-secondary/90') ?>"
+                    <?= ($has || $locked) ? 'disabled' : '' ?>>
+              <?php if ($has): ?><i class="fas fa-check mr-1.5"></i>In your account
+              <?php elseif ($locked): ?><i class="fas fa-lock mr-1.5"></i>Hold all three cards
+              <?php else: ?><i class="fab fa-bitcoin mr-1.5"></i>Pay with USDT<?php endif; ?>
+            </button>
+          <?php endif; ?>
         </article>
       <?php endforeach; ?>
     </div>
   </section>
+
+  <!-- ── Open invoices / payment status ──────────────────────────────────── -->
+  <?php if ($openInv || $rejected): ?>
+  <section class="rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-amber-50/50 dark:bg-amber-500/5 p-5">
+    <h2 class="text-lg font-bold flex items-center gap-2">
+      <i class="fas fa-file-invoice-dollar text-amber-600 dark:text-amber-400"></i> Your orders
+    </h2>
+
+    <?php foreach ($openInv as $inv):
+      $waiting = $inv['status'] === 'awaiting_confirmation'; ?>
+      <div class="mt-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-[#111834] p-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">
+              <?= htmlspecialchars((string) $inv['product_code']) ?>
+              <?php if ((int) $inv['units'] > 1): ?><span class="text-gray-400">× <?= (int) $inv['units'] ?></span><?php endif; ?>
+            </div>
+            <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Invoice #<?= (int) $inv['id'] ?> · raised <?= htmlspecialchars(date('M j, H:i', strtotime((string) $inv['created_at']))) ?>
+            </div>
+            <?php if ($waiting && !empty($inv['tx_hash'])): ?>
+              <div class="mt-1 text-[11px] text-gray-400 font-mono break-all"><?= htmlspecialchars((string) $inv['tx_hash']) ?></div>
+            <?php endif; ?>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-lg font-extrabold sq-num"><?= $money($inv['total']) ?> <span class="text-xs text-gray-400">USDT</span></div>
+            <span class="mt-1 inline-block text-[10px] font-bold px-2 py-1 rounded-full <?= $waiting
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' ?>">
+              <i class="fas <?= $waiting ? 'fa-hourglass-half' : 'fa-circle-exclamation' ?> mr-1"></i>
+              <?= $waiting ? 'Verifying on-chain' : 'Awaiting payment' ?>
+            </span>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" onclick='sqOpenPay(<?= json_encode([
+                    "purchase_id" => (int) $inv["id"], "product" => (string) $inv["product_code"],
+                    "amount" => (float) $inv["total"], "units" => (int) $inv["units"],
+                    "status" => (string) $inv["status"],
+                  ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                  class="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600">
+            <i class="fas fa-qrcode mr-1.5"></i><?= $waiting ? 'View details' : 'Pay now' ?>
+          </button>
+          <?php if (!$waiting): ?>
+            <button type="button" onclick="sqCancelInvoice(this,<?= (int) $inv['id'] ?>)"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-red-500">
+              Cancel
+            </button>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+
+    <?php foreach ($rejected as $inv): ?>
+      <div class="mt-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-[#111834] p-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm"><?= htmlspecialchars((string) $inv['product_code']) ?></div>
+            <div class="mt-0.5 text-xs text-red-600 dark:text-red-400">
+              <i class="fas fa-circle-xmark mr-1"></i><?= htmlspecialchars((string) ($inv['rejection_reason'] ?: 'Payment could not be verified.')) ?>
+            </div>
+            <div class="mt-0.5 text-[11px] text-gray-400">Invoice #<?= (int) $inv['id'] ?> — order again to retry.</div>
+          </div>
+          <div class="text-right shrink-0 text-sm font-semibold sq-num text-gray-400"><?= $money($inv['total']) ?> USDT</div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </section>
+  <?php endif; ?>
 
   <!-- ── Allocations ─────────────────────────────────────────────────────── -->
   <section class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
@@ -476,6 +574,65 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
       <?php endforeach; ?>
     </div>
 
+    <!-- Payment verification queue: confirming here is what grants the allocation. -->
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="font-semibold text-sm">
+          <i class="fas fa-clipboard-check mr-1.5 text-gray-400"></i>Payments awaiting verification
+          <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><?= count($admin['review_queue']) ?></span>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 sq-num">
+          <?= $money($admin['awaiting_value']) ?> USDT submitted · <?= $money($admin['pending_value']) ?> USDT unpaid
+        </div>
+      </div>
+
+      <?php if (!$admin['review_queue']): ?>
+        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Nothing waiting. Submitted transfers appear here for an on-chain check.</p>
+      <?php else: ?>
+        <div class="mt-3 space-y-2">
+          <?php foreach ($admin['review_queue'] as $q): ?>
+            <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+              <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="min-w-0">
+                  <div class="font-semibold text-sm truncate"><?= htmlspecialchars((string) $q['member']) ?></div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    #<?= (int) $q['id'] ?> · <?= htmlspecialchars((string) $q['product_code']) ?>
+                    <?php if ((int) $q['units'] > 1): ?> × <?= (int) $q['units'] ?><?php endif; ?>
+                    · submitted <?= htmlspecialchars(date('M j, H:i', strtotime((string) $q['paid_at']))) ?>
+                  </div>
+                </div>
+                <div class="font-bold sq-num text-sm shrink-0"><?= $money($q['total']) ?> USDT</div>
+              </div>
+
+              <div class="mt-2 flex items-center gap-2">
+                <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars((string) $q['tx_hash']) ?>"
+                       class="flex-1 min-w-0 px-2 py-1.5 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#0b1020]">
+                <a href="https://bscscan.com/tx/<?= rawurlencode((string) $q['tx_hash']) ?>" target="_blank" rel="noopener noreferrer"
+                   class="shrink-0 px-2.5 py-1.5 rounded text-xs font-semibold border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"
+                   title="Open on BscScan"><i class="fas fa-arrow-up-right-from-square"></i></a>
+              </div>
+
+              <div class="mt-2 flex gap-2">
+                <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'confirm')"
+                        class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+                  <i class="fas fa-check mr-1"></i>Confirm &amp; grant
+                </button>
+                <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'reject')"
+                        class="px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">
+                  <i class="fas fa-xmark mr-1"></i>Reject
+                </button>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
+      <p class="mt-3 text-[11px] text-gray-400 leading-snug">
+        Verify the transfer landed at <span class="font-mono"><?= htmlspecialchars((string) $payment['address']) ?></span>
+        for the exact amount before confirming. Confirming creates the allocation and pays the referral overrides.
+      </p>
+    </div>
+
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
         <div class="font-semibold text-sm">Revenue by product</div>
@@ -536,10 +693,87 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
   </section>
   <?php endif; ?>
 
-  <p class="text-center text-[11px] text-gray-400 pb-4">
-    SilverQueen is a simulation environment. Yields shown are modelled, not guaranteed returns.
+  <p class="text-center text-[11px] text-gray-400 pb-4 max-w-2xl mx-auto leading-relaxed">
+    Payment is accepted in USDT on <?= htmlspecialchars((string) $payment['network']) ?> only — orders unlock after the transfer is verified on-chain.
+    Yields shown are modelled, not guaranteed returns.
   </p>
 </main>
+
+<!-- ── USDT payment sheet ─────────────────────────────────────────────────
+     Bottom sheet on phones, centred dialog from sm up. The wallet address is
+     rendered as text as well as the QR, so a buyer who cannot scan can copy it. -->
+<div id="sqPayModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="sqClosePay()"></div>
+  <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111834] border border-gray-200 dark:border-gray-800 shadow-2xl">
+
+      <div class="sticky top-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834]">
+        <div class="min-w-0">
+          <div class="font-bold leading-tight">Pay with USDT</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 truncate" id="sqPayProduct">—</div>
+        </div>
+        <button type="button" onclick="sqClosePay()" class="w-9 h-9 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-500">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Network warning: wrong-chain transfers are unrecoverable. -->
+        <div class="rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 p-3 text-xs leading-snug text-red-700 dark:text-red-300">
+          <i class="fas fa-triangle-exclamation mr-1"></i>
+          Send <strong>USDT</strong> on <strong><?= htmlspecialchars((string) $payment['network']) ?></strong> only.
+          Funds sent on another network are <strong>permanently lost</strong> and cannot be refunded.
+        </div>
+
+        <div class="text-center">
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Amount to send</div>
+          <div class="mt-0.5 text-3xl font-extrabold sq-num" id="sqPayAmount">—</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">exact amount, USDT</div>
+        </div>
+
+        <div class="flex justify-center">
+          <div class="p-3 rounded-xl bg-white border border-gray-200 dark:border-gray-700">
+            <img src="<?= htmlspecialchars((string) $payment['qr']) ?>" alt="USDT BEP20 wallet QR code"
+                 class="w-44 h-44 object-contain" loading="lazy">
+          </div>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Wallet address</div>
+          <div class="mt-1.5 flex gap-2">
+            <input id="sqPayAddress" type="text" readonly onclick="this.select()"
+                   value="<?= htmlspecialchars((string) $payment['address']) ?>"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-[11px] font-mono border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#0b1020]">
+            <button type="button" onclick="sqCopyAddress(this)" class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="sqPayForm" class="pt-1 border-t border-gray-200 dark:border-gray-800">
+          <label class="block mt-3 text-[11px] uppercase tracking-wider text-gray-400" for="sqPayTx">Transaction hash</label>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            After sending, paste the TxHash from your wallet. We verify it on-chain and unlock your order.
+          </p>
+          <input id="sqPayTx" type="text" placeholder="0x…" autocomplete="off" spellcheck="false"
+                 class="mt-2 w-full px-3 py-2.5 rounded-lg text-xs font-mono border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+          <button type="button" onclick="sqSubmitTx(this)"
+                  class="mt-3 w-full px-4 py-3 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition">
+            <i class="fas fa-paper-plane mr-1.5"></i>I have sent the payment
+          </button>
+        </div>
+
+        <div id="sqPayWaiting" class="hidden rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4 text-center">
+          <i class="fas fa-hourglass-half text-blue-600 dark:text-blue-300 text-xl"></i>
+          <div class="mt-2 font-semibold text-sm">Verifying your transfer</div>
+          <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+            We're checking the transaction on-chain. Your order unlocks as soon as it clears.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- Toast -->
 <div id="sqToast" class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-80 z-50 hidden">
@@ -623,7 +857,102 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     const input = $('sqUnitsInput'), out = $('sqEngineTotal');
     if (!input || !out) return;
     const unit = <?= json_encode((float) (array_values(array_filter($products, static fn($p) => $p['kind'] === 'engine'))[0]['price'] ?? 100)) ?>;
-    out.textContent = '= ' + usd(Math.max(1, parseInt(input.value, 10) || 1) * unit);
+    const total = Math.max(1, parseInt(input.value, 10) || 1) * unit;
+    out.textContent = '= ' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+  };
+
+  // ---- USDT payment sheet --------------------------------------------------
+  let payInvoice = null;
+
+  window.sqOpenPay = function (inv) {
+    payInvoice = inv;
+    $('sqPayProduct').textContent = inv.product + (inv.units > 1 ? ' × ' + inv.units : '') + ' · invoice #' + inv.purchase_id;
+    $('sqPayAmount').textContent  = Number(inv.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const waiting = inv.status === 'awaiting_confirmation';
+    $('sqPayForm').classList.toggle('hidden', waiting);
+    $('sqPayWaiting').classList.toggle('hidden', !waiting);
+    $('sqPayTx').value = '';
+    $('sqPayModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.sqClosePay = function () {
+    $('sqPayModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    payInvoice = null;
+  };
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') sqClosePay(); });
+
+  window.sqCopyAddress = function (btn) {
+    const input = $('sqPayAddress');
+    const done = () => { const h = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(() => btn.innerHTML = h, 1500); };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+    } else { input.select(); document.execCommand('copy'); done(); }
+  };
+
+  window.sqSubmitTx = async function (btn) {
+    if (!payInvoice) return;
+    const tx = ($('sqPayTx').value || '').trim();
+    if (!/^0x[a-fA-F0-9]{64}$/.test(tx)) {
+      toast('Paste the full transaction hash — 0x followed by 64 characters.', false);
+      return;
+    }
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Submitting';
+    try {
+      const r = await post('/silverqueen/payment/submit', { purchase_id: payInvoice.purchase_id, tx_hash: tx });
+      if (r.ok) {
+        toast(r.message || 'Payment submitted for verification.');
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast(r.error || 'Could not submit the payment.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqCancelInvoice = async function (btn, purchaseId) {
+    btn.disabled = true;
+    try {
+      const r = await post('/silverqueen/payment/cancel', { purchase_id: purchaseId });
+      if (r.ok) { toast('Invoice cancelled.'); setTimeout(() => location.reload(), 700); return; }
+      toast(r.error || 'Could not cancel.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+  };
+
+  window.sqVerify = async function (btn, purchaseId, decision) {
+    let reason = '';
+    if (decision === 'reject') {
+      reason = window.prompt('Why is this payment being rejected?', 'Transfer could not be verified on-chain.');
+      if (reason === null) return;
+    }
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    try {
+      const r = await post('/silverqueen/admin/verify', { purchase_id: purchaseId, decision, reason });
+      if (r.ok) {
+        toast(decision === 'confirm'
+          ? 'Payment confirmed — allocation granted and overrides paid.'
+          : 'Invoice rejected.');
+        setTimeout(() => location.reload(), 1000);
+        return;
+      }
+      toast(r.error || 'Could not record the decision.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
   };
 
   window.sqBuy = async function (btn, code, isEngine) {
@@ -634,11 +963,13 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     try {
       const r = await post('/silverqueen/purchase', { code, units });
       if (r.ok) {
-        toast(r.product + ' purchased.' + (r.commissions && r.commissions.length ? ' Overrides paid to your upline.' : ''));
-        setTimeout(() => location.reload(), 900);
+        // Nothing is granted yet — this opens the payment sheet for the new invoice.
+        sqOpenPay({ purchase_id: r.purchase_id, product: r.product, amount: r.amount, units: r.units, status: 'pending' });
+        btn.disabled = false;
+        btn.innerHTML = original;
         return;
       }
-      toast(r.error || 'Purchase failed.', false);
+      toast(r.error || 'Could not raise the invoice.', false);
     } catch (e) {
       toast('Network error — try again.', false);
     }
