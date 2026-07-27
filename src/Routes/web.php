@@ -1718,6 +1718,7 @@ $router->get('/silverqueen', 'SilverQueenController@index');
 $router->get('/silverqueen/data', 'SilverQueenController@data');             // live snapshot for the yield tracker
 $router->post('/silverqueen/purchase', 'SilverQueenController@purchase');    // raise a USDT invoice for a card or N SQB units
 $router->post('/silverqueen/payment/submit', 'SilverQueenController@paymentSubmit'); // buyer submits the BEP20 TxHash
+$router->post('/silverqueen/payment/recheck', 'SilverQueenController@paymentRecheck'); // re-ask the chain about a submitted transfer
 $router->post('/silverqueen/payment/cancel', 'SilverQueenController@paymentCancel'); // buyer drops an unpaid invoice
 $router->post('/silverqueen/claim', 'SilverQueenController@claim');          // Transfer to Wallet
 $router->post('/silverqueen/enroll', 'SilverQueenController@enroll');        // join the AntFun tree under a sponsor

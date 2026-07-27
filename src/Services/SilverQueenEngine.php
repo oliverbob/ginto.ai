@@ -38,6 +38,12 @@ class SilverQueenEngine
     /** Invoice states that are still live — raised or paid, but not yet settled. */
     public const OPEN_STATUSES = ['pending', 'awaiting_confirmation'];
 
+    /** confirmed_by for orders settled by the on-chain verifier rather than a person. */
+    public const SYSTEM_VERIFIER_ID = 0;
+
+    /** How long a submitted hash may stay invisible to the nodes before we call it fake. */
+    private const UNKNOWN_TX_GRACE_SECS = 1800; // 30 minutes
+
     /** Safety rail so a bogus/ancient anchor can't produce an absurd exponent. */
     private const MAX_COMPOUND_CYCLES = 3650;
 
@@ -112,6 +118,13 @@ class SilverQueenEngine
                 "ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(255) NULL",
                 "ADD UNIQUE KEY IF NOT EXISTS uq_sq_purchases_tx (tx_hash)",
                 "ADD KEY IF NOT EXISTS idx_sq_purchases_review (status, paid_at)",
+                "ADD COLUMN IF NOT EXISTS chain_from VARCHAR(64) NULL",
+                "ADD COLUMN IF NOT EXISTS chain_amount DECIMAL(30,8) NULL",
+                "ADD COLUMN IF NOT EXISTS confirmations INT UNSIGNED NULL",
+                "ADD COLUMN IF NOT EXISTS verify_verdict VARCHAR(20) NULL",
+                "ADD COLUMN IF NOT EXISTS verify_note VARCHAR(255) NULL",
+                "ADD COLUMN IF NOT EXISTS verify_checked_at DATETIME NULL",
+                "ADD KEY IF NOT EXISTS idx_sq_purchases_verify (status, verify_checked_at)",
             ] as $change) {
                 try { $pdo->exec("ALTER TABLE sq_purchases $change"); } catch (\Throwable $e) {}
             }
@@ -375,8 +388,119 @@ class SilverQueenEngine
             return ['ok' => false, 'error' => 'That transaction hash has already been submitted.'];
         }
 
-        return ['ok' => true, 'purchase_id' => $purchaseId, 'status' => 'awaiting_confirmation',
-                'message' => 'Payment submitted. Your order unlocks once we verify the transfer on-chain.'];
+        // Check the chain straight away. A transfer that already has enough
+        // confirmations completes the order here, with no human in the loop.
+        $verdict = $this->autoVerify($purchaseId);
+
+        return [
+            'ok'          => true,
+            'purchase_id' => $purchaseId,
+            'status'      => $verdict['status'] ?? 'awaiting_confirmation',
+            'verify'      => $verdict['verify'] ?? null,
+            'message'     => $verdict['message'] ?? 'Payment submitted. Your order unlocks once we verify the transfer on-chain.',
+        ];
+    }
+
+    /**
+     * Ask the public BSC nodes what really happened to an invoice's TxHash, record
+     * the answer, and act on it:
+     *
+     *   confirmed  -> complete the order (allocation + referral overrides)
+     *   failed     -> reject; the transaction reverted
+     *   not_found  -> reject, but only after a grace period, since a freshly
+     *                 broadcast hash can be briefly unknown to the node we asked
+     *   mismatch   -> reject; it didn't pay us, or paid short
+     *   pending    -> leave it queued and look again next sweep
+     *   unavailable-> decide nothing; the nodes were unreachable
+     *
+     * Never rejects on an inconclusive answer, so an RPC outage can only ever delay
+     * an order, never cancel a real payment.
+     */
+    public function autoVerify(int $purchaseId): array
+    {
+        $inv = $this->db->get('sq_purchases', '*', ['id' => $purchaseId]);
+        if (!is_array($inv) || !in_array((string) $inv['status'], self::OPEN_STATUSES, true)) {
+            return ['status' => is_array($inv) ? (string) $inv['status'] : 'unknown', 'verify' => null,
+                    'message' => 'Nothing to verify.'];
+        }
+        $txHash = (string) ($inv['tx_hash'] ?? '');
+        if ($txHash === '') {
+            return ['status' => (string) $inv['status'], 'verify' => null, 'message' => 'No transaction hash submitted yet.'];
+        }
+
+        $verifier = new UsdtBep20Verifier();
+        $res = $verifier->verify($txHash, (string) $inv['wallet_address'], (float) $inv['total']);
+
+        // Always record what we saw, even when the answer is inconclusive.
+        try {
+            $this->db->update('sq_purchases', [
+                'chain_from'        => $res['from'],
+                'chain_amount'      => $res['amount'],
+                'confirmations'     => (int) $res['confirmations'],
+                'verify_verdict'    => (string) $res['verdict'],
+                'verify_note'       => substr((string) $res['note'], 0, 255),
+                'verify_checked_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $purchaseId]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen autoVerify record: ' . $e->getMessage());
+        }
+
+        switch ($res['verdict']) {
+            case 'confirmed':
+                $done = $this->confirmPurchase($purchaseId, self::SYSTEM_VERIFIER_ID);
+                return !empty($done['ok'])
+                    ? ['status' => 'completed', 'verify' => $res, 'confirmed' => $done,
+                       'message' => 'Payment verified on-chain — your order is active.']
+                    : ['status' => 'awaiting_confirmation', 'verify' => $res,
+                       'message' => 'Payment verified, but the order could not be completed. Support has been notified.'];
+
+            case 'failed':
+            case 'mismatch':
+                $this->rejectPurchase($purchaseId, self::SYSTEM_VERIFIER_ID, (string) $res['note']);
+                return ['status' => 'rejected', 'verify' => $res, 'message' => (string) $res['note']];
+
+            case 'not_found':
+                // Give a just-broadcast transaction time to propagate before calling it fake.
+                $submitted = strtotime((string) ($inv['paid_at'] ?? 'now'));
+                if ($submitted !== false && (time() - $submitted) > self::UNKNOWN_TX_GRACE_SECS) {
+                    $this->rejectPurchase($purchaseId, self::SYSTEM_VERIFIER_ID,
+                        'No such transaction on BNB Smart Chain.');
+                    return ['status' => 'rejected', 'verify' => $res, 'message' => 'No such transaction on BNB Smart Chain.'];
+                }
+                return ['status' => 'awaiting_confirmation', 'verify' => $res,
+                        'message' => 'We cannot see that transaction yet — still looking.'];
+
+            case 'pending':
+            default:
+                return ['status' => 'awaiting_confirmation', 'verify' => $res,
+                        'message' => (string) $res['note']];
+        }
+    }
+
+    /**
+     * Sweep every submitted invoice that is still waiting. Run from cron; the
+     * per-invoice work is a couple of RPC calls, so a small batch keeps the sweep
+     * well inside a one-minute tick.
+     */
+    public function verifyPending(int $limit = 25): array
+    {
+        $rows = $this->db->select('sq_purchases', ['id'], [
+            'status'   => 'awaiting_confirmation',
+            'tx_hash[!]' => null,
+            'ORDER'    => ['verify_checked_at' => 'ASC'],
+            'LIMIT'    => $limit,
+        ]);
+        if (!is_array($rows)) $rows = [];
+
+        $out = ['checked' => 0, 'completed' => 0, 'rejected' => 0, 'waiting' => 0];
+        foreach ($rows as $r) {
+            $res = $this->autoVerify((int) $r['id']);
+            $out['checked']++;
+            if (($res['status'] ?? '') === 'completed')      $out['completed']++;
+            elseif (($res['status'] ?? '') === 'rejected')   $out['rejected']++;
+            else                                            $out['waiting']++;
+        }
+        return $out;
     }
 
     /**
@@ -500,6 +624,12 @@ class SilverQueenEngine
         }
         $this->db->update('sq_purchases', ['status' => 'cancelled'], ['id' => $purchaseId, 'user_id' => $userId, 'status' => 'pending']);
         return ['ok' => true, 'purchase_id' => $purchaseId];
+    }
+
+    /** Whether an invoice belongs to this member — the ownership check for re-checks. */
+    public function ownsInvoice(int $userId, int $purchaseId): bool
+    {
+        return $this->db->count('sq_purchases', ['id' => $purchaseId, 'user_id' => $userId]) > 0;
     }
 
     /** This member's open invoices — what they still owe or are waiting on. */
@@ -1108,6 +1238,12 @@ class SilverQueenEngine
             'awaiting_value'   => $sum('sq_purchases', 'total', ['status' => 'awaiting_confirmation']),
             'pending_value'    => $sum('sq_purchases', 'total', ['status' => 'pending']),
             'payment'          => $this->paymentConfig(),
+            'verifier'         => [
+                'min_confirmations' => (new UsdtBep20Verifier())->minConfirmations(),
+                'usdt_contract'     => (new UsdtBep20Verifier())->contract(),
+                'chain'             => 'BNB Smart Chain',
+                'source'            => 'public JSON-RPC (keyless)',
+            ],
             'params'           => [
                 'daily_rate'          => self::DAILY_RATE,
                 'term_days'           => self::TERM_DAYS,

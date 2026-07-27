@@ -309,6 +309,11 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
             </div>
             <?php if ($waiting && !empty($inv['tx_hash'])): ?>
               <div class="mt-1 text-[11px] text-gray-400 font-mono break-all"><?= htmlspecialchars((string) $inv['tx_hash']) ?></div>
+              <?php if (!empty($inv['verify_note'])): ?>
+                <div class="mt-1 text-[11px] text-blue-600 dark:text-blue-400">
+                  <i class="fas fa-link mr-1"></i><?= htmlspecialchars((string) $inv['verify_note']) ?>
+                </div>
+              <?php endif; ?>
             <?php endif; ?>
           </div>
           <div class="text-right shrink-0">
@@ -330,7 +335,12 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
                   class="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600">
             <i class="fas fa-qrcode mr-1.5"></i><?= $waiting ? 'View details' : 'Pay now' ?>
           </button>
-          <?php if (!$waiting): ?>
+          <?php if ($waiting): ?>
+            <button type="button" onclick="sqRecheck(this,<?= (int) $inv['id'] ?>)"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary">
+              <i class="fas fa-rotate mr-1.5"></i>Check now
+            </button>
+          <?php else: ?>
             <button type="button" onclick="sqCancelInvoice(this,<?= (int) $inv['id'] ?>)"
                     class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-red-500">
               Cancel
@@ -612,10 +622,42 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
                    title="Open on BscScan"><i class="fas fa-arrow-up-right-from-square"></i></a>
               </div>
 
+              <?php
+              // What the chain itself reported. These rows are only still here because
+              // the verifier hasn't been able to confirm them yet.
+              $vv = (string) ($q['verify_verdict'] ?? '');
+              $vStyle = [
+                'pending'     => ['fa-hourglass-half', 'text-blue-600 dark:text-blue-400'],
+                'not_found'   => ['fa-question',       'text-amber-600 dark:text-amber-400'],
+                'unavailable' => ['fa-plug-circle-xmark', 'text-gray-500 dark:text-gray-400'],
+                'mismatch'    => ['fa-triangle-exclamation', 'text-red-600 dark:text-red-400'],
+                'failed'      => ['fa-circle-xmark',   'text-red-600 dark:text-red-400'],
+                'confirmed'   => ['fa-circle-check',   'text-emerald-600 dark:text-emerald-400'],
+              ][$vv] ?? ['fa-hourglass-half', 'text-gray-500 dark:text-gray-400'];
+              ?>
+              <div class="mt-2 rounded-lg bg-gray-50 dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-2">
+                <div class="text-[11px] <?= $vStyle[1] ?> font-medium">
+                  <i class="fas <?= $vStyle[0] ?> mr-1"></i>
+                  <?= $vv !== '' ? htmlspecialchars((string) ($q['verify_note'] ?? $vv)) : 'Not checked yet.' ?>
+                </div>
+                <?php if (!empty($q['chain_from'])): ?>
+                  <div class="mt-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono break-all">
+                    from <?= htmlspecialchars((string) $q['chain_from']) ?>
+                    · <?= $money($q['chain_amount'], 4) ?> USDT
+                    · <?= (int) $q['confirmations'] ?> conf
+                  </div>
+                <?php endif; ?>
+              </div>
+
               <div class="mt-2 flex gap-2">
+                <button type="button" onclick="sqRecheck(this,<?= (int) $q['id'] ?>)"
+                        class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/90">
+                  <i class="fas fa-rotate mr-1"></i>Re-check chain
+                </button>
                 <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'confirm')"
-                        class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
-                  <i class="fas fa-check mr-1"></i>Confirm &amp; grant
+                        class="px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                        title="Override the verifier and grant this order">
+                  <i class="fas fa-check mr-1"></i>Force
                 </button>
                 <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'reject')"
                         class="px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">
@@ -628,8 +670,11 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
       <?php endif; ?>
 
       <p class="mt-3 text-[11px] text-gray-400 leading-snug">
-        Verify the transfer landed at <span class="font-mono"><?= htmlspecialchars((string) $payment['address']) ?></span>
-        for the exact amount before confirming. Confirming creates the allocation and pays the referral overrides.
+        Payments verify themselves against <?= htmlspecialchars((string) ($admin['verifier']['chain'] ?? 'BNB Smart Chain')) ?>
+        via <?= htmlspecialchars((string) ($admin['verifier']['source'] ?? 'public JSON-RPC')) ?>, and complete automatically at
+        <?= (int) ($admin['verifier']['min_confirmations'] ?? 12) ?> confirmations — anything sitting here is still unconfirmed,
+        unseen, or disputed. <strong>Force</strong> overrides the verifier and grants the order anyway; use it only when you have
+        confirmed the transfer yourself on BscScan.
       </p>
     </div>
 
@@ -753,7 +798,8 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
         <div id="sqPayForm" class="pt-1 border-t border-gray-200 dark:border-gray-800">
           <label class="block mt-3 text-[11px] uppercase tracking-wider text-gray-400" for="sqPayTx">Transaction hash</label>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            After sending, paste the TxHash from your wallet. We verify it on-chain and unlock your order.
+            After sending, paste the TxHash from your wallet. We read it straight off BNB Smart Chain —
+            once it has enough confirmations your order unlocks automatically.
           </p>
           <input id="sqPayTx" type="text" placeholder="0x…" autocomplete="off" spellcheck="false"
                  class="mt-2 w-full px-3 py-2.5 rounded-lg text-xs font-mono border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
@@ -767,8 +813,12 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
           <i class="fas fa-hourglass-half text-blue-600 dark:text-blue-300 text-xl"></i>
           <div class="mt-2 font-semibold text-sm">Verifying your transfer</div>
           <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">
-            We're checking the transaction on-chain. Your order unlocks as soon as it clears.
+            We're reading the transaction from BNB Smart Chain. Your order unlocks automatically as soon as it clears.
           </p>
+          <button type="button" onclick="sqRecheckCurrent(this)"
+                  class="mt-3 px-4 py-2 rounded-lg text-xs font-semibold border border-blue-300 dark:border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20">
+            <i class="fas fa-rotate mr-1"></i>Check now
+          </button>
         </div>
       </div>
     </div>
@@ -905,11 +955,36 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     try {
       const r = await post('/silverqueen/payment/submit', { purchase_id: payInvoice.purchase_id, tx_hash: tx });
       if (r.ok) {
-        toast(r.message || 'Payment submitted for verification.');
-        setTimeout(() => location.reload(), 1200);
+        // The chain is checked on submit, so this may already be settled.
+        toast(r.message || 'Payment submitted for verification.', r.status !== 'rejected');
+        setTimeout(() => location.reload(), r.status === 'completed' ? 900 : 1600);
         return;
       }
       toast(r.error || 'Could not submit the payment.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqRecheckCurrent = function (btn) {
+    if (payInvoice) sqRecheck(btn, payInvoice.purchase_id);
+  };
+
+  window.sqRecheck = async function (btn, purchaseId) {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1"></i>Checking';
+    try {
+      const r = await post('/silverqueen/payment/recheck', { purchase_id: purchaseId });
+      if (r.ok) {
+        const settled = r.status === 'completed' || r.status === 'rejected';
+        toast(r.message || 'Checked.', r.status !== 'rejected');
+        if (settled) { setTimeout(() => location.reload(), 1200); return; }
+      } else {
+        toast(r.error || 'Could not reach the chain.', false);
+      }
     } catch (e) {
       toast('Network error — try again.', false);
     }

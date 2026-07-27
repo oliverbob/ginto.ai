@@ -133,6 +133,37 @@ class SilverQueenController
         exit;
     }
 
+    /**
+     * POST /silverqueen/payment/recheck — ask the chain again about a submitted
+     * transfer. Same code path the cron sweep uses; this just lets an impatient
+     * buyer (or an admin) trigger it on demand.
+     */
+    public function paymentRecheck(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice?']); exit; }
+
+        try {
+            $engine = $this->engine();
+            // Members may only re-check their own invoices; elevated users, any.
+            if (!$this->isElevated($userId) && !$engine->ownsInvoice($userId, $purchaseId)) {
+                echo json_encode(['ok' => false, 'error' => 'Invoice not found.']);
+                exit;
+            }
+            $result = $engine->autoVerify($purchaseId);
+            echo json_encode(['ok' => true] + $result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentRecheck: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not reach the chain right now.']);
+        }
+        exit;
+    }
+
     /** POST /silverqueen/payment/cancel — buyer abandons an unpaid invoice. */
     public function paymentCancel(): void
     {
