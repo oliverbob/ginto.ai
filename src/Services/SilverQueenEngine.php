@@ -47,6 +47,9 @@ class SilverQueenEngine
     /** Safety rail so a bogus/ancient anchor can't produce an absurd exponent. */
     private const MAX_COMPOUND_CYCLES = 3650;
 
+    /** Upper sanity bound on a single variable-amount stake, in USDT. */
+    public const MAX_STAKE = 10000000.0;
+
     private \Medoo\Medoo $db;
     private static bool $schemaReady = false;
 
@@ -75,7 +78,11 @@ class SilverQueenEngine
                 id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
                 code VARCHAR(40) NOT NULL, name VARCHAR(100) NOT NULL,
                 kind ENUM('card','engine') NOT NULL DEFAULT 'card',
-                price DECIMAL(20,8) NOT NULL, currency VARCHAR(10) NOT NULL DEFAULT 'USD',
+                price DECIMAL(20,8) NOT NULL,
+                pricing_mode ENUM('fixed','variable') NOT NULL DEFAULT 'fixed',
+                min_amount DECIMAL(20,8) NOT NULL DEFAULT 0,
+                max_amount DECIMAL(20,8) NOT NULL DEFAULT 0,
+                currency VARCHAR(10) NOT NULL DEFAULT 'USDT',
                 daily_rate DECIMAL(10,6) NOT NULL DEFAULT 0, term_days INT UNSIGNED NOT NULL DEFAULT 0,
                 max_per_user INT UNSIGNED NOT NULL DEFAULT 0, description VARCHAR(255) NULL,
                 sort_order INT NOT NULL DEFAULT 0, is_active TINYINT(1) NOT NULL DEFAULT 1,
@@ -83,6 +90,14 @@ class SilverQueenEngine
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 UNIQUE KEY uq_sq_products_code (code)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            // Upgrade path for installs created before buyer-priced engines.
+            foreach ([
+                "ADD COLUMN IF NOT EXISTS pricing_mode ENUM('fixed','variable') NOT NULL DEFAULT 'fixed'",
+                "ADD COLUMN IF NOT EXISTS min_amount DECIMAL(20,8) NOT NULL DEFAULT 0",
+                "ADD COLUMN IF NOT EXISTS max_amount DECIMAL(20,8) NOT NULL DEFAULT 0",
+            ] as $change) {
+                try { $pdo->exec("ALTER TABLE sq_products $change"); } catch (\Throwable $e) {}
+            }
 
             $pdo->exec("CREATE TABLE IF NOT EXISTS sq_purchases (
                 id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -206,21 +221,23 @@ class SilverQueenEngine
     private function seedCatalog(): void
     {
         $seed = [
-            ['card_virtual',  'Virtual Membership',        'card',   120.0, 0,                0,               1,
+            ['card_virtual',  'Virtual Membership',     'card',   120.0, 'fixed',    0.0,   0,                0,               1,
              'Entry card. Unlocks the SilverQueen console and your AntFun invite code.', 1],
-            ['card_physical', 'Physical Membership',       'card',   240.0, 0,                0,               1,
+            ['card_physical', 'Physical Membership',    'card',   240.0, 'fixed',    0.0,   0,                0,               1,
              'Shipped hardware card. Required for physical rack attestation.', 2],
-            ['card_nft',      'NFT Tracker Membership',    'card',   567.0, 0,                0,               1,
-             'On-chain tracker that binds your engine units to a verifiable identity.', 3],
-            ['sqb_engine',    'SQB Engine Unit',           'engine', 100.0, self::DAILY_RATE, self::TERM_DAYS, 0,
-             'One unit of allocated cloud compute. Yields 0.5% of its principal per day for 365 days.', 4],
+            ['card_nft',      'NFT Tracker Membership', 'card',   567.0, 'fixed',    0.0,   0,                0,               1,
+             'On-chain tracker that binds your engine allocation to a verifiable identity.', 3],
+            // Buyer-priced: 100 USDT is the floor, not the price.
+            ['sqb_engine',    'SQB Engine',             'engine', 100.0, 'variable', 100.0, self::DAILY_RATE, self::TERM_DAYS, 0,
+             'Allocated cloud compute. Stake any amount from 100 USDT up — it yields 0.5% of whatever you put in, per day, for 365 days.', 4],
         ];
-        foreach ($seed as [$code, $name, $kind, $price, $rate, $term, $max, $desc, $sort]) {
+        foreach ($seed as [$code, $name, $kind, $price, $mode, $min, $rate, $term, $maxPer, $desc, $sort]) {
             if ($this->db->count('sq_products', ['code' => $code]) > 0) continue;
             $this->db->insert('sq_products', [
                 'code' => $code, 'name' => $name, 'kind' => $kind, 'price' => $price,
+                'pricing_mode' => $mode, 'min_amount' => $min, 'max_amount' => 0,
                 'currency' => 'USDT', 'daily_rate' => $rate, 'term_days' => $term,
-                'max_per_user' => $max, 'description' => $desc, 'sort_order' => $sort, 'is_active' => 1,
+                'max_per_user' => $maxPer, 'description' => $desc, 'sort_order' => $sort, 'is_active' => 1,
             ]);
         }
     }
@@ -238,6 +255,53 @@ class SilverQueenEngine
     {
         $r = $this->db->get('sq_products', '*', ['code' => $code, 'is_active' => 1]);
         return is_array($r) ? $r : null;
+    }
+
+    /**
+     * Work out what an order costs, from whatever the caller typed.
+     *
+     * Fixed products (the membership cards) are priced per unit. Variable products
+     * (the SQB engine) are priced by the buyer: $input is a USDT amount, floored at
+     * the product's min_amount, and that amount becomes the allocation's principal.
+     * 100 USDT is the floor, never the price.
+     *
+     * Buyer checkout and admin grant both come through here, so the two can't drift
+     * apart on what an order is worth.
+     *
+     * @param float|int|string $input units for a fixed product, USDT for a variable one
+     */
+    public function priceOrder(array $product, $input): array
+    {
+        $variable = ($product['pricing_mode'] ?? 'fixed') === 'variable';
+
+        if (!$variable) {
+            $units = (int) $input;
+            // Cards are one-per-member; anything else is capped at a sane batch size.
+            $units = ($product['kind'] === 'card') ? 1 : max(1, min(1000, $units));
+            $unitPrice = (float) $product['price'];
+            return ['ok' => true, 'units' => $units, 'unit_price' => $unitPrice,
+                    'total' => round($unitPrice * $units, 8), 'variable' => false];
+        }
+
+        $amount = round((float) $input, 8);
+        $min    = (float) ($product['min_amount'] ?: $product['price']);
+        $max    = (float) ($product['max_amount'] ?? 0) ?: self::MAX_STAKE;
+
+        if ($amount <= 0) {
+            return ['ok' => false, 'error' => 'Enter how much you want to allocate.'];
+        }
+        if ($amount < $min) {
+            return ['ok' => false, 'error' => 'The minimum for ' . $product['name'] . ' is '
+                . rtrim(rtrim(number_format($min, 2, '.', ','), '0'), '.') . ' USDT.'];
+        }
+        if ($amount > $max) {
+            return ['ok' => false, 'error' => 'That is above the maximum of '
+                . number_format($max, 2, '.', ',') . ' USDT for a single allocation.'];
+        }
+
+        // One allocation carrying the whole stake — "units" stops being meaningful
+        // once the buyer sets the amount.
+        return ['ok' => true, 'units' => 1, 'unit_price' => $amount, 'total' => $amount, 'variable' => true];
     }
 
     /** Product codes this member already owns (completed purchases only). */
@@ -291,16 +355,17 @@ class SilverQueenEngine
      * on-chain. Allocations and referral overrides happen in confirmPurchase(),
      * once an admin has verified the transfer.
      */
-    public function createInvoice(int $userId, string $code, int $units = 1): array
+    public function createInvoice(int $userId, string $code, $amountOrUnits = 1): array
     {
         $product = $this->product($code);
         if (!$product) return ['ok' => false, 'error' => 'Unknown product.'];
 
-        $units = max(1, min(1000, $units));
+        $priced = $this->priceOrder($product, $amountOrUnits);
+        if (empty($priced['ok'])) return ['ok' => false, 'error' => $priced['error']];
+        $units = (int) $priced['units'];
         $kind  = (string) $product['kind'];
 
         if ($kind === 'card') {
-            $units = 1; // cards are one-per-user, never bought in bulk
             if ($this->db->count('sq_purchases', ['user_id' => $userId, 'product_code' => $code, 'status' => 'completed']) > 0) {
                 return ['ok' => false, 'error' => 'You already hold this card.'];
             }
@@ -315,8 +380,8 @@ class SilverQueenEngine
         }
 
         $pay       = $this->paymentConfig();
-        $unitPrice = (float) $product['price'];
-        $total     = round($unitPrice * $units, 8);
+        $unitPrice = (float) $priced['unit_price'];
+        $total     = (float) $priced['total'];
 
         try {
             $this->db->insert('sq_purchases', [
@@ -344,6 +409,7 @@ class SilverQueenEngine
             'purchase_id' => $purchaseId,
             'product'     => (string) $product['name'],
             'units'       => $units,
+            'variable'    => (bool) $priced['variable'],
             'amount'      => $total,
             'currency'    => 'USDT',
             'payment'     => $pay,
@@ -658,7 +724,7 @@ class SilverQueenEngine
         int $adminId,
         string $identifier,
         string $code,
-        int $units = 1,
+        $amountOrUnits = 1,
         string $note = '',
         bool $withCommissions = true
     ): array {
@@ -669,10 +735,14 @@ class SilverQueenEngine
         $product = $this->product($code);
         if (!$product) return ['ok' => false, 'error' => 'Unknown product.'];
 
-        $units = max(1, min(1000, $units));
+        // Same pricing rules as a buyer's own checkout, including the variable-amount
+        // floor — an operator grants the amount actually paid or negotiated.
+        $priced = $this->priceOrder($product, $amountOrUnits);
+        if (empty($priced['ok'])) return ['ok' => false, 'error' => $priced['error']];
+        $units = (int) $priced['units'];
         $kind  = (string) $product['kind'];
+
         if ($kind === 'card') {
-            $units = 1;
             if ($this->db->count('sq_purchases', ['user_id' => $userId, 'product_code' => $code, 'status' => 'completed']) > 0) {
                 return ['ok' => false, 'error' => trim(($member['username'] ?: 'That member')) . ' already holds this card.'];
             }
@@ -681,8 +751,8 @@ class SilverQueenEngine
         // Make sure they have a place in the tree before overrides are calculated.
         $this->enroll($userId);
 
-        $unitPrice = (float) $product['price'];
-        $total     = round($unitPrice * $units, 8);
+        $unitPrice = (float) $priced['unit_price'];
+        $total     = (float) $priced['total'];
         $note      = trim($note) !== '' ? substr(trim($note), 0, 255) : 'Granted manually by an administrator.';
 
         try {
@@ -1327,6 +1397,7 @@ class SilverQueenEngine
             'allocations'      => $allocations,
             'active_count'     => $active,
             'units'            => $units,
+            'alloc_count'      => count($allocations),
             'principal'        => round($principal, 8),
             'pending_yield'    => round($pending, 8),
             'claimed_total'    => round($claimed, 8),

@@ -102,7 +102,7 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
       <div class="text-[11px] uppercase tracking-wider text-gray-400">Allocated principal</div>
       <div class="mt-1 text-2xl sm:text-3xl font-extrabold sq-num" id="sqPrincipal">$<?= $money($snapshot['principal'] ?? 0) ?></div>
       <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        <span id="sqUnits"><?= (int) ($snapshot['units'] ?? 0) ?></span> SQB unit<?= ((int) ($snapshot['units'] ?? 0)) === 1 ? '' : 's' ?>
+        <span id="sqAllocs"><?= (int) ($snapshot['alloc_count'] ?? 0) ?></span> allocation<?= ((int) ($snapshot['alloc_count'] ?? 0)) === 1 ? '' : 's' ?>
         · <span id="sqActive"><?= (int) ($snapshot['active_count'] ?? 0) ?></span> active
       </div>
     </div>
@@ -246,21 +246,50 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
           <h3 class="mt-3 font-bold leading-tight"><?= htmlspecialchars((string) $p['name']) ?></h3>
           <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex-1"><?= htmlspecialchars((string) ($p['description'] ?? '')) ?></p>
 
+          <?php
+          $variable = ($p['pricing_mode'] ?? 'fixed') === 'variable';
+          $minAmt   = (float) ($p['min_amount'] ?: $p['price']);
+          ?>
           <div class="mt-3 flex items-baseline gap-1">
-            <span class="text-2xl font-extrabold sq-num"><?= $money($p['price']) ?></span>
-            <span class="text-xs font-semibold text-gray-400">USDT<?= $isCard ? '' : ' / unit' ?></span>
+            <?php if ($variable): ?>
+              <span class="text-xs font-semibold text-gray-400">from</span>
+              <span class="text-2xl font-extrabold sq-num"><?= $money($minAmt) ?></span>
+              <span class="text-xs font-semibold text-gray-400">USDT</span>
+            <?php else: ?>
+              <span class="text-2xl font-extrabold sq-num"><?= $money($p['price']) ?></span>
+              <span class="text-xs font-semibold text-gray-400">USDT</span>
+            <?php endif; ?>
           </div>
           <?php if (!$isCard): ?>
             <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
               <?= rtrim(rtrim(number_format((float) $p['daily_rate'] * 100, 3), '0'), '.') ?>%/day · <?= (int) $p['term_days'] ?> days
             </div>
-            <div class="mt-3 flex items-center gap-2">
-              <label class="text-xs text-gray-500 dark:text-gray-400" for="sqUnitsInput">Units</label>
-              <input id="sqUnitsInput" type="number" min="1" max="1000" value="1" <?= $locked ? 'disabled' : '' ?>
-                     class="w-20 px-2 py-1.5 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] disabled:opacity-40"
-                     oninput="sqUpdateEngineTotal()">
-              <span class="text-xs text-gray-500 dark:text-gray-400 sq-num" id="sqEngineTotal">= <?= $money($p['price']) ?> USDT</span>
-            </div>
+            <?php if ($variable): ?>
+              <div class="mt-3">
+                <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqStakeInput">Amount to allocate</label>
+                <div class="relative">
+                  <input id="sqStakeInput" type="number" min="<?= $minAmt ?>" step="0.01" value="<?= (int) $minAmt ?>"
+                         inputmode="decimal" <?= $locked ? 'disabled' : '' ?>
+                         data-min="<?= $minAmt ?>" data-rate="<?= (float) $p['daily_rate'] ?>" data-term="<?= (int) $p['term_days'] ?>"
+                         class="w-full pl-3 pr-14 py-2.5 rounded-lg text-base font-bold sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] disabled:opacity-40"
+                         oninput="sqStakeRecalc()">
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 pointer-events-none">USDT</span>
+                </div>
+                <div class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400" id="sqStakeHint">
+                  Minimum <?= $money($minAmt) ?> USDT — put in whatever you like above that.
+                </div>
+                <div class="mt-2 rounded-lg bg-gray-50 dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 px-3 py-2 text-xs">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-gray-500 dark:text-gray-400">Daily yield</span>
+                    <span class="font-bold sq-num text-emerald-600 dark:text-emerald-400" id="sqStakeDaily">—</span>
+                  </div>
+                  <div class="flex justify-between gap-2 mt-0.5">
+                    <span class="text-gray-500 dark:text-gray-400">Over <?= (int) $p['term_days'] ?> days</span>
+                    <span class="font-bold sq-num" id="sqStakeTotal">—</span>
+                  </div>
+                </div>
+              </div>
+            <?php endif; ?>
           <?php endif; ?>
 
           <?php if ($pending): ?>
@@ -273,7 +302,7 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
               <i class="fas fa-qrcode mr-1.5"></i><?= $pending['status'] === 'awaiting_confirmation' ? 'View payment' : 'Pay now' ?>
             </button>
           <?php else: ?>
-            <button type="button" onclick="sqBuy(this,'<?= htmlspecialchars($code) ?>',<?= $isCard ? 'false' : 'true' ?>)"
+            <button type="button" onclick="sqBuy(this,'<?= htmlspecialchars($code) ?>',<?= $variable ? 'true' : 'false' ?>)"
                     class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm transition <?= ($has || $locked)
                       ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                       : ($isCard ? 'bg-primary text-white hover:bg-primary/90' : 'bg-secondary text-white hover:bg-secondary/90') ?>"
@@ -386,9 +415,10 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
               <div class="flex items-center gap-3">
                 <span class="w-9 h-9 rounded-lg bg-secondary/10 text-secondary inline-flex items-center justify-center"><i class="fas fa-microchip"></i></span>
                 <div>
-                  <div class="font-semibold text-sm"><?= (int) $a['units'] ?> unit<?= (int) $a['units'] === 1 ? '' : 's' ?> · $<?= $money($a['principal']) ?></div>
+                  <div class="font-semibold text-sm"><?= $money($a['principal']) ?> USDT allocated</div>
                   <div class="text-xs text-gray-500 dark:text-gray-400">
                     Started <?= htmlspecialchars(date('M j, Y', strtotime((string) $a['start_at']))) ?>
+                    · <?= $money((float) $a['principal'] * (float) $a['daily_rate'], 2) ?>/day
                   </div>
                 </div>
               </div>
@@ -613,19 +643,29 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
           <select id="sqGrantProduct" onchange="sqGrantRecalc()"
                   class="w-full px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
             <?php foreach ($products as $p): ?>
+              <?php $vMode = ($p['pricing_mode'] ?? 'fixed') === 'variable';
+                    $vMin  = (float) ($p['min_amount'] ?: $p['price']); ?>
               <option value="<?= htmlspecialchars((string) $p['code']) ?>"
                       data-price="<?= (float) $p['price'] ?>"
-                      data-kind="<?= htmlspecialchars((string) $p['kind']) ?>">
-                <?= htmlspecialchars((string) $p['name']) ?> — <?= $money($p['price']) ?> USDT
+                      data-kind="<?= htmlspecialchars((string) $p['kind']) ?>"
+                      data-variable="<?= $vMode ? '1' : '0' ?>"
+                      data-min="<?= $vMin ?>">
+                <?= htmlspecialchars((string) $p['name']) ?> — <?= $vMode ? 'from ' . $money($vMin) : $money($p['price']) ?> USDT
               </option>
             <?php endforeach; ?>
           </select>
         </div>
 
         <div>
-          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantUnits">Units</label>
-          <input id="sqGrantUnits" type="number" min="1" max="1000" value="1" oninput="sqGrantRecalc()"
-                 class="w-full px-3 py-2 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantUnits">
+            <span id="sqGrantQtyLabel">Units</span>
+          </label>
+          <div class="relative">
+            <input id="sqGrantUnits" type="number" min="1" step="1" value="1" inputmode="decimal" oninput="sqGrantRecalc()"
+                   class="w-full pl-3 pr-14 py-2 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <span id="sqGrantQtyUnit" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 pointer-events-none hidden">USDT</span>
+          </div>
+          <div id="sqGrantQtyHint" class="mt-1 text-[11px] text-gray-400"></div>
         </div>
 
         <div class="sm:col-span-2">
@@ -1021,7 +1061,7 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     $('sqWallet').textContent     = usd(s.wallet && s.wallet.balance, 4);
     $('sqWalletChip').textContent = usd(s.wallet && s.wallet.balance);
     $('sqWalletDaily').textContent = '+' + usd(s.wallet_daily, 4);
-    $('sqUnits').textContent      = s.units;
+    $('sqAllocs').textContent     = s.alloc_count;
     $('sqActive').textContent     = s.active_count;
     $('sqClaimBtn').disabled      = !(Number(s.pending_yield) > 0);
   }
@@ -1036,12 +1076,36 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     return res.json();
   }
 
-  window.sqUpdateEngineTotal = function () {
-    const input = $('sqUnitsInput'), out = $('sqEngineTotal');
-    if (!input || !out) return;
-    const unit = <?= json_encode((float) (array_values(array_filter($products, static fn($p) => $p['kind'] === 'engine'))[0]['price'] ?? 100)) ?>;
-    const total = Math.max(1, parseInt(input.value, 10) || 1) * unit;
-    out.textContent = '= ' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT';
+  /**
+   * The SQB engine is buyer-priced: the minimum is a floor, not a price. Show what
+   * the typed amount actually earns, and flag anything under the floor before the
+   * server has to.
+   */
+  window.sqStakeRecalc = function () {
+    const input = $('sqStakeInput');
+    if (!input) return;
+    const min    = parseFloat(input.getAttribute('data-min')) || 0;
+    const rate   = parseFloat(input.getAttribute('data-rate')) || 0;
+    const term   = parseInt(input.getAttribute('data-term'), 10) || 0;
+    const amount = parseFloat(input.value);
+    const hint   = $('sqStakeHint'), daily = $('sqStakeDaily'), total = $('sqStakeTotal');
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (!isFinite(amount) || amount <= 0) {
+      hint.textContent = 'Minimum ' + fmt(min) + ' USDT — put in whatever you like above that.';
+      hint.className = 'mt-1.5 text-[11px] text-gray-500 dark:text-gray-400';
+      daily.textContent = '—'; total.textContent = '—';
+      return;
+    }
+    if (amount < min) {
+      hint.textContent = 'Below the ' + fmt(min) + ' USDT minimum.';
+      hint.className = 'mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium';
+    } else {
+      hint.textContent = 'Yields ' + (rate * 100).toFixed(1) + '% of this, every day, for ' + term + ' days.';
+      hint.className = 'mt-1.5 text-[11px] text-gray-500 dark:text-gray-400';
+    }
+    daily.textContent = '+' + fmt(amount * rate) + ' USDT';
+    total.textContent = fmt(amount * rate * term) + ' USDT';
   };
 
   // ---- USDT payment sheet --------------------------------------------------
@@ -1163,13 +1227,24 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     btn.innerHTML = original;
   };
 
-  window.sqBuy = async function (btn, code, isEngine) {
-    const units = isEngine ? Math.max(1, parseInt(($('sqUnitsInput') || {}).value, 10) || 1) : 1;
+  window.sqBuy = async function (btn, code, isVariable) {
+    let body = { code, units: 1 };
+    if (isVariable) {
+      const input  = $('sqStakeInput');
+      const amount = parseFloat(input && input.value);
+      const min    = parseFloat(input && input.getAttribute('data-min')) || 0;
+      if (!isFinite(amount) || amount <= 0) { toast('Enter how much you want to allocate.', false); return; }
+      if (amount < min) {
+        toast('The minimum is ' + min.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT.', false);
+        return;
+      }
+      body = { code, amount };
+    }
     const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Processing';
     try {
-      const r = await post('/silverqueen/purchase', { code, units });
+      const r = await post('/silverqueen/purchase', body);
       if (r.ok) {
         // Nothing is granted yet — this opens the payment sheet for the new invoice.
         sqOpenPay({ purchase_id: r.purchase_id, product: r.product, amount: r.amount, units: r.units, status: 'pending' });
@@ -1228,16 +1303,43 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
   };
 
   // ---- Manual override (elevated) -----------------------------------------
+  /**
+   * The quantity box means different things per product: units for a fixed-price
+   * card, USDT for the buyer-priced engine — where the operator types the amount
+   * actually paid or negotiated. Relabel it so it can't be misread.
+   */
   window.sqGrantRecalc = function () {
-    const sel = $('sqGrantProduct'), unitsEl = $('sqGrantUnits'), out = $('sqGrantTotal');
+    const sel = $('sqGrantProduct'), qtyEl = $('sqGrantUnits'), out = $('sqGrantTotal');
     if (!sel || !out) return;
-    const opt   = sel.options[sel.selectedIndex];
-    const price = parseFloat(opt.getAttribute('data-price')) || 0;
-    const isCard = opt.getAttribute('data-kind') === 'card';
-    // Cards are one per member; lock the unit box so the total can't mislead.
-    if (unitsEl) { unitsEl.disabled = isCard; if (isCard) unitsEl.value = 1; }
-    const units = isCard ? 1 : Math.max(1, parseInt(unitsEl && unitsEl.value, 10) || 1);
-    out.textContent = (price * units).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const opt      = sel.options[sel.selectedIndex];
+    const price    = parseFloat(opt.getAttribute('data-price')) || 0;
+    const isCard   = opt.getAttribute('data-kind') === 'card';
+    const variable = opt.getAttribute('data-variable') === '1';
+    const min      = parseFloat(opt.getAttribute('data-min')) || 0;
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    $('sqGrantQtyLabel').textContent = variable ? 'Amount granted' : 'Units';
+    $('sqGrantQtyUnit').classList.toggle('hidden', !variable);
+    qtyEl.step = variable ? '0.01' : '1';
+    qtyEl.min  = variable ? min : 1;
+    qtyEl.disabled = isCard;
+
+    // Switching modes: a leftover "1" would silently mean 1 USDT.
+    if (variable && parseFloat(qtyEl.value) < min) qtyEl.value = min;
+    if (isCard) qtyEl.value = 1;
+
+    if (variable) {
+      const amount = parseFloat(qtyEl.value);
+      const short  = isFinite(amount) && amount < min;
+      $('sqGrantQtyHint').textContent = short ? 'Below the ' + fmt(min) + ' USDT minimum.' : 'Minimum ' + fmt(min) + ' USDT.';
+      $('sqGrantQtyHint').className = 'mt-1 text-[11px] ' + (short ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400');
+      out.textContent = isFinite(amount) ? fmt(amount) : '0.00';
+      return;
+    }
+    $('sqGrantQtyHint').textContent = '';
+    $('sqGrantQtyHint').className = 'mt-1 text-[11px] text-gray-400';
+    const units = isCard ? 1 : Math.max(1, parseInt(qtyEl.value, 10) || 1);
+    out.textContent = fmt(price * units);
   };
 
   window.sqLookupMember = async function (btn) {
@@ -1269,20 +1371,37 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
   window.sqDoGrant = async function (btn) {
     const member = ($('sqGrantMember').value || '').trim();
     if (!member) { toast('Enter an email, username, or user id first.', false); return; }
-    const code  = $('sqGrantProduct').value;
-    const units = Math.max(1, parseInt($('sqGrantUnits').value, 10) || 1);
-    const note  = ($('sqGrantNote').value || '').trim();
-    const comm  = $('sqGrantComm').checked;
+    const sel  = $('sqGrantProduct');
+    const opt  = sel.options[sel.selectedIndex];
+    const code = sel.value;
+    const note = ($('sqGrantNote').value || '').trim();
+    const comm = $('sqGrantComm').checked;
+    const variable = opt.getAttribute('data-variable') === '1';
+    const min = parseFloat(opt.getAttribute('data-min')) || 0;
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-    const label = $('sqGrantProduct').options[$('sqGrantProduct').selectedIndex].text;
-    if (!window.confirm('Grant ' + label + (units > 1 ? ' × ' + units : '') + ' to "' + member + '"?'
+    let body = { member, code, note, commissions: comm };
+    let what;
+    if (variable) {
+      const amount = parseFloat($('sqGrantUnits').value);
+      if (!isFinite(amount) || amount <= 0) { toast('Enter the USDT amount to grant.', false); return; }
+      if (amount < min) { toast('The minimum is ' + fmt(min) + ' USDT.', false); return; }
+      body.amount = amount;
+      what = opt.text.split(' — ')[0] + ' for ' + fmt(amount) + ' USDT';
+    } else {
+      const units = Math.max(1, parseInt($('sqGrantUnits').value, 10) || 1);
+      body.units = units;
+      what = opt.text + (units > 1 ? ' × ' + units : '');
+    }
+
+    if (!window.confirm('Grant ' + what + ' to "' + member + '"?'
         + (comm ? '\n\nReferral overrides WILL be paid.' : '\n\nNo referral overrides will be paid.'))) return;
 
     const original = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Granting';
     try {
-      const r = await post('/silverqueen/admin/grant', { member, code, units, note, commissions: comm });
+      const r = await post('/silverqueen/admin/grant', body);
       if (r.ok) {
         toast('Granted ' + r.product + ' to ' + r.member + '.'
           + (r.commissions && r.commissions.length ? ' Overrides paid.' : ''));
@@ -1333,6 +1452,10 @@ $money = static fn($n, $d = 2) => number_format((float) $n, $d);
     btn.disabled = false;
     btn.innerHTML = original;
   };
+
+  // Prime the buyer-priced calculators so the figures are right before any typing.
+  if ($('sqStakeInput')) sqStakeRecalc();
+  if ($('sqGrantProduct')) sqGrantRecalc();
 
   // Re-settle from the server every 60s so a crossed 24h boundary shows up
   // without a reload, and pause while the tab is hidden.

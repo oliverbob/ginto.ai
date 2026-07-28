@@ -92,14 +92,16 @@ class SilverQueenController
         $input  = $this->jsonInput();
         $this->requireCsrf($input);
 
-        $code  = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
-        $units = (int) ($input['units'] ?? 1);
+        $code = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
         if ($code === '') { echo json_encode(['ok' => false, 'error' => 'Pick a product first.']); exit; }
+        // Variable products (the SQB engine) are priced by the buyer, so 'amount' wins
+        // when present; fixed products still count units.
+        $qty = array_key_exists('amount', $input) ? (float) $input['amount'] : (int) ($input['units'] ?? 1);
 
         try {
             $engine = $this->engine();
             $engine->enroll($userId, $this->pendingSponsorCode());
-            $result = $engine->createInvoice($userId, $code, $units);
+            $result = $engine->createInvoice($userId, $code, $qty);
             if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
             echo json_encode($result);
         } catch (\Throwable $e) {
@@ -282,8 +284,10 @@ class SilverQueenController
 
         $member = trim((string) ($input['member'] ?? ''));
         $code   = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
-        $units  = (int) ($input['units'] ?? 1);
         $note   = (string) ($input['note'] ?? '');
+        // For the buyer-priced engine the operator grants the USDT actually paid or
+        // negotiated; fixed products still count units.
+        $qty = array_key_exists('amount', $input) ? (float) $input['amount'] : (int) ($input['units'] ?? 1);
         // Default to paying overrides — a granted order should behave like a paid one
         // unless the operator deliberately says otherwise.
         $withCommissions = !isset($input['commissions']) || (bool) $input['commissions'];
@@ -293,7 +297,7 @@ class SilverQueenController
 
         try {
             $engine = $this->engine();
-            $result = $engine->adminGrant($userId, $member, $code, $units, $note, $withCommissions);
+            $result = $engine->adminGrant($userId, $member, $code, $qty, $note, $withCommissions);
             if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
             echo json_encode($result);
         } catch (\Throwable $e) {
