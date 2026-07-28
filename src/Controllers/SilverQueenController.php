@@ -389,6 +389,27 @@ class SilverQueenController
     // ------------------------------------------------------------------ guard
 
     /**
+     * Public entitlement probe for OTHER surfaces that want to link here — currently the
+     * Academy header's SilverQueen button. It runs the very same rule as the route guard
+     * below, so the two can never drift: if this says false, /silverqueen would 404, and
+     * nothing about the console (least of all the wallet) is ever put on the page.
+     *
+     * Pass a user id, or omit it to test the current session.
+     */
+    public static function canAccess(?int $userId = null): bool
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId ??= (int) ($_SESSION['user_id'] ?? 0);
+        if ($userId <= 0) return false;
+        try {
+            return (new self())->hasAccess($userId);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen canAccess: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
      * The route guard. Anyone who isn't a logged-in Pro Trader (or an admin) gets a
      * 404 page and the request ends here — the route stays invisible to everyone else.
      */

@@ -11,6 +11,7 @@ vendor/
 # Local environment files (do not commit secrets)
 .env
 .installed
+.install_config
 
 # Ignore nested git repos (MCP tools)
 tools/groq-mcp/

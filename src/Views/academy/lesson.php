@@ -32,6 +32,7 @@ if ($video !== '') {
         <a href="/academy/learn" class="text-sm text-gray-500 hover:text-primary"><i class="fas fa-arrow-left mr-1"></i> All lessons</a>
         <div class="flex items-center gap-3">
             <a href="/academy" class="flex items-center gap-2 font-bold text-sm"><i class="fas fa-graduation-cap text-primary"></i> Ginto Trading Academy</a>
+            <?php include __DIR__ . '/_silverqueen_button.php'; ?>
             <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <?php if (!empty($_SESSION['user_id'])): ?><a href="/logout" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
             <?php else: ?><a href="/login?redirect=<?= urlencode('/academy/learn') ?>" class="text-sm text-gray-500 hover:text-primary">Log in</a><?php endif; ?>

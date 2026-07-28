@@ -25,6 +25,7 @@ $isPro   = !empty($isPro);
             <a href="/academy/history" class="text-gray-500 hover:text-primary" title="My trade history"><i class="fas fa-clock-rotate-left mr-1"></i><span class="hidden sm:inline">History</span></a>
             <a href="/academy/thoughts" class="text-gray-500 hover:text-primary" title="Bot's mind — full reasoning history"><i class="fas fa-brain mr-1"></i><span class="hidden sm:inline">Bot's mind</span></a>
             <a href="/academy/settings" class="text-gray-500 hover:text-primary" title="Bot &amp; risk settings"><i class="fas fa-sliders"></i></a>
+            <?php include __DIR__ . '/_silverqueen_button.php'; ?>
             <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <span class="hidden sm:inline text-gray-500 dark:text-gray-400"><?= htmlspecialchars($_SESSION['fullname'] ?? $_SESSION['username'] ?? 'Member') ?></span>
             <a href="/logout" class="inline-flex items-center gap-1 text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>

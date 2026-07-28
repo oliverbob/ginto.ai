@@ -36,6 +36,7 @@ class AcademyController
             'currentPlan'  => $hasAccess ? $this->planName((int) $userId) : '',
             'plans'        => $plans,
             'referralLink' => $hasAccess ? $this->referralLink((int) $userId) : '',
+            'showSilverQueen' => $this->showSilverQueen($userId),
             'csrf_token'   => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
         ]);
     }
@@ -126,6 +127,7 @@ class AcademyController
             'title' => 'Live Bot Lab — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true, 'csrf_token' => $csrf,
             'isPro' => $this->isPro((int) $userId), 'catalog' => \Ginto\Services\GtbStrategy::catalog(),
             'botInterval' => (int) $this->botSettings((int) $userId)['bot_interval_sec'],
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 
@@ -330,6 +332,7 @@ class AcademyController
             'hasAccess'    => $hasAccess,
             'lessons'      => $this->publishedLessons(),
             'referralLink' => $hasAccess ? $this->referralLink((int) $userId) : '',
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 
@@ -355,6 +358,7 @@ class AcademyController
             'lesson'     => $lesson,
             'hasAccess'  => $hasAccess,
             'lessons'    => $this->publishedLessons(),
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 
@@ -1056,6 +1060,7 @@ class AcademyController
         if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
         View::view('academy/history', [
             'title' => 'Trade History — Ginto Trading Academy', 'isLoggedIn' => true, 'hasAccess' => true,
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 
@@ -1111,6 +1116,7 @@ class AcademyController
         if (!$this->hasActiveSubscription((int) $userId)) { $this->redirect('/academy#pricing'); return; }
         View::view('academy/thoughts', [
             'title' => "The Bot's Mind — Ginto Trading Academy", 'isLoggedIn' => true, 'hasAccess' => true,
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 
@@ -1150,6 +1156,22 @@ class AcademyController
     }
 
     private function isPro(int $userId): bool { return $this->planName($userId) === 'academy_pro'; }
+
+    /**
+     * Should the SilverQueen button appear in the Academy header for this visitor?
+     * Delegates to the console's own guard, so the button shows only for members who
+     * could actually open /silverqueen — Pro Trader (or elevated). Everyone else gets
+     * no button and no mention of it anywhere on the page.
+     */
+    private function showSilverQueen($userId): bool
+    {
+        if (empty($userId)) return false;
+        try {
+            return \Ginto\Controllers\SilverQueenController::canAccess((int) $userId);
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
 
     private const DEFAULT_TEMPLATES = 'gainers,scalp,breakout,trend,pullback';
 
@@ -1249,6 +1271,7 @@ class AcademyController
             'catalog'    => \Ginto\Services\GtbStrategy::catalog(),
             'settings'   => $this->botSettings((int) $userId),
             'csrf_token' => $csrf,
+            'showSilverQueen' => $this->showSilverQueen($userId),
         ]);
     }
 

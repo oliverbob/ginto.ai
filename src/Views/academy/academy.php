@@ -50,6 +50,7 @@ $peso = fn($v) => '₱' . number_format((float) $v, ((float) $v == floor((float)
             <a href="#pricing" class="hover:text-primary">Membership</a>
         </nav>
         <div class="flex items-center gap-2">
+            <?php include __DIR__ . '/_silverqueen_button.php'; ?>
             <button onclick="gtaToggleTheme()" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <?php if ($hasAccess): ?>
                 <?php if ($currentPlan !== 'academy_pro'): ?><a href="#pricing" class="hidden sm:inline text-sm font-semibold text-primary hover:underline px-2"><i class="fas fa-crown mr-0.5"></i>Upgrade</a><?php endif; ?>

@@ -28,6 +28,7 @@ $tierBadge = ['free' => ['Free', 'bg-green-100 text-green-700 dark:bg-green-500/
         <a href="/academy" class="flex items-center gap-2 font-bold"><i class="fas fa-graduation-cap text-primary"></i> Ginto <span class="text-primary">Trading Academy</span></a>
         <div class="flex items-center gap-3">
         <?php if ($hasAccess): ?><a href="/academy/bot" class="text-sm text-gray-500 hover:text-primary"><i class="fas fa-flask mr-1"></i>Bot Lab</a><?php endif; ?>
+        <?php include __DIR__ . '/_silverqueen_button.php'; ?>
         <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
         <?php if ($hasAccess): ?><span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-400">Member</span>
         <?php endif; ?>

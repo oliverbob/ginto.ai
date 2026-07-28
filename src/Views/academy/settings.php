@@ -23,6 +23,7 @@ $enabled  = array_filter(array_map('trim', explode(',', (string) ($settings['tem
     <div class="max-w-4xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy/bot" class="flex items-center gap-2 font-bold"><i class="fas fa-arrow-left text-primary"></i> Back to Bot Lab</a>
         <div class="flex items-center gap-3 text-sm">
+            <?php include __DIR__ . '/_silverqueen_button.php'; ?>
             <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
             <span class="text-[11px] font-bold px-2.5 py-1 rounded-full <?= $isPro ? 'bg-primary/15 text-primary' : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' ?>"><?= $isPro ? 'Pro Trader' : 'Starter' ?></span>
             <a href="/logout" class="inline-flex items-center gap-1 text-gray-500 hover:text-red-500" title="Log out"><i class="fas fa-arrow-right-from-bracket"></i><span class="hidden sm:inline">Log out</span></a>
