@@ -139,6 +139,35 @@ next bind clears the flag rather than leaving a stale requirement behind.
 The frps token is read from `FRP_AUTH_TOKEN` in the app environment, falling
 back to `/etc/frp/frps.env`.
 
+## Authorisation is enforced per request
+
+`*.ginto.ai` runs every request through Caddy `forward_auth` to
+`/api/tunnel/authz` before it reaches frps. A subdomain serves only while the
+online proxy publishes an account key that is valid, so revoking or deleting a
+key at `/account/keys` stops the tunnel on the next request - no restart and no
+cooperation from the client.
+
+```
+Browser ──► Caddy ──► forward_auth /api/tunnel/authz ──► 204 ──► frps :7080
+                              │
+                              └── 403 "tunnel not authorised"
+```
+
+The subrequest must carry `Host: ginto.ai` and pass the real hostname in
+`X-Tunnel-Host`. The app routes by `Host`, so a subdomain Host makes it relay
+the check into that very tunnel, which answers from the tunnelled app instead
+of the gate.
+
+Exempt, because they are not frp tunnels: subdomains with their own file in
+`sites-enabled`, `virtual_hosts` records, and `owui-*`.
+
+Two consequences worth knowing:
+
+- being online is not authorisation. The frps token is shared by every client,
+  so a connected proxy only proves someone holds that token.
+- this puts the PHP app on the request path for every tunnel hit. Decisions are
+  cached for a few seconds, but if the app is down, tunnels stop serving.
+
 ## Inspecting live state
 
 ```bash
