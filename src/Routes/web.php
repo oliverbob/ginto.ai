@@ -1593,6 +1593,9 @@ $router->req('/api/tunnel/request', 'TunnelController@requestTunnel', ['POST']);
 $router->req('/api/tunnel/status', 'TunnelController@tunnelStatus');
 $router->req('/api/tunnel/disconnect', 'TunnelController@disconnectTunnel', ['POST']);
 $router->req('/api/tunnel/verify', 'TunnelController@verifyTunnel');
+// Per-request gate for *.ginto.ai, called by Caddy forward_auth. A tunnel only
+// serves while a valid account key is bound to it.
+$router->req('/api/tunnel/authz', 'TunnelController@tunnelAuthz');
 // Machine-facing bind: a key from /account/keys is the only credential a tunnel
 // client needs. No session, no CSRF, no admin approval step.
 $router->req('/api/tunnel/bind', 'TunnelController@bindTunnel', ['POST']);

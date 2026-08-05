@@ -940,27 +940,25 @@ TOML;
                 echo "OK - FRP dashboard + operator key";
                 return;
             }
-        } elseif ($this->isFrpSubdomainOnline($subdomain)) {
-            http_response_code(200);
-            echo "OK - FRP dashboard";
-            return;
-        }
-        
-        // 7. Check FRP tunnel registry (tracks registered tunnels)
-        $registryFile = '/var/lib/ginto/tunnel-registry.json';
-        if (file_exists($registryFile)) {
-            $registry = json_decode(file_get_contents($registryFile), true) ?: [];
-            if (isset($registry[$subdomain])) {
-                // Check if not expired
-                $expiresAt = $registry[$subdomain]['expires_at'] ?? 0;
-                if ($expiresAt > time()) {
-                    http_response_code(200);
-                    echo "OK - FRP registry";
-                    return;
-                }
+        } else {
+            // Being online is not authorisation. The frps token is shared by
+            // every client, so "a proxy is connected" only proves someone has
+            // that token - not that they own the subdomain. Require a valid
+            // account key, which is what revoke and expiry act on.
+            [$allowed, $reason] = $this->subdomainAuthorized($subdomain);
+            if ($allowed) {
+                http_response_code(200);
+                echo "OK - " . $reason;
+                return;
             }
         }
         
+        // A registry entry alone is deliberately not enough any more: entries
+        // outlive the keys that created them (deleting a key used to leave one
+        // behind with a decade-long expiry), which kept revoked subdomains
+        // resolvable. Authorisation now comes from the key check above.
+
+
         // Subdomain not in use - deny certificate request
         // This prevents ACME challenges for random/arbitrary subdomains
         http_response_code(404);
@@ -1686,13 +1684,14 @@ TOML;
         }
 
         try {
-            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'revoked'], ['id' => $id]);
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'revoked', 'subdomain'], ['id' => $id]);
             if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'Key not found']);
                 return;
             }
             if ((int)($row['revoked'] ?? 0) === 1) {
+                $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
                 echo json_encode(['success' => true]);
                 return;
             }
@@ -1703,6 +1702,7 @@ TOML;
                 'id' => $id,
                 'user_id' => (int)$userId,
             ]);
+            $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
             http_response_code(500);
@@ -1852,7 +1852,7 @@ TOML;
         }
 
         try {
-            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id'], ['id' => $id]);
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'subdomain'], ['id' => $id]);
             if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
                 http_response_code(404);
                 echo json_encode(['success' => false, 'error' => 'Key not found']);
@@ -1863,6 +1863,11 @@ TOML;
                 'id' => $id,
                 'user_id' => (int)$userId,
             ]);
+
+            // Deleting the last key for a subdomain releases it: the registry
+            // entry must go too, or the subdomain keeps resolving and stays
+            // claimed against anyone else generating a key for it.
+            $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
 
             echo json_encode(['success' => true]);
         } catch (\Exception $e) {
@@ -2019,6 +2024,148 @@ TOML;
         return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
     }
 
+    /**
+     * Key hashes published by currently-online proxies, cached briefly.
+     *
+     * This sits on the request path via forward_auth, so it must not hit the
+     * frps dashboard for every hit.
+     */
+    private function onlineProxyKeyHashes(int $maxAgeSeconds = 5): array
+    {
+        $cached = $this->readFrpOnlineKeyCache($maxAgeSeconds);
+        if ($cached !== null) {
+            return $cached;
+        }
+        $fresh = $this->fetchFrpOnlineSubdomainKeyHashes();
+        $this->writeFrpOnlineKeyCache($fresh);
+        return $fresh;
+    }
+
+    /**
+     * Is this subdomain allowed to serve traffic right now?
+     *
+     * A tunnel is authorised only while the proxy that is online publishes an
+     * account key that is still valid. Revoking or deleting the key at
+     * /account/keys therefore takes effect on the next request - no restart, no
+     * admin action, and no reliance on the client behaving well.
+     *
+     * Returns [allowed(bool), reason(string)].
+     */
+    private function subdomainAuthorized(string $subdomain): array
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return [false, 'no subdomain'];
+        }
+
+        // Non-tunnel subdomains keep working: these are served by their own
+        // Caddy site files or database records, not by frp.
+        if (file_exists("/etc/caddy/sites-enabled/{$subdomain}.ginto.ai.caddy")) {
+            return [true, 'static site'];
+        }
+        if (preg_match('/^owui-[a-z0-9]{6}$/', $subdomain)) {
+            return [true, 'openwebui'];
+        }
+        try {
+            if ($this->db && $this->db->has('virtual_hosts', [
+                'domain' => $subdomain . '.ginto.ai',
+                'is_enabled' => 1,
+            ])) {
+                return [true, 'registered domain'];
+            }
+        } catch (\Throwable $_) {
+            // fall through to the key check
+        }
+
+        $presentedHash = (string)($this->onlineProxyKeyHashes()[$subdomain] ?? '');
+        if ($presentedHash === '') {
+            return [false, 'tunnel published no account key'];
+        }
+
+        if (!$this->db) {
+            return [false, 'key store unavailable'];
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], [
+                'subdomain' => $subdomain,
+                'token_hash' => $presentedHash,
+            ]);
+        } catch (\Throwable $_) {
+            return [false, 'key lookup failed'];
+        }
+
+        if (!is_array($row) || empty($row)) {
+            return [false, 'key not recognised'];
+        }
+        if (!empty($row['revoked'])) {
+            return [false, 'key revoked'];
+        }
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            return [false, 'key expired'];
+        }
+
+        return [true, 'key valid'];
+    }
+
+    /**
+     * Per-request authorisation gate for *.ginto.ai (Caddy forward_auth).
+     *
+     * GET /api/tunnel/authz  (subdomain taken from the forwarded Host header)
+     */
+    public function tunnelAuthz(): void
+    {
+        $host = strtolower(trim((string)(
+            $_SERVER['HTTP_X_FORWARDED_HOST']
+            ?? $_SERVER['HTTP_HOST']
+            ?? ($_GET['host'] ?? '')
+        )));
+        $host = explode(':', $host)[0];
+
+        $subdomain = '';
+        if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.ginto\.ai$/', $host, $m)) {
+            $subdomain = $m[1];
+        } elseif (isset($_GET['subdomain'])) {
+            $subdomain = strtolower(preg_replace('/[^a-z0-9\-]/', '', (string)$_GET['subdomain']));
+        }
+
+        [$allowed, $reason] = $this->subdomainAuthorized($subdomain);
+
+        if ($allowed) {
+            http_response_code(204);
+            return;
+        }
+
+        http_response_code(403);
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        $safeHost = htmlspecialchars($host, ENT_QUOTES, 'UTF-8');
+        $safeReason = htmlspecialchars($reason, ENT_QUOTES, 'UTF-8');
+        echo <<<HTML
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tunnel not authorised</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937}
+.card{background:#fff;border-radius:16px;padding:40px;max-width:520px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+h1{margin:0 0 4px;color:#6366f1;font-size:2rem}h2{margin:0 0 16px;font-size:1.1rem}
+code{background:#f3f4f6;border-radius:6px;padding:2px 6px;font-size:.9rem}
+ul{color:#4b5563;line-height:1.7;font-size:.95rem}a{color:#6366f1}
+</style></head><body><div class="card">
+<h1>403</h1><h2>This tunnel is not authorised</h2>
+<p><code>{$safeHost}</code> is not serving because no valid account key is bound to it.</p>
+<p style="color:#6b7280">Reason: {$safeReason}</p>
+<ul>
+<li>The key for this subdomain was revoked or deleted</li>
+<li>The key expired</li>
+<li>The tunnel was started without a key</li>
+</ul>
+<p>The owner can bind a key at <a href="https://ginto.ai/account/keys">ginto.ai/account/keys</a>.</p>
+</div></body></html>
+HTML;
+    }
+
     private function base64UrlDecode(string $raw): string
     {
         $padded = strtr($raw, '-_', '+/');
@@ -2122,6 +2269,65 @@ TOML;
         }
 
         return '';
+    }
+
+    /**
+     * Drop every trace that would keep a subdomain resolvable after its key is
+     * revoked or deleted: the registry entry, any cached authorisation, and the
+     * pid/expiry markers verifyTunnel() treats as proof of an active tunnel.
+     *
+     * Only runs when the subdomain has no remaining usable key, so revoking one
+     * of several keys does not take the tunnel down.
+     */
+    private function purgeSubdomainAuthorization(string $subdomain): void
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return;
+        }
+
+        try {
+            if ($this->db) {
+                $remaining = (int)$this->db->count('tunnel_access_keys', [
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => date('Y-m-d H:i:s'),
+                    ],
+                ]);
+                if ($remaining > 0) {
+                    return;
+                }
+            }
+        } catch (\Throwable $_) {
+            // If the count fails, fall through and purge: failing closed keeps
+            // a revoked key from continuing to serve.
+        }
+
+        try {
+            $registry = $this->readRegistry();
+            if (isset($registry[$subdomain])) {
+                unset($registry[$subdomain]);
+                $this->saveRegistry($registry);
+            }
+        } catch (\Throwable $_) {
+        }
+
+        foreach ([
+            "/tmp/tunnel-{$subdomain}.pid",
+            "/tmp/frpc-{$subdomain}.pid",
+            "/tmp/frpc-{$subdomain}.expiry",
+        ] as $path) {
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        // Force the next authorisation check to re-read frps rather than trust
+        // a cache entry written before the revocation.
+        @unlink('/tmp/ginto-frp-online-keys.json');
+        @unlink(self::FRP_ONLINE_CACHE_FILE);
     }
 
     private function saveRegistry(array $registry): bool
