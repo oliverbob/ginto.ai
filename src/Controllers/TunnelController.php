@@ -1244,7 +1244,9 @@ TOML;
                 if ($sd === '') {
                     continue;
                 }
-                $metas = $conf['metas'] ?? null;
+                // frp v1 configs call this "metadatas"; older builds reported
+                // "metas". Accept both so the check works across frps versions.
+                $metas = $conf['metadatas'] ?? ($conf['metas'] ?? null);
                 $rawKey = '';
                 if (is_array($metas)) {
                     $rawKey = trim((string)($metas['ginto_key'] ?? $metas['ginto-key'] ?? ''));
@@ -2183,7 +2185,20 @@ TOML;
             return;
         }
 
-        $sendsMeta = !empty($input['sends_meta']);
+        // Whether to require the running proxy to present the key as a meta.
+        // This is verified against frps rather than taken on trust: enabling it
+        // for a proxy that does not actually publish the meta would fail
+        // certificate issuance for the subdomain. Clients call bind a second
+        // time once the tunnel is up, which is when this turns on.
+        $keyHash = hash('sha256', $key);
+        $metaVerified = false;
+        try {
+            $online = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($online[$subdomain] ?? '');
+            $metaVerified = $seen !== '' && hash_equals($keyHash, $seen);
+        } catch (\Throwable $_) {
+            $metaVerified = false;
+        }
 
         try {
             $registry = $this->readRegistry();
@@ -2197,12 +2212,13 @@ TOML;
             $entry['bound_at'] = time();
             $entry['bound_client'] = substr(preg_replace('/[^\w .:-]/', '', (string)($input['client'] ?? '')), 0, 64);
 
-            // Only require the proxy to present the key once the client has
-            // confirmed it sends the meta. Turning this on for a client that
-            // does not would fail certificate issuance for the subdomain.
-            if ($sendsMeta) {
-                $entry['access_key_hash'] = hash('sha256', $key);
+            if ($metaVerified) {
+                $entry['access_key_hash'] = $keyHash;
                 $entry['access_key_enabled'] = true;
+            } else {
+                // Never leave a stale requirement behind for a tunnel that no
+                // longer publishes the meta.
+                unset($entry['access_key_enabled']);
             }
 
             $registry[$subdomain] = $entry;
@@ -2233,6 +2249,7 @@ TOML;
             'proxy_type' => 'http',
             'edge_terminates_tls' => true,
             'meta_key_name' => 'ginto_key',
+            'meta_verified' => $metaVerified,
             'expires_at' => $expiresAt,
         ]);
     }
