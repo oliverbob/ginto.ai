@@ -1593,6 +1593,9 @@ $router->req('/api/tunnel/request', 'TunnelController@requestTunnel', ['POST']);
 $router->req('/api/tunnel/status', 'TunnelController@tunnelStatus');
 $router->req('/api/tunnel/disconnect', 'TunnelController@disconnectTunnel', ['POST']);
 $router->req('/api/tunnel/verify', 'TunnelController@verifyTunnel');
+// Machine-facing bind: a key from /account/keys is the only credential a tunnel
+// client needs. No session, no CSRF, no admin approval step.
+$router->req('/api/tunnel/bind', 'TunnelController@bindTunnel', ['POST']);
 $router->req('/api/tunnel/relay/approval', 'TunnelController@relayApproval');
 $router->req('/api/tunnel/time', 'TunnelController@tunnelTime');
 $router->req('/api/tunnel/access-key/generate', 'TunnelController@generateAccessKey', ['POST']);

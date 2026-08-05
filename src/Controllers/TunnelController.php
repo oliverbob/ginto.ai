@@ -2016,4 +2016,224 @@ TOML;
     {
         return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
     }
+
+    private function base64UrlDecode(string $raw): string
+    {
+        $padded = strtr($raw, '-_', '+/');
+        $remainder = strlen($padded) % 4;
+        if ($remainder > 0) {
+            $padded .= str_repeat('=', 4 - $remainder);
+        }
+        $decoded = base64_decode($padded, true);
+        return $decoded === false ? '' : $decoded;
+    }
+
+    /**
+     * Verify a gtnl- access key and return its database row.
+     *
+     * The stored hash is the source of truth (it is what revoke/expiry act on).
+     * The JWT signature is checked as well when APP_KEY is available, so a key
+     * that was never minted by this server cannot be presented even if the
+     * hash column were somehow poisoned.
+     */
+    private function verifyTunnelAccessKey(string $token): ?array
+    {
+        $token = trim($token);
+        if ($token === '' || strncmp($token, 'gtnl-', 5) !== 0) {
+            return null;
+        }
+        if (!$this->db) {
+            return null;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', [
+                'id', 'user_id', 'subdomain', 'jti', 'expires_at', 'revoked',
+            ], [
+                'token_hash' => hash('sha256', $token),
+            ]);
+        } catch (\Throwable $_) {
+            return null;
+        }
+
+        if (!is_array($row) || empty($row)) {
+            return null;
+        }
+        if (!empty($row['revoked'])) {
+            return null;
+        }
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            return null;
+        }
+
+        $secret = $this->getTunnelKeySigningSecret();
+        if ($secret !== '') {
+            $parts = explode('.', substr($token, 5));
+            if (count($parts) !== 3) {
+                return null;
+            }
+            [$h, $p, $s] = $parts;
+            $expected = $this->base64UrlEncode(hash_hmac('sha256', $h . '.' . $p, $secret, true));
+            if (!hash_equals($expected, $s)) {
+                return null;
+            }
+            $payload = json_decode($this->base64UrlDecode($p), true);
+            if (!is_array($payload)) {
+                return null;
+            }
+            // The claims must describe the same grant as the stored row.
+            if ((string)($payload['sd'] ?? '') !== (string)$row['subdomain']) {
+                return null;
+            }
+            if ((int)($payload['sub'] ?? 0) !== (int)$row['user_id']) {
+                return null;
+            }
+            if (!empty($row['jti']) && (string)($payload['jti'] ?? '') !== (string)$row['jti']) {
+                return null;
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * The shared frps token. Not in the app .env, so fall back to the frps
+     * environment file the server already ships.
+     */
+    private function resolveFrpAuthToken(): string
+    {
+        $token = (string)(getenv('FRP_AUTH_TOKEN') ?: ($_ENV['FRP_AUTH_TOKEN'] ?? ''));
+        if ($token !== '') {
+            return $token;
+        }
+
+        foreach (['/etc/frp/frps.env'] as $path) {
+            if (!is_readable($path)) {
+                continue;
+            }
+            $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach ($lines as $line) {
+                if (preg_match('/^\s*FRP_AUTH_TOKEN\s*=\s*(.*)$/', $line, $m)) {
+                    return trim($m[1], " \t\"'");
+                }
+            }
+        }
+
+        return '';
+    }
+
+    private function saveRegistry(array $registry): bool
+    {
+        $primaryDir = dirname(self::TUNNEL_REGISTRY_FILE);
+        if (!is_dir($primaryDir)) {
+            @mkdir($primaryDir, 0755, true);
+        }
+
+        $target = (is_dir($primaryDir) && is_writable($primaryDir))
+            ? self::TUNNEL_REGISTRY_FILE
+            : self::TUNNEL_REGISTRY_FALLBACK_FILE;
+
+        return @file_put_contents(
+            $target,
+            json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        ) !== false;
+    }
+
+    /**
+     * Bind a running frp client to a subdomain using an account key.
+     *
+     * POST /api/tunnel/bind
+     * Body: {"key":"gtnl-...","local_port":2026,"sends_meta":true,"client":"host"}
+     *
+     * This is the machine-facing counterpart to /account/keys: a key generated
+     * there is all a client needs to configure and authorise itself. No admin
+     * approval step, and no session - the key is the credential.
+     */
+    public function bindTunnel(): void
+    {
+        header('Content-Type: application/json');
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+
+        $key = trim((string)($input['key'] ?? ''));
+        $row = $this->verifyTunnelAccessKey($key);
+        if ($row === null) {
+            // One generic error for malformed, unknown, revoked and expired
+            // keys, so this cannot be used to probe which subdomains exist.
+            http_response_code(401);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Invalid, revoked, or expired key',
+            ]);
+            return;
+        }
+
+        $subdomain = strtolower((string)$row['subdomain']);
+        $userId = (int)$row['user_id'];
+        $expiresAt = !empty($row['expires_at']) ? strtotime((string)$row['expires_at']) : 0;
+
+        $frpToken = $this->resolveFrpAuthToken();
+        if ($frpToken === '') {
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tunnel server credentials unavailable',
+            ]);
+            return;
+        }
+
+        $sendsMeta = !empty($input['sends_meta']);
+
+        try {
+            $registry = $this->readRegistry();
+            $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain]))
+                ? $registry[$subdomain]
+                : [];
+
+            $entry['subdomain'] = $subdomain;
+            $entry['owner_user_id'] = $userId;
+            $entry['expires_at'] = $expiresAt > 0 ? $expiresAt : (time() + 86400 * 365);
+            $entry['bound_at'] = time();
+            $entry['bound_client'] = substr(preg_replace('/[^\w .:-]/', '', (string)($input['client'] ?? '')), 0, 64);
+
+            // Only require the proxy to present the key once the client has
+            // confirmed it sends the meta. Turning this on for a client that
+            // does not would fail certificate issuance for the subdomain.
+            if ($sendsMeta) {
+                $entry['access_key_hash'] = hash('sha256', $key);
+                $entry['access_key_enabled'] = true;
+            }
+
+            $registry[$subdomain] = $entry;
+            $this->saveRegistry($registry);
+        } catch (\Throwable $_) {
+            // A registry write failure must not block the bind: the frps
+            // dashboard check in verifyTunnel() still authorises the subdomain.
+        }
+
+        try {
+            $this->db->update('tunnel_access_keys', [
+                'last_used_at' => date('Y-m-d H:i:s'),
+            ], ['id' => (int)$row['id']]);
+        } catch (\Throwable $_) {
+            // last_used_at is informational
+        }
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'hostname' => $subdomain . '.ginto.ai',
+            'server_addr' => 'ginto.ai',
+            'server_port' => 7000,
+            'frp_token' => $frpToken,
+            // ginto.ai terminates TLS at Caddy and forwards to the frps HTTP
+            // vhost, so the client must register an http-type proxy. See
+            // docs/frp.md.
+            'proxy_type' => 'http',
+            'edge_terminates_tls' => true,
+            'meta_key_name' => 'ginto_key',
+            'expires_at' => $expiresAt,
+        ]);
+    }
 }
