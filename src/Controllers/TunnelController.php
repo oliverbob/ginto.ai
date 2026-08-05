@@ -2115,8 +2115,12 @@ TOML;
      */
     public function tunnelAuthz(): void
     {
+        // X-Tunnel-Host is set by the forward_auth caller. The subrequest must
+        // carry Host: ginto.ai, because a subdomain Host makes the app relay
+        // the request into that very tunnel instead of serving this route.
         $host = strtolower(trim((string)(
-            $_SERVER['HTTP_X_FORWARDED_HOST']
+            $_SERVER['HTTP_X_TUNNEL_HOST']
+            ?? $_SERVER['HTTP_X_FORWARDED_HOST']
             ?? $_SERVER['HTTP_HOST']
             ?? ($_GET['host'] ?? '')
         )));
