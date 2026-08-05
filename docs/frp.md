@@ -94,6 +94,51 @@ The gntl client implements this in `_frp_exposure_plan()` and
 `render_frpc_config()`, keyed off `FRP_EDGE_TLS_HOSTS` (default `ginto.ai`) so
 that pointing gntl at any other frps leaves its behaviour unchanged.
 
+## Authorising a tunnel: `POST /api/tunnel/bind`
+
+Keys minted at `/account/keys` are the credential a tunnel client uses to
+authorise itself. No session, no CSRF (the caller is an frpc host, not a
+browser), and no admin step.
+
+```bash
+curl -X POST https://ginto.ai/api/tunnel/bind \
+     -H 'Content-Type: application/json' \
+     -d '{"key":"gtnl-...","local_port":2026,"client":"my-host"}'
+```
+
+Returns the connection parameters the client needs — `server_addr`,
+`server_port`, `frp_token`, and `proxy_type` (always `http`, per the rule
+above) — and records the subdomain in `/var/lib/ginto/tunnel-registry.json`
+against its owner and the key's expiry, which is what `verifyTunnel()` consults
+when issuing a certificate.
+
+Verification, in `verifyTunnelAccessKey()`:
+
+1. `sha256(token)` must match a `tunnel_access_keys` row — that column is what
+   revoke and expiry act on
+2. the row must not be revoked or expired
+3. when `APP_KEY` is set, the HS256 signature must verify and the claims
+   (`sd`, `sub`, `jti`) must describe the same grant as the row
+
+Malformed, unknown, revoked and expired keys all return the same generic 401,
+so the endpoint cannot be used to enumerate subdomains.
+
+### The operator-key binding
+
+A client publishes its key as the `ginto_key` proxy meta. On a second bind call
+— made once the tunnel is online — the server reads the meta off the live proxy
+via the frps dashboard and, only if it matches, sets `access_key_enabled` in the
+registry. From then on `verifyTunnel()` requires the online proxy to present
+that key before issuing a certificate.
+
+This is deliberately verified rather than trusted: enabling the requirement for
+a proxy that does not publish the meta would block certificate issuance for that
+subdomain, so a bind would cause an outage. If the meta later disappears, the
+next bind clears the flag rather than leaving a stale requirement behind.
+
+The frps token is read from `FRP_AUTH_TOKEN` in the app environment, falling
+back to `/etc/frp/frps.env`.
+
 ## Inspecting live state
 
 ```bash
