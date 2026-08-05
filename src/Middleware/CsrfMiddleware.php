@@ -31,6 +31,7 @@ class CsrfMiddleware
         '/debug/session-set',             // Debug helper: allow localhost POST to set session for testing
         '/login-m',                       // Mobile app JSON login — authenticates via credentials, no CSRF session
         '/logout-m',                      // Mobile app JSON logout — kills session, CSRF not applicable
+        '/api/tunnel/bind',               // Tunnel clients (frpc hosts) authenticate with a gtnl- key, not a browser session
     ];
 
     /**
