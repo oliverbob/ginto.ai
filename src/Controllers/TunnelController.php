@@ -2155,17 +2155,23 @@ font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937}
 .card{background:#fff;border-radius:16px;padding:40px;max-width:520px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
 h1{margin:0 0 4px;color:#6366f1;font-size:2rem}h2{margin:0 0 16px;font-size:1.1rem}
 code{background:#f3f4f6;border-radius:6px;padding:2px 6px;font-size:.9rem}
-ul{color:#4b5563;line-height:1.7;font-size:.95rem}a{color:#6366f1}
+ul,ol{color:#4b5563;line-height:1.8;font-size:.95rem;padding-left:20px}a{color:#6366f1}
+h3{margin:20px 0 8px;font-size:1rem;color:#374151}
 </style></head><body><div class="card">
 <h1>403</h1><h2>This tunnel is not authorised</h2>
 <p><code>{$safeHost}</code> is not serving because no valid account key is bound to it.</p>
 <p style="color:#6b7280">Reason: {$safeReason}</p>
-<ul>
-<li>The key for this subdomain was revoked or deleted</li>
-<li>The key expired</li>
-<li>The tunnel was started without a key</li>
-</ul>
-<p>The owner can bind a key at <a href="https://ginto.ai/account/keys">ginto.ai/account/keys</a>.</p>
+<h3>If you own this tunnel</h3>
+<ol>
+<li>Generate a key for this subdomain at
+    <a href="https://ginto.ai/account/keys">ginto.ai/account/keys</a> and copy it.</li>
+<li>Open the Ginto Tunnel admin <b>on the machine running the tunnel</b>
+    (<code>https://&lt;that machine&gt;:2026</code>).</li>
+<li>Paste the key into <b>Connect with an Account Key</b> and press
+    <b>Bind this machine</b>.</li>
+</ol>
+<p style="color:#6b7280">The keys page only issues keys - binding happens on the
+machine that runs the tunnel, because that is where the key has to be installed.</p>
 </div></body></html>
 HTML;
     }
