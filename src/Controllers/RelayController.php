@@ -99,6 +99,38 @@ class RelayController
         }
     }
 
+    /**
+     * POST /api/v1/relay/analyze — the AI's read on one coin, or on the market.
+     *
+     * Advisory. The one exception is deliberate and belongs to the member, not
+     * to this endpoint: for a Pro member with the bot armed, a BUY verdict opens
+     * a paper trade, exactly as it does on /academy/bot. Same brain, same
+     * per-member cooldown, so the relay cannot be used to get a second helping
+     * of a shared AI budget.
+     */
+    public function analyze(): void
+    {
+        $member = $this->member();
+        if ($member === null) {
+            return;
+        }
+
+        $in  = $this->body();
+        try {
+            $out = (new AcademyController())->runAnalysis(
+                (int) $member['user']['id'],
+                (string) ($in['symbol'] ?? 'BTCUSDT'),
+                (string) ($in['scope'] ?? 'coin')
+            );
+            $status = !empty($out['rate_limited']) ? 429 : 200;
+            unset($out['rate_limited']);
+            $this->json($out, $status);
+        } catch (\Throwable $e) {
+            error_log('RelayController analyze: ' . $e->getMessage());
+            $this->json(['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.'], 500);
+        }
+    }
+
     /** @return array<string,mixed> */
     private function body(): array
     {

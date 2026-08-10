@@ -1838,3 +1838,4 @@ $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_
 $router->get('/api/v1/relay/session', 'RelayController@session'); // identity + entitlement for the token's member
 $router->post('/api/v1/relay/trade/buy',  'RelayController@tradeBuy');  // paper buy for the token's member
 $router->post('/api/v1/relay/trade/sell', 'RelayController@tradeSell'); // close a manual paper position
+$router->post('/api/v1/relay/analyze',    'RelayController@analyze');   // AI read on a coin or the whole market

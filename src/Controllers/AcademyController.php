@@ -252,24 +252,45 @@ class AcademyController
     {
         header('Content-Type: application/json; charset=utf-8');
         $userId = $this->requireMemberJson();
+        $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        $out    = $this->runAnalysis($userId, (string) ($input['symbol'] ?? 'BTCUSDT'), (string) ($input['scope'] ?? 'coin'));
+        if (!empty($out['rate_limited'])) {
+            http_response_code(429);
+        }
+        unset($out['rate_limited']);
+        echo json_encode($out);
+        exit;
+    }
+
+    /**
+     * Run one AI analysis and return it.
+     *
+     * Session-free like placePaperBuy and closePaperPositions, so the relay
+     * reaches the same brain under the same cooldown. That cooldown is why this
+     * belongs in one place: it rations a shared AI budget, and a second entry
+     * point carrying its own copy of it rations nothing.
+     *
+     * @return array<string,mixed>
+     */
+    public function runAnalysis(int $userId, string $symbolIn = 'BTCUSDT', string $scopeIn = 'coin'): array
+    {
 
         // Per-user cooldown (seconds) — one analysis at a time, protects the AI budget.
         $cool = 12;
         $stamp = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_analyze_' . $userId . '.txt';
         if (is_file($stamp)) {
             $wait = $cool - (time() - (int) filemtime($stamp));
-            if ($wait > 0) { http_response_code(429); echo json_encode(['ok' => false, 'error' => 'Hold on ' . $wait . 's — one analysis at a time.']); exit; }
+            if ($wait > 0) return ['ok' => false, 'rate_limited' => true, 'error' => 'Hold on ' . $wait . 's — one analysis at a time.'];
         }
 
-        $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $scope  = ($input['scope'] ?? 'coin') === 'market' ? 'market' : 'coin';
-        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
+        $scope  = $scopeIn === 'market' ? 'market' : 'coin';
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $symbolIn)) ?: 'BTCUSDT';
         if (!str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
         $base = substr($symbol, 0, -4);
 
         try {
             $brain = new \Ginto\Services\GtbBrain();
-            if (!$brain->isConfigured()) { echo json_encode(['ok' => false, 'error' => 'The AI brain is not configured yet. Try again later.']); exit; }
+            if (!$brain->isConfigured()) return ['ok' => false, 'error' => 'The AI brain is not configured yet. Try again later.'];
             @touch($stamp);   // start the cooldown now (before the slow AI call)
 
             $client = new \Ginto\Services\BinanceClient();
@@ -306,18 +327,17 @@ class AcademyController
             }
 
             $res = $brain->reflect($context);
-            if (empty($res['ok'])) { echo json_encode(['ok' => false, 'error' => $res['error'] ?? 'Analysis failed']); exit; }
+            if (empty($res['ok'])) return ['ok' => false, 'error' => $res['error'] ?? 'Analysis failed'];
             // Pro + bot ON: a BUY verdict auto-executes a paper trade for THIS user only.
             $auto = $this->autoBuyFromDecision($userId, $scope, $symbol, $res);
-            echo json_encode([
+            return [
                 'ok' => true, 'scope' => $scope, 'symbol' => $symbol, 'base' => $base,
                 'text' => $res['text'], 'decision' => $res['decision'] ?? null, 'auto' => $auto,
-            ]);
+            ];
         } catch (\Throwable $e) {
-            error_log('Academy analyze: ' . $e->getMessage());
-            echo json_encode(['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.']);
+            error_log('Academy runAnalysis: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'The analysis engine is busy — try again in a moment.'];
         }
-        exit;
     }
 
     /** GET /academy/learn — the branded lessons facility (preview lessons open; rest gated). */

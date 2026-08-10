@@ -34,6 +34,7 @@ class CsrfMiddleware
         '/api/tunnel/bind',               // Tunnel clients (frpc hosts) authenticate with a gtnl- key, not a browser session
         '/api/v1/relay/trade/buy',        // Relay callers carry a signed, single-use token; there is no session to hold a CSRF token
         '/api/v1/relay/trade/sell',
+        '/api/v1/relay/analyze',
     ];
 
     /**
