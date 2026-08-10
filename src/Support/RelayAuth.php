@@ -51,16 +51,49 @@ class RelayAuth
      */
     public static function authenticate(): array
     {
+        $token = self::bearerToken();
+        if ($token === null) {
+            throw new RelayAuthError('Missing bearer token.', 401);
+        }
+
+        return self::resolve($token);
+    }
+
+    /**
+     * Authenticate a token that did not arrive in an Authorization header.
+     *
+     * The WebSocket fan-out needs exactly the same decision as the REST relay —
+     * is this token real, fresh, unspent, and does it name a member who is still
+     * subscribed — but a WebSocket handshake carries no bearer header it can
+     * rely on, so the token arrives in the first frame instead. Sharing this
+     * method rather than reimplementing the checks is the point: two copies of
+     * an authorisation rule drift, and the copy that drifts is the one nobody
+     * is looking at.
+     *
+     * @return array{user:array<string,mixed>,username:string,plan:string,is_pro:bool,claims:array<string,mixed>}
+     * @throws RelayAuthError
+     */
+    public static function authenticateToken(string $token): array
+    {
+        $token = trim($token);
+        if ($token === '') {
+            throw new RelayAuthError('Missing token.', 401);
+        }
+
+        return self::resolve($token);
+    }
+
+    /**
+     * @return array{user:array<string,mixed>,username:string,plan:string,is_pro:bool,claims:array<string,mixed>}
+     * @throws RelayAuthError
+     */
+    private static function resolve(string $token): array
+    {
         $secrets = self::secrets();
         if ($secrets === []) {
             // Misconfiguration, not a client error — say so in the log, not the response.
             error_log('RelayAuth: RELAY_JWT_SECRET is not set; refusing all relay requests.');
             throw new RelayAuthError('Relay authentication is not configured.', 503);
-        }
-
-        $token = self::bearerToken();
-        if ($token === null) {
-            throw new RelayAuthError('Missing bearer token.', 401);
         }
 
         $claims = null;
