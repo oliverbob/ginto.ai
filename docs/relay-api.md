@@ -74,7 +74,6 @@ On ginto.ai:
 
 ```
 RELAY_JWT_SECRET=<openssl rand -hex 32>
-RELAY_ALLOWED_USERS=          # optional, comma-separated; empty = any member
 ```
 
 On the calling host (SilverQueen), the same secret as `GINTO_RELAY_SECRET`.
@@ -83,9 +82,12 @@ Anything shorter than 32 bytes is refused at both ends — `firebase/php-jwt` v7
 will not sign with a shorter key, so this side enforces the same floor rather
 than accepting a key the other side cannot even use.
 
-**`RELAY_ALLOWED_USERS` is the bound worth setting.** Whoever holds the shared
-secret can mint a token for *any* username; the allowlist means a stolen secret
-still only reaches the accounts you named.
+Whoever holds the shared secret can mint a token for *any* username. There is
+deliberately no list of permitted usernames in configuration: who counts as a
+member is already decided by `user_subscriptions`, which is data and stays
+current, where a hand-maintained list in `.env` would need an edit and a deploy
+every time somebody joined. The bound on a stolen secret is rotating it — see
+below — not a second copy of the membership list.
 
 ## Rotating the secret
 

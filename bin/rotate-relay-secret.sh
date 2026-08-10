@@ -105,7 +105,6 @@ case "${1:-}" in
     section "ginto.ai — $GINTO_ENV"
     note "RELAY_JWT_SECRET          $(fingerprint "$(get_env "$GINTO_ENV" RELAY_JWT_SECRET)")"
     note "RELAY_JWT_SECRET_PREVIOUS $(fingerprint "$(get_env "$GINTO_ENV" RELAY_JWT_SECRET_PREVIOUS)")"
-    note "RELAY_ALLOWED_USERS       $(get_env "$GINTO_ENV" RELAY_ALLOWED_USERS || echo '(any member)')"
     if [ -f "$CALLER_ENV" ]; then
       section "caller — $CALLER_ENV"
       note "GINTO_RELAY_SECRET        $(fingerprint "$(get_env "$CALLER_ENV" GINTO_RELAY_SECRET)")"

@@ -29,9 +29,11 @@ use Ginto\Core\Database;
  * happens to equal another account's username would be an impersonation route.
  *
  * Worth being clear about the trust boundary: whoever holds the shared secret
- * can mint a token for ANY username. That is acceptable when the holder is your
- * own service, and it is why RELAY_ALLOWED_USERS exists — set it and a stolen
- * secret still only reaches the accounts you listed.
+ * can mint a token for ANY username. That is acceptable while the holder is our
+ * own service, and it is the reason to rotate the secret rather than to keep a
+ * list of permitted usernames here — membership is already decided by the
+ * subscription check below, which is data, not configuration, and so cannot go
+ * stale the way a hand-maintained list in .env would.
  */
 class RelayAuth
 {
@@ -105,11 +107,6 @@ class RelayAuth
         $username = trim((string) ($claims['sub'] ?? ''));
         if ($username === '') {
             throw new RelayAuthError('Token names no user.', 401);
-        }
-
-        $allowed = self::allowlist();
-        if ($allowed !== null && !in_array($username, $allowed, true)) {
-            throw new RelayAuthError('That user is not permitted over the relay.', 403);
         }
 
         $user = self::findByUsername($username);
@@ -265,17 +262,6 @@ class RelayAuth
             error_log('RelayAuth: plan lookup failed — ' . $e->getMessage());
             return '';
         }
-    }
-
-    /** Usernames the relay may act for, or null when unrestricted. */
-    private static function allowlist(): ?array
-    {
-        $raw = trim((string) (Env::get('RELAY_ALLOWED_USERS', '') ?? ''));
-        if ($raw === '') return null;
-
-        $names = array_values(array_filter(array_map('trim', explode(',', $raw)), static fn($n) => $n !== ''));
-
-        return $names === [] ? null : $names;
     }
 
     private static function storage(): string
