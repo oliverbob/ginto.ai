@@ -1,6 +1,7 @@
 <?php
 namespace Ginto\Controllers;
 
+use Ginto\Controllers\AcademyController;
 use Ginto\Support\RelayAuth;
 use Ginto\Support\RelayAuthError;
 
@@ -46,6 +47,64 @@ class RelayController
             'expires_at' => (int) $member['claims']['exp'],
             'server_time' => time(),
         ]);
+    }
+
+    /**
+     * POST /api/v1/relay/trade/buy — open a paper position for the token's member.
+     *
+     * The rules — minimum size, available balance, the stop and target applied
+     * to every entry — are AcademyController's, called rather than copied. A
+     * second implementation of what a buy means is a second set of guardrails
+     * to forget to update.
+     */
+    public function tradeBuy(): void
+    {
+        $member = $this->member();
+        if ($member === null) {
+            return;
+        }
+
+        $in = $this->body();
+        try {
+            $this->json((new AcademyController())->placePaperBuy(
+                (int) $member['user']['id'],
+                (string) ($in['symbol'] ?? ''),
+                (float) ($in['amount'] ?? 0),
+                'manual'
+            ));
+        } catch (\Throwable $e) {
+            error_log('RelayController tradeBuy: ' . $e->getMessage());
+            $this->json(['ok' => false, 'error' => 'Could not place the trade.'], 500);
+        }
+    }
+
+    /** POST /api/v1/relay/trade/sell — close a manual paper position, by id or symbol. */
+    public function tradeSell(): void
+    {
+        $member = $this->member();
+        if ($member === null) {
+            return;
+        }
+
+        $in = $this->body();
+        try {
+            $this->json((new AcademyController())->closePaperPositions(
+                (int) $member['user']['id'],
+                (int) ($in['id'] ?? 0),
+                (string) ($in['symbol'] ?? '')
+            ));
+        } catch (\Throwable $e) {
+            error_log('RelayController tradeSell: ' . $e->getMessage());
+            $this->json(['ok' => false, 'error' => 'Could not close the trade.'], 500);
+        }
+    }
+
+    /** @return array<string,mixed> */
+    private function body(): array
+    {
+        $raw = json_decode((string) file_get_contents('php://input'), true);
+
+        return is_array($raw) ? $raw : [];
     }
 
     /**

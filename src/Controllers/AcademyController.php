@@ -914,7 +914,12 @@ class AcademyController
      * baked in. Used by the manual Buy ticket AND the AI auto-buy. Returns a JSON-ready result array;
      * never echoes. Enforces the daily-loss halt, min size, and balance.
      */
-    private function placePaperBuy(int $userId, string $symbol, float $amount, string $template = 'manual'): array
+    /**
+     * Open a paper position. Session-free and returns its result rather than
+     * echoing it, so the relay can place the same trade under the same rules —
+     * one implementation of what a buy means, not two that drift.
+     */
+    public function placePaperBuy(int $userId, string $symbol, float $amount, string $template = 'manual'): array
     {
         $this->ensureTradingSchema();
         $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $symbol));
@@ -1014,16 +1019,33 @@ class AcademyController
     {
         header('Content-Type: application/json; charset=utf-8');
         $userId = $this->requireMemberJson();
+        $input  = json_decode(file_get_contents('php://input'), true) ?: $_POST;
+        echo json_encode($this->closePaperPositions(
+            $userId, (int) ($input['id'] ?? 0), (string) ($input['symbol'] ?? '')
+        ));
+        exit;
+    }
+
+    /**
+     * Close manual paper positions at the live mark, by id or by symbol.
+     *
+     * Session-free and returns its result, for the same reason placePaperBuy is:
+     * the relay closes trades through this too, so what "sell" means is defined
+     * once. Bot-followed positions (ref_trade_id set) are never touched here —
+     * the bot opened them and the bot closes them, and letting a member close
+     * one by hand would leave the bot managing a position that no longer exists.
+     *
+     * @return array<string,mixed>
+     */
+    public function closePaperPositions(int $userId, int $id = 0, string $symbol = ''): array
+    {
         $this->ensureTradingSchema();
-        $input = json_decode(file_get_contents('php://input'), true) ?: $_POST;
-        $id    = (int) ($input['id'] ?? 0);
-        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($input['symbol'] ?? '')));
+        $symbol = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $symbol));
         if ($symbol !== '' && !str_ends_with($symbol, 'USDT')) $symbol .= 'USDT';
+
         try {
             $db = Database::getInstance();
             $client = new \Ginto\Services\BinanceClient();
-            // Manual positions only (ref_trade_id NULL) — bot-followed trades are managed by the bot.
-            // Sell by id (one card) OR by symbol (the Buy/Sell ticket closes the whole holding).
             if ($id > 0) {
                 $rows = ($p = $db->get('academy_positions', '*', ['id' => $id, 'user_id' => $userId, 'status' => 'open', 'ref_trade_id' => null])) && is_array($p) ? [$p] : [];
             } elseif ($symbol !== '') {
@@ -1032,7 +1054,8 @@ class AcademyController
             } else {
                 $rows = [];
             }
-            if (!$rows) { echo json_encode(['ok' => false, 'error' => 'No open manual position to close (bot trades are managed by the bot).']); exit; }
+            if (!$rows) return ['ok' => false, 'error' => 'No open manual position to close (bot trades are managed by the bot).'];
+
             $balance = (float) $this->walletFor($userId)['balance'];
             $realized = 0.0; $n = 0;
             foreach ($rows as $p) {
@@ -1043,12 +1066,12 @@ class AcademyController
                 $db->update('academy_positions', ['status' => 'closed', 'exit_price' => $mark, 'realized' => round($r, 8), 'close_reason' => 'manual', 'closed_at' => date('Y-m-d H:i:s')], ['id' => (int) $p['id']]);
             }
             $db->update('academy_wallets', ['balance' => round($balance, 8)], ['user_id' => $userId]);
-            echo json_encode(['ok' => true, 'closed' => $n, 'realized' => round($realized, 4), 'balance' => round($balance, 8)]);
+
+            return ['ok' => true, 'closed' => $n, 'realized' => round($realized, 4), 'balance' => round($balance, 8)];
         } catch (\Throwable $e) {
-            error_log('Academy tradeSell: ' . $e->getMessage());
-            echo json_encode(['ok' => false, 'error' => 'Could not close the trade.']);
+            error_log('Academy closePaperPositions: ' . $e->getMessage());
+            return ['ok' => false, 'error' => 'Could not close the trade.'];
         }
-        exit;
     }
 
     /** GET /academy/history — this learner's paper-trading transaction history (full page). */

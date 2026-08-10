@@ -1836,3 +1836,5 @@ $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_
 // in; the shared secret is the trust. See docs/relay-api.md.
 // ============================================================================
 $router->get('/api/v1/relay/session', 'RelayController@session'); // identity + entitlement for the token's member
+$router->post('/api/v1/relay/trade/buy',  'RelayController@tradeBuy');  // paper buy for the token's member
+$router->post('/api/v1/relay/trade/sell', 'RelayController@tradeSell'); // close a manual paper position
