@@ -445,7 +445,26 @@ class SilverQueenController
      */
     private function hasAccess(int $userId): bool
     {
+        if (!$this->isRegistered($userId)) return false;
         return $this->isElevated($userId) || $this->isProTrader($userId);
+    }
+
+    /**
+     * The session points at a real, live account. A cookie can outlive the user row it
+     * names (deleted, suspended, banned), and that stale session must not be treated as
+     * a member — it is checked before anything else, so no such visitor reaches a query
+     * that could grant entry.
+     */
+    private function isRegistered(int $userId): bool
+    {
+        try {
+            return Database::getInstance()->has('users', [
+                'id' => $userId, 'status' => 'active',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen isRegistered: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -466,26 +485,39 @@ class SilverQueenController
     }
 
     /**
-     * An active, unexpired Pro Trader subscription. Mirrors AcademyController's plan
-     * lookup so the two products agree on what "Pro" means.
+     * A paid-up Pro Trader membership — the ONLY thing that buys a seat here.
+     *
+     * One query, joined to the plan, so every condition is enforced by the database and
+     * none of them can be satisfied by accident:
+     *
+     *   - the plan is matched by machine name (self::PRO_PLANS) and plan_type 'academy'.
+     *     NOT by display_name: plan titles are editable in the Academy admin screen, and
+     *     any plan re-titled "Pro Trader" used to hand out the console for free.
+     *   - expires_at must be strictly in the future. A NULL expiry no longer passes —
+     *     `NULL > '...'` is NULL in SQL, so open-ended rows are excluded, where the old
+     *     `!empty($expires)` test let them through forever.
+     *   - every active row is considered, not just the newest, so a later Trader/other
+     *     subscription can't mask a genuine Pro one (and vice versa: a stale Pro row that
+     *     has lapsed can no longer stand in for a current membership).
+     *
+     * Anything short of that returns false and the caller answers 404.
      */
     private function isProTrader(int $userId): bool
     {
         try {
-            $db  = Database::getInstance();
-            $sub = $db->get('user_subscriptions', ['plan_id', 'expires_at'], [
-                'user_id' => $userId, 'status' => 'active', 'ORDER' => ['id' => 'DESC'],
-            ]);
-            if (!is_array($sub)) return false;
+            $row = Database::getInstance()->get('user_subscriptions',
+                ['[>]subscription_plans' => ['plan_id' => 'id']],
+                ['subscription_plans.name'],
+                [
+                    'user_subscriptions.user_id'       => $userId,
+                    'user_subscriptions.status'        => 'active',
+                    'user_subscriptions.expires_at[>]' => date('Y-m-d H:i:s'),
+                    'subscription_plans.name'          => self::PRO_PLANS,
+                    'subscription_plans.plan_type'     => 'academy',
+                    'ORDER' => ['user_subscriptions.expires_at' => 'DESC'],
+                ]);
 
-            $expires = $sub['expires_at'] ?? null;
-            if (!empty($expires) && strtotime((string) $expires) <= time()) return false;
-
-            $plan = $db->get('subscription_plans', ['name', 'display_name'], ['id' => $sub['plan_id']]);
-            if (!is_array($plan)) return false;
-
-            return in_array((string) ($plan['name'] ?? ''), self::PRO_PLANS, true)
-                || strcasecmp(trim((string) ($plan['display_name'] ?? '')), 'Pro Trader') === 0;
+            return is_array($row) && in_array((string) ($row['name'] ?? ''), self::PRO_PLANS, true);
         } catch (\Throwable $e) {
             error_log('SilverQueen isProTrader: ' . $e->getMessage());
             return false;
