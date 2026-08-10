@@ -1825,3 +1825,14 @@ $router->post('/gtb/bot/pine', 'GtbController@pineTool');       // AI inspect/su
 $router->post('/gtb/bot/close', 'GtbController@closePosition'); // manually close one position
 $router->get('/gtb-settings', 'GtbController@settings');   // Binance API config form
 $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_* to .env
+
+// ============================================================================
+// Relay API — service-to-service, for callers with no browser session.
+// Controller: src/Controllers/RelayController.php
+// Auth:       src/Support/RelayAuth.php (HS256 bearer token, RELAY_JWT_SECRET)
+//
+// SilverQueen reaches this host over HTTPS from behind the gntl tunnel and names
+// the ginto.ai member it is acting for in the token's `sub` claim. Nobody logs
+// in; the shared secret is the trust. See docs/relay-api.md.
+// ============================================================================
+$router->get('/api/v1/relay/session', 'RelayController@session'); // identity + entitlement for the token's member
