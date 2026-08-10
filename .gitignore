@@ -10,6 +10,12 @@ vendor/
 
 # Local environment files (do not commit secrets)
 .env
+# Anything derived from it too — bin/rotate-relay-secret.sh writes .env.bak-<stamp>
+# before each edit, and those backups hold the live signing secret. The negation
+# matters: .env.* alone also swallows .env.example, and a template nobody can
+# commit is how the next person ends up with no reference for what to set.
+.env.*
+!.env.example
 .installed
 .install_config
 

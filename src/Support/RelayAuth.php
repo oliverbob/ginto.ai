@@ -49,8 +49,8 @@ class RelayAuth
      */
     public static function authenticate(): array
     {
-        $secret = (string) (Env::get('RELAY_JWT_SECRET', '') ?? '');
-        if ($secret === '') {
+        $secrets = self::secrets();
+        if ($secrets === []) {
             // Misconfiguration, not a client error — say so in the log, not the response.
             error_log('RelayAuth: RELAY_JWT_SECRET is not set; refusing all relay requests.');
             throw new RelayAuthError('Relay authentication is not configured.', 503);
@@ -61,12 +61,29 @@ class RelayAuth
             throw new RelayAuthError('Missing bearer token.', 401);
         }
 
-        try {
-            $claims = Jwt::decode($token, $secret, self::AUDIENCE);
-        } catch (\Throwable $e) {
+        $claims = null;
+        $last   = null;
+        foreach ($secrets as $label => $secret) {
+            try {
+                $claims = Jwt::decode($token, $secret, self::AUDIENCE);
+                if ($label === 'previous') {
+                    // Rotation is only finished once this stops appearing. Leaving
+                    // the old secret in place indefinitely doubles the number of
+                    // keys that can mint a token, which is the thing rotation was
+                    // supposed to reduce.
+                    error_log('RelayAuth: accepted a token signed with RELAY_JWT_SECRET_PREVIOUS; '
+                        . 'the caller has not picked up the new secret yet.');
+                }
+                break;
+            } catch (\Throwable $e) {
+                $last = $e;
+            }
+        }
+
+        if ($claims === null) {
             // Deliberately one flat message: "expired" vs "bad signature" tells an
             // attacker which half of the token to keep working on.
-            error_log('RelayAuth: token rejected — ' . $e->getMessage());
+            error_log('RelayAuth: token rejected — ' . ($last ? $last->getMessage() : 'unknown'));
             throw new RelayAuthError('Invalid token.', 401);
         }
 
@@ -117,6 +134,36 @@ class RelayAuth
             'is_pro'   => $plan === 'academy_pro',
             'claims'   => $claims,
         ];
+    }
+
+    /**
+     * Signing secrets to try, current first.
+     *
+     * Two exist only during a rotation. The secret lives in a file on two
+     * separate hosts, so it cannot change on both at the same instant; without
+     * an overlap every request in the gap fails, and the gap is however long it
+     * takes to edit the second file and deploy. Honouring the previous secret
+     * for a window turns that into a rotation with no failed requests at all.
+     *
+     * Clear RELAY_JWT_SECRET_PREVIOUS as soon as the callers have been updated.
+     * Until you do, both keys can mint a token.
+     *
+     * @return array<string,string>
+     */
+    private static function secrets(): array
+    {
+        $out     = [];
+        $current = (string) (Env::get('RELAY_JWT_SECRET', '') ?? '');
+        if ($current !== '') {
+            $out['current'] = $current;
+        }
+
+        $previous = (string) (Env::get('RELAY_JWT_SECRET_PREVIOUS', '') ?? '');
+        if ($previous !== '' && $previous !== $current) {
+            $out['previous'] = $previous;
+        }
+
+        return $out;
     }
 
     /** The Authorization header, unwrapped. Falls back for servers that hide it from PHP. */

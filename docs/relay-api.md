@@ -87,6 +87,48 @@ than accepting a key the other side cannot even use.
 secret can mint a token for *any* username; the allowlist means a stolen secret
 still only reaches the accounts you named.
 
+## Rotating the secret
+
+The secret lives in a file on two separate hosts, so it cannot change on both at
+the same instant. Changing it in one place first means every request in the gap
+is refused, for however long it takes to edit the second file and deploy.
+
+`RELAY_JWT_SECRET_PREVIOUS` closes that gap: while it is set, the relay accepts
+either secret, so the two hosts can be updated one at a time with no failed
+requests. `bin/rotate-relay-secret.sh` drives the three phases.
+
+```bash
+# On ginto.ai — install a new secret, keep honouring the old one.
+bin/rotate-relay-secret.sh accept          # prints the new secret
+
+# On each caller — start signing with it.
+bin/rotate-relay-secret.sh issue <secret>
+
+# Back on ginto.ai — stop honouring the old one.
+bin/rotate-relay-secret.sh retire
+
+bin/rotate-relay-secret.sh status          # what each side is using
+```
+
+When both checkouts are on one machine, `bin/rotate-relay-secret.sh local` runs
+all three against `~/repo/blockchain` (override with `CALLER_DIR`).
+
+Set `VERIFY_USER` to a member's username and each phase confirms itself with a
+live call before reporting success; `accept` refuses to proceed if the *old*
+secret has stopped working, since that is what callers are still using. Every
+`.env` is copied to `.env.bak-<timestamp>` first — those hold the live secret and
+are covered by `.env.*` in `.gitignore`.
+
+**Rotation is not finished until `retire` runs.** Until then two keys can mint a
+token, which is the thing rotation was meant to reduce. Any request accepted on
+the old secret writes a line to the error log naming
+`RELAY_JWT_SECRET_PREVIOUS`, so a caller you forgot to update is visible rather
+than silent.
+
+Nothing caches a token — `GintoRelayClient` mints one per request — so no caller
+has to be restarted for a rotation to take effect beyond picking up the new
+`.env`.
+
 ## Endpoints
 
 ### `GET /api/v1/relay/session`
