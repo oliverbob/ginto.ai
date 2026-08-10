@@ -47,6 +47,8 @@
         "mcp:status": "bash -c 'if [ -f /tmp/github-mcp.pid ]; then PID=$(cat /tmp/github-mcp.pid); if ps -p $PID > /dev/null; then echo \"github-mcp running (PID: $PID)\"; else echo \"github-mcp pid file exists but process not running\"; fi; else echo \"github-mcp not running\"; fi'",
         "server:status": "bash -c 'PID=$(sudo lsof -t -i:8000 2>/dev/null); if [ ! -z \"$PID\" ]; then echo \"Server running on port 8000 (PID: $PID)\"; else echo \"No server running on port 8000\"; fi'",
         "test:transcribe": "bash bin/test_transcribe.sh",
+        "test:relay": "php bin/test_relay.php",
+        "test:relay:unit": "php bin/test_relay.php --unit",
         "post-install-cmd": [
             "bash bin/composer_post.sh"
         ],
