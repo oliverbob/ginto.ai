@@ -494,18 +494,72 @@ class LtradingServer implements MessageComponentInterface
     private function rows(string $sql, array $args = []): array
     {
         if ($this->db === null) {
-            return [];
+            // Lost earlier and not yet recovered — try again now rather than
+            // staying dead until someone restarts the process.
+            $this->connect();
+            if ($this->db === null) {
+                return [];
+            }
         }
-        try {
-            $st = $this->db->prepare($sql);
-            $st->execute($args);
 
-            return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        try {
+            return $this->run($sql, $args);
         } catch (\Throwable $e) {
-            error_log('[LtradingServer] query failed: ' . $e->getMessage());
-            // One bad query must not kill the loop for everyone else.
-            return [];
+            // A daemon holds one connection for weeks, and MySQL closes it after
+            // wait_timeout with "server has gone away". Left unhandled that is
+            // the worst kind of failure here: every query starts returning
+            // nothing, the stream keeps ticking, and subscribers see an empty
+            // portfolio rather than an error — the same fault already visible in
+            // this server's log from MessengerServer. So reconnect once and
+            // retry before giving up on the query.
+            if (!$this->isLostConnection($e)) {
+                error_log('[LtradingServer] query failed: ' . $e->getMessage());
+                return [];
+            }
+
+            error_log('[LtradingServer] database connection lost; reconnecting.');
+            $this->db = null;
+            $this->connect();
+            if ($this->db === null) {
+                return [];
+            }
+
+            try {
+                return $this->run($sql, $args);
+            } catch (\Throwable $again) {
+                error_log('[LtradingServer] query failed after reconnect: ' . $again->getMessage());
+                // One bad query must not kill the loop for everyone else.
+                return [];
+            }
         }
+    }
+
+    /**
+     * @param list<mixed> $args
+     * @return list<array<string,mixed>>
+     */
+    private function run(string $sql, array $args): array
+    {
+        $st = $this->db->prepare($sql);
+        $st->execute($args);
+
+        return $st->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** Distinguishes a dropped connection from a query that is simply wrong. */
+    private function isLostConnection(\Throwable $e): bool
+    {
+        $message = $e->getMessage();
+
+        // 2006 is the server closing an idle connection, 2013 is losing it
+        // mid-query. Retrying anything else would just repeat a real error.
+        foreach (['2006', '2013', 'gone away', 'Lost connection', 'Broken pipe'] as $needle) {
+            if (stripos($message, $needle) !== false) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function connect(): void
