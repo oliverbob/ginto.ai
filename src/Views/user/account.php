@@ -127,13 +127,10 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         </table>
       </div>
     </div>
-  </div>
-</div>
 
-<!-- ── Two-factor authentication ───────────────────────────────────── -->
-<div id="mainContent-2fa" class="px-6 pb-2" style="max-width:900px;">
-  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mt-6" style="max-width:860px;">
-    <h2 class="text-lg font-semibold">Two-factor authentication</h2>
+    <!-- ── Two-factor authentication ───────────────────────────────── -->
+    <div id="twoFactorSection" style="margin-top:22px; padding-top:16px; border-top:1px solid rgba(148,163,184,0.35); max-width:720px;">
+    <div style="font-weight:600; margin-bottom:4px;">Two-factor authentication</div>
     <p id="totpStatus" class="text-sm text-gray-500 mt-1">Loading security status…</p>
     <div id="totpMessage" class="hidden text-sm rounded p-2 mt-3"></div>
 
@@ -156,6 +153,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         <label class="text-sm">Authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required class="block border rounded px-3 py-2 mt-1"></label>
         <button type="submit" class="border border-red-400 text-red-700 hover:bg-red-50 font-semibold px-4 py-2 rounded-lg text-sm">Disable 2FA</button>
       </form>
+    </div>
     </div>
   </div>
 </div>
