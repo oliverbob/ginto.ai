@@ -155,12 +155,9 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       </form>
     </div>
     </div>
-  </div>
-</div>
 
 <!-- ── Change Password ──────────────────────────────────────────────── -->
-<div id="mainContent-pw" class="px-6 pb-8" style="max-width:900px;">
-  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mt-6" style="max-width:860px;">
+  <div id="changePasswordSection" style="margin-top:22px; padding-top:16px; border-top:1px solid rgba(148,163,184,0.35); max-width:720px;">
     <h2 class="text-lg font-semibold mb-4">Change Password</h2>
 
     <div id="pwMsg" class="mb-3 hidden text-sm rounded p-2"></div>
@@ -197,6 +194,7 @@ $csrf = $_SESSION['csrf_token'] ?? '';
         Update Password
       </button>
     </form>
+  </div>
   </div>
 </div>
 
