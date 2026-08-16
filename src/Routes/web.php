@@ -86,6 +86,7 @@ $router->get('/api/code-token', function() {
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');
+$router->req('/login/2fa', 'UserController@twoFactorChallenge');
 $router->post('/login-m',  'AuthController@loginMobile');   // Mobile app JSON login
 $router->req('/logout-m',  'AuthController@logoutMobile');  // Mobile app logout (GET redirects, POST returns JSON)
 $router->req('/forgot-password', 'PasswordResetController@forgotPassword');
@@ -1247,6 +1248,10 @@ $router->req('/api/account/keys/list', 'UserController@accountApiKeysList', ['GE
 $router->req('/api/account/keys/create', 'UserController@createAccountApiKey', ['POST']);
 $router->req('/api/account/keys/revoke', 'UserController@revokeAccountApiKey', ['POST']);
 $router->req('/api/account/change-password', 'UserController@changePassword', ['POST']);
+$router->get('/api/account/2fa/status', 'UserController@twoFactorStatus');
+$router->post('/api/account/2fa/begin', 'UserController@twoFactorBegin');
+$router->post('/api/account/2fa/confirm', 'UserController@twoFactorConfirm');
+$router->post('/api/account/2fa/disable', 'UserController@twoFactorDisable');
 
 // Seller KYC and Product management (organized under /marketplace/sellers)
 $router->req('/marketplace/sellers/kyc', 'SellerController@kycForm');

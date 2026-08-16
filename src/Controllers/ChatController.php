@@ -719,6 +719,16 @@ class ChatController
             $_SESSION['referral_code'] = trim($_GET['ref']);
         }
 
+        if (empty($_SESSION['user_id']) || !$this->hasPassedTwoFactor()) {
+            if (!empty($_SESSION['user_id']) && !$this->hasPassedTwoFactor()) {
+                $_SESSION = [];
+                session_regenerate_id(true);
+            }
+            $_SESSION['login_redirect'] = '/chat';
+            header('Location: /login');
+            exit;
+        }
+
         // Check if user is logged in
         $isLoggedIn = !empty($_SESSION['user_id']);
         
@@ -786,6 +796,13 @@ class ChatController
             exit;
         }
 
+        if (empty($_SESSION['user_id']) || !$this->hasPassedTwoFactor()) {
+            if (!empty($_SESSION['user_id']) && !$this->hasPassedTwoFactor()) { $_SESSION = []; session_regenerate_id(true); }
+            $_SESSION['login_redirect'] = '/chat/c/' . rawurlencode($convoId);
+            header('Location: /login');
+            exit;
+        }
+
         $isLoggedIn = !empty($_SESSION['user_id']);
         $isAdmin = UserController::isAdmin();
         $sandboxId = $_SESSION['sandbox_id'] ?? null;
@@ -839,6 +856,10 @@ class ChatController
      */
     public function chatMobile(): void
     {
+        if (empty($_SESSION['user_id']) || !$this->hasPassedTwoFactor()) {
+            header('Location: /login?next=/chat-m');
+            exit;
+        }
         $isLoggedIn = !empty($_SESSION['user_id']);
         $isAdmin = UserController::isAdmin();
         $sandboxId = $_SESSION['sandbox_id'] ?? null;
@@ -887,8 +908,26 @@ class ChatController
      */
     public function stream(): void
     {
+        if (empty($_SESSION['user_id']) || !$this->hasPassedTwoFactor()) {
+            http_response_code(401);
+            header('Content-Type: application/json');
+            echo json_encode(['error' => 'Authentication required.']);
+            exit;
+        }
         $handler = new \Ginto\Handlers\ChatStreamHandler($this->db);
         $handler->handle();
+    }
+
+    /** Ensures an enabled account completed TOTP in this particular session. */
+    private function hasPassedTwoFactor(): bool
+    {
+        if (empty($_SESSION['user_id'])) return false;
+        try {
+            $enabled = (bool) $this->db->get('users', 'two_factor_enabled', ['id' => (int) $_SESSION['user_id']]);
+            return !$enabled || (int) ($_SESSION['two_factor_verified_user_id'] ?? 0) === (int) $_SESSION['user_id'];
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     /**

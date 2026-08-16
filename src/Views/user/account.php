@@ -130,6 +130,36 @@ $csrf = $_SESSION['csrf_token'] ?? '';
   </div>
 </div>
 
+<!-- ── Two-factor authentication ───────────────────────────────────── -->
+<div id="mainContent-2fa" class="px-6 pb-2" style="max-width:900px;">
+  <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mt-6" style="max-width:860px;">
+    <h2 class="text-lg font-semibold">Two-factor authentication</h2>
+    <p id="totpStatus" class="text-sm text-gray-500 mt-1">Loading security status…</p>
+    <div id="totpMessage" class="hidden text-sm rounded p-2 mt-3"></div>
+
+    <div id="totpOff" class="mt-4">
+      <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">Protect sign-ins and Chat with a 6-digit code from Google Authenticator.</p>
+      <button id="totpBegin" type="button" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2 rounded-lg text-sm">Set up Google Authenticator</button>
+    </div>
+    <div id="totpSetup" class="hidden mt-4 p-4 rounded-lg border border-amber-300 bg-amber-50 dark:bg-gray-900">
+      <p class="text-sm font-medium">In Google Authenticator, choose <em>Add a code</em> → <em>Enter a setup key</em>.</p>
+      <p class="text-sm mt-2">Account: <strong id="totpAccount"></strong><br>Key: <code id="totpSecret" class="select-all break-all"></code><br>Type: Time based</p>
+      <form id="totpConfirmForm" class="mt-4 flex gap-2 flex-wrap">
+        <input id="totpConfirmCode" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required placeholder="6-digit code" class="border rounded px-3 py-2 text-sm">
+        <button type="submit" class="bg-amber-500 hover:bg-amber-600 text-white font-semibold px-4 py-2 rounded-lg text-sm">Enable 2FA</button>
+      </form>
+    </div>
+    <div id="totpOn" class="hidden mt-4">
+      <p class="text-sm text-green-700 dark:text-green-300 mb-3">Two-factor authentication is enabled.</p>
+      <form id="totpDisableForm" class="flex gap-2 flex-wrap items-end">
+        <label class="text-sm">Current password<input name="password" type="password" required class="block border rounded px-3 py-2 mt-1"></label>
+        <label class="text-sm">Authenticator code<input name="code" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required class="block border rounded px-3 py-2 mt-1"></label>
+        <button type="submit" class="border border-red-400 text-red-700 hover:bg-red-50 font-semibold px-4 py-2 rounded-lg text-sm">Disable 2FA</button>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!-- ── Change Password ──────────────────────────────────────────────── -->
 <div id="mainContent-pw" class="px-6 pb-8" style="max-width:900px;">
   <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 mt-6" style="max-width:860px;">
@@ -171,6 +201,20 @@ $csrf = $_SESSION['csrf_token'] ?? '';
     </form>
   </div>
 </div>
+
+<script>
+(function () {
+  var csrf = <?= json_encode($csrf) ?>;
+  var status = document.getElementById('totpStatus'), off = document.getElementById('totpOff'), on = document.getElementById('totpOn'), setup = document.getElementById('totpSetup'), message = document.getElementById('totpMessage');
+  function note(text, ok) { message.textContent = text; message.className = 'text-sm rounded p-2 mt-3 ' + (ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'); }
+  async function request(url, data) { var body = new URLSearchParams(data || {}); body.set('csrf_token', csrf); var r = await fetch(url, {method: data ? 'POST' : 'GET', credentials: 'same-origin', headers: data ? {'Content-Type':'application/x-www-form-urlencoded'} : {}}); return r.json(); }
+  async function load() { try { var d = await request('/api/account/2fa/status'); if (!d.success) throw Error(d.error); status.textContent = d.enabled ? 'Enabled — a code is required after your password.' : 'Not enabled.'; off.classList.toggle('hidden', d.enabled); on.classList.toggle('hidden', !d.enabled); setup.classList.add('hidden'); } catch(e) { status.textContent = 'Unable to load two-factor status.'; } }
+  document.getElementById('totpBegin').addEventListener('click', async function () { try { var d = await request('/api/account/2fa/begin', {}); if (!d.success) throw Error(d.error); document.getElementById('totpSecret').textContent = d.secret; document.getElementById('totpAccount').textContent = 'Ginto AI'; setup.classList.remove('hidden'); note('Enter the setup key in Google Authenticator, then confirm a code below.', true); } catch(e) { note(e.message || 'Unable to start setup.', false); } });
+  document.getElementById('totpConfirmForm').addEventListener('submit', async function(e) { e.preventDefault(); try { var d = await request('/api/account/2fa/confirm', {code: document.getElementById('totpConfirmCode').value}); if (!d.success) throw Error(d.error); note('Two-factor authentication is enabled.', true); load(); } catch(err) { note(err.message || 'Unable to enable two-factor authentication.', false); } });
+  document.getElementById('totpDisableForm').addEventListener('submit', async function(e) { e.preventDefault(); if (!confirm('Disable two-factor authentication?')) return; var f = e.currentTarget; try { var d = await request('/api/account/2fa/disable', {password: f.password.value, code: f.code.value}); if (!d.success) throw Error(d.error); f.reset(); note('Two-factor authentication is disabled.', true); load(); } catch(err) { note(err.message || 'Unable to disable two-factor authentication.', false); } });
+  load();
+})();
+</script>
 
 <script>
 (function () {

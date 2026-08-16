@@ -338,6 +338,115 @@ class UserController extends \Core\Controller
         ]);
     }
 
+    /** TOTP status and enrollment endpoints for the Account page. */
+    public function twoFactorStatus(): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->requireTwoFactorAccount()) return;
+        try {
+            $totp = new \Ginto\Services\TotpService($this->db);
+            echo json_encode(['success' => true, 'enabled' => $totp->isEnabled((int) $_SESSION['user_id'])]);
+        } catch (\Throwable $e) {
+            http_response_code(503); echo json_encode(['success' => false, 'error' => 'Two-factor authentication is not available.']);
+        }
+    }
+
+    public function twoFactorBegin(): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->requireTwoFactorAccount(true)) return;
+        try {
+            $user = $this->db->get('users', ['email', 'username'], ['id' => (int) $_SESSION['user_id']]) ?: [];
+            $label = (string) ($user['email'] ?: $user['username'] ?: ('user-' . $_SESSION['user_id']));
+            $totp = new \Ginto\Services\TotpService($this->db);
+            echo json_encode(['success' => true] + $totp->createEnrollment((int) $_SESSION['user_id'], $label));
+        } catch (\Throwable $e) {
+            error_log('TOTP enrollment error: ' . $e->getMessage());
+            http_response_code(503); echo json_encode(['success' => false, 'error' => 'Unable to start two-factor setup.']);
+        }
+    }
+
+    public function twoFactorConfirm(): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->requireTwoFactorAccount(true)) return;
+        try {
+            $totp = new \Ginto\Services\TotpService($this->db);
+            if (!$totp->confirmEnrollment((int) $_SESSION['user_id'], (string) ($_POST['code'] ?? ''))) {
+                http_response_code(422); echo json_encode(['success' => false, 'error' => 'That authenticator code is invalid.']); return;
+            }
+            $this->db->update('users', ['two_factor_enabled' => 1], ['id' => (int) $_SESSION['user_id']]);
+            $_SESSION['two_factor_verified_user_id'] = (int) $_SESSION['user_id'];
+            echo json_encode(['success' => true]);
+        } catch (\Throwable $e) {
+            http_response_code(503); echo json_encode(['success' => false, 'error' => 'Unable to enable two-factor authentication.']);
+        }
+    }
+
+    public function twoFactorDisable(): void
+    {
+        header('Content-Type: application/json');
+        if (!$this->requireTwoFactorAccount(true)) return;
+        $user = $this->userModel->find((int) $_SESSION['user_id']);
+        $password = (string) ($_POST['password'] ?? '');
+        try {
+            $totp = new \Ginto\Services\TotpService($this->db);
+            if (!$user || !password_verify($password, (string) ($user['password_hash'] ?? '')) || !$totp->verifyUserCode((int) $_SESSION['user_id'], (string) ($_POST['code'] ?? ''))) {
+                http_response_code(422); echo json_encode(['success' => false, 'error' => 'Current password or authenticator code is incorrect.']); return;
+            }
+            $totp->disable((int) $_SESSION['user_id']);
+            $this->db->update('users', ['two_factor_enabled' => 0], ['id' => (int) $_SESSION['user_id']]);
+            unset($_SESSION['two_factor_verified_user_id']);
+            echo json_encode(['success' => true]);
+        } catch (\Throwable $e) {
+            http_response_code(503); echo json_encode(['success' => false, 'error' => 'Unable to disable two-factor authentication.']);
+        }
+    }
+
+    private function requireTwoFactorAccount(bool $csrf = false): bool
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        if (empty($_SESSION['user_id'])) { http_response_code(401); echo json_encode(['success' => false, 'error' => 'Not authenticated']); return false; }
+        if ($csrf && !validateCsrfToken((string) ($_POST['csrf_token'] ?? ''))) { http_response_code(403); echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']); return false; }
+        return true;
+    }
+
+    /** GET/POST /login/2fa: finishes a password-authenticated sign-in. */
+    public function twoFactorChallenge(): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $pendingId = (int) ($_SESSION['two_factor_pending_user_id'] ?? 0);
+        if (!$pendingId) { header('Location: /login'); exit; }
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            $this->view('user/two-factor-challenge', ['title' => 'Verify your sign-in', 'csrf_token' => generateCsrfToken()]); return;
+        }
+        if (!validateCsrfToken((string) ($_POST['csrf_token'] ?? ''))) {
+            $this->view('user/two-factor-challenge', ['title' => 'Verify your sign-in', 'csrf_token' => generateCsrfToken(), 'error' => 'Please refresh and try again.']); return;
+        }
+        try { $valid = (new \Ginto\Services\TotpService($this->db))->verifyUserCode($pendingId, (string) ($_POST['code'] ?? '')); } catch (\Throwable $e) { $valid = false; }
+        if (!$valid) {
+            $this->view('user/two-factor-challenge', ['title' => 'Verify your sign-in', 'csrf_token' => generateCsrfToken(), 'error' => 'Invalid authenticator code.']); return;
+        }
+        $user = $this->userModel->find($pendingId);
+        if (!$user) { unset($_SESSION['two_factor_pending_user_id']); header('Location: /login'); exit; }
+        session_regenerate_id(true);
+        unset($_SESSION['two_factor_pending_user_id']);
+        $this->setAuthenticatedSession($user);
+        $_SESSION['two_factor_verified_user_id'] = (int) $user['id'];
+        $redirect = $_SESSION['login_redirect'] ?? '/chat'; unset($_SESSION['login_redirect']);
+        header('Location: ' . $redirect); exit;
+    }
+
+    private function setAuthenticatedSession(array $user): void
+    {
+        $_SESSION['user_id'] = $user['id']; $_SESSION['username'] = $user['username']; $_SESSION['fullname'] = $user['fullname'] ?? '';
+        $_SESSION['user'] = $user['email'] ?? $user['username']; $_SESSION['user_email'] = $user['email'] ?? '';
+        $_SESSION['user_full_name'] = $user['fullname'] ?? 'User'; $_SESSION['user_username'] = $user['username'] ?? '';
+        $_SESSION['user_profile_picture'] = $user['avatar'] ?? null; $_SESSION['role_id'] = $user['role_id'] ?? 5;
+        $_SESSION['role'] = in_array((int) $_SESSION['role_id'], [1, 2], true) ? 'admin' : 'user';
+        try { $this->db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $user['id']]); } catch (\Throwable $_) {}
+    }
+
     /**
      * Settings page (GET /user/settings)
      */
@@ -1659,6 +1768,34 @@ class UserController extends \Core\Controller
 
         // Ensure session started
         if (session_status() !== PHP_SESSION_ACTIVE) {@session_start();}
+
+        // Password verification alone is deliberately not an authenticated session
+        // when the account has TOTP enabled.
+        try {
+            if (!empty($user['two_factor_enabled']) && (new \Ginto\Services\TotpService($this->db))->isEnabled((int) $user['id'])) {
+                $redirect = $_SESSION['login_redirect'] ?? null;
+                $_SESSION = [];
+                session_regenerate_id(true);
+                $_SESSION['two_factor_pending_user_id'] = (int) $user['id'];
+                if (is_string($redirect) && str_starts_with($redirect, '/') && !str_starts_with($redirect, '//')) {
+                    $_SESSION['login_redirect'] = $redirect;
+                }
+                if ($isAjax) {
+                    header('Content-Type: application/json');
+                    echo json_encode(['success' => false, 'two_factor_required' => true, 'redirect' => '/login/2fa']);
+                    return;
+                }
+                header('Location: /login/2fa');
+                exit;
+            }
+        } catch (\Throwable $e) {
+            // Failing closed prevents an enabled account from bypassing its second factor.
+            error_log('TOTP login check failed: ' . $e->getMessage());
+            $this->view('user/login', ['title' => 'Login', 'error' => 'Unable to verify two-factor authentication. Please try again.', 'old' => $postData, 'csrf_token' => generateCsrfToken()]);
+            return;
+        }
+
+        session_regenerate_id(true);
 
         // Set session data (include role_id and readable role name to avoid extra DB lookups later)
         $_SESSION['user_id'] = $user['id'];

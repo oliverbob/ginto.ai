@@ -209,6 +209,19 @@ class AuthController
             return;
         }
 
+        // Do not let the mobile password endpoint bypass an enabled second factor.
+        try {
+            if (!empty($user['two_factor_enabled']) && (new \Ginto\Services\TotpService($this->db))->isEnabled((int) $user['id'])) {
+                http_response_code(403);
+                echo json_encode(['success' => false, 'two_factor_required' => true, 'error' => 'Complete two-factor authentication on the Ginto sign-in page.']);
+                return;
+            }
+        } catch (\Throwable $e) {
+            http_response_code(503);
+            echo json_encode(['success' => false, 'error' => 'Unable to verify two-factor authentication.']);
+            return;
+        }
+
         // Reset rate-limit counter on success
         $_SESSION[$rlKey] = ['count' => 0, 'window' => $now];
 
