@@ -9,16 +9,28 @@ $peso = fn($v) => '₱' . number_format((float) $v, 0);
 <head>
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? 'Manual subscription grant') ?></title>
-    <script>(function(){const t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&true));})();</script>
+    <script>
+      (function(){const t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&true));})();
+      function gtaToggleTheme(){const d=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',d);try{localStorage.setItem('theme',d?'dark':'light');}catch(e){}}
+    </script>
     <script src="/assets/js/tailwindcss.js"></script>
     <script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#6366f1',secondary:'#8b5cf6'}}}};</script>
-    <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css"><style>.dark{color-scheme:dark}</style>
+    <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css">
+    <style>
+      :root{color-scheme:light}
+      html.dark{color-scheme:dark}
+      .dark select, .dark select option{background-color:#0b1020;color:#e5e7eb}
+      select option{background-color:#fff;color:#111827}
+    </style>
 </head>
 <body class="bg-white dark:bg-[#0b1020] text-gray-900 dark:text-gray-100 min-h-screen">
 <header class="border-b border-gray-200 dark:border-gray-800">
     <div class="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
         <a href="/academy/admin" class="flex items-center gap-2 font-bold text-sm"><i class="fas fa-arrow-left text-primary"></i> Academy Admin</a>
-        <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/15 text-primary">Admin</span>
+        <div class="flex items-center gap-3">
+            <button onclick="gtaToggleTheme()" title="Toggle light / dark" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"><i class="fas fa-circle-half-stroke"></i></button>
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full bg-primary/15 text-primary">Admin</span>
+        </div>
     </div>
 </header>
 
@@ -38,7 +50,7 @@ $peso = fn($v) => '₱' . number_format((float) $v, 0);
             </div>
             <div>
                 <label class="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Plan</label>
-                <select id="g-plan" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-transparent text-sm focus:border-primary focus:outline-none">
+                <select id="g-plan" class="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] text-sm focus:border-primary focus:outline-none">
                     <?php foreach ($plans as $p): ?>
                     <option value="<?= htmlspecialchars($p['name'] ?? '') ?>" data-price="<?= (float) ($p['price_monthly'] ?? 0) ?>" <?= ($p['name'] ?? '') === 'academy_pro' ? 'selected' : '' ?>><?= htmlspecialchars($p['display_name'] ?? $p['name'] ?? '') ?> — <?= $peso($p['price_monthly'] ?? 0) ?>/mo</option>
                     <?php endforeach; ?>
