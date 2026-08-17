@@ -368,44 +368,55 @@ ensure_php_extensions() {
     php_version=$(php -v 2>/dev/null | head -1 | awk '{print $2}')
     php_major_minor=$(echo "$php_version" | cut -d. -f1,2)
 
+    # Repair any half-configured dpkg state before touching packages
+    sudo dpkg --configure -a 2>/dev/null || true
+    sudo apt-get install -f -y 2>/dev/null || true
+
     local needs_restart=false ext_spec ext_module ext_package
     local repo_ready=false
 
     for ext_spec in "${PHP_REQUIRED_EXTS[@]}"; do
         ext_module="${ext_spec%%:*}"
         ext_package="${ext_spec##*:}"
-        if ! php -m | grep -qi "^${ext_module}$"; then
-            case "$OS" in
-                ubuntu|debian)
-                    # Make sure the PPA that actually ships php8.4-* packages
-                    # (mysql, redis, xml, curl, zip, bcmath, intl, etc.) is
-                    # present and apt's cache is fresh, or every install
-                    # below silently 404s and gets swallowed.
-                    if ! $repo_ready; then
-                        if ! apt-cache show "php${php_major_minor}-opcache" &>/dev/null; then
-                            log_info "Adding ppa:ondrej/php to resolve PHP ${php_major_minor} extensions..."
-                            sudo apt-get install -y software-properties-common
-                            sudo add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
-                            sudo apt-get update -qq
-                        fi
-                        repo_ready=true
-                    fi
 
-                    log_info "Installing missing PHP extension: ${ext_module} (php${php_major_minor}-${ext_package})..."
-                    if ! sudo apt-get install -y "php${php_major_minor}-${ext_package}"; then
-                        log_warn "apt-get install failed for php${php_major_minor}-${ext_package}"
-                    fi
-                    needs_restart=true
-                    ;;
-            esac
+        if php -m | grep -qi "^${ext_module}$"; then
+            continue
         fi
+
+        case "$OS" in
+            ubuntu|debian)
+                if ! $repo_ready; then
+                    if ! apt-cache show "php${php_major_minor}-opcache" &>/dev/null; then
+                        log_info "Adding ppa:ondrej/php to resolve PHP ${php_major_minor} extensions..."
+                        sudo apt-get install -y software-properties-common
+                        sudo add-apt-repository -y ppa:ondrej/php 2>/dev/null || true
+                        sudo apt-get update -qq
+                    fi
+                    repo_ready=true
+                fi
+
+                local pkg="php${php_major_minor}-${ext_package}"
+                if dpkg -s "$pkg" &>/dev/null; then
+                    # apt thinks it's installed but php -m disagrees — force reconfigure/reinstall
+                    log_warn "$pkg reports installed but ${ext_module} not loaded — reinstalling..."
+                    sudo apt-get install --reinstall -y "$pkg" || true
+                else
+                    log_info "Installing missing PHP extension: ${ext_module} (${pkg})..."
+                    sudo apt-get install -y "$pkg" || log_warn "apt-get install failed for $pkg"
+                fi
+
+                # Explicitly enable across every SAPI in case the dpkg trigger didn't run
+                sudo phpenmod -v "$php_major_minor" "$ext_module" 2>/dev/null || true
+                needs_restart=true
+                ;;
+        esac
     done
 
     if [[ "$needs_restart" == "true" ]]; then
         sudo systemctl restart "php${php_major_minor}-fpm" 2>/dev/null || true
     fi
 
-    # Final hard check: anything Ginto/phpMyAdmin cannot run without.
+    # Final hard check, with real diagnostics this time instead of a blind warning
     local missing="" ext_module2
     for ext_spec in "${PHP_REQUIRED_EXTS[@]}"; do
         ext_module2="${ext_spec%%:*}"
@@ -413,7 +424,11 @@ ensure_php_extensions() {
     done
     if [ -n "$missing" ]; then
         log_warn "PHP is still missing extension(s):${missing}"
-        log_warn "Composer install may fail. Install manually: sudo apt-get install php${php_major_minor}-<ext>"
+        log_warn "Diagnostics:"
+        log_warn "  php binary: $(command -v php) -> $(readlink -f "$(command -v php)" 2>/dev/null)"
+        log_warn "  loaded ini: $(php --ini 2>/dev/null | grep 'Loaded Configuration')"
+        log_warn "  conf.d dir: /etc/php/${php_major_minor}/cli/conf.d/"
+        ls "/etc/php/${php_major_minor}/cli/conf.d/" 2>/dev/null | sed 's/^/    /' || true
         return 1
     fi
     return 0
