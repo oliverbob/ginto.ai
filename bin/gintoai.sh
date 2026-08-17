@@ -444,8 +444,11 @@ install_php() {
             log_info "PHP already installed: $php_version"
             # Guarantee all required extensions exist even if PHP was installed
             # by something other than this script (this is exactly the case that
-            # left mysqli missing and broke composer).
-            ensure_php_extensions
+            # left mysqli missing and broke composer). A non-zero return here must
+            # NOT abort the installer under `set -e` — later steps (Caddy, MariaDB,
+            # Composer) still need to run so the real failure (if any) surfaces at
+            # the composer install step instead of silently killing everything.
+            ensure_php_extensions || log_warn "Some PHP extensions still missing — continuing install; composer step will confirm if this is fatal"
             return 0
         fi
     fi
@@ -474,7 +477,10 @@ install_php() {
                 log_info "Detected latest stable PHP version: $PHP_VERSION"
             fi
             
-            # Install PHP and extensions with detected version
+            # Install PHP and extensions with detected version.
+            # No `|| true` swallow here on purpose: if this apt-get genuinely fails
+            # (bad package names, network issue), we want to know immediately rather
+            # than limping forward with a half-installed PHP and blaming extensions later.
             sudo apt-get install -y \
                 "php${PHP_VERSION}" \
                 "php${PHP_VERSION}-cli" \
@@ -509,7 +515,8 @@ install_php() {
 
     # Verify (and backfill) required extensions after a fresh install too, so a
     # package that failed to install for any reason is caught before composer runs.
-    ensure_php_extensions
+    # Same non-fatal guard as above — don't let this kill the rest of the installer.
+    ensure_php_extensions || log_warn "Some PHP extensions still missing after fresh install — continuing; composer step will confirm if this is fatal"
 
     log_success "PHP installed: $(php -v | head -1)"
 }
