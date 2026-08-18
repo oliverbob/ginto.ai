@@ -649,6 +649,10 @@ install_utilities() {
     command -v cmake &>/dev/null || missing_utils+=("cmake")
     command -v g++ &>/dev/null || missing_utils+=("build-essential")
     command -v git &>/dev/null || missing_utils+=("git")
+    # docker compose plugin — checked separately from `docker` itself since native
+    # mode never installs the Docker engine; we only need the CLI + compose plugin
+    # here so `docker compose` subcommands used elsewhere (sdcpu, tunnel, etc.) work.
+    docker compose version &>/dev/null 2>&1 || missing_utils+=("docker-compose-plugin")
     # OCR/PDF tools for Vision-Centric RAG
     command -v pdftotext &>/dev/null || missing_utils+=("poppler-utils")
     command -v tesseract &>/dev/null || missing_utils+=("tesseract-ocr")
@@ -663,18 +667,58 @@ install_utilities() {
     fi
     
     if [ ${#missing_utils[@]} -eq 0 ]; then
-        log_info "All utilities already installed (curl, unzip, ffmpeg, lsof, websockify, websocat, net-tools, cmake, g++, git, OCR tools)"
+        log_info "All utilities already installed (curl, unzip, ffmpeg, lsof, websockify, websocat, net-tools, cmake, g++, git, docker compose, OCR tools)"
+        # Even if packages are already present, group membership can still be
+        # missing (e.g. docker group created after this user last logged in,
+        # or user added by other means). Check every run, not just on install.
+        ensure_docker_group_membership
         return 0
     fi
     
     log_info "Installing missing utilities: ${missing_utils[*]}"
+
+    # docker-compose-plugin (and docker-ce-cli it depends on for the `docker`
+    # command it hooks into) live in Docker's own apt/dnf repo, not the distro's
+    # default repos. Neither is ever added in native mode (that only happens
+    # inside install_docker_engine, which is Docker-mode-only). Without adding
+    # this repo first, the apt-get/dnf install below fails to resolve
+    # docker-compose-plugin — and under `set -euo pipefail` that failure kills
+    # the ENTIRE installer here, before Redis/Caddy/PHP/MariaDB ever run.
+    ensure_docker_repo() {
+        case $OS in
+            ubuntu|debian)
+                if [ ! -f /etc/apt/sources.list.d/docker.list ]; then
+                    log_info "Adding Docker's apt repository (required for docker-compose-plugin)..."
+                    sudo apt-get install -y ca-certificates curl gnupg
+                    sudo install -m 0755 -d /etc/apt/keyrings
+                    if [ ! -f /etc/apt/keyrings/docker.gpg ]; then
+                        curl -fsSL "https://download.docker.com/linux/${OS}/gpg" | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+                        sudo chmod a+r /etc/apt/keyrings/docker.gpg
+                    fi
+                    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${OS} $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+                        sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+                    sudo apt-get update -qq
+                fi
+                ;;
+            fedora)
+                if ! sudo dnf repolist 2>/dev/null | grep -qi docker-ce; then
+                    log_info "Adding Docker's dnf repository (required for docker-compose-plugin)..."
+                    sudo dnf install -y dnf-plugins-core
+                    sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+                fi
+                ;;
+        esac
+    }
+    ensure_docker_repo
     
     case $OS in
         ubuntu|debian)
             # Ensure universe repo is enabled for ffmpeg
             sudo add-apt-repository -y universe 2>/dev/null || true
             sudo apt-get update -qq
-            sudo apt-get install -y curl unzip ffmpeg lsof iputils-ping net-tools docker-compose-plugin python3-websockify \
+            sudo apt-get install -y curl unzip ffmpeg lsof iputils-ping net-tools \
+                docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+                python3-websockify \
                 python3-websocket cmake build-essential git pkg-config libcurl4-openssl-dev \
                 poppler-utils tesseract-ocr tesseract-ocr-eng tesseract-ocr-fil tesseract-ocr-chi-sim \
                 ghostscript imagemagick antiword catdoc wkhtmltopdf \
@@ -691,7 +735,9 @@ install_utilities() {
             fi
             ;;
         fedora)
-            sudo dnf install -y curl unzip ffmpeg lsof iputils net-tools docker-compose-plugin python3-websockify \
+            sudo dnf install -y curl unzip ffmpeg lsof iputils net-tools \
+                docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin \
+                python3-websockify \
                 python3-websocket cmake gcc-c++ git pkgconfig libcurl-devel \
                 poppler-utils tesseract tesseract-langpack-eng tesseract-langpack-fil \
                 ghostscript ImageMagick antiword catdoc \
@@ -742,8 +788,40 @@ install_utilities() {
             hash -r || true
         fi
     fi
+
+    # Final check: confirm docker compose actually works now, not just that
+    # the package installed (mirrors the ensure_php_extensions pattern).
+    if ! docker compose version &>/dev/null 2>&1; then
+        log_warn "docker compose still not working after install — 'docker' commands elsewhere may fail"
+        log_warn "Check: docker --version ; docker compose version"
+    fi
+
+    # Add INSTALL_USER to the docker group so they can run `docker`/`docker compose`
+    # without sudo. The docker-ce-cli package alone does not create this group or
+    # add anyone to it — that normally only happens via install_docker_engine
+    # (Docker-mode-only), so native mode needs it done explicitly here too.
+    ensure_docker_group_membership
     
     log_success "Utilities installed"
+}
+
+# Ensure INSTALL_USER is a member of the docker group, creating the group first
+# if the docker-ce-cli package didn't already create it (some minimal installs
+# skip group creation since no daemon is present to need it).
+ensure_docker_group_membership() {
+    if ! getent group docker &>/dev/null; then
+        log_info "Creating docker group..."
+        sudo groupadd docker
+    fi
+
+    if groups "$INSTALL_USER" 2>/dev/null | grep -qw docker; then
+        log_info "$INSTALL_USER already in docker group"
+        return 0
+    fi
+
+    sudo usermod -aG docker "$INSTALL_USER"
+    log_success "Added $INSTALL_USER to docker group"
+    log_warn "Group membership takes effect on next login/shell — run 'newgrp docker' or log out and back in to use docker without sudo in this session"
 }
 
 # Install Redis for agent communication and caching
