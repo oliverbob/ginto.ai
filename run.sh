@@ -50,6 +50,8 @@ show_help() {
     echo "  sudo ./run.sh install --skip sdcpu     # Install but skip SDCPU image gen"
     echo "  sudo ./run.sh install --skip sdcpu,powerdns"
     echo "  ./run.sh start                         # Start the application"
+    echo "  reset      Clear install checkpoint/config (use before a fresh reinstall)"
+    echo "             --wipe-db   Also DROP the MariaDB database/user (destructive, asks to confirm)"
 }
 
 cmd_install() {
@@ -113,7 +115,7 @@ cmd_novnc_local() {
 
 cmd_reset() {
     log_info "Clearing installation checkpoint via bin/gintoai.sh..."
-    bash "$SCRIPT_DIR/bin/gintoai.sh" reset
+    bash "$SCRIPT_DIR/bin/gintoai.sh" reset "$@"
 }
 
 cmd_local_tunnel() {
@@ -187,7 +189,8 @@ case "${1:-help}" in
         cmd_novnc_local
         ;;
     reset)
-        cmd_reset
+        shift
+        cmd_reset "$@"
         ;;
     local-tunnel)
         cmd_local_tunnel

@@ -4140,7 +4140,61 @@ case "${1:-help}" in
         INSTALL_MODE="native"
         do_install
         ;;
-    reset)
+        reset)
+        shift || true
+        wipe_db=false
+        for arg in "$@"; do
+            case "$arg" in
+                --wipe-db) wipe_db=true ;;
+            esac
+        done
+
+        if $wipe_db; then
+            # Read DB_NAME/DB_USER from the CURRENT .env before anything is
+            # touched, so we drop what's actually installed, not a guess.
+            RESET_DB_NAME="" RESET_DB_USER=""
+            if [ -f "$PROJECT_DIR/.env" ]; then
+                RESET_DB_NAME=$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+                RESET_DB_USER=$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+            fi
+            RESET_DB_NAME="${RESET_DB_NAME:-ginto}"
+            RESET_DB_USER="${RESET_DB_USER:-ginto}"
+
+            echo ""
+            log_warn "This will PERMANENTLY DELETE the MariaDB database '$RESET_DB_NAME' and user '$RESET_DB_USER'@'localhost'."
+            log_warn "All data stored in it (users, chats, files, everything) will be lost. This cannot be undone."
+
+            if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
+                log_prompt "Type the database name '$RESET_DB_NAME' to confirm deletion:"
+                read -r -p "> " confirm_name < /dev/tty
+                if [[ "$confirm_name" != "$RESET_DB_NAME" ]]; then
+                    log_error "Confirmation did not match — skipping database wipe. Checkpoint reset will still proceed."
+                    wipe_db=false
+                fi
+            else
+                # Non-interactive: require an explicit env var match instead of
+                # a typed confirmation, so this can never fire by accident in
+                # scripted/automated runs.
+                if [[ "${GINTO_CONFIRM_WIPE_DB:-}" == "$RESET_DB_NAME" ]]; then
+                    log_info "GINTO_CONFIRM_WIPE_DB matched '$RESET_DB_NAME' — proceeding non-interactively."
+                else
+                    log_error "No tty to confirm, and GINTO_CONFIRM_WIPE_DB not set to '$RESET_DB_NAME'."
+                    log_error "Re-run with: GINTO_CONFIRM_WIPE_DB=$RESET_DB_NAME $0 reset --wipe-db"
+                    wipe_db=false
+                fi
+            fi
+
+            if $wipe_db; then
+                if command -v mysql &>/dev/null; then
+                    sudo mysql -e "DROP DATABASE IF EXISTS \`${RESET_DB_NAME}\`; DROP USER IF EXISTS '${RESET_DB_USER}'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null \
+                        && log_success "Database '$RESET_DB_NAME' and user '$RESET_DB_USER' dropped" \
+                        || log_warn "Could not drop database/user (may not exist yet, or MariaDB not running)"
+                else
+                    log_warn "mysql client not found — skipping database wipe"
+                fi
+            fi
+        fi
+
         # Clear checkpoints to start fresh
         clear_checkpoint
         log_success "Installation checkpoint cleared. Run 'install' to start fresh."
