@@ -3361,9 +3361,17 @@ prompt_configuration() {
             log_info "Using GINTO_UPDATE_MODE=$reinstall_choice"
         fi
 
-                if [[ "$reinstall_choice" == "2" ]]; then
+        if [[ "$reinstall_choice" == "2" ]]; then
             log_warn "Fresh install selected - clearing all checkpoints..."
             clear_checkpoint
+
+            # Capture the OLD db name/user before we wipe .env, so we can drop
+            # them from MariaDB below.
+            local OLD_DB_NAME="" OLD_DB_USER=""
+            if [ -f "$PROJECT_DIR/.env" ]; then
+                OLD_DB_NAME=$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+                OLD_DB_USER=$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+            fi
 
             # Actually wipe .env so setup_env() creates a clean one from
             # .env.example instead of patching a handful of keys inside the
@@ -3375,6 +3383,19 @@ prompt_configuration() {
                 log_info "Backed up old .env to $(basename "$backup_env") and removed it"
             fi
             rm -f "$PROJECT_DIR/.legacy-install"
+
+            # Drop the old MariaDB database/user. CREATE USER IF NOT EXISTS
+            # later on will silently no-op if this user already exists —
+            # including skipping the password — which previously left .env
+            # and MariaDB's actual credentials out of sync after every fresh
+            # install. Dropping first guarantees the next CREATE USER actually
+            # creates the user with the new password.
+            if [ -n "$OLD_DB_NAME" ] && command -v mysql &>/dev/null; then
+                log_warn "Dropping old MariaDB database '$OLD_DB_NAME' and user '${OLD_DB_USER:-ginto}'@'localhost'..."
+                sudo mysql -e "DROP DATABASE IF EXISTS \`${OLD_DB_NAME}\`; DROP USER IF EXISTS '${OLD_DB_USER:-ginto}'@'localhost'; FLUSH PRIVILEGES;" 2>/dev/null \
+                    && log_success "Old database and user dropped" \
+                    || log_warn "Could not drop old database/user (may not exist yet, or MariaDB not running) — continuing"
+            fi
 
             SKIP_CONFIGURED=false
             # Falls through to the full configuration flow below. clear_checkpoint
