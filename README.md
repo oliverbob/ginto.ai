@@ -288,6 +288,9 @@ domain/email prompt.
 # 1. Clear any leftover checkpoint/config from a previous run
 sudo bash ./run.sh reset
 
+# Destructive (if you're sure you want to wipe out everything) — clears checkpoints AND drops the database, with a typed confirmation
+sudo ./run.sh reset --wipe-db
+
 # 2. Re-run the installer (skip SDCPU image generation if you don't need it)
 sudo ./run.sh install --skip sdcpu
 ```
