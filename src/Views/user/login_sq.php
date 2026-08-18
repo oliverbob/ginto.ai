@@ -32,7 +32,7 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        padding: 1.5rem;
+        padding: 0.5rem 1.5rem 1.5rem;
         background: linear-gradient(135deg, #f5f3ff 0%, #e0e7ff 100%);
         transition: background 0.3s;
     }
@@ -273,7 +273,7 @@
         opacity: 0.6;
         transition: opacity 0.2s;
         text-decoration: none;
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.5rem;
     }
     .sq-powered:hover { opacity: 1; }
     .sq-powered span {
