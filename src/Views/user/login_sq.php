@@ -104,8 +104,21 @@
     .sq-logo-area.ginto img {
         box-shadow: 0 0 14px rgba(191,161,74,0.4);
     }
-    .sq-logo-area.sqs img {
-        box-shadow: 0 0 14px rgba(99,102,241,0.4);
+    .sq-logo-crown {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        background: rgba(99,102,241,0.1);
+        box-shadow: 0 0 14px rgba(99,102,241,0.35);
+        transition: box-shadow 0.3s;
+    }
+    .sq-logo-crown i {
+        font-size: 1.5rem;
+        color: #6366f1;
     }
     .sq-logo-area h2 {
         font-size: 1.2rem;
@@ -299,7 +312,7 @@
         <!-- SQ Platform Panel -->
         <div class="sq-panel" id="panel-sqs">
             <div class="sq-logo-area sqs">
-                <img src="/assets/images/ginto.png" alt="SilverQueen">
+                <div class="sq-logo-crown"><i class="fas fa-crown"></i></div>
                 <h2>SQ Platform</h2>
                 <p>sq.silverqueen.pro</p>
             </div>
