@@ -1,7 +1,29 @@
-<?php
-/** @var string $title */
-?>
-<?php require_once __DIR__ . '/../layout/login_header.php'; ?>
+<?php /** @var string $title */ ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars($title ?? 'Ginto') ?></title>
+    <link rel="stylesheet" href="/assets/css/tailwind.css">
+    <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css">
+    <link rel="icon" type="image/png" href="/assets/images/ginto.png">
+    <script src="/assets/js/theme.js"></script>
+    <style>
+        :root {
+            --bg-primary: #ffffff; --bg-secondary: #f3f4f6; --text-primary: #111827;
+            --text-secondary: #4b5563; --border-color: #e5e7eb; --accent-color: #3b82f6;
+            --sidebar-bg: #ffffff; --card-bg: #ffffff; --hover-bg: #f3f4f6;
+        }
+        :root[class~="dark"] {
+            --bg-primary: #111827; --bg-secondary: #1f2937; --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af; --border-color: #374151; --accent-color: #60a5fa;
+            --sidebar-bg: #1f2937; --card-bg: #1f2937; --hover-bg: #374151;
+        }
+        body { background-color: var(--bg-secondary); color: var(--text-primary); }
+    </style>
+</head>
+<body class="antialiased">
 
 <style>
     .sq-page {
@@ -383,4 +405,4 @@ function togglePw(id, btn) {
 }
 </script>
 
-<?php require_once __DIR__ . '/../layout/footer.php'; ?>
+</body></html>
