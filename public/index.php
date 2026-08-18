@@ -39,7 +39,8 @@ $path = parse_url($requestUri, PHP_URL_PATH);
 
 // CORS: Allow *.silverqueen.pro, silverqueen.pro, *.ginto.ai, ginto.ai, and local dev origins to call
 // API endpoints cross-origin.  This enables the SQ login form on ginto.ai to fetch() to
-// sq.silverqueen.pro, and vice versa.
+// sq.silverqueen.pro, and vice versa.  Wildcard patterns (*.domain.com) match any single
+// subdomain — deeper nesting (a.b.domain.com) is intentionally excluded.
 $_gntl_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (
     $_gntl_origin
@@ -48,17 +49,17 @@ if (
         || $_gntl_origin === 'https://silverqueen.pro'
         || preg_match('#^https://[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.ginto\.ai$#', $_gntl_origin)
         || $_gntl_origin === 'https://ginto.ai'
-        || preg_match('#^https?://localhost(?::\d{1,5})?$#', $_gntl_origin)
-        || preg_match('#^https?://127\.0\.0\.1(?::\d{1,5})?$#', $_gntl_origin)
+        || preg_match('#^https?://localhost(?::\d{1,5})?$', $_gntl_origin)
+        || preg_match('#^https?://127\.0\.0\.1(?::\d{1,5})?$', $_gntl_origin)
     )
 ) {
     header('Access-Control-Allow-Origin: ' . $_gntl_origin);
     header('Access-Control-Allow-Credentials: true');
+    header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, Accept, X-Requested-With, Authorization');
+    header('Access-Control-Max-Age: 86400');
     header('Vary: Origin');
     if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, X-CSRF-Token, Accept');
-        header('Access-Control-Max-Age: 86400');
         http_response_code(204);
         exit;
     }
