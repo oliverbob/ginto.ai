@@ -2669,6 +2669,7 @@ print_summary() {
         if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
             echo "  - phpMyAdmin: https://$site_domain/pma"
         fi
+        echo "  - Live setup: https://$site_domain/live"
     elif [ -n "$app_url" ] && [[ "$app_url" == https://* ]]; then
         # Extract domain from APP_URL
         local url_domain=$(echo "$app_url" | sed 's|https://||' | sed 's|/.*||')
@@ -2679,6 +2680,7 @@ print_summary() {
         if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
             echo "  - phpMyAdmin: https://$url_domain/pma"
         fi
+        echo "  - Live setup: https://$url_domain/live"
     else
         # Local development mode
         echo "  - Local: http://localhost"
@@ -2689,6 +2691,7 @@ print_summary() {
         if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
             echo "  - phpMyAdmin: http://localhost/pma"
         fi
+        echo "  - Local setup: http://localhost:8000/live"
     fi
     echo ""
     echo "Useful commands:"
