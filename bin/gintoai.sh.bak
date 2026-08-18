@@ -3349,7 +3349,7 @@ prompt_configuration() {
             log_info "Checking file permissions..."
             fix_permissions
             log_success "Permissions verified"
-            log_info "Skipping most configuration prompts - will only update, reconfirm Caddy, and run migrations"
+            log_info "Skipping configuration prompts - will only update and run migrations"
 
             if [ -f "$PROJECT_DIR/.env" ]; then
                 DB_NAME=$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "ginto")
@@ -3480,54 +3480,16 @@ prompt_configuration() {
                 fi
             fi
 
-            # --- Caddy domain/email: always offer to (re)configure, even in
-            # update mode, instead of hardcoding it to "skip". Pre-filled with
-            # whatever is currently in .env so hitting Enter just keeps it.
-            echo ""
-            log_step "Caddy Domain Configuration"
-            local existing_domain="" existing_email="" existing_mode="1"
-            if [ -f "$PROJECT_DIR/.env" ]; then
-                existing_domain=$(grep -E '^CADDY_DOMAIN=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
-                existing_email=$(grep -E '^TLS_EMAIL=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
-                [ -z "$existing_email" ] && existing_email=$(grep -E '^MAIL_FROM=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
-            fi
-            [ -n "$existing_domain" ] && [ "$existing_domain" != "localhost" ] && existing_mode="2"
-
-            local server_choice
-            server_choice=$(prompt_or_env "Choose server mode (1-2) [default: ${existing_mode}] (current: ${existing_domain:-localhost}):
-  1) Local     - localhost on port 80 (development)
-  2) Live      - Configure domain with HTTPS (production)" "${GINTO_SERVER_MODE:-}" "$existing_mode")
-
-            if [[ "$server_choice" == "2" ]]; then
-                CADDY_LIVE_MODE="yes"
-                CADDY_DOMAIN=$(prompt_or_env "Enter your domain name (current: ${existing_domain:-none}):" "${GINTO_DOMAIN:-}" "${existing_domain}")
-                if [ -z "$CADDY_DOMAIN" ]; then
-                    log_warn "No domain entered, keeping Caddy on localhost"
-                    CADDY_LIVE_MODE="no"
-                    CADDY_DOMAIN="localhost"
-                    CADDY_TLS_EMAIL=""
-                else
-                    CADDY_TLS_EMAIL=$(prompt_or_env "Enter your email for TLS certificate (current: ${existing_email:-admin@$CADDY_DOMAIN}):" "${GINTO_TLS_EMAIL:-}" "${existing_email:-admin@$CADDY_DOMAIN}")
-                fi
-            else
-                CADDY_LIVE_MODE="no"
-                CADDY_DOMAIN="localhost"
-                CADDY_TLS_EMAIL=""
-            fi
-
-            # SKIP_CONFIGURED still short-circuits everything else in update
-            # mode (DB setup, systemd service, etc). FORCE_CADDY_RECONFIGURE
-            # is a separate flag so configure_caddy()/setup_env() know to
-            # actually apply the domain/email we just confirmed above instead
-            # of skipping like they normally would when SKIP_CONFIGURED=true.
+            CADDY_LIVE_MODE="skip"
+            CADDY_DOMAIN=""
+            CADDY_TLS_EMAIL=""
             SKIP_CONFIGURED=true
             SKIP_DB_USER_SETUP=true
-            FORCE_CADDY_RECONFIGURE=true
 
             save_checkpoint "install_dependencies"
             # Explicit return — this is the ONLY branch that should skip the
-            # DB prompts below. The fresh-install branch above falls through
-            # intentionally; it must NOT hit this return.
+            # domain/TLS/DB prompts below. The fresh-install branch above falls
+            # through intentionally; it must NOT hit this return.
             return 0
         fi
     fi
