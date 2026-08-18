@@ -2644,7 +2644,7 @@ print_summary() {
     echo "  - ginto.service: $(sudo systemctl is-active ginto.service 2>/dev/null || echo 'unknown')"
     echo "  - caddy.service: $(sudo systemctl is-active caddy.service 2>/dev/null || echo 'unknown')"
     echo ""
-    
+
     # Read domain from .env if available
     local env_domain=""
     local env_app_url=""
@@ -2652,47 +2652,52 @@ print_summary() {
         env_domain=$(grep -E '^CADDY_DOMAIN=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
         env_app_url=$(grep -E '^APP_URL=' "$PROJECT_DIR/.env" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
     fi
-    
+
     # Use configured domain or fall back to localhost
     local site_domain="${CADDY_DOMAIN:-$env_domain}"
     local app_url="${env_app_url:-}"
-    
+
+    # Resolve the live domain regardless of which variable it came from —
+    # used below to decide whether a live section prints at all.
+    local live_domain=""
+    if [ -n "$site_domain" ] && [ "$site_domain" != "localhost" ]; then
+        live_domain="$site_domain"
+    elif [ -n "$app_url" ] && [[ "$app_url" == https://* ]]; then
+        live_domain=$(echo "$app_url" | sed 's|https://||' | sed 's|/.*||')
+    fi
+
     local server_ip=$(get_server_ip)
     echo "Access your site:"
-    
-    # If domain is configured (live mode), show HTTPS URL
-    if [ -n "$site_domain" ] && [ "$site_domain" != "localhost" ]; then
-        echo "  - Website: https://$site_domain"
-        if [ "$server_ip" != "unknown" ]; then
-            echo "  - Server IP: $server_ip"
-        fi
-        if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
-            echo "  - phpMyAdmin: https://$site_domain/pma"
-        fi
-        echo "  - Live setup: https://$site_domain/live"
-    elif [ -n "$app_url" ] && [[ "$app_url" == https://* ]]; then
-        # Extract domain from APP_URL
-        local url_domain=$(echo "$app_url" | sed 's|https://||' | sed 's|/.*||')
-        echo "  - Website: $app_url"
-        if [ "$server_ip" != "unknown" ]; then
-            echo "  - Server IP: $server_ip"
-        fi
-        if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
-            echo "  - phpMyAdmin: https://$url_domain/pma"
-        fi
-        echo "  - Live setup: https://$url_domain/live"
-    else
-        # Local development mode
-        echo "  - Local: http://localhost"
-        if [ "$server_ip" != "unknown" ]; then
-            echo "  - Network: http://$server_ip"
-        fi
-        echo "  - Direct: http://localhost:8000"
-        if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
-            echo "  - phpMyAdmin: http://localhost/pma"
-        fi
-        echo "  - Local setup: http://localhost:8000/live"
+
+    # Local access is ALWAYS shown — even when a live domain is configured,
+    # this machine may also be the live server itself, and the admin needs
+    # a guaranteed way to reach /live regardless of DNS/TLS working.
+    echo "  Local:"
+    echo "    - Website: http://localhost"
+    if [ "$server_ip" != "unknown" ]; then
+        echo "    - Network: http://$server_ip"
     fi
+    echo "    - Direct: http://localhost:8000"
+    if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
+        echo "    - phpMyAdmin: http://localhost/pma"
+    fi
+    echo "    - Local setup: http://localhost:8000/live"
+
+    # Live access is shown in ADDITION to local whenever a domain is
+    # configured, since local and live can both be valid entry points to
+    # the same running instance.
+    if [ -n "$live_domain" ]; then
+        echo "  Live:"
+        echo "    - Website: https://$live_domain"
+        if [ "$server_ip" != "unknown" ]; then
+            echo "    - Server IP: $server_ip"
+        fi
+        if [ -d "$PROJECT_DIR/vendor/phpmyadmin/phpmyadmin/vendor" ]; then
+            echo "    - phpMyAdmin: https://$live_domain/pma"
+        fi
+        echo "    - Live setup: https://$live_domain/live"
+    fi
+
     echo ""
     echo "Useful commands:"
     echo "  - Start:   sudo systemctl start ginto"
