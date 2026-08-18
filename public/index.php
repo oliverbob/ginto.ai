@@ -6,7 +6,7 @@
 
 define('ROOT_PATH', dirname(__DIR__));
 // Define STORAGE_PATH for use across the app. Defaults to the parent directory's
-// storage folder (e.g. ~/ginto.ai/../storage) which matches how some services
+// storage folder (e.g. ~/silverqueen.pro/../storage) which matches how some services
 // place persistent data outside the repository. Can be overridden in a server
 // bootstrap before including `public/index.php`.
 if (!defined('STORAGE_PATH')) {
@@ -37,7 +37,7 @@ $envFileExists = file_exists(ROOT_PATH . '/.env');
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($requestUri, PHP_URL_PATH);
 
-// CORS: Allow *.ginto.ai subdomains and local dev origins to call API endpoints directly.
+// CORS: Allow *.silverqueen.pro subdomains and local dev origins to call API endpoints directly.
 // This enables the gntl codex frontend to call /api and /api/code-token cross-origin without
 // routing inference streams back through the frp tunnel.
 $_gntl_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -173,7 +173,7 @@ $longLifetime = 315360000; // 10 years in seconds
 
 // Use storage path outside repo (same as non-docker LXC setup)
 // In docker: /var/www/storage/sessions (bind-mounted from host)
-// Non-docker: ~/ginto.ai/../storage/sessions
+// Non-docker: ~/silverqueen.pro/../storage/sessions
 ini_set('session.save_path', STORAGE_PATH . '/sessions');
 ini_set('session.gc_maxlifetime', (string)$longLifetime);
 ini_set('session.cookie_lifetime', (string)$longLifetime);
@@ -1718,14 +1718,14 @@ $router->req('/mail', function() {
             $to = 'aihqcorp@gmail.com';
             $subject = trim((string)($_POST['subject'] ?? 'Ginto Mail Test')) ?: 'Ginto Mail Test';
             $body = trim((string)($_POST['body'] ?? 'This is a test email from Ginto.'));
-            $from = 'no-reply@ginto.ai';
+            $from = 'no-reply@silverqueen.pro';
 
             // Ensure from is no-reply regardless of config
             $_ENV['MAIL_FROM'] = $from;
             putenv('MAIL_FROM=' . $from);
 
             // Try direct PHP mail() to avoid live-domain guard in MailHelper for tests.
-            $from = 'no-reply@ginto.ai';
+            $from = 'no-reply@silverqueen.pro';
             $headers = implode("\r\n", [
                 'MIME-Version: 1.0',
                 'Content-Type: text/html; charset=UTF-8',

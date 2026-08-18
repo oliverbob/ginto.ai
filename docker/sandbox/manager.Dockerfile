@@ -4,7 +4,7 @@
 
 FROM php:8.3-cli-alpine
 
-LABEL maintainer="Ginto AI <support@ginto.ai>"
+LABEL maintainer="Ginto AI <support@silverqueen.pro>"
 LABEL description="Sandbox Manager for Ginto AI user sandboxes"
 
 # Install minimal dependencies

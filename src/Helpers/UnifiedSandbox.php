@@ -816,7 +816,7 @@ class UnifiedSandbox
     {
         // Prefer storing jobs in a sibling `storage/` directory located
         // next to the project directory (../storage). This keeps runtime
-        // files outside the repository folder (e.g. ~/ginto.ai -> ~/storage).
+        // files outside the repository folder (e.g. ~/silverqueen.pro -> ~/storage).
         $projectRoot = defined('ROOT_PATH') ? ROOT_PATH : dirname(dirname(__DIR__));
         $storageRoot = dirname($projectRoot) . '/storage';
         $dir = $storageRoot . '/var/sandbox_jobs';

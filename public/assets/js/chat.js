@@ -6506,7 +6506,7 @@ try { __startSandboxJobPollerLegacy(); } catch (e) { console.warn('legacy sandbo
     // Handle special action: ginto_install - open web terminal with the install command
     if (j?.action === 'ginto_install' || j?.result?.action === 'ginto_install') {
       // Use command from server, or build from GINTO_PATH global
-      const gintoPath = window.GINTO_PATH || '/home/test/ginto.ai';
+      const gintoPath = window.GINTO_PATH || '/home/test/silverqueen.pro';
       const cmd = j?.result?.command || ('sudo bash ' + gintoPath + '/bin/ginto.sh install');
       
       // Try to open the web console terminal with the command (admin only)

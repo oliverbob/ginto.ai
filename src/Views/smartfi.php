@@ -23,7 +23,7 @@ $referralLink = $referralLink ?? '';
 if (!$referralLink && $userId) {
     $publicId = $_SESSION['user_public_id'] ?? $userId;
     $scheme = (!empty($_SERVER['HTTPS']) || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')) ? 'https' : 'http';
-    $referralLink = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/register?ref=' . rawurlencode((string)$publicId);
+    $referralLink = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/register?ref=' . rawurlencode((string)$publicId);
 }
 ?>
 <!DOCTYPE html>
@@ -96,7 +96,7 @@ if (!$referralLink && $userId) {
                     <div class="p-4 bg-blue-800 rounded-lg">
                         <h4 class="text-sm font-semibold mb-2">Need Help?</h4>
                         <p class="text-xs text-blue-200 mb-3">Questions about your SmartFi setup? Our team is here.</p>
-                        <a href="mailto:support@ginto.ai" class="block w-full bg-white text-blue-800 py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors duration-200 text-center">
+                        <a href="mailto:support@silverqueen.pro" class="block w-full bg-white text-blue-800 py-2 px-4 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors duration-200 text-center">
                             Contact Support
                         </a>
                     </div>

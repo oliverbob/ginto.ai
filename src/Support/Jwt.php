@@ -5,8 +5,8 @@ namespace Ginto\Support;
  * Minimal HS256 JSON Web Token encoder/verifier.
  *
  * This exists so services that cannot hold a session cookie — SilverQueen on
- * sq.ginto.ai, reaching this host over HTTPS through the tunnel — can say which
- * ginto.ai user a request is for, in a way the receiving side can trust.
+ * sq.silverqueen.pro, reaching this host over HTTPS through the tunnel — can say which
+ * silverqueen.pro user a request is for, in a way the receiving side can trust.
  *
  * What the token does and does not do is worth being explicit about, because it
  * is easy to assume otherwise: the payload is base64url, NOT ciphertext. Anyone

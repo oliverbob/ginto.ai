@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS dns_records (
 -- SOA (Start of Authority) defaults for zones
 CREATE TABLE IF NOT EXISTS dns_soa_defaults (
     id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    primary_ns VARCHAR(255) DEFAULT 'ns1.ginto.ai',
-    admin_email VARCHAR(255) DEFAULT 'admin.ginto.ai',
+    primary_ns VARCHAR(255) DEFAULT 'ns1.silverqueen.pro',
+    admin_email VARCHAR(255) DEFAULT 'admin.silverqueen.pro',
     refresh INT UNSIGNED DEFAULT 10800,
     retry INT UNSIGNED DEFAULT 3600,
     expire INT UNSIGNED DEFAULT 604800,
@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS dns_soa_defaults (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Insert default SOA settings
-INSERT INTO dns_soa_defaults (primary_ns, admin_email) VALUES ('ns1.ginto.ai', 'admin.ginto.ai');
+INSERT INTO dns_soa_defaults (primary_ns, admin_email) VALUES ('ns1.silverqueen.pro', 'admin.silverqueen.pro');
 
 -- DNS-over-HTTPS configuration
 CREATE TABLE IF NOT EXISTS dns_doh_config (

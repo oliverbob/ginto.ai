@@ -6,7 +6,7 @@ use Ginto\Core\View;
 /**
  * Live Controller
  * 
- * Admin settings panel for configuring Ginto.ai after installation.
+ * Admin settings panel for configuring Silverqueen.pro after installation.
  * This is the "v2 install" - accessible to admins at /live for:
  * - Viewing/editing environment configuration
  * - Managing API keys and providers
@@ -974,7 +974,7 @@ class LiveController
 
             $inferredModel = null;
             if (is_array($models)) {
-                if ($baseUrl === 'https://vision.ginto.ai') {
+                if ($baseUrl === 'https://vision.silverqueen.pro') {
                     $inferredModel = $models['default_model_cuda'] ?? $models['default_model'] ?? null;
                 } else {
                     $inferredModel = $models['default_model_cpu'] ?? $models['default_model'] ?? null;
@@ -982,7 +982,7 @@ class LiveController
             }
 
             if (!is_string($inferredModel) || trim($inferredModel) === '') {
-                $inferredModel = $baseUrl === 'https://vision.ginto.ai'
+                $inferredModel = $baseUrl === 'https://vision.silverqueen.pro'
                     ? 'stabilityai/sd-turbo'
                     : 'rupeshs/sd-turbo-openvino';
             }
@@ -1175,12 +1175,12 @@ class LiveController
         $sdcpuTunnel = $sdcpuActive && strtolower(trim((string)($envValues['SDCPU_TUNNEL'] ?? 'false'))) === 'true';
 
         if ($computeMode === 'gpu') {
-            return 'https://vision.ginto.ai';
+            return 'https://vision.silverqueen.pro';
         }
         if ($computeMode === 'cpu') {
             return 'http://127.0.0.1:8888';
         }
-        return $sdcpuTunnel ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+        return $sdcpuTunnel ? 'https://vision.silverqueen.pro' : 'http://127.0.0.1:8888';
     }
 
     private function fetchJson(string $url, int $timeoutSeconds = 5): ?array

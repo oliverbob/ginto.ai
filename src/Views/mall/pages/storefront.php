@@ -101,7 +101,7 @@ $storeName = htmlspecialchars($storefront['display_name'] ?? 'Storefront', ENT_Q
         </div>
 
         <div class="sf-hero-meta">
-            <span class="sf-meta-pill">🔗 ginto.ai/mall/<?= $storeSlug ?></span>
+            <span class="sf-meta-pill">🔗 silverqueen.pro/mall/<?= $storeSlug ?></span>
             <span class="sf-meta-pill">👤 <?= htmlspecialchars($seller['fullname'] ?? ($seller['username'] ?? 'Seller'), ENT_QUOTES, 'UTF-8') ?></span>
             <span class="sf-meta-pill">📦 <?= count($storeProducts) ?> listing<?= count($storeProducts) !== 1 ? 's' : '' ?></span>
         </div>

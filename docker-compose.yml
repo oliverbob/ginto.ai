@@ -5,7 +5,7 @@
 #
 # Architecture:
 #   Host/LXC/LXD:
-#     - PHP 8.3 + FPM (serves the Ginto.ai application)
+#     - PHP 8.3 + FPM (serves the Silverqueen.pro application)
 #     - MariaDB (database)
 #     - Caddy (web server with auto-SSL)
 #     - Redis (caching)

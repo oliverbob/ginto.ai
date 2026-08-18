@@ -73,7 +73,7 @@ class AcademyController
     }
 
     /**
-     * The member's shareable referral link — the short root form https://ginto.ai/?ref=<public_id>.
+     * The member's shareable referral link — the short root form https://silverqueen.pro/?ref=<public_id>.
      * Landing anywhere with this ?ref (root, /register, or /academy) stores the same
      * $_SESSION['referral_code'], so an Academy sign-up is attributed to this member either way —
      * without forcing the invitee onto /register first.
@@ -92,7 +92,7 @@ class AcademyController
     private function baseUrl(): string
     {
         $scheme = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
+        return $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro');
     }
 
     /**
@@ -1462,7 +1462,7 @@ class AcademyController
 
             $vat    = $this->vatBreakdown((float) $plan['price_monthly']);
             $amount = (int) round($vat['total'] * 100); // centavos, VAT-inclusive
-            $base   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
+            $base   = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro');
 
             $pm  = new \Ginto\Handlers\PayMongoHandler();
             $res = $pm->createCheckoutSession(
@@ -1579,7 +1579,7 @@ class AcademyController
         $plName = htmlspecialchars($plan['display_name'] ?? ($plan['name'] ?? 'Membership'));
         $amt   = htmlspecialchars($currency . ' ' . number_format($amount, 2));
         $exp   = htmlspecialchars(date('M j, Y', strtotime($expires)));
-        $base  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai');
+        $base  = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro');
 
         $html = '<div style="font-family:Segoe UI,Arial,sans-serif;max-width:520px;margin:auto;color:#1f2937;">'
               . '<div style="background:linear-gradient(135deg,#4f46e5,#8b5cf6);border-radius:14px 14px 0 0;padding:22px 24px;color:#fff;">'
@@ -1684,7 +1684,7 @@ class AcademyController
 
     /**
      * POST /academy/card/init — start an ON-SITE credit/debit card payment (card entered on
-     * ginto.ai). Creates the intent, attaches the card, and returns any 3DS/OTP next-action URL
+     * silverqueen.pro). Creates the intent, attaches the card, and returns any 3DS/OTP next-action URL
      * to complete inline. Finalization reuses /academy/qrph/finalize (it verifies PI status).
      */
     public function cardInit(): void
@@ -1760,7 +1760,7 @@ class AcademyController
             }
             if ($res === null) {   // no vault (or vaulting unsupported) — charge one-off
                 $scheme    = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                $returnUrl = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/academy/card/return';
+                $returnUrl = $scheme . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/academy/card/return';
                 $res = $handler->initCardPayment((float) $amount, (string) $payEmail, (string) $payName, '', $desc, $card, [], $returnUrl);
                 $autoRenew = false;
             }

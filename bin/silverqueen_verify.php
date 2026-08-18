@@ -7,7 +7,7 @@
  * catches the rest — a transfer submitted before it had enough confirmations, or
  * one checked while the RPC endpoints were unreachable. Run it every minute:
  *
- *   * * * * * cd /home/oliverbob/ginto.ai && /usr/bin/php bin/silverqueen_verify.php >> /tmp/silverqueen_verify.log 2>&1
+ *   * * * * * cd /home/oliverbob/silverqueen.pro && /usr/bin/php bin/silverqueen_verify.php >> /tmp/silverqueen_verify.log 2>&1
  *
  * Confirming here grants the allocation and pays the referral overrides, exactly as
  * an admin confirmation would — the difference is that the evidence came from the

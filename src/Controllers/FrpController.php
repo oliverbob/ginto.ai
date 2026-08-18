@@ -14,7 +14,7 @@ class FrpController
 {
     protected ?\Medoo\Medoo $db;
     protected string $frpDir;
-    protected string $baseDomain = 'ginto.ai';
+    protected string $baseDomain = 'silverqueen.pro';
     private bool $identifierSchemaEnsured = false;
     
     public function __construct(?\Medoo\Medoo $db = null)
@@ -466,7 +466,7 @@ auth.token = "{$token}"
 
 transport.tls.enable = true
 
-# Example: Expose local port 8088 as yourname.ginto.ai
+# Example: Expose local port 8088 as yourname.silverqueen.pro
 [[proxies]]
 name = "my-app"
 type = "http"

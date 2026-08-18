@@ -6,7 +6,7 @@
 
 FROM debian:12-slim
 
-LABEL maintainer="Ginto AI <support@ginto.ai>"
+LABEL maintainer="Ginto AI <support@silverqueen.pro>"
 LABEL description="Ginto AI Sandbox - Isolated code execution environment (Debian slim)"
 
 ENV DEBIAN_FRONTEND=noninteractive

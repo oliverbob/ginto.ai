@@ -7,7 +7,7 @@ $page = $page ?? 1;
 $totalPages = $totalPages ?? 1;
 $totalCount = $totalCount ?? 0;
 $csrf_token = $csrf_token ?? '';
-$baseUrl = rtrim(getenv('BASE_URL') ?: (defined('BASE_URL') ? BASE_URL : 'https://ginto.ai'), '/');
+$baseUrl = rtrim(getenv('BASE_URL') ?: (defined('BASE_URL') ? BASE_URL : 'https://silverqueen.pro'), '/');
 ?>
 <!DOCTYPE html>
 <html lang="en"<?php echo $htmlDark; ?>>

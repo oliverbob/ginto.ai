@@ -1,16 +1,16 @@
 #!/bin/bash
 #
-# Ginto FRP Client - Easy tunnel to ginto.ai
+# Ginto FRP Client - Easy tunnel to silverqueen.pro
 #
 # Usage:
-#   ginto-frpc expose <subdomain> <local_port>  - Expose local port as subdomain.ginto.ai
+#   ginto-frpc expose <subdomain> <local_port>  - Expose local port as subdomain.silverqueen.pro
 #   ginto-frpc status                           - Check tunnel status
 #   ginto-frpc stop                             - Stop tunnel
 #   ginto-frpc install                          - Download frpc binary
 #
 # Environment variables:
-#   GINTO_FRP_TOKEN   - Your authentication token (get from ginto.ai dashboard)
-#   GINTO_FRP_SERVER  - Server address (default: ginto.ai)
+#   GINTO_FRP_TOKEN   - Your authentication token (get from silverqueen.pro dashboard)
+#   GINTO_FRP_SERVER  - Server address (default: silverqueen.pro)
 #   GINTO_FRP_PORT    - Server port (default: 7000)
 #
 
@@ -18,7 +18,7 @@ set -e
 
 # Configuration
 FRP_VERSION="${FRP_VERSION:-0.66.0}"
-FRP_SERVER="${GINTO_FRP_SERVER:-ginto.ai}"
+FRP_SERVER="${GINTO_FRP_SERVER:-silverqueen.pro}"
 FRP_PORT="${GINTO_FRP_PORT:-7000}"
 FRP_TOKEN="${GINTO_FRP_TOKEN:-}"
 FRP_DIR="${HOME}/.ginto-frp"
@@ -122,7 +122,7 @@ check_token() {
     if [[ -z "$FRP_TOKEN" ]]; then
         log_error "Authentication token not set!"
         echo ""
-        echo "Get your token from https://ginto.ai/dashboard/tokens"
+        echo "Get your token from https://silverqueen.pro/dashboard/tokens"
         echo ""
         echo "Then set it with one of:"
         echo "  export GINTO_FRP_TOKEN='your-token'"
@@ -207,8 +207,8 @@ cmd_expose() {
         log_error "Usage: ginto-frpc expose <subdomain> [local_port]"
         echo ""
         echo "Examples:"
-        echo "  ginto-frpc expose myapp 8088     # Expose port 8088 as myapp.ginto.ai"
-        echo "  ginto-frpc expose demo 3000      # Expose port 3000 as demo.ginto.ai"
+        echo "  ginto-frpc expose myapp 8088     # Expose port 8088 as myapp.silverqueen.pro"
+        echo "  ginto-frpc expose demo 3000      # Expose port 3000 as demo.silverqueen.pro"
         exit 1
     fi
     
@@ -311,7 +311,7 @@ cmd_help() {
     echo "Usage: ginto-frpc <command> [options]"
     echo ""
     echo "Commands:"
-    echo "  expose <subdomain> [port]  Expose local port as subdomain.ginto.ai"
+    echo "  expose <subdomain> [port]  Expose local port as subdomain.silverqueen.pro"
     echo "  status                     Check tunnel status"
     echo "  stop                       Stop running tunnel"
     echo "  logs                       View tunnel logs"
@@ -320,15 +320,15 @@ cmd_help() {
     echo "  help                       Show this help"
     echo ""
     echo "Examples:"
-    echo "  ginto-frpc expose myapp 8088    # https://myapp.ginto.ai -> localhost:8088"
-    echo "  ginto-frpc expose demo 3000     # https://demo.ginto.ai -> localhost:3000"
+    echo "  ginto-frpc expose myapp 8088    # https://myapp.silverqueen.pro -> localhost:8088"
+    echo "  ginto-frpc expose demo 3000     # https://demo.silverqueen.pro -> localhost:3000"
     echo ""
     echo "Environment Variables:"
     echo "  GINTO_FRP_TOKEN    Your authentication token"
-    echo "  GINTO_FRP_SERVER   Server address (default: ginto.ai)"
+    echo "  GINTO_FRP_SERVER   Server address (default: silverqueen.pro)"
     echo "  GINTO_FRP_PORT     Server port (default: 7000)"
     echo ""
-    echo "Get your token at: https://ginto.ai/dashboard/tokens"
+    echo "Get your token at: https://silverqueen.pro/dashboard/tokens"
     echo ""
 }
 

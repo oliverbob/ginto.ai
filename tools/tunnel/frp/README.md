@@ -1,6 +1,6 @@
 # Ginto FRP Tunnel
 
-A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fast Reverse Proxy) to expose local services to the internet via subdomains on ginto.ai.
+A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fast Reverse Proxy) to expose local services to the internet via subdomains on silverqueen.pro.
 
 ## Overview
 
@@ -9,7 +9,7 @@ A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fa
 │                        GINTO FRP TUNNEL                              │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  [Local Machine]                        [ginto.ai Server]            │
+│  [Local Machine]                        [silverqueen.pro Server]            │
 │  ┌──────────────┐                      ┌──────────────────────────┐ │
 │  │ OpenWebUI    │                      │ frps (Server)            │ │
 │  │ :8088        │◄───────────────────►│ ┌──────────────────────┐ │ │
@@ -22,12 +22,12 @@ A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fa
 │  └──────────────┘                      │                          │ │
 │                                        │ ┌──────────────────────┐ │ │
 │                                        │ │ Caddy Reverse Proxy  │ │ │
-│                                        │ │ *.ginto.ai:443       │ │ │
+│                                        │ │ *.silverqueen.pro:443       │ │ │
 │                                        │ └──────────────────────┘ │ │
 │                                        └──────────────────────────┘ │
 │                                                    ▲                │
 │  [Internet User]                                   │                │
-│  Browser: https://xyz.ginto.ai ────────────────────┘                │
+│  Browser: https://xyz.silverqueen.pro ────────────────────┘                │
 │                                                                      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -36,7 +36,7 @@ A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fa
 
 - **High Performance**: Native Go implementation, much faster than WebSocket tunnels
 - **Multiple Protocols**: HTTP, HTTPS, TCP, UDP, STCP (secret TCP)
-- **Custom Subdomains**: Use `subdomain = "myapp"` for myapp.ginto.ai
+- **Custom Subdomains**: Use `subdomain = "myapp"` for myapp.silverqueen.pro
 - **TLS Encryption**: Secure communication between client and server
 - **Token Authentication**: Secure access with shared token
 - **Connection Pooling**: Faster response times
@@ -49,9 +49,9 @@ A fast, reliable tunnel service using [frp](https://github.com/fatedier/frp) (Fa
 
 ```bash
 # Download and run the client helper script
-curl -sSL https://ginto.ai/frp/install.sh | bash
+curl -sSL https://silverqueen.pro/frp/install.sh | bash
 
-# Expose local port 8088 as myapp.ginto.ai
+# Expose local port 8088 as myapp.silverqueen.pro
 ginto-frp expose myapp 8088
 ```
 
@@ -61,7 +61,7 @@ ginto-frp expose myapp 8088
 
 2. Create `frpc.toml`:
 ```toml
-serverAddr = "ginto.ai"
+serverAddr = "silverqueen.pro"
 serverPort = 7000
 auth.token = "your-auth-token"
 
@@ -77,17 +77,17 @@ subdomain = "myapp"
 ./frpc -c ./frpc.toml
 ```
 
-4. Access your service at `https://myapp.ginto.ai`
+4. Access your service at `https://myapp.silverqueen.pro`
 
 ## Server Configuration
 
-The frps server runs on ginto.ai with the following configuration:
+The frps server runs on silverqueen.pro with the following configuration:
 
 - **Bind Port**: 7000 (client connections)
 - **vHost HTTP Port**: 8080 (HTTP vhost routing)
 - **vHost HTTPS Port**: 8443 (HTTPS vhost routing)
 - **Dashboard**: 7500 (admin interface)
-- **Subdomain Host**: ginto.ai
+- **Subdomain Host**: silverqueen.pro
 
 ## Authentication
 
@@ -95,8 +95,8 @@ The frps server runs on ginto.ai with the following configuration:
 Set `auth.token` in both frps.toml and frpc.toml to the same value.
 
 ### Per-User Tokens
-Users can get their personal auth token from their ginto.ai dashboard:
-1. Log in at https://ginto.ai
+Users can get their personal auth token from their silverqueen.pro dashboard:
+1. Log in at https://silverqueen.pro
 2. Go to Settings → API Tokens
 3. Generate a "Tunnel" token
 4. Use this token in your frpc.toml
@@ -129,7 +129,7 @@ subdomain = "secure"
 name = "ssh"
 type = "tcp"
 localPort = 22
-remotePort = 6000  # Access via ginto.ai:6000
+remotePort = 6000  # Access via silverqueen.pro:6000
 ```
 
 ### Secret TCP (Private Access)
@@ -195,7 +195,7 @@ transport.bandwidthLimit = "10MB"
 
 ### "Login failed" or "auth failed"
 - Ensure `auth.token` matches between client and server
-- Check if your token is valid in your ginto.ai dashboard
+- Check if your token is valid in your silverqueen.pro dashboard
 
 ### "Subdomain already used"
 - Choose a different subdomain
@@ -234,4 +234,4 @@ http://127.0.0.1:7400
 
 - [frp GitHub Repository](https://github.com/fatedier/frp)
 - [frp Full Documentation](https://github.com/fatedier/frp/blob/dev/README.md)
-- [Ginto.ai](https://ginto.ai)
+- [Silverqueen.pro](https://silverqueen.pro)

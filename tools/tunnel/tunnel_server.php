@@ -3,7 +3,7 @@
  * Ginto Tunnel Server
  * 
  * A SirTunnel-inspired reverse tunnel service that allows local OpenWebUI
- * installations to be exposed to the web via [subdomain].ginto.ai
+ * installations to be exposed to the web via [subdomain].silverqueen.pro
  * 
  * Architecture:
  * 1. Client connects via WebSocket and requests a subdomain
@@ -38,7 +38,7 @@ class TunnelServer implements MessageComponentInterface
     protected ?\Medoo\Medoo $db = null;
     
     private string $jwtSecret;
-    public string $baseDomain = 'ginto.ai';
+    public string $baseDomain = 'silverqueen.pro';
     private int $defaultExpiry = 600; // 10 minutes
     private int $pingInterval = 30;   // seconds between pings
     private int $pingTimeout = 90;    // seconds without pong before disconnect
@@ -331,7 +331,7 @@ class TunnelServer implements MessageComponentInterface
     }
     
     /**
-     * Validate user auth token (from ginto.ai registration)
+     * Validate user auth token (from silverqueen.pro registration)
      */
     protected function validateAuthToken(string $token): array
     {
@@ -475,7 +475,7 @@ class TunnelServer implements MessageComponentInterface
                         echo "[TunnelServer] Expiring tunnel: {$subdomain}.{$this->baseDomain}\n";
                         $this->send($conn, [
                             'type' => 'expired',
-                            'message' => 'Tunnel expired. Register at https://ginto.ai/register for non-expiring tunnels.'
+                            'message' => 'Tunnel expired. Register at https://silverqueen.pro/register for non-expiring tunnels.'
                         ]);
                         $conn->close();
                         $closedCount++;

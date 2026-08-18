@@ -869,7 +869,7 @@ Welcome to your personal development environment!
 
 ## Learn More
 
-Visit [ginto.ai](https://ginto.ai) for tutorials and documentation.
+Visit [silverqueen.pro](https://silverqueen.pro) for tutorials and documentation.
 ';
         
         // Write index.php with ownership fix

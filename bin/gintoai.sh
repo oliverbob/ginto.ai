@@ -1472,7 +1472,7 @@ install_powerdns() {
         log_info "Configuring PowerDNS..."
         sudo tee /etc/powerdns/pdns.conf > /dev/null << EOF
 # PowerDNS Authoritative Server Configuration
-# Managed by Ginto AI - https://ginto.ai
+# Managed by Ginto AI - https://silverqueen.pro
 
 # Backend: Use gmysql (MySQL/MariaDB)
 launch=gmysql
@@ -1511,7 +1511,7 @@ query-cache-ttl=20
 negquery-cache-ttl=60
 
 # SOA defaults
-default-soa-content=ns1.ginto.ai admin.ginto.ai 0 10800 3600 604800 3600
+default-soa-content=ns1.silverqueen.pro admin.silverqueen.pro 0 10800 3600 604800 3600
 EOF
         
         # Add PowerDNS API credentials to .env if not already present
@@ -1855,7 +1855,7 @@ $CADDY_DOMAIN {
 
     # Serve static video files directly
     handle /public/assets/videos/* {
-        root * /home/$INSTALL_USER/ginto.ai
+        root * /home/$INSTALL_USER/silverqueen.pro
         file_server
     }
 
@@ -2261,7 +2261,7 @@ fix_permissions() {
     fi
     
     # Ensure www-data can traverse directories to reach bin/start_websockify.sh for noVNC
-    # This sets execute permission on the path: /home/user -> /home/user/ginto.ai -> /home/user/ginto.ai/bin
+    # This sets execute permission on the path: /home/user -> /home/user/silverqueen.pro -> /home/user/silverqueen.pro/bin
     local home_dir
     home_dir=$(dirname "$PROJECT_DIR")
     chmod o+x "$home_dir" 2>/dev/null || true

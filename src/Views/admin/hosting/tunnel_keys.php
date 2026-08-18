@@ -194,7 +194,7 @@ $currentPage = 'tunnels';
         return;
       }
 
-      if (!confirm(`Release ${subdomain}.ginto.ai for everyone? This deletes all key records for this subdomain.`)) {
+      if (!confirm(`Release ${subdomain}.silverqueen.pro for everyone? This deletes all key records for this subdomain.`)) {
         return;
       }
 
@@ -211,7 +211,7 @@ $currentPage = 'tunnels';
           return;
         }
 
-        alert(`${subdomain}.ginto.ai is now released and available.`);
+        alert(`${subdomain}.silverqueen.pro is now released and available.`);
         loadKeys();
       } catch (e) {
         alert('Failed to release subdomain');

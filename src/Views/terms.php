@@ -91,7 +91,7 @@
                         <h2 class="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
                             <span class="text-teal-500">01</span> Acceptance of Terms
                         </h2>
-                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">By accessing or using any Ginto service — including ginto.ai, Ginto Mall, and the Ginto mobile application — you agree to be bound by these Terms of Service ("<strong>Terms</strong>") and all applicable laws and regulations. If you do not agree with any of these Terms, you are prohibited from using or accessing this site. These Terms apply to all visitors, users, buyers, sellers, and any other persons who access or use the Service.</p>
+                        <p class="text-gray-600 dark:text-gray-400 leading-relaxed">By accessing or using any Ginto service — including silverqueen.pro, Ginto Mall, and the Ginto mobile application — you agree to be bound by these Terms of Service ("<strong>Terms</strong>") and all applicable laws and regulations. If you do not agree with any of these Terms, you are prohibited from using or accessing this site. These Terms apply to all visitors, users, buyers, sellers, and any other persons who access or use the Service.</p>
                     </section>
 
                     <!-- 2 -->
@@ -222,11 +222,11 @@
                         <div class="flex flex-col gap-2 text-sm text-gray-600 dark:text-gray-400">
                             <div class="flex items-center gap-2">
                                 <i class="fas fa-globe text-teal-500 w-4"></i>
-                                <a href="https://ginto.ai" class="text-teal-500 hover:underline">https://ginto.ai</a>
+                                <a href="https://silverqueen.pro" class="text-teal-500 hover:underline">https://silverqueen.pro</a>
                             </div>
                             <div class="flex items-center gap-2">
                                 <i class="fas fa-envelope text-teal-500 w-4"></i>
-                                <a href="mailto:support@ginto.ai" class="text-teal-500 hover:underline">support@ginto.ai</a>
+                                <a href="mailto:support@silverqueen.pro" class="text-teal-500 hover:underline">support@silverqueen.pro</a>
                             </div>
                         </div>
                     </section>

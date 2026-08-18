@@ -13,7 +13,7 @@ $_reqUri    = $_SERVER['REQUEST_URI'] ?? '';
 $basePath   = str_starts_with($_reqUri, '/wallet/') ? '/wallet' : '/marketplace/sellers';
 $sf         = $storefront ?? [];
 $slug       = htmlspecialchars($sf['slug'] ?? '', ENT_QUOTES, 'UTF-8');
-$storeUrl   = 'https://ginto.ai/mall/' . $slug;
+$storeUrl   = 'https://silverqueen.pro/mall/' . $slug;
 ?>
 <!doctype html>
 <html lang="en">
@@ -191,7 +191,7 @@ $storeUrl   = 'https://ginto.ai/mall/' . $slug;
                 <div class="sf-field">
                     <label class="sf-label" for="sf-slug">Store URL</label>
                     <div class="sf-slug-wrap">
-                        <span class="sf-slug-prefix">ginto.ai/mall/</span>
+                        <span class="sf-slug-prefix">silverqueen.pro/mall/</span>
                         <input class="sf-slug-input" id="sf-slug" type="text" name="slug"
                             maxlength="64" pattern="[a-z0-9][a-z0-9\-]*"
                             value="<?= $slug ?>"
@@ -199,7 +199,7 @@ $storeUrl   = 'https://ginto.ai/mall/' . $slug;
                             placeholder="your-store-name">
                     </div>
                     <div class="sf-url-preview">
-                        Your store: <a id="slugPreviewLink" href="/mall/<?= $slug ?>" target="_blank"><?= htmlspecialchars('https://ginto.ai/mall/' . ($sf['slug'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a>
+                        Your store: <a id="slugPreviewLink" href="/mall/<?= $slug ?>" target="_blank"><?= htmlspecialchars('https://silverqueen.pro/mall/' . ($sf['slug'] ?? ''), ENT_QUOTES, 'UTF-8') ?></a>
                     </div>
                     <span class="sf-hint">Lowercase letters, numbers, and hyphens only. This is the shareable URL for your store.</span>
                 </div>
@@ -289,7 +289,7 @@ $storeUrl   = 'https://ginto.ai/mall/' . $slug;
 <script>
 function updateSlugPreview(val) {
     var clean = val.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    var url = 'https://ginto.ai/mall/' + (clean || '…');
+    var url = 'https://silverqueen.pro/mall/' + (clean || '…');
     var link = document.getElementById('slugPreviewLink');
     if (link) { link.textContent = url; link.href = '/mall/' + clean; }
 }
@@ -302,7 +302,7 @@ function previewImage(input, previewId) {
     reader.readAsDataURL(file);
 }
 function copyStoreLink() {
-    var url = '<?= htmlspecialchars('https://ginto.ai/mall/' . ($sf['slug'] ?? ''), ENT_QUOTES, 'UTF-8') ?>';
+    var url = '<?= htmlspecialchars('https://silverqueen.pro/mall/' . ($sf['slug'] ?? ''), ENT_QUOTES, 'UTF-8') ?>';
     navigator.clipboard.writeText(url).then(function() {
         var btn = document.getElementById('copyLinkBtn');
         if (btn) { var orig = btn.innerHTML; btn.innerHTML = '✓ Copied!'; setTimeout(function() { btn.innerHTML = orig; }, 2000); }

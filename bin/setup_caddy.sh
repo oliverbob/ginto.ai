@@ -1,5 +1,5 @@
 #!/bin/bash
-# Setup Caddy configuration for ginto.ai
+# Setup Caddy configuration for silverqueen.pro
 # Run this script with sudo: sudo ./setup_caddy.sh
 
 set -e
@@ -7,7 +7,7 @@ set -e
 echo "Writing Caddy configuration..."
 
 cat > /etc/caddy/Caddyfile << 'EOF'
-ginto.ai {
+silverqueen.pro {
     tls oliverbob.lagumen@gmail.com
 
     encode zstd gzip

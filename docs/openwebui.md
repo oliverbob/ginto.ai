@@ -7,14 +7,14 @@ Ginto AI includes native [Open WebUI](https://github.com/open-webui/open-webui) 
 We're proud and excited to announce two breakthrough features that transform how you use Open WebUI:
 
 1. **Seamless Iframe Embedding** - Open WebUI embedded directly in Ginto AI with same-origin subdomain architecture solving cross-origin storage issues
-2. **Expose to Web** - One-click FRP tunneling to share your local OpenWebUI instance via public `*.ginto.ai` subdomains
+2. **Expose to Web** - One-click FRP tunneling to share your local OpenWebUI instance via public `*.silverqueen.pro` subdomains
 
 Open WebUI is embedded as a first-class feature within Ginto AI, providing users with access to Open WebUI's interface directly from the Ginto AI dashboard without leaving the application.
 
 ### Key Features
 
 - **One-click installation** - Open WebUI is automatically installed in the user's sandbox container
-- **Same-origin subdomain** - Uses `oi.ginto.ai` to solve cross-origin storage issues
+- **Same-origin subdomain** - Uses `oi.silverqueen.pro` to solve cross-origin storage issues
 - **Universal iframe modal** - Minimize, maximize, fullscreen controls with tab management
 - **Automatic SSL** - Caddy reverse proxy handles HTTPS and WebSocket connections
 - **Shared authentication** - localStorage and JWT tokens work seamlessly
@@ -30,11 +30,11 @@ Open WebUI is embedded as a first-class feature within Ginto AI, providing users
 
 ```
 +-------------------------------------------------------------+
-|                         ginto.ai                            |
+|                         silverqueen.pro                            |
 |  +-------------------------------------------------------+  |
 |  |                    Iframe Modal                       |  |
 |  |  +-------------------------------------------------+  |  |
-|  |  |               oi.ginto.ai                       |  |  |
+|  |  |               oi.silverqueen.pro                       |  |  |
 |  |  |          (Open WebUI Instance)                  |  |  |
 |  |  |                                                 |  |  |
 |  |  |  +-------------------------------------------+  |  |  |
@@ -53,7 +53,7 @@ The key technical challenge with iframe embedding is browser security restrictio
 
 ### The Problem
 
-When embedding `external-domain.com` in an iframe on `ginto.ai`:
+When embedding `external-domain.com` in an iframe on `silverqueen.pro`:
 - Browser treats `external-domain.com` cookies/localStorage as third-party
 - Modern browsers block or partition third-party storage
 - Open WebUI's JWT authentication fails because tokens aren't accessible
@@ -63,11 +63,11 @@ When embedding `external-domain.com` in an iframe on `ginto.ai`:
 By using a **subdomain of the parent domain**:
 
 ```
-Parent:    ginto.ai
-OpenWebUI: oi.ginto.ai  ← Same registrable domain
+Parent:    silverqueen.pro
+OpenWebUI: oi.silverqueen.pro  ← Same registrable domain
 ```
 
-The browser treats `oi.ginto.ai` as same-site with `ginto.ai`, allowing:
+The browser treats `oi.silverqueen.pro` as same-site with `silverqueen.pro`, allowing:
 - Shared localStorage
 - Cookie access with `SameSite=Lax`
 - Full JWT authentication functionality
@@ -84,10 +84,10 @@ When a user clicks "Open WebUI" in Ginto AI:
      -v open-webui:/app/backend/data \
      ghcr.io/open-webui/open-webui:main
    ```
-3. **DNS Registration** - Creates A record for `oi.ginto.ai` pointing to server
+3. **DNS Registration** - Creates A record for `oi.silverqueen.pro` pointing to server
 4. **Caddy Config** - Generates reverse proxy configuration:
    ```caddy
-   oi.ginto.ai {
+   oi.silverqueen.pro {
        reverse_proxy http://{sandbox_ip}:8088 {
            header_up Host {host}
            header_up X-Real-IP {remote_host}
@@ -126,7 +126,7 @@ When a user clicks "Open WebUI" in Ginto AI:
   "sandbox_exists": true,
   "sandbox_id": "abc123",
   "backend": "lxd",
-  "url": "https://oi.ginto.ai/"
+  "url": "https://oi.silverqueen.pro/"
 }
 ```
 
@@ -150,10 +150,10 @@ The "Expose to Web" feature allows you to share your Open WebUI instance with an
 **How it works:**
 1. Click the **Expose** button (globe icon) in the iframe modal toolbar
 2. Choose a custom subdomain (3-32 chars, lowercase, alphanumeric + hyphens)
-3. Click "Start Tunnel" to create a public URL like `myapp.ginto.ai`
+3. Click "Start Tunnel" to create a public URL like `myapp.silverqueen.pro`
 
 **Features:**
-- **Git-style subdomains** - Auto-generated 7-character hex subdomains (e.g., `4cc23ad.ginto.ai`)
+- **Git-style subdomains** - Auto-generated 7-character hex subdomains (e.g., `4cc23ad.silverqueen.pro`)
 - **Custom subdomains** - Choose your own subdomain name
 - **10-minute expiry** - Free users get temporary tunnels; registered users get persistent access
 - **FRP-powered** - Uses [fatedier/frp](https://github.com/fatedier/frp) for high-performance tunneling
@@ -161,7 +161,7 @@ The "Expose to Web" feature allows you to share your Open WebUI instance with an
 
 **Technical details:**
 - Server: FRP server binds to port 7000, vhost HTTP on 7080
-- Caddy wildcard: `*.ginto.ai` routes to FRP vhost port
+- Caddy wildcard: `*.silverqueen.pro` routes to FRP vhost port
 - Client config stored in `~/.ginto-frp/frpc-{subdomain}.toml`
 - Logs: `/tmp/frpc-{subdomain}.log`
 
@@ -194,9 +194,9 @@ DATA_DIR=/app/backend/data
 
 ### Caddy Configuration
 
-The Caddy config is stored in `/etc/caddy/sites-available/oi.ginto.ai.caddy` for reference.
+The Caddy config is stored in `/etc/caddy/sites-available/oi.silverqueen.pro.caddy` for reference.
 
-**Note:** The actual routing for `oi.ginto.ai` is handled in `/etc/caddy/sites-available/tunnels.caddy` as part of the wildcard `*.ginto.ai` configuration. The standalone config is kept in `sites-available` for backup/reference but is not enabled in `sites-enabled`.
+**Note:** The actual routing for `oi.silverqueen.pro` is handled in `/etc/caddy/sites-available/tunnels.caddy` as part of the wildcard `*.silverqueen.pro` configuration. The standalone config is kept in `sites-available` for backup/reference but is not enabled in `sites-enabled`.
 
 ## Troubleshooting
 
@@ -204,7 +204,7 @@ The Caddy config is stored in `/etc/caddy/sites-available/oi.ginto.ai.caddy` for
 
 If images or assets don't load in the iframe:
 
-1. **Check domain** - Ensure using same-origin subdomain (e.g., `oi.ginto.ai`)
+1. **Check domain** - Ensure using same-origin subdomain (e.g., `oi.silverqueen.pro`)
 2. **Clear cache** - Hard refresh with Ctrl+Shift+R
 3. **Check Caddy** - Verify config is loaded: `systemctl status caddy`
 
@@ -242,7 +242,7 @@ lxc exec {sandbox_name} -- docker restart open-webui
 Key updates related to OpenWebUI integration:
 
 - **v1.0.6** - FRP Tunnel "Expose to Web" feature with git-style subdomains
-- **v1.0.5** - Iframe modal improvements, refresh button, same-origin domain switch to `oi.ginto.ai`
+- **v1.0.5** - Iframe modal improvements, refresh button, same-origin domain switch to `oi.silverqueen.pro`
 
 ## Credits
 

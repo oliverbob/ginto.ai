@@ -2,12 +2,12 @@
 // src/Routes/web.php
 // Centralized route definitions for Ginto CMS
 
-// Cloud subdomain proxy - catch requests to *.ginto.ai cloud subdomains
+// Cloud subdomain proxy - catch requests to *.silverqueen.pro cloud subdomains
 $router->req('/cloud-proxy', 'CloudProxyController@proxy');
 // Cloud subdomain route check - returns target IP for Caddy
 $router->req('/api/cloud/route', 'CloudProxyController@getRoute');
 
-// Unified tunnel relay endpoint (pinned to vision.ginto.ai)
+// Unified tunnel relay endpoint (pinned to vision.silverqueen.pro)
 $router->req('/tunnel', 'TunnelController@relayVision');
 $router->req('/tunnel/{path:.*}', 'TunnelController@relayVisionPath');
 
@@ -37,7 +37,7 @@ $router->req('/api/debug/ip-headers', 'DebugController@ipHeaders');
 $router->get('/api', 'ApiController@index');
 $router->post('/api', 'ApiController@post');
 
-// CSRF + session bootstrap for cross-origin callers (gntl and other *.ginto.ai submodules).
+// CSRF + session bootstrap for cross-origin callers (gntl and other *.silverqueen.pro submodules).
 // Returns a one-hour CSRF token and re-issues the session cookie with SameSite=None so the
 // browser can include it in cross-origin POSTs to /api without routing through the frp tunnel.
 $router->get('/api/code-token', function() {
@@ -47,14 +47,14 @@ $router->get('/api/code-token', function() {
         || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 
     // Re-issue the session cookie with SameSite=None; Secure so the browser can send it
-    // in cross-origin fetch requests (credentials:'include') from *.ginto.ai subdomains.
+    // in cross-origin fetch requests (credentials:'include') from *.silverqueen.pro subdomains.
     if ($isSecure) {
         $lifetime = 3600;
         if (defined('PHP_VERSION_ID') && PHP_VERSION_ID >= 70300) {
             setcookie(session_name(), session_id(), [
                 'expires'  => time() + $lifetime,
                 'path'     => '/',
-                'domain'   => '.ginto.ai',
+                'domain'   => '.silverqueen.pro',
                 'secure'   => true,
                 'httponly' => true,
                 'samesite' => 'None',
@@ -62,7 +62,7 @@ $router->get('/api/code-token', function() {
         } else {
             header(
                 'Set-Cookie: ' . session_name() . '=' . rawurlencode(session_id())
-                . '; Path=/; Domain=.ginto.ai; Expires=' . gmdate('D, d-M-Y H:i:s T', time() + $lifetime)
+                . '; Path=/; Domain=.silverqueen.pro; Expires=' . gmdate('D, d-M-Y H:i:s T', time() + $lifetime)
                 . '; Secure; HttpOnly; SameSite=None',
                 false
             );
@@ -979,8 +979,8 @@ $router->req('/api/addon/one-time/create-order', function() use ($db) {
         return;
     }
 
-    $returnUrl = 'https://ginto.ai/account/keys?pp_term=1&state=' . urlencode($state);
-    $cancelUrl = 'https://ginto.ai/account/keys?pp_term=0';
+    $returnUrl = 'https://silverqueen.pro/account/keys?pp_term=1&state=' . urlencode($state);
+    $cancelUrl = 'https://silverqueen.pro/account/keys?pp_term=0';
 
     $payload = [
         'intent' => 'CAPTURE',
@@ -1598,7 +1598,7 @@ $router->req('/api/tunnel/request', 'TunnelController@requestTunnel', ['POST']);
 $router->req('/api/tunnel/status', 'TunnelController@tunnelStatus');
 $router->req('/api/tunnel/disconnect', 'TunnelController@disconnectTunnel', ['POST']);
 $router->req('/api/tunnel/verify', 'TunnelController@verifyTunnel');
-// Per-request gate for *.ginto.ai, called by Caddy forward_auth. A tunnel only
+// Per-request gate for *.silverqueen.pro, called by Caddy forward_auth. A tunnel only
 // serves while a valid account key is bound to it.
 $router->req('/api/tunnel/authz', 'TunnelController@tunnelAuthz');
 // Machine-facing bind: a key from /account/keys is the only credential a tunnel
@@ -1837,7 +1837,7 @@ $router->post('/gtb-settings', 'GtbController@saveSettings'); // writes BINANCE_
 // Auth:       src/Support/RelayAuth.php (HS256 bearer token, RELAY_JWT_SECRET)
 //
 // SilverQueen reaches this host over HTTPS from behind the gntl tunnel and names
-// the ginto.ai member it is acting for in the token's `sub` claim. Nobody logs
+// the silverqueen.pro member it is acting for in the token's `sub` claim. Nobody logs
 // in; the shared secret is the trust. See docs/relay-api.md.
 // ============================================================================
 $router->get('/api/v1/relay/session', 'RelayController@session'); // identity + entitlement for the token's member

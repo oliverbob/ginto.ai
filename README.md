@@ -73,7 +73,7 @@ https://github.com/user-attachments/assets/62220ea5-453b-4774-b13a-1cca89f728ff
 
 *Left: OpenWebUI embedded in Ginto AI's universal iframe modal with minimize, maximize, and fullscreen controls. Right: Full-screen view with stacked minimized tabs for Console and OpenWebUI running simultaneously.*
 
-> **Note:** OpenWebUI runs at `oi.ginto.ai` (same-origin subdomain) for seamless iframe integration with shared localStorage and authentication.
+> **Note:** OpenWebUI runs at `oi.silverqueen.pro` (same-origin subdomain) for seamless iframe integration with shared localStorage and authentication.
 
 ### 📜 Acknowledgments & Inspirations
 
@@ -184,10 +184,10 @@ The "My Files" interface follows the familiar [Microsoft Windows](https://www.mi
 - **Database Access** - MySQL access with role-based access control
 
 ### 🌐 Expose to Web (FRP Tunnel)
-- **One-click public URLs** - Expose local OpenWebUI to the internet via `{subdomain}.ginto.ai`
+- **One-click public URLs** - Expose local OpenWebUI to the internet via `{subdomain}.silverqueen.pro`
 - **High-performance FRP** - Uses [fatedier/frp](https://github.com/fatedier/frp) for fast, reliable tunneling
 - **Auto frpc download** - Client binary automatically downloaded on first use
-- **Dynamic Caddy routing** - Wildcard `*.ginto.ai` routes to frp vhost
+- **Dynamic Caddy routing** - Wildcard `*.silverqueen.pro` routes to frp vhost
 - **10-minute free tunnels** - Quick sharing for demos; register for persistent tunnels
 - **Token-based auth** - Secure tunnel access with per-user tokens
 
@@ -270,7 +270,7 @@ Ginto AI fully supports Windows via WSL2 with Ubuntu. Both the core AI agent and
 
 4. **Run the installer** as your normal user (not root directly):
    ```bash
-   cd ~/ginto.ai
+   cd ~/silverqueen.pro
    sudo ./run.sh install
    ```
 
@@ -354,17 +354,17 @@ sudo ./run.sh install --skip sdcpu,powerdns
 **One-liner install** (recommended):
 
 ```bash
-curl -fsSL https://ginto.ai/install.sh | sh
+curl -fsSL https://silverqueen.pro/install.sh | sh
 ```
 
-This will clone the repo to `~/ginto.ai` and run the full installer automatically.
+This will clone the repo to `~/silverqueen.pro` and run the full installer automatically.
 
 **Or clone manually:**
 
 ```bash
 cd ~
-git clone https://github.com/oliverbob/ginto.ai.git
-cd ginto.ai
+git clone https://github.com/oliverbob/silverqueen.pro.git
+cd silverqueen.pro
 sudo ./run.sh install
 ```
 
@@ -405,7 +405,7 @@ This runs `./bin/ginto.sh` which sets up:
 ## 📁 Project Structure
 
 ```
-ginto.ai/
+silverqueen.pro/
 ├── run.sh                 # Main entry point
 ├── install.sh             # One-line installer
 ├── docker-compose.yml     # Docker sandbox services only
@@ -622,15 +622,15 @@ Docker mode allows you to run Ginto AI entirely in containers, with optional Doc
 
 **One-liner install:**
 ```bash
-curl -fsSL https://ginto.ai/install.sh | sh
+curl -fsSL https://silverqueen.pro/install.sh | sh
 ```
 Then choose option `2) docker` when prompted for installation mode.
 
 **Or manual setup:**
 ```bash
 # Clone the repository
-git clone https://github.com/oliverbob/ginto.ai.git
-cd ginto.ai
+git clone https://github.com/oliverbob/silverqueen.pro.git
+cd silverqueen.pro
 
 # Copy and configure environment
 cp docker/.env.example .env
@@ -822,7 +822,7 @@ The `./install.sh` script will support multiple installation modes:
 - [x] **Official Docker image** - Run Ginto AI in Docker containers
 - [x] **Docker-based sandboxes** - Cross-platform sandbox support via Docker
 - [ ] **Pre-built OS images** - Ready-to-use VM images for quick deployment
-- [x] One-click web installer at `https://ginto.ai/install.sh`
+- [x] One-click web installer at `https://silverqueen.pro/install.sh`
 - [ ] **CMS-only mode** - Lightweight install for shared hosting (cPanel, Plesk, DirectAdmin). Upload files, run `/install/` web installer, focuses on CMS/MVC features only (no sandboxes, no Docker, no system services)
 
 ### Sandbox
@@ -834,8 +834,8 @@ The `./install.sh` script will support multiple installation modes:
 
 ### Features
 - [x] **Ollama proxy support** - Use Ollama as a local inference backend
-- [x] **OpenWebUI iframe embedding** - Same-origin subdomain (`oi.ginto.ai`) for seamless iframe integration
-- [x] **Expose to Web** - One-click SSH tunnel to share local OpenWebUI via `{subdomain}.ginto.ai`
+- [x] **OpenWebUI iframe embedding** - Same-origin subdomain (`oi.silverqueen.pro`) for seamless iframe integration
+- [x] **Expose to Web** - One-click SSH tunnel to share local OpenWebUI via `{subdomain}.silverqueen.pro`
 - [ ] **Svelte dev proxy** - Hot-reload proxy service for faster frontend development
 - [ ] Resource usage dashboard
 - [ ] Web-based model management

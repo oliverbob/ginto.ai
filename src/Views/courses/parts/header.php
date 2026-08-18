@@ -6,7 +6,7 @@
             
             <div class="flex items-center gap-4">
                 <!-- Star on GitHub + Theme Toggle -->
-                <a href="https://github.com/oliverbob/ginto.ai" target="_blank" 
+                <a href="https://github.com/oliverbob/silverqueen.pro" target="_blank" 
                    class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm"
                    title="Star us on GitHub">
                     <i class="fab fa-github"></i>

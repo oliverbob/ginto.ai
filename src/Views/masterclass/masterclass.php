@@ -7,7 +7,7 @@
     
     <!-- Star on GitHub + Theme Toggle (aligned with sidebar header) -->
     <div class="fixed top-2 right-4 z-50 hidden lg:flex items-center gap-2" x-data="{ darkMode: document.documentElement.classList.contains('dark') }">
-        <a href="https://github.com/oliverbob/ginto.ai" target="_blank" 
+        <a href="https://github.com/oliverbob/silverqueen.pro" target="_blank" 
            class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm"
            title="Star us on GitHub">
             <i class="fab fa-github"></i>

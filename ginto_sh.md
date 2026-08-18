@@ -2280,4 +2280,4 @@ Since the script works in a nested LXD environment (which is more restrictive), 
 - No `security.nesting=true` required on the host
 - Better performance (no virtualization overhead)
 - Same commands, same workflow
-# ginto.ai
+# silverqueen.pro

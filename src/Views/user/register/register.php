@@ -1129,7 +1129,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
                 <div class="flex items-center p-4 rounded-lg cursor-pointer tier-card payment-method-container ginto-pay-option" data-radio="ginto-pay">
                   <input type="radio" name="payment_method" id="ginto-pay" value="ginto_pay" class="h-5 w-5" style="accent-color: var(--primary-500);">
                   <label for="ginto-pay" class="ml-3 flex items-center gap-2 font-medium" style="color: var(--text-primary);">
-                    <img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" loading="lazy" onerror="this.style.display='none'">
+                    <img src="https://silverqueen.pro/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" loading="lazy" onerror="this.style.display='none'">
                     <i class="fas fa-credit-card text-lg" style="color: #6366f1;"></i>
                     <span class="payment-method-copy">
                       <span class="payment-method-title">Ginto Pay</span>
@@ -2455,7 +2455,7 @@ if (empty($paypalClientId)) {
     if (iconEl) {
       if (value === 'ginto_pay') {
         iconEl.innerHTML = '<span style="display:inline-flex;align-items:center;gap:0.35rem;">' +
-          '<img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
+          '<img src="https://silverqueen.pro/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
           '<i class="' + info.icon + '" style="color:#d4af37"></i>' +
         '</span>';
       } else {
@@ -2484,7 +2484,7 @@ if (empty($paypalClientId)) {
           }
         }
         if (radio.value === 'ginto_pay') {
-          btn.innerHTML = '<img src="https://ginto.ai/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
+          btn.innerHTML = '<img src="https://silverqueen.pro/assets/images/ginto.png" alt="Ginto" class="ginto-pay-logo" onerror="this.style.display=\'none\'">' +
             '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';
         } else {
           btn.innerHTML = '<i class="' + mi.icon + '"></i><span>' + mi.label + '</span>';

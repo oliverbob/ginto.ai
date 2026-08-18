@@ -117,7 +117,7 @@ $currentPage = 'tunnels';
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <span class="text-gray-500">Server:</span>
-            <span class="ml-2 font-mono">ginto.ai:7000</span>
+            <span class="ml-2 font-mono">silverqueen.pro:7000</span>
           </div>
           <div>
             <span class="text-gray-500">HTTP VHost:</span>
@@ -129,7 +129,7 @@ $currentPage = 'tunnels';
           </div>
           <div>
             <span class="text-gray-500">Subdomain Host:</span>
-            <span class="ml-2 font-mono">*.ginto.ai</span>
+            <span class="ml-2 font-mono">*.silverqueen.pro</span>
           </div>
         </div>
 
@@ -205,7 +205,7 @@ $currentPage = 'tunnels';
         const relayExpiresAt = Number(relay.expires_at || 0);
 
         document.getElementById('relay-domain').textContent = relayDomain;
-        document.getElementById('relay-endpoint').textContent = `https://ginto.ai${relayEndpoint}`;
+        document.getElementById('relay-endpoint').textContent = `https://silverqueen.pro${relayEndpoint}`;
         document.getElementById('relay-approval-url').textContent = relay.approval_url || '-';
         document.getElementById('relay-local-port').textContent = relay.local_port ? `127.0.0.1:${relay.local_port}` : '-';
         relayApi = {
@@ -309,7 +309,7 @@ $currentPage = 'tunnels';
               </span>
             </td>
             <td class="px-4 py-3 font-mono text-sm">
-              ${p.subdomain ? `<a href="https://${p.subdomain}.ginto.ai" target="_blank" class="text-blue-500 hover:text-blue-400">${p.subdomain}.ginto.ai</a>` : (p.remote_port || '-')}
+              ${p.subdomain ? `<a href="https://${p.subdomain}.silverqueen.pro" target="_blank" class="text-blue-500 hover:text-blue-400">${p.subdomain}.silverqueen.pro</a>` : (p.remote_port || '-')}
             </td>
             <td class="px-4 py-3 font-mono text-sm text-gray-400">
               ${clientIp}

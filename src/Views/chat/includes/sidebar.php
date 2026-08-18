@@ -188,7 +188,7 @@
       // Get user's public_id for referral link
       $userPublicId = $GLOBALS['db']->get('users', 'public_id', ['id' => $_SESSION['user_id']]);
       if ($userPublicId):
-        $referralLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/register?ref=' . urlencode($userPublicId);
+        $referralLink = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/register?ref=' . urlencode($userPublicId);
     ?>
     <!-- Referral Link -->
     <div class="py-1.5 px-1">

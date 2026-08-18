@@ -22,7 +22,7 @@ $rating        = (float)($product['rating'] ?? 0);
 $badge         = $product['badge'] ?? null;
 $storeSlug     = htmlspecialchars($storefront['slug'] ?? '', ENT_QUOTES, 'UTF-8');
 $storeName     = htmlspecialchars($storefront['display_name'] ?? ($seller['fullname'] ?? 'Seller'), ENT_QUOTES, 'UTF-8');
-$canonicalUrl  = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/mall/product/' . $slug;
+$canonicalUrl  = 'https://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/mall/product/' . $slug;
 
 // Images
 $images = [];
@@ -39,7 +39,7 @@ $priceFormatted = $currencySymbol . number_format($price, 2);
 
 // Schema.org JSON-LD
 $_proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$_host  = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+$_host  = $_SERVER['HTTP_HOST'] ?? 'silverqueen.pro';
 $absImg = (str_starts_with($mainImg, 'http')) ? $mainImg : ($_proto . '://' . $_host . $mainImg);
 $jsonLd = [
     '@context'    => 'https://schema.org',

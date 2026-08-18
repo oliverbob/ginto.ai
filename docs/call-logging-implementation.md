@@ -97,7 +97,7 @@ To test the implementation:
 2. Restart the WebSocket server:
    ```bash
    # SSH to server
-   ssh root@yourIP "kill $(lsof -t -i:31827) 2>/dev/null; sleep 1; su - oliverbob -c 'cd ~/ginto.ai && nohup php bin/start_rachet_stream.php > /tmp/ratchet.log 2>&1 &'"
+   ssh root@yourIP "kill $(lsof -t -i:31827) 2>/dev/null; sleep 1; su - oliverbob -c 'cd ~/silverqueen.pro && nohup php bin/start_rachet_stream.php > /tmp/ratchet.log 2>&1 &'"
    ```
 3. Make a test call between two users
 4. Verify call events appear in conversation:

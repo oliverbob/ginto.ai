@@ -925,7 +925,7 @@ class HostingController
         }
 
         $proxyTarget = '127.0.0.1:' . $frpVhostPort;
-        if ($safeDomain === 'vision.ginto.ai') {
+        if ($safeDomain === 'vision.silverqueen.pro') {
             $relayLocalPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
             if ($relayLocalPort < 1024 || $relayLocalPort > 65535) {
                 $relayLocalPort = 18080;
@@ -1283,7 +1283,7 @@ class HostingController
         $jti = bin2hex(random_bytes(16));
         $now = time();
         $payload = [
-            'iss' => 'ginto.ai',
+            'iss' => 'silverqueen.pro',
             'sub' => $userId,
             'sd' => $subdomain,
             'jti' => $jti,
@@ -1362,7 +1362,7 @@ class HostingController
         $this->requireAdmin();
 
         $relaySubdomain = 'vision';
-        $relayDomain = $relaySubdomain . '.ginto.ai';
+        $relayDomain = $relaySubdomain . '.silverqueen.pro';
         $relayEndpoint = '/tunnel';
         $relayLocalPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
         if ($relayLocalPort < 1024 || $relayLocalPort > 65535) {
@@ -1710,7 +1710,7 @@ class HostingController
 
     /**
      * Set or clear an access key for a tunnel subdomain.
-     * When set, requests to https://{subdomain}.ginto.ai must include:
+     * When set, requests to https://{subdomain}.silverqueen.pro must include:
      *   - header: X-Ginto-Tunnel-Key: <key>
      *   - OR query: ?key=<key> (or ?k=<key>)
      *
@@ -1826,7 +1826,7 @@ class HostingController
             exit;
         }
 
-        $relayDomain = $subdomain . '.ginto.ai';
+        $relayDomain = $subdomain . '.silverqueen.pro';
         $caddyProvision = $this->provisionRelayDomainConfig($relayDomain);
         if (empty($caddyProvision['success'])) {
             http_response_code(500);
@@ -2735,8 +2735,8 @@ class HostingController
         
         // Add default SOA record
         $soaContent = sprintf("%s %s %s %d %d %d %d",
-            $soa['primary_ns'] ?? 'ns1.ginto.ai',
-            str_replace('@', '.', $soa['admin_email'] ?? 'admin.ginto.ai'),
+            $soa['primary_ns'] ?? 'ns1.silverqueen.pro',
+            str_replace('@', '.', $soa['admin_email'] ?? 'admin.silverqueen.pro'),
             $serial,
             $soa['refresh'] ?? 10800,
             $soa['retry'] ?? 3600,
@@ -2757,7 +2757,7 @@ class HostingController
             'zone_id' => $zoneId,
             'name' => $name,
             'type' => 'NS',
-            'content' => $soa['primary_ns'] ?? 'ns1.ginto.ai',
+            'content' => $soa['primary_ns'] ?? 'ns1.silverqueen.pro',
             'ttl' => 86400
         ]);
 
@@ -2954,8 +2954,8 @@ class HostingController
             return ['success' => true, 'defaults' => $defaults ?: []];
         } catch (\Exception $e) {
             return ['success' => true, 'defaults' => [
-                'primary_ns' => 'ns1.ginto.ai',
-                'admin_email' => 'admin.ginto.ai',
+                'primary_ns' => 'ns1.silverqueen.pro',
+                'admin_email' => 'admin.silverqueen.pro',
                 'refresh' => 10800,
                 'retry' => 3600,
                 'expire' => 604800,
@@ -2968,8 +2968,8 @@ class HostingController
     private function updateSoaDefaults(array $input): array
     {
         $this->db->update('dns_soa_defaults', [
-            'primary_ns' => $input['primary_ns'] ?? 'ns1.ginto.ai',
-            'admin_email' => $input['admin_email'] ?? 'admin.ginto.ai',
+            'primary_ns' => $input['primary_ns'] ?? 'ns1.silverqueen.pro',
+            'admin_email' => $input['admin_email'] ?? 'admin.silverqueen.pro',
             'refresh' => (int)($input['refresh'] ?? 10800),
             'retry' => (int)($input['retry'] ?? 3600),
             'expire' => (int)($input['expire'] ?? 604800),

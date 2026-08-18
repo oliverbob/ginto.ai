@@ -3,7 +3,7 @@
 
 FROM caddy:2-alpine
 
-LABEL maintainer="Ginto AI <support@ginto.ai>"
+LABEL maintainer="Ginto AI <support@silverqueen.pro>"
 LABEL description="Caddy 2 web server for Ginto AI"
 
 # Install curl for healthchecks

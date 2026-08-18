@@ -4,7 +4,7 @@
 
 FROM php:8.3-fpm
 
-LABEL maintainer="Ginto AI <support@ginto.ai>"
+LABEL maintainer="Ginto AI <support@silverqueen.pro>"
 LABEL description="PHP 8.3-FPM with extensions for Ginto AI"
 
 # Install system dependencies

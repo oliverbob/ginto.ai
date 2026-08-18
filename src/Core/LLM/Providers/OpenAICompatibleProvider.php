@@ -43,7 +43,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         'openai' => 'https://api.openai.com/v1/',
         'groq' => 'https://api.groq.com/openai/v1/',
         'cerebras' => 'https://api.cerebras.ai/v1/',
-        'ginto_tunnel' => 'https://ollama.ginto.ai/v1/',
+        'ginto_tunnel' => 'https://ollama.silverqueen.pro/v1/',
         'together' => 'https://api.together.xyz/v1/',
         'fireworks' => 'https://api.fireworks.ai/inference/v1/',
         'local' => 'http://127.0.0.1:8034/v1/',

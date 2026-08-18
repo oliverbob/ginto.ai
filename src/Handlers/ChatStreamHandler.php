@@ -739,7 +739,7 @@ class ChatStreamHandler
 
             // Build messages
             $messages = [];
-            $systemPrompt = 'You are Sai (Social AI), a helpful AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/ginto.ai. Be concise and direct.';
+            $systemPrompt = 'You are Sai (Social AI), a helpful AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/silverqueen.pro. Be concise and direct.';
             $messages[] = ['role' => 'system', 'content' => $systemPrompt];
 
             // Add history
@@ -2042,7 +2042,7 @@ class ChatStreamHandler
      */
     private function buildSystemPrompt(bool $hasImage, bool $hadImageInHistory, bool $isContinuation, bool $isAdminUser, bool $useLightpandaSearch = false): string
     {
-        $systemPrompt = 'You are Sai (Social AI), an AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/ginto.ai. '
+        $systemPrompt = 'You are Sai (Social AI), an AI assistant powered by Ginto, built by Bob Reyes, open-sourced at https://github.com/oliverbob/silverqueen.pro. '
             . 'You are powered by advanced language models and have web search capability. '
             . 'When asked about your identity, say you are Sai (Social AI), powered by Ginto, built by Bob Reyes. '
             . 'RESPONSE STYLE: Be concise and direct. Use short, clear sentences. Avoid unnecessary filler words, lengthy introductions, or verbose explanations. '
@@ -2125,7 +2125,7 @@ class ChatStreamHandler
                     
                     // Add referral link section
                     if (!empty($userData['public_id'])) {
-                        $referralLink = 'https://ginto.ai/register?ref=' . urlencode($userData['public_id']);
+                        $referralLink = 'https://silverqueen.pro/register?ref=' . urlencode($userData['public_id']);
                         $systemPrompt .= "\n## YOUR REFERRAL LINK\n"
                             . "The current user's personal referral link is: {$referralLink}\n"
                             . "When the user asks for their referral link, share link, or wants to invite others, "
@@ -2516,8 +2516,8 @@ class ChatStreamHandler
             return null;
         }
 
-        $fallback = $this->normalizeGintoTunnelDomainToBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? 'ollama.ginto.ai')))
-            ?: 'https://ollama.ginto.ai/v1/';
+        $fallback = $this->normalizeGintoTunnelDomainToBaseUrl((string)(getenv('GINTO_TUNNEL_BASE_URL') ?: ($_ENV['GINTO_TUNNEL_BASE_URL'] ?? 'ollama.silverqueen.pro')))
+            ?: 'https://ollama.silverqueen.pro/v1/';
 
         if (!$db) {
             return $fallback;
@@ -2903,13 +2903,13 @@ class ChatStreamHandler
 
         $computeMode = $this->imageGenEnv('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
-            return 'https://vision.ginto.ai';
+            return 'https://vision.silverqueen.pro';
         }
         if ($computeMode === 'cpu') {
             return 'http://127.0.0.1:8888';
         }
 
-        return ($sdcpuActive && $sdcpuTunnelEnabled) ? 'https://vision.ginto.ai' : 'http://127.0.0.1:8888';
+        return ($sdcpuActive && $sdcpuTunnelEnabled) ? 'https://vision.silverqueen.pro' : 'http://127.0.0.1:8888';
     }
 
     private function resolveLocalImageGenTunnelBaseUrl(): string
@@ -3210,7 +3210,7 @@ class ChatStreamHandler
         }
 
         if (($curlError !== '' || $httpCode < 200 || $httpCode >= 300 || !$finalResult || (!isset($finalResult['image']) && !isset($finalResult['image_url'])))) {
-            $shouldTryLocalRelay = str_starts_with($baseUrl, 'https://vision.ginto.ai') && $localRelayBaseUrl !== '';
+            $shouldTryLocalRelay = str_starts_with($baseUrl, 'https://vision.silverqueen.pro') && $localRelayBaseUrl !== '';
             if ($shouldTryLocalRelay) {
                 $emitProgressFromPercent(45, 'Retrying through local tunnel relay...');
                 $relayResult = $callJsonImageApi($localRelayBaseUrl . '/api/generate', $requestData);

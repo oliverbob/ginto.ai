@@ -1,7 +1,7 @@
 # Relay API
 
 Service-to-service endpoints under `/api/v1/relay`, for callers that have no
-browser session. SilverQueen on `sq.ginto.ai` is the first of them.
+browser session. SilverQueen on `sq.silverqueen.pro` is the first of them.
 
 ## Why it exists
 
@@ -18,7 +18,7 @@ that adds a hop and a bottleneck for nothing.
 
 ## How a caller identifies its member
 
-Nobody logs in. The caller names the ginto.ai member it is acting for in the
+Nobody logs in. The caller names the silverqueen.pro member it is acting for in the
 `sub` claim of an HS256 token, signed with a secret both hosts hold:
 
 ```php
@@ -70,7 +70,7 @@ nobody else; the specific reason goes to the error log.
 
 ## Configuration
 
-On ginto.ai:
+On silverqueen.pro:
 
 ```
 RELAY_JWT_SECRET=<openssl rand -hex 32>
@@ -100,13 +100,13 @@ either secret, so the two hosts can be updated one at a time with no failed
 requests. `bin/rotate-relay-secret.sh` drives the three phases.
 
 ```bash
-# On ginto.ai — install a new secret, keep honouring the old one.
+# On silverqueen.pro — install a new secret, keep honouring the old one.
 bin/rotate-relay-secret.sh accept          # prints the new secret
 
 # On each caller — start signing with it.
 bin/rotate-relay-secret.sh issue <secret>
 
-# Back on ginto.ai — stop honouring the old one.
+# Back on silverqueen.pro — stop honouring the old one.
 bin/rotate-relay-secret.sh retire
 
 bin/rotate-relay-secret.sh status          # what each side is using
@@ -171,7 +171,7 @@ if ($res['ok']) {
 By hand, to check a deployment:
 
 ```bash
-curl -sS https://ginto.ai/api/v1/relay/session \
+curl -sS https://silverqueen.pro/api/v1/relay/session \
      -H "Authorization: Bearer $TOKEN" | jq
 ```
 

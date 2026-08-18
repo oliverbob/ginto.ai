@@ -12,9 +12,9 @@
     <div class="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl max-w-lg w-full transform transition-all" id="sandbox-wizard-content">
       
       <?php 
-      // Check if we're on live/production (ginto.ai) - show sandbox type selector
-      $isLive = (strpos($_SERVER['HTTP_HOST'] ?? '', 'ginto.ai') !== false) || 
-                (($_ENV['APP_URL'] ?? '') === 'https://ginto.ai');
+      // Check if we're on live/production (silverqueen.pro) - show sandbox type selector
+      $isLive = (strpos($_SERVER['HTTP_HOST'] ?? '', 'silverqueen.pro') !== false) || 
+                (($_ENV['APP_URL'] ?? '') === 'https://silverqueen.pro');
       ?>
       
       <!-- Step 1: Welcome/Introduction -->
@@ -477,7 +477,7 @@
               <div class="flex-1">
                 <h4 class="font-semibold text-gray-900 dark:text-white">SSH into your server and run:</h4>
                 <div class="flex items-center bg-gray-900 rounded-lg mt-2">
-                  <code id="lxc-install-cmd" class="flex-1 text-green-400 p-3 text-sm font-mono select-all">sudo bash ~/ginto.ai/bin/ginto.sh install</code>
+                  <code id="lxc-install-cmd" class="flex-1 text-green-400 p-3 text-sm font-mono select-all">sudo bash ~/silverqueen.pro/bin/ginto.sh install</code>
                   <button type="button" onclick="copyLxcInstallCmd()" class="p-3 text-gray-400 hover:text-white hover:bg-gray-700 rounded-r-lg transition-colors" title="Copy to clipboard">
                     <svg id="lxc-copy-icon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     <svg id="lxc-check-icon" class="w-5 h-5 hidden text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
@@ -522,7 +522,7 @@
         <!-- Terminal Output -->
         <div class="p-4">
           <div id="lxc-terminal-output" class="bg-gray-900 rounded-xl p-4 h-64 overflow-y-auto font-mono text-sm text-green-400 whitespace-pre-wrap">
-            <span class="text-gray-500">$ sudo bash ~/ginto.ai/bin/ginto.sh install</span>
+            <span class="text-gray-500">$ sudo bash ~/silverqueen.pro/bin/ginto.sh install</span>
             <br><span class="text-yellow-400">Starting LXC/LXD setup...</span>
             <br>
           </div>

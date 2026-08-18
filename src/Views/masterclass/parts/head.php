@@ -8,11 +8,11 @@
     <meta name="keywords" content="masterclass, redis tutorial, lxc lxd containers, docker training, proxmox guide, virtualmin hosting, ginto ai, devops training, infrastructure, containers">
     <meta name="author" content="Ginto AI">
     <meta name="robots" content="index, follow">
-    <link rel="canonical" href="<?= htmlspecialchars((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/masterclass') ?>">
+    <link rel="canonical" href="<?= htmlspecialchars((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/masterclass') ?>">
     
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="<?= htmlspecialchars((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'ginto.ai') . '/masterclass') ?>">
+    <meta property="og:url" content="<?= htmlspecialchars((isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro') . '/masterclass') ?>">
     <meta property="og:title" content="Masterclasses - Deep Dive Technical Training | Ginto AI">
     <meta property="og:description" content="Master infrastructure technologies with hands-on masterclasses. Redis, LXC/LXD, Docker, Proxmox, Virtualmin, and the Ginto AI platform.">
     <meta property="og:image" content="/assets/images/masterclass-og.png">

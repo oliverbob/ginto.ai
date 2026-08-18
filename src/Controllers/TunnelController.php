@@ -20,7 +20,7 @@ class TunnelController
     private const TUNNEL_REGISTRY_FALLBACK_FILE = '/tmp/ginto-tunnel-registry.json';
     private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
     private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
-    private const APPROVAL_SERVER = 'https://ginto.ai';
+    private const APPROVAL_SERVER = 'https://silverqueen.pro';
     private const FRP_ONLINE_CACHE_FILE = '/tmp/ginto-frp-online-subdomains.json';
     private const FRP_ONLINE_CACHE_LOCK = '/tmp/ginto-frp-online-subdomains.lock';
 
@@ -90,11 +90,11 @@ class TunnelController
         if (!$this->isVisionRelayApprovedRemote()) {
             http_response_code(403);
             header('Content-Type: text/html; charset=utf-8');
-            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.ginto.ai relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Approval check: <code>' . htmlspecialchars($this->lastRelayApprovalDetail, ENT_QUOTES, 'UTF-8') . '</code></p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.silverqueen.pro relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Approval check: <code>' . htmlspecialchars($this->lastRelayApprovalDetail, ENT_QUOTES, 'UTF-8') . '</code></p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
             return;
         }
 
-        $this->proxyToTargetHost(self::VISION_RELAY_SUBDOMAIN . '.ginto.ai', $path, '/tunnel', false);
+        $this->proxyToTargetHost(self::VISION_RELAY_SUBDOMAIN . '.silverqueen.pro', $path, '/tunnel', false);
     }
 
     private function proxyToTargetHost(string $targetHost, string $path, string $locationPrefix, bool $isHttpTarget): void
@@ -134,7 +134,7 @@ class TunnelController
         $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
         $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
         $headers[] = 'X-Forwarded-Proto: ' . ($isHttpTarget ? 'http' : 'https');
-        $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.ginto.ai';
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.silverqueen.pro';
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
         $response = curl_exec($ch);
@@ -414,7 +414,7 @@ class TunnelController
             echo json_encode([
                 'success' => true,
                 'subdomain' => $subdomain,
-                'url' => "https://{$subdomain}.ginto.ai/",
+                'url' => "https://{$subdomain}.silverqueen.pro/",
                 'expires_in' => $expiresIn,
                 'expires_at' => $expiryTime,
                 'mode' => 'frp',
@@ -442,7 +442,7 @@ class TunnelController
                 'owner_user_id' => $ownerUserId ?: null,
             ]);
             
-            $ch = curl_init('https://ginto.ai/admin/hosting/tunnels/register');
+            $ch = curl_init('https://silverqueen.pro/admin/hosting/tunnels/register');
             curl_setopt_array($ch, [
                 CURLOPT_POST => true,
                 CURLOPT_POSTFIELDS => $data,
@@ -478,7 +478,7 @@ class TunnelController
         $privateKey = "{$sshDir}/id_ed25519";
         $publicKey = "{$sshDir}/id_ed25519.pub";
         $knownHosts = "{$sshDir}/known_hosts";
-        $tunnelServer = 'ginto.ai';
+        $tunnelServer = 'silverqueen.pro';
         $tunnelUser = 'oliverbob';
         
         // Ensure .ssh directory exists
@@ -543,7 +543,7 @@ class TunnelController
         }
         
         // Start gtunnel in client mode (creates SSH tunnel)
-        $host = "{$subdomain}.ginto.ai";
+        $host = "{$subdomain}.silverqueen.pro";
         $cmd = "nohup python3 {$gtunnelScript} --expose {$host} {$localPort} --server {$tunnelServer} --user {$tunnelUser} > {$logFile} 2>&1 & echo \$!";
         
         $pid = trim(shell_exec($cmd));
@@ -581,7 +581,7 @@ class TunnelController
     }
     
     /**
-     * Start FRP tunnel client process to connect to ginto.ai
+     * Start FRP tunnel client process to connect to silverqueen.pro
      * Uses frpc (Fast Reverse Proxy) for high-performance tunneling
      */
     protected function startTunnelClient(string $subdomain, int $localPort): array
@@ -594,7 +594,7 @@ class TunnelController
         $pidFile = "/tmp/frpc-{$subdomain}.pid";
         
         // FRP server details
-        $frpServer = 'ginto.ai';
+        $frpServer = 'silverqueen.pro';
         $frpPort = 7000;
         $frpToken = '0868d7a0943085871e506e79c8589bd1d80fbd9852b441165237deea6e16955a';
         
@@ -728,7 +728,7 @@ TOML;
         }
         
         // Check if Caddy config exists for this subdomain
-        $domain = "{$subdomain}.ginto.ai";
+        $domain = "{$subdomain}.silverqueen.pro";
         $configFile = "/etc/caddy/sites-enabled/{$domain}.caddy";
         
         $active = file_exists($configFile);
@@ -838,7 +838,7 @@ TOML;
     
     /**
      * API: Verify if a tunnel domain should be allowed for on-demand TLS
-     * GET /api/tunnel/verify?domain=subdomain.ginto.ai
+     * GET /api/tunnel/verify?domain=subdomain.silverqueen.pro
      * 
      * Called by Caddy's on_demand_tls to verify certificate requests
      * Return 200 to allow, 4xx to deny
@@ -850,7 +850,7 @@ TOML;
     {
         $domain = $_GET['domain'] ?? '';
         
-        // Must be a valid *.ginto.ai subdomain (2-32 chars)
+        // Must be a valid *.silverqueen.pro subdomain (2-32 chars)
         if (!preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.ginto\.ai$/', $domain, $matches)) {
             http_response_code(400);
             echo "Invalid domain format";
@@ -1901,7 +1901,7 @@ TOML;
         $jti = bin2hex(random_bytes(16));
         $now = time();
         $payload = [
-            'iss' => 'ginto.ai',
+            'iss' => 'silverqueen.pro',
             'sub' => $userId,
             'sd' => $subdomain,
             'jti' => $jti,
@@ -2060,7 +2060,7 @@ TOML;
 
         // Non-tunnel subdomains keep working: these are served by their own
         // Caddy site files or database records, not by frp.
-        if (file_exists("/etc/caddy/sites-enabled/{$subdomain}.ginto.ai.caddy")) {
+        if (file_exists("/etc/caddy/sites-enabled/{$subdomain}.silverqueen.pro.caddy")) {
             return [true, 'static site'];
         }
         if (preg_match('/^owui-[a-z0-9]{6}$/', $subdomain)) {
@@ -2068,7 +2068,7 @@ TOML;
         }
         try {
             if ($this->db && $this->db->has('virtual_hosts', [
-                'domain' => $subdomain . '.ginto.ai',
+                'domain' => $subdomain . '.silverqueen.pro',
                 'is_enabled' => 1,
             ])) {
                 return [true, 'registered domain'];
@@ -2109,14 +2109,14 @@ TOML;
     }
 
     /**
-     * Per-request authorisation gate for *.ginto.ai (Caddy forward_auth).
+     * Per-request authorisation gate for *.silverqueen.pro (Caddy forward_auth).
      *
      * GET /api/tunnel/authz  (subdomain taken from the forwarded Host header)
      */
     public function tunnelAuthz(): void
     {
         // X-Tunnel-Host is set by the forward_auth caller. The subrequest must
-        // carry Host: ginto.ai, because a subdomain Host makes the app relay
+        // carry Host: silverqueen.pro, because a subdomain Host makes the app relay
         // the request into that very tunnel instead of serving this route.
         $host = strtolower(trim((string)(
             $_SERVER['HTTP_X_TUNNEL_HOST']
@@ -2164,7 +2164,7 @@ h3{margin:20px 0 8px;font-size:1rem;color:#374151}
 <h3>If you own this tunnel</h3>
 <ol>
 <li>Generate a key for this subdomain at
-    <a href="https://ginto.ai/account/keys">ginto.ai/account/keys</a> and copy it.</li>
+    <a href="https://silverqueen.pro/account/keys">silverqueen.pro/account/keys</a> and copy it.</li>
 <li>Open the Ginto Tunnel admin <b>on the machine running the tunnel</b>
     (<code>https://&lt;that machine&gt;:2026</code>).</li>
 <li>Paste the key into <b>Connect with an Account Key</b> and press
@@ -2455,11 +2455,11 @@ HTML;
         echo json_encode([
             'success' => true,
             'subdomain' => $subdomain,
-            'hostname' => $subdomain . '.ginto.ai',
-            'server_addr' => 'ginto.ai',
+            'hostname' => $subdomain . '.silverqueen.pro',
+            'server_addr' => 'silverqueen.pro',
             'server_port' => 7000,
             'frp_token' => $frpToken,
-            // ginto.ai terminates TLS at Caddy and forwards to the frps HTTP
+            // silverqueen.pro terminates TLS at Caddy and forwards to the frps HTTP
             // vhost, so the client must register an http-type proxy. See
             // docs/frp.md.
             'proxy_type' => 'http',

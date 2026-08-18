@@ -2,7 +2,7 @@
 #
 # Ginto FRP Client Installer
 # 
-# Quick install: curl -sSL https://ginto.ai/frp/install.sh | bash
+# Quick install: curl -sSL https://silverqueen.pro/frp/install.sh | bash
 #
 # This script:
 # 1. Downloads the frpc binary
@@ -94,7 +94,7 @@ rm -rf "/tmp/frp_${FRP_VERSION}_${ARCH}" "$TMP_FILE"
 
 # Download ginto-frpc helper script
 echo -e "${BLUE}[INFO]${NC} Installing ginto-frpc helper..."
-HELPER_URL="https://ginto.ai/frp/ginto-frpc.sh"
+HELPER_URL="https://silverqueen.pro/frp/ginto-frpc.sh"
 
 if command -v curl &> /dev/null; then
     curl -sSL "$HELPER_URL" -o "$INSTALL_DIR/ginto-frpc"
@@ -138,7 +138,7 @@ echo "  symlink:     $BIN_DIR/ginto-frpc"
 echo ""
 echo "Next steps:"
 echo ""
-echo "  1. Get your auth token from https://ginto.ai/dashboard/tokens"
+echo "  1. Get your auth token from https://silverqueen.pro/dashboard/tokens"
 echo ""
 echo "  2. Set your token:"
 echo "     export GINTO_FRP_TOKEN='your-token-here'"
@@ -146,7 +146,7 @@ echo ""
 echo "  3. Expose your local service:"
 echo "     ginto-frpc expose myapp 8088"
 echo ""
-echo "  4. Access at https://myapp.ginto.ai"
+echo "  4. Access at https://myapp.silverqueen.pro"
 echo ""
 echo "For help: ginto-frpc help"
 echo ""

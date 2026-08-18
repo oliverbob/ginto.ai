@@ -17,7 +17,7 @@ class MallPushService
     public function __construct($db = null)
     {
         $this->db = $db ?? Database::getInstance();
-        $this->vapidSubject    = getenv('VAPID_SUBJECT')     ?: 'mailto:admin@ginto.ai';
+        $this->vapidSubject    = getenv('VAPID_SUBJECT')     ?: 'mailto:admin@silverqueen.pro';
         $this->vapidPublicKey  = getenv('VAPID_PUBLIC_KEY')  ?: '';
         $this->vapidPrivateKey = getenv('VAPID_PRIVATE_KEY') ?: '';
     }

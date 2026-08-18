@@ -4,7 +4,7 @@
 
 PORT="${1:-6080}"
 TARGET="${2:-localhost:5900}"
-WEB_ROOT="${3:-/home/test/ginto.ai/public/lib/novnc}"
+WEB_ROOT="${3:-/home/test/silverqueen.pro/public/lib/novnc}"
 LOG_FILE="/tmp/websockify-${PORT}.log"
 PID_FILE="/tmp/websockify-${PORT}.pid"
 TARGET_FILE="/tmp/websockify-${PORT}.target"

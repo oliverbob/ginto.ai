@@ -42,7 +42,7 @@
     wrapper.classList.toggle('hidden', !enabled);
     if (enabled) {
       if (!baseUrlInput.value.trim()) {
-        baseUrlInput.value = 'ollama.ginto.ai';
+        baseUrlInput.value = 'ollama.silverqueen.pro';
       }
       baseUrlInput.value = normalizeTunnelDomain(baseUrlInput.value);
       baseUrlInput.setAttribute('required', 'required');
@@ -75,7 +75,7 @@
     const normalized = normalizeTunnelDomain(domain || '');
     const isGintoTunnel = (providerSelect?.value || '').toLowerCase() === 'ginto_tunnel';
     if (isGintoTunnel && baseUrlInput) {
-      baseUrlInput.value = normalized || baseUrlInput.value || 'ollama.ginto.ai';
+      baseUrlInput.value = normalized || baseUrlInput.value || 'ollama.silverqueen.pro';
       baseUrlInput.focus();
       baseUrlInput.select();
 
@@ -210,7 +210,7 @@
     const baseUrl = normalizeTunnelDomain(String(formData.get('base_url') || ''));
 
     if (provider === 'ginto_tunnel' && !isValidTunnelDomain(baseUrl)) {
-      showToast('Enter a valid domain like ollama.ginto.ai (no https://).', 'error');
+      showToast('Enter a valid domain like ollama.silverqueen.pro (no https://).', 'error');
       return;
     }
 

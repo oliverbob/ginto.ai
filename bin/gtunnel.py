@@ -4,14 +4,14 @@ Ginto Tunnel (gtunnel) - SirTunnel-style SSH tunnel with Caddy API
 
 Two modes of operation:
 1. SERVER MODE (run on the server with Caddy):
-   gtunnel.py sub.ginto.ai 9001
+   gtunnel.py sub.silverqueen.pro 9001
    
 2. CLIENT MODE (run from any machine, creates SSH tunnel):
-   gtunnel.py --expose sub.ginto.ai 8080 [--server ginto.ai] [--user oliverbob]
+   gtunnel.py --expose sub.silverqueen.pro 8080 [--server silverqueen.pro] [--user oliverbob]
 
 Example (from client):
-   gtunnel.py --expose myapp.ginto.ai 8080
-   # This creates: ssh -tR 9001:localhost:8080 ginto.ai gtunnel.py myapp.ginto.ai 9001
+   gtunnel.py --expose myapp.silverqueen.pro 8080
+   # This creates: ssh -tR 9001:localhost:8080 silverqueen.pro gtunnel.py myapp.silverqueen.pro 9001
 """
 
 import sys
@@ -24,7 +24,7 @@ import random
 from urllib import request, error
 
 CADDY_API = 'http://127.0.0.1:2019'
-DEFAULT_SERVER = 'ginto.ai'
+DEFAULT_SERVER = 'silverqueen.pro'
 DEFAULT_USER = 'oliverbob'
 REMOTE_PORT_RANGE = (10000, 19999)
 
@@ -121,7 +121,7 @@ def client_mode(host: str, local_port: str, server: str, user: str) -> int:
     
     # Get the path to this script on the remote server
     script_name = os.path.basename(__file__)
-    remote_script = f"~/ginto.ai/bin/{script_name}"
+    remote_script = f"~/silverqueen.pro/bin/{script_name}"
     
     # Build the SSH command (SirTunnel pattern)
     # ssh -tR <remote_port>:localhost:<local_port> <server> gtunnel.py <host> <remote_port>
@@ -200,11 +200,11 @@ Ginto Tunnel (gtunnel) - SirTunnel-style SSH tunnel
 
 SERVER MODE (run on the server with Caddy):
   {prog} <subdomain.domain> <port>
-  Example: {prog} myapp.ginto.ai 9001
+  Example: {prog} myapp.silverqueen.pro 9001
 
 CLIENT MODE (run from any machine, creates SSH tunnel):
   {prog} --expose <subdomain.domain> <local_port> [options]
-  Example: {prog} --expose myapp.ginto.ai 8080
+  Example: {prog} --expose myapp.silverqueen.pro 8080
 
 Options:
   --expose, -e          Run in client mode (create SSH tunnel)

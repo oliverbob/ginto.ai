@@ -1734,7 +1734,7 @@ class MallCommerceService
                     . "<p><strong>Order:</strong> {$orderCode}</p>"
                     . "<p><strong>Total:</strong> ₱{$total}</p>"
                     . "<p><strong>Items:</strong></p><ul>{$itemsHtml}</ul>"
-                    . "<p>Track your delivery status at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                    . "<p>Track your delivery status at <a href='https://silverqueen.pro/mall/orders'>My Orders</a>.</p>"
                     . "<p>— Ginto Mall Team</p>";
                 MailHelper::send((string)$order['buyer']['email'], "Ginto: Purchase Confirmed — {$orderCode}", $buyerBody);
             }
@@ -1755,7 +1755,7 @@ class MallCommerceService
             $orderCode = htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8');
             $body = "<h2>🚚 Your Order is On the Way!</h2>"
                 . "<p>Hi {$buyerName}, your order <strong>{$orderCode}</strong> is now on its way to you.</p>"
-                . "<p>Track delivery at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                . "<p>Track delivery at <a href='https://silverqueen.pro/mall/orders'>My Orders</a>.</p>"
                 . "<p>— Ginto Mall Team</p>";
 
             if (!empty($order['buyer']['email'])) {
@@ -1779,7 +1779,7 @@ class MallCommerceService
             $orderCode = htmlspecialchars((string)$order['order_code'], ENT_QUOTES, 'UTF-8');
             $body = "<h2>✅ Order Delivered!</h2>"
                 . "<p>Hi {$buyerName}, your order <strong>{$orderCode}</strong> has been delivered.</p>"
-                . "<p>Please take a photo of the received product and rate your experience at <a href='https://ginto.ai/mall/orders'>My Orders</a>.</p>"
+                . "<p>Please take a photo of the received product and rate your experience at <a href='https://silverqueen.pro/mall/orders'>My Orders</a>.</p>"
                 . "<p>— Ginto Mall Team</p>";
 
             if (!empty($order['buyer']['email'])) {

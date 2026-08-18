@@ -138,7 +138,7 @@ $htmlDark = (isset($_COOKIE['theme']) && $_COOKIE['theme'] === 'dark') ? ' class
 
         <!-- Footer -->
         <p class="text-center text-gray-500 dark:text-gray-400 text-sm mt-6">
-            Powered by <a href="https://ginto.ai" class="text-blue-600 hover:underline">Ginto AI</a>
+            Powered by <a href="https://silverqueen.pro" class="text-blue-600 hover:underline">Ginto AI</a>
         </p>
     </div>
 

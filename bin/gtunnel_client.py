@@ -22,7 +22,7 @@ try:
 except ImportError:
     HAS_WEBSOCKET = False
 
-TUNNEL_SERVER = "wss://ginto.ai/tunnel/ws"
+TUNNEL_SERVER = "wss://silverqueen.pro/tunnel/ws"
 
 
 def forward_request(local_port: int, request_data: dict) -> dict:
@@ -77,7 +77,7 @@ def run_tunnel(subdomain: str, local_port: int, auth_token: str = None):
             msg_type = data.get('type')
             
             if msg_type == 'registered':
-                url = data.get('url', f'https://{subdomain}.ginto.ai/')
+                url = data.get('url', f'https://{subdomain}.silverqueen.pro/')
                 expires_in = data.get('expires_in', 600)
                 authenticated = data.get('authenticated', False)
                 
@@ -165,7 +165,7 @@ def main():
     local_port = int(sys.argv[2])
     auth_token = sys.argv[3] if len(sys.argv) > 3 else None
     
-    print(f"Starting tunnel: {subdomain}.ginto.ai -> localhost:{local_port}")
+    print(f"Starting tunnel: {subdomain}.silverqueen.pro -> localhost:{local_port}")
     run_tunnel(subdomain, local_port, auth_token)
 
 

@@ -1444,7 +1444,7 @@ if ($isUserLoggedIn) {
                             <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> 50 AI code-generation prompts / month</li>
                             <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> Full in-browser HTML/CSS/JS editor</li>
                             <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> Save & export your projects</li>
-                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> <strong class="text-white">1 free public subdomain</strong> (e.g. yoursite.ginto.ai)</li>
+                            <li class="flex items-center gap-2"><i class="fas fa-check text-indigo-400 w-4"></i> <strong class="text-white">1 free public subdomain</strong> (e.g. yoursite.silverqueen.pro)</li>
                             <li class="flex items-center gap-2 text-xs text-indigo-300"><i class="fas fa-info-circle w-4"></i> Host &amp; share your sites instantly</li>
                         </ul>
                         <a href="/register?plan=code_1000" class="mt-auto block text-center bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 rounded-lg transition-colors text-sm">Get ₱1,000 Plan</a>

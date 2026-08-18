@@ -493,7 +493,7 @@ details summary::-webkit-details-marker { display: none; }
                     <p style="font-size:0.83rem;color:var(--muted);margin-bottom:13px">Read all terms below. You must agree to continue your identity verification.</p>
                     <div class="kyc-tos-box" id="kycTosBox">
                         <h3>1. Identity Verification &amp; Data Privacy (RA 10173)</h3>
-                        <p>Under the Philippines Data Privacy Act of 2012 (Republic Act No. 10173), your personal information and identity documents are collected solely for identity verification. Your data is processed with your consent, encrypted at rest and in transit, and will not be shared with any third party without your explicit written permission, except as required by law. You have the right to access, correct, and request deletion of your data by writing to <strong>privacy@ginto.ai</strong>.</p>
+                        <p>Under the Philippines Data Privacy Act of 2012 (Republic Act No. 10173), your personal information and identity documents are collected solely for identity verification. Your data is processed with your consent, encrypted at rest and in transit, and will not be shared with any third party without your explicit written permission, except as required by law. You have the right to access, correct, and request deletion of your data by writing to <strong>privacy@silverqueen.pro</strong>.</p>
                         <h3>2. Anti-Money Laundering Compliance (RA 9160)</h3>
                         <p>ePower Mall is obligated under the Anti-Money Laundering Act to verify the identity of all sellers. Submitting fraudulent documents or inaccurate information may result in immediate account suspension and referral to appropriate government authorities.</p>
                         <h3>3. Business Name Registration (RA 3883)</h3>
@@ -520,7 +520,7 @@ details summary::-webkit-details-marker { display: none; }
                         <h3>10. Intellectual Property (RA 8293)</h3>
                         <p>Sellers of digital content, creative works, software, music, videos, e-books, courses, or any intellectual property must hold the legal right to distribute or sell such works. Uploading, listing, or selling pirated, plagiarized, or unauthorized copies of copyrighted materials is strictly prohibited under the Intellectual Property Code of the Philippines (RA 8293) and may result in civil and criminal liability.</p>
                         <h3>11. Data Retention</h3>
-                        <p>KYC documents and identity records are retained per applicable law. Deletion requests can be submitted to our Data Privacy Officer at <strong>privacy@ginto.ai</strong>, subject to legal retention obligations under RA 10173, Section 11(c).</p>
+                        <p>KYC documents and identity records are retained per applicable law. Deletion requests can be submitted to our Data Privacy Officer at <strong>privacy@silverqueen.pro</strong>, subject to legal retention obligations under RA 10173, Section 11(c).</p>
                     </div>
                     <label style="display:flex;align-items:flex-start;gap:10px;cursor:pointer;font-size:0.83rem;padding:12px 14px;background:rgba(59,130,246,0.06);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius-sm);margin-bottom:4px">
                         <input type="checkbox" id="kycTosCheck" style="margin-top:3px;accent-color:var(--accent);flex-shrink:0" <?= $tosAgreed ? 'checked' : '' ?>>

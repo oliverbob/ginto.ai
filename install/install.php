@@ -1496,13 +1496,13 @@ SETUP;
             } else {
                 $messages[] = "";
                 $messages[] = "⚠️ Could not auto-start models. Run manually:";
-                $messages[] = "   bash ~/ginto.ai/bin/start_llamacpp_models.sh";
+                $messages[] = "   bash ~/silverqueen.pro/bin/start_llamacpp_models.sh";
             }
         } elseif ($isDocker) {
             $messages[] = "";
             $messages[] = "🐳 Docker mode detected - llama.cpp runs on the host machine.";
             $messages[] = "   To start local models, run on the HOST (not in container):";
-            $messages[] = "   cd ~/ginto.ai && bash bin/start_llamacpp_models.sh";
+            $messages[] = "   cd ~/silverqueen.pro && bash bin/start_llamacpp_models.sh";
         }
         
         $messages[] = "";

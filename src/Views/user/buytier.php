@@ -1115,16 +1115,16 @@
             Building financial futures through sustainable network marketing since 2025.
           </p>
           <div class="flex space-x-4">
-            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://silverqueen.pro" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-facebook-f text-xl"></i>
             </a>
-            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://silverqueen.pro" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-twitter text-xl"></i>
             </a>
-            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://silverqueen.pro" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-instagram text-xl"></i>
             </a>
-            <a href="https://ginto.ai" class="text-gray-400 hover:text-white transition-colors">
+            <a href="https://silverqueen.pro" class="text-gray-400 hover:text-white transition-colors">
               <i class="fab fa-youtube text-xl"></i>
             </a>
           </div>

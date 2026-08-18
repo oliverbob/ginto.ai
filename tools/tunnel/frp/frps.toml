@@ -1,4 +1,4 @@
-# frps Server Configuration for Ginto.ai
+# frps Server Configuration for Silverqueen.pro
 # Place this file at /etc/frp/frps.toml on the server
 
 # === BIND SETTINGS ===
@@ -18,8 +18,8 @@ vhostHTTPPort = 8080
 # HTTPS virtual host port (for direct HTTPS passthrough)
 vhostHTTPSPort = 8443
 
-# Subdomain host - clients use subdomain = "xxx" to get xxx.ginto.ai
-subDomainHost = "ginto.ai"
+# Subdomain host - clients use subdomain = "xxx" to get xxx.silverqueen.pro
+subDomainHost = "silverqueen.pro"
 
 # TCP multiplexing port for HTTP CONNECT style proxying
 # tcpmuxHTTPConnectPort = 1337
@@ -55,8 +55,8 @@ webServer.user = "admin"
 # Password is read from environment variable FRP_DASHBOARD_PWD
 webServer.password = "{{ .Envs.FRP_DASHBOARD_PWD }}"
 # Enable TLS for dashboard (optional)
-# webServer.tls.certFile = "/etc/ssl/certs/ginto.ai.crt"
-# webServer.tls.keyFile = "/etc/ssl/private/ginto.ai.key"
+# webServer.tls.certFile = "/etc/ssl/certs/silverqueen.pro.crt"
+# webServer.tls.keyFile = "/etc/ssl/private/silverqueen.pro.key"
 
 # Prometheus metrics
 enablePrometheus = true

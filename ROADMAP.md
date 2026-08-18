@@ -1,4 +1,4 @@
-# Ginto.AI Roadmap
+# Silverqueen.pro Roadmap
 
 ## Installation Modes (User Preference System)
 
@@ -10,7 +10,7 @@ The `./install.sh` script (internally `gintoai.sh`) will support multiple instal
 
 **Command:** `./install.sh lite`
 
-**For:** Users who want to experience Ginto.AI immediately with zero wait time.
+**For:** Users who want to experience Silverqueen.pro immediately with zero wait time.
 
 **Philosophy:** Get the UI running in seconds. Everything else loads lazily in the background.
 
@@ -168,14 +168,14 @@ The `./install.sh` script (internally `gintoai.sh`) will support multiple instal
 | Aspect | Behavior |
 |--------|----------|
 | **Speed** | Instant |
-| **Infrastructure** | Managed by Ginto.AI |
+| **Infrastructure** | Managed by Silverqueen.pro |
 | **Maintenance** | Automatic updates, backups |
 | **Support** | Priority support included |
 
 **Deployment Options:**
-- One-click from ginto.ai dashboard
+- One-click from silverqueen.pro dashboard
 - API provisioning for automation
-- Custom subdomain: `yourname.ginto.ai`
+- Custom subdomain: `yourname.silverqueen.pro`
 
 ---
 
@@ -224,7 +224,7 @@ After installation, users are greeted with an optional interactive walkthrough:
 - 🎮 **Simulated experience** — demo conversations show capabilities
 
 **Walkthrough Steps:**
-1. **Welcome** — Introduction to Ginto.AI
+1. **Welcome** — Introduction to Silverqueen.pro
 2. **Chat Input** — How to ask questions
 3. **Model Selector** — Switching between AI providers
 4. **Sidebar** — Navigation and history

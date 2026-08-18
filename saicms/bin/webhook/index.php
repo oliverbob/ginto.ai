@@ -1,6 +1,6 @@
 <?php
 // PayPal Webhook Handler
-// Place this file at https://wh.ginto.ai/index.php
+// Place this file at https://wh.silverqueen.pro/index.php
 
 // --- MODIFICATION START ---
 // Load Composer's autoloader

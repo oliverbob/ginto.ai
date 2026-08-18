@@ -1,11 +1,11 @@
 #!/bin/sh
 # Ginto AI - One-line installer
-# Usage: curl -fsSL https://raw.githubusercontent.com/oliverbob/ginto.ai/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/oliverbob/silverqueen.pro/main/install.sh | sh
 
 set -e
 
-REPO_URL="https://github.com/oliverbob/ginto.ai.git"
-INSTALL_DIR="$HOME/ginto.ai"
+REPO_URL="https://github.com/oliverbob/silverqueen.pro.git"
+INSTALL_DIR="$HOME/silverqueen.pro"
 
 echo "🚀 Ginto AI Installer"
 echo "====================="

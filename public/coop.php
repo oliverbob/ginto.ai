@@ -10,24 +10,24 @@
 <meta name="theme-color" content="#1A1610">
 
 <!-- Favicon -->
-<link rel="icon" type="image/png" href="https://ginto.ai/assets/images/ginto.png">
-<link rel="apple-touch-icon" href="https://ginto.ai/assets/images/ginto.png">
+<link rel="icon" type="image/png" href="https://silverqueen.pro/assets/images/ginto.png">
+<link rel="apple-touch-icon" href="https://silverqueen.pro/assets/images/ginto.png">
 
 <!-- Open Graph (Facebook, Messenger, Viber, LinkedIn) -->
 <meta property="og:type" content="website">
 <meta property="og:title" content="Ginto Cooperative — Member Guidelines">
 <meta property="og:description" content="Official membership guidelines for Ginto Cooperative. Membership, loan programs, and repayment policy.">
-<meta property="og:image" content="https://ginto.ai/assets/images/ginto.png">
+<meta property="og:image" content="https://silverqueen.pro/assets/images/ginto.png">
 <meta property="og:image:width" content="512">
 <meta property="og:image:height" content="512">
-<meta property="og:url" content="https://ginto.ai">
+<meta property="og:url" content="https://silverqueen.pro">
 <meta property="og:site_name" content="Ginto Cooperative">
 
 <!-- Twitter / X Card -->
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="Ginto Cooperative — Member Guidelines">
 <meta name="twitter:description" content="Official membership guidelines for Ginto Cooperative. Membership, loan programs, and repayment policy.">
-<meta name="twitter:image" content="https://ginto.ai/assets/images/ginto.png">
+<meta name="twitter:image" content="https://silverqueen.pro/assets/images/ginto.png">
 <title>Ginto Cooperative — Member Guidelines</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -571,7 +571,7 @@
 <!-- FOOTER -->
 <footer class="doc-footer">
   <p><strong>Ginto Cooperative</strong> &nbsp;·&nbsp; Official Member Guidelines</p>
-  <p style="margin-top:4px">For inquiries, visit <strong>ginto.ai</strong> or contact your cooperative officer.</p>
+  <p style="margin-top:4px">For inquiries, visit <strong>silverqueen.pro</strong> or contact your cooperative officer.</p>
 </footer>
 
 <script>

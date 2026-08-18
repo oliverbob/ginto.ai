@@ -7,7 +7,7 @@ Type=simple
 # NOTE: This is a template - the installer will create the actual service
 # with the correct user and paths. See bin/gintoai.sh configure_sdcpu_service()
 User=INSTALL_USER
-WorkingDirectory=/home/INSTALL_USER/ginto.ai/tools/sdcpu
+WorkingDirectory=/home/INSTALL_USER/silverqueen.pro/tools/sdcpu
 ExecStart=/bin/bash -c 'source venv/bin/activate && python src/api_server.py --port 8888'
 Restart=always
 RestartSec=5

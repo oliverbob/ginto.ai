@@ -4,11 +4,11 @@ This document explains how Ginto’s ImageGen tunnel relay works, with emphasis 
 
 Admin UI entry point:
 
-- https://ginto.ai/admin/hosting/tunnels
+- https://silverqueen.pro/admin/hosting/tunnels
 
 ## Why this exists
 
-Image generation can run locally on CPU (`127.0.0.1:8888`) or through the public relay endpoint (`https://vision.ginto.ai`) when tunnel mode is enabled. The `/tunnel` path acts as a controlled gateway that can be explicitly approved or revoked.
+Image generation can run locally on CPU (`127.0.0.1:8888`) or through the public relay endpoint (`https://vision.silverqueen.pro`) when tunnel mode is enabled. The `/tunnel` path acts as a controlled gateway that can be explicitly approved or revoked.
 
 ## Routing and endpoints
 
@@ -40,7 +40,7 @@ Server behavior in `HostingController::tunnelsRelayApprove()`:
 1. Validates admin + CSRF.
 2. Sanitizes subdomain (`vision` by default), validates approval duration (minutes or never-expire).
 3. Starts a dedicated relay FRP client process (`provisionRelayProxy`) bound to `TUNNEL_RELAY_LOCAL_PORT`.
-4. Ensures Caddy domain config for `vision.ginto.ai` (`provisionRelayDomainConfig`).
+4. Ensures Caddy domain config for `vision.silverqueen.pro` (`provisionRelayDomainConfig`).
 5. Ensures DNS zone/records (`autoCreateDnsForDomain`).
 6. Writes approval into registry and removes blocklist entry.
 
@@ -83,7 +83,7 @@ Implemented in `TunnelController::proxyVisionRequest()`:
 
 - Local requests (`localhost/127.0.0.1`) proxy directly to `127.0.0.1:TUNNEL_RELAY_LOCAL_PORT`.
 - Non-local requests must pass relay approval checks.
-- If approved, request is proxied to `https://vision.ginto.ai`.
+- If approved, request is proxied to `https://vision.silverqueen.pro`.
 - If not approved, request is rejected with HTTP 403 and an admin guidance message.
 
 The relay preserves request method/body and forwards headers with `X-Forwarded-*` plus `X-Ginto-Tunnel-Relay`.
@@ -103,8 +103,8 @@ Code paths:
 
 When relay mode is selected, requests target:
 
-- `https://vision.ginto.ai/api/generate`
-- `https://vision.ginto.ai/api/generate-stream`
+- `https://vision.silverqueen.pro/api/generate`
+- `https://vision.silverqueen.pro/api/generate-stream`
 
 The `/live` settings page exposes customization via env-backed controls:
 
@@ -121,14 +121,14 @@ This relay is implemented with a serverless-style control plane:
 
 - Approval is represented as lightweight state (JSON registry/blocklist) instead of a tightly coupled persistent tunnel session store.
 - Runtime relay checks are stateless HTTP reads (`/api/tunnel/relay/approval`) before forwarding traffic.
-- The admin console at `https://ginto.ai/admin/hosting/tunnels` acts as the control surface for provisioning/revocation while clients only need the public relay endpoint.
+- The admin console at `https://silverqueen.pro/admin/hosting/tunnels` acts as the control surface for provisioning/revocation while clients only need the public relay endpoint.
 
 In short: control-plane decisions are centralized; data-plane proxying remains simple and stateless per request.
 
 ## Operations quick runbook
 
-1. Open `https://ginto.ai/admin/hosting/tunnels`.
-2. Verify relay section shows `vision.ginto.ai` and local relay port.
+1. Open `https://silverqueen.pro/admin/hosting/tunnels`.
+2. Verify relay section shows `vision.silverqueen.pro` and local relay port.
 3. Click **Approve** and choose duration.
 4. Confirm:
    - Relay status = Approved

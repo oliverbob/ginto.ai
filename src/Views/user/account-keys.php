@@ -541,7 +541,7 @@ $userId = (int)($_SESSION['user_id'] ?? ($_SESSION['user']['id'] ?? 0));
   }
 
   function showGeneratedToken(subdomain, token) {
-    const link = `https://${subdomain}.ginto.ai/?token=${encodeURIComponent(token)}`;
+    const link = `https://${subdomain}.silverqueen.pro/?token=${encodeURIComponent(token)}`;
     setMaskedValue(document.getElementById('akToken'), token, false);
     setEyeIcon(false);
     const linkEl = document.getElementById('akLink');

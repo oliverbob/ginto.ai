@@ -3,7 +3,7 @@
 # One-step installation for Docker mode deployment
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/oliverbob/ginto.ai/main/docker-install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/oliverbob/silverqueen.pro/main/docker-install.sh | bash
 #   OR
 #   ./docker-install.sh
 #
@@ -98,7 +98,7 @@ check_docker() {
 clone_repo() {
     print_header "Setting Up Repository"
     
-    INSTALL_DIR="${GINTO_INSTALL_DIR:-$HOME/ginto.ai}"
+    INSTALL_DIR="${GINTO_INSTALL_DIR:-$HOME/silverqueen.pro}"
     
     if [ -d "$INSTALL_DIR" ]; then
         print_info "Repository exists at $INSTALL_DIR"
@@ -111,7 +111,7 @@ clone_repo() {
         fi
     else
         print_info "Cloning repository to $INSTALL_DIR..."
-        git clone https://github.com/oliverbob/ginto.ai.git "$INSTALL_DIR"
+        git clone https://github.com/oliverbob/silverqueen.pro.git "$INSTALL_DIR"
         cd "$INSTALL_DIR"
     fi
     
@@ -330,7 +330,7 @@ print_final() {
     echo "  $(pwd)/.env"
     echo ""
     echo "Documentation:"
-    echo "  https://github.com/oliverbob/ginto.ai/blob/main/docker/README.md"
+    echo "  https://github.com/oliverbob/silverqueen.pro/blob/main/docker/README.md"
     echo ""
     
     if [ -f ".env" ]; then

@@ -5,7 +5,7 @@ $ogDesc      = $ogDesc      ?? 'Discover products and sellers on Ginto Mall — 
 $ogImage     = $ogImage     ?? '/assets/images/mall-og.png';
 $ogType      = $ogType      ?? 'website';
 $_proto      = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$_host       = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+$_host       = $_SERVER['HTTP_HOST'] ?? 'silverqueen.pro';
 $ogUrl       = $ogUrl       ?? ($_proto . '://' . $_host . ($_SERVER['REQUEST_URI'] ?? '/'));
 // Ensure absolute image URL for crawlers
 if (!empty($ogImage) && !str_starts_with($ogImage, 'http')) {

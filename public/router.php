@@ -3,7 +3,7 @@
  * Router for PHP Built-in Server
  * This file routes all requests through index.php for proper handling
  * 
- * Also handles subdomain routing for cloud subdomains (*.ginto.ai)
+ * Also handles subdomain routing for cloud subdomains (*.silverqueen.pro)
  */
 
 $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
@@ -168,7 +168,7 @@ function ginto_build_tunnel_token_from_row(array $row): string {
 
     $header = ['alg' => 'HS256', 'typ' => 'JWT'];
     $payload = [
-        'iss' => 'ginto.ai',
+        'iss' => 'silverqueen.pro',
         'sub' => $userId,
         'sd' => $subdomain,
         'jti' => $jti,
@@ -631,11 +631,11 @@ function ginto_frp_get_online_key_hashes_cached(int $ttlSeconds = 2): array {
     return ginto_frp_fetch_online_key_hashes();
 }
 
-// Check if this is a subdomain request (*.ginto.ai but not ginto.ai itself)
+// Check if this is a subdomain request (*.silverqueen.pro but not silverqueen.pro itself)
 if (preg_match('/^([a-z0-9]+)\.ginto\.ai$/', $hostNoPort, $matches)) {
     $subdomain = $matches[1];
     
-    // Skip if it's oi.ginto.ai (handled by Caddy directly)
+    // Skip if it's oi.silverqueen.pro (handled by Caddy directly)
     if ($subdomain === 'oi') {
         // This shouldn't happen as Caddy handles it, but just in case
         require_once __DIR__ . '/index.php';

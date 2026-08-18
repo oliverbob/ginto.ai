@@ -711,7 +711,7 @@ class ChatController
      */
     public function index(): void
     {
-        // Referral capture: the short root invite link (https://ginto.ai/?ref=<public_id>) stores the
+        // Referral capture: the short root invite link (https://silverqueen.pro/?ref=<public_id>) stores the
         // same session key /register uses, so a later sign-up or Academy subscription is attributed to
         // the referrer without forcing the visitor onto /register first.
         if (isset($_GET['ref']) && is_string($_GET['ref']) && trim($_GET['ref']) !== '') {

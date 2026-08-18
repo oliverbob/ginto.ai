@@ -2,7 +2,7 @@
 set -e
 
 # ==========================================
-# Ginto.ai Interactive Installer (Force Mode)
+# Silverqueen.pro Interactive Installer (Force Mode)
 # ==========================================
 
 # 1. Root Check
@@ -74,7 +74,7 @@ fi
 echo ""
 echo "❓ Select Mode:"
 echo "   1) DEV  (http://localhost on Port 80 - NO SSL)"
-echo "   2) LIVE (https://ginto.ai - Auto SSL)"
+echo "   2) LIVE (https://silverqueen.pro - Auto SSL)"
 read -p "   Enter choice [1 or 2]: " MODE_CHOICE
 
 # Set defaults
@@ -133,8 +133,8 @@ EOF
 
 else
     # LIVE CONFIG
-    read -p "🌐 Enter Domain [Default: ginto.ai]: " DOMAIN_NAME
-    DOMAIN_NAME=${DOMAIN_NAME:-ginto.ai}
+    read -p "🌐 Enter Domain [Default: silverqueen.pro]: " DOMAIN_NAME
+    DOMAIN_NAME=${DOMAIN_NAME:-silverqueen.pro}
     
     read -p "📧 Enter Email for TLS [Optional]: " TLS_EMAIL
     TLS_CONFIG=""

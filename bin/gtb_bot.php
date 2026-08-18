@@ -6,7 +6,7 @@
  * be launched every minute by cron; an flock prevents overlapping instances, and
  * enabled-state is re-checked each loop so Stop takes effect within seconds:
  *
- *   * * * * * cd /home/oliverbob/ginto.ai && /usr/bin/php bin/gtb_bot.php >> /tmp/gtb_bot.log 2>&1
+ *   * * * * * cd /home/oliverbob/silverqueen.pro && /usr/bin/php bin/gtb_bot.php >> /tmp/gtb_bot.log 2>&1
  *
  * Open positions live in the DB and the enabled flag is persisted, so after a
  * reboot cron relaunches this and the bot resumes managing exactly where it left off.

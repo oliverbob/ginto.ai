@@ -1,6 +1,6 @@
 # Ginto Tunnel
 
-A SirTunnel-inspired reverse tunnel service that allows users to expose their local OpenWebUI (or other services) to the internet via subdomains on ginto.ai.
+A SirTunnel-inspired reverse tunnel service that allows users to expose their local OpenWebUI (or other services) to the internet via subdomains on silverqueen.pro.
 
 ## Tunnel Options
 
@@ -20,7 +20,7 @@ Ginto offers two tunnel implementations:
 
 ## ImageGen Relay (`/tunnel`)
 
-For the ImageGen-specific relay control plane (approve/revoke, server/client sync, and `vision.ginto.ai` behavior), see:
+For the ImageGen-specific relay control plane (approve/revoke, server/client sync, and `vision.silverqueen.pro` behavior), see:
 
 - [ImageGen Tunnel Relay Documentation](./tunnel-imagegen.md)
 
@@ -35,12 +35,12 @@ For the ImageGen-specific relay control plane (approve/revoke, server/client syn
 │                          GINTO TUNNEL                               │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
-│  [Local Machine]                        [ginto.ai Server]           │
+│  [Local Machine]                        [silverqueen.pro Server]           │
 │  ┌──────────────┐                      ┌──────────────────────────┐ │
 │  │ OpenWebUI    │                      │ Tunnel Server (ws:8765)  │ │
 │  │ :8088        │◄───────────────────► │ ┌──────────────────────┐ │ │
 │  └──────────────┘   WebSocket Tunnel   │ │ Caddy Reverse Proxy  │ │ │
-│        │                               │ │ xyz.ginto.ai:443     │ │ │
+│        │                               │ │ xyz.silverqueen.pro:443     │ │ │
 │        │                               │ └──────────────────────┘ │ │
 │  ┌──────────────┐                      └──────────────────────────┘ │
 │  │ expose.sh    │                                  ▲                │
@@ -48,7 +48,7 @@ For the ImageGen-specific relay control plane (approve/revoke, server/client syn
 │  └──────────────┘                                                   │
 │                                                                     │
 │  [Internet User]                                                    │
-│  Browser: https://xyz.ginto.ai ──────────────────► Caddy ► Tunnel   │
+│  Browser: https://xyz.silverqueen.pro ──────────────────► Caddy ► Tunnel   │
 │                                                                     │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -84,7 +84,7 @@ Bash script to establish tunnel from local machine:
 ./expose.sh myapp 8088
 
 # Custom server
-./expose.sh myapp 3000 custom-server.ginto.ai
+./expose.sh myapp 3000 custom-server.silverqueen.pro
 ```
 
 ### 3. API Controller (`src/Controllers/TunnelController.php`)
@@ -129,7 +129,7 @@ sudo ufw allow 8765/tcp
 Just download and run expose.sh:
 
 ```bash
-curl -O https://ginto.ai/bin/expose.sh
+curl -O https://silverqueen.pro/bin/expose.sh
 chmod +x expose.sh
 ./expose.sh myapp 8088
 ```
@@ -143,18 +143,18 @@ chmod +x expose.sh
 3. Enter desired subdomain (e.g., `my-owui`)
 4. Copy the terminal command shown
 5. Run the command on your local machine
-6. Access via `https://my-owui.ginto.ai`
+6. Access via `https://my-owui.silverqueen.pro`
 
 ### From Command Line
 
 ```bash
-# Expose local port 8088 as myapp.ginto.ai
+# Expose local port 8088 as myapp.silverqueen.pro
 ./expose.sh myapp 8088
 
 # Output:
-# [TUNNEL] Connecting to wss://ginto.ai:8765...
+# [TUNNEL] Connecting to wss://silverqueen.pro:8765...
 # [TUNNEL] ✓ Connected! Your service is live at:
-# [TUNNEL] https://myapp.ginto.ai
+# [TUNNEL] https://myapp.silverqueen.pro
 # [TUNNEL] Press Ctrl+C to disconnect
 ```
 
@@ -175,11 +175,11 @@ Request a new tunnel subdomain.
 ```json
 {
   "success": true,
-  "url": "https://my-openwebui.ginto.ai",
+  "url": "https://my-openwebui.silverqueen.pro",
   "subdomain": "my-openwebui",
   "token": "eyJ0eXAi...",
   "expires_in": 600,
-  "ws_endpoint": "wss://ginto.ai:8765"
+  "ws_endpoint": "wss://silverqueen.pro:8765"
 }
 ```
 
@@ -200,7 +200,7 @@ Check if user has an active tunnel.
 {
   "active": true,
   "subdomain": "my-openwebui",
-  "url": "https://my-openwebui.ginto.ai",
+  "url": "https://my-openwebui.silverqueen.pro",
   "created_at": 1735123456,
   "expires_at": 1735124056
 }
@@ -223,8 +223,8 @@ Check if user has an active tunnel.
 Tunnel creates Caddy configs like:
 
 ```caddyfile
-# /etc/caddy/sites-enabled/tunnel-myapp.ginto.ai
-myapp.ginto.ai {
+# /etc/caddy/sites-enabled/tunnel-myapp.silverqueen.pro
+myapp.silverqueen.pro {
     tls {
         on_demand
     }
@@ -270,13 +270,13 @@ Choose a different subdomain or wait for existing tunnel to expire.
 
 ### "Token expired"
 
-Tunnel sessions last 10 minutes for unregistered users. Register at ginto.ai for persistent tunnels.
+Tunnel sessions last 10 minutes for unregistered users. Register at silverqueen.pro for persistent tunnels.
 
 ### "DNS not resolving"
 
 Wait 1-2 minutes for DNS propagation, or check PowerDNS:
 ```bash
-dig +short myapp.ginto.ai
+dig +short myapp.silverqueen.pro
 ```
 
 ## Limitations

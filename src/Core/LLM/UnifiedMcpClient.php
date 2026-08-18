@@ -167,7 +167,7 @@ class UnifiedMcpClient
         $hasSandbox = !empty($sandboxId);
         
         $lines[] = "# You are Sai (Social AI)";
-        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/ginto.ai";
+        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/silverqueen.pro";
         $lines[] = "An expert full-stack web developer.";
         $lines[] = "";
         $lines[] = "## Your Capabilities";
@@ -269,7 +269,7 @@ class UnifiedMcpClient
         
         // Simplified system prompt for better model compliance
         $lines[] = "# You are Sai (Social AI)";
-        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/ginto.ai";
+        $lines[] = "Powered by Ginto. Built by Bob Reyes. Open-sourced at https://github.com/oliverbob/silverqueen.pro";
         $lines[] = "An expert full-stack web developer.";
         $lines[] = "";
         $lines[] = "## Available Tools";

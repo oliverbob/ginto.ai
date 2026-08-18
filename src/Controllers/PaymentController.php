@@ -1200,14 +1200,14 @@ class PaymentController
         
         // Origin validation for CSRF protection
         $appUrl = $_ENV['APP_URL'] ?? 'https://ginto.app';
-        $prodUrl = $_ENV['PRODUCTION_URL'] ?? 'https://ginto.ai';
+        $prodUrl = $_ENV['PRODUCTION_URL'] ?? 'https://silverqueen.pro';
         $allowedOrigins = [
             $appUrl, 
             rtrim($appUrl, '/'),
             $prodUrl,
             rtrim($prodUrl, '/'),
-            'https://ginto.ai',
-            'https://www.ginto.ai',
+            'https://silverqueen.pro',
+            'https://www.silverqueen.pro',
             'http://localhost', 
             'http://localhost:8000', 
             'http://127.0.0.1:8000'
@@ -1218,7 +1218,7 @@ class PaymentController
         $prodHost = parse_url($prodUrl, PHP_URL_HOST);
         
         $originAllowed = in_array($origin, $allowedOrigins) || $origin === '';
-        $refererAllowed = $referer === $appHost || $referer === $prodHost || $referer === 'ginto.ai' || $referer === 'www.ginto.ai' || $referer === 'localhost' || $referer === '127.0.0.1' || empty($referer);
+        $refererAllowed = $referer === $appHost || $referer === $prodHost || $referer === 'silverqueen.pro' || $referer === 'www.silverqueen.pro' || $referer === 'localhost' || $referer === '127.0.0.1' || empty($referer);
         
         if (!$originAllowed && !$refererAllowed) {
             error_log("CSRF blocked: origin=$origin, referer=$referer, allowed_host=$appHost");

@@ -51,7 +51,7 @@ $currentPage = 'dashboard';
         <i class="fas fa-sync-alt"></i>
         <span class="hidden sm:inline text-sm">Refresh</span>
       </button>
-      <a href="https://github.com/ginto-ai/ginto.ai" target="_blank" rel="noopener" class="flex items-center gap-2 px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Star us on GitHub">
+      <a href="https://github.com/ginto-ai/silverqueen.pro" target="_blank" rel="noopener" class="flex items-center gap-2 px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors" title="Star us on GitHub">
         <i class="fab fa-github"></i>
         <span class="hidden sm:inline text-sm">Star us</span>
       </a>

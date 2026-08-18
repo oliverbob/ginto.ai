@@ -12,7 +12,7 @@ return [
         'address' => '0x4ff1c66c5da2e687b3e1a156a0c8e4cf30eb2f06',
     ],
 
-    // SilverQueen collects into the SilverQueen wallet platform at sq.ginto.ai —
+    // SilverQueen collects into the SilverQueen wallet platform at sq.silverqueen.pro —
     // this is the operator's own deposit address there, so a payment made here
     // is credited to that account automatically once the chain confirms it.
     // Separate from registration payments, which still go to the address above.

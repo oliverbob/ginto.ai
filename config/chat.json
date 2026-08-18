@@ -1,5 +1,5 @@
 {
-    "$schema": "https://ginto.ai/schemas/chat-config.json",
+    "$schema": "https://silverqueen.pro/schemas/chat-config.json",
     "comment": "Ginto AI Chat Configuration - Similar to VS Code settings",
     
     "streaming": {

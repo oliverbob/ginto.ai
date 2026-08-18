@@ -6,7 +6,7 @@
  * Hourly from cron is plenty; the engine is time-anchored rather than tick-driven,
  * so running more often is harmless and running less often catches up:
  *
- *   0 * * * * cd /home/oliverbob/ginto.ai && /usr/bin/php bin/silverqueen_accrue.php >> /tmp/silverqueen.log 2>&1
+ *   0 * * * * cd /home/oliverbob/silverqueen.pro && /usr/bin/php bin/silverqueen_accrue.php >> /tmp/silverqueen.log 2>&1
  *
  * The dashboard also syncs the visiting member on page load, so this worker exists
  * to keep members who never log in — and their uplines' ledgers — current.

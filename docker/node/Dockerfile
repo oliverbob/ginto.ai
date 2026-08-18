@@ -3,7 +3,7 @@
 
 FROM node:20-alpine
 
-LABEL maintainer="Ginto AI <support@ginto.ai>"
+LABEL maintainer="Ginto AI <support@silverqueen.pro>"
 LABEL description="Node.js services for Ginto AI (sandbox-proxy, terminal-server)"
 
 # Install system dependencies for node-pty and Docker CLI

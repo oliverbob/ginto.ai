@@ -259,7 +259,7 @@ $csrf = $csrf_token ?? '';
 </section>
 
 <?php if (!empty($plans) && $currentPlan !== 'academy_pro'): /* render for guests + non-Pro members (so upgrade works) */ ?>
-<!-- On-site sign-up + QR Ph payment — the QR is generated and paid on ginto.ai (no PayMongo redirect). -->
+<!-- On-site sign-up + QR Ph payment — the QR is generated and paid on silverqueen.pro (no PayMongo redirect). -->
 <div id="join-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4 bg-black/60" onclick="if(event.target===this)gtaCloseJoin()">
     <div class="w-full max-w-md rounded-2xl bg-white dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-6 shadow-2xl">
         <div class="flex items-center justify-between mb-1">
@@ -298,7 +298,7 @@ $csrf = $csrf_token ?? '';
                 <div class="flex justify-between font-bold text-base text-gray-900 dark:text-gray-100 mt-1 pt-1 border-t border-gray-200 dark:border-gray-700"><span>Total due</span><span id="jm-total">—</span></div>
             </div>
             <button type="button" onclick="gtaPickQr()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary text-left"><i class="fas fa-qrcode text-primary text-lg"></i><span><span class="font-semibold block">QR Ph</span><span class="text-xs text-gray-400">GCash, Maya, GoTyme, BPI &amp; banks</span></span></button>
-            <button type="button" onclick="gtaPickCard()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary text-left"><i class="fas fa-credit-card text-primary text-lg"></i><span><span class="font-semibold block">Credit / Debit card</span><span class="text-xs text-gray-400">Visa, Mastercard — entered on ginto.ai</span></span></button>
+            <button type="button" onclick="gtaPickCard()" class="w-full flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-700 hover:border-primary hover:text-primary text-left"><i class="fas fa-credit-card text-primary text-lg"></i><span><span class="font-semibold block">Credit / Debit card</span><span class="text-xs text-gray-400">Visa, Mastercard — entered on silverqueen.pro</span></span></button>
         </div>
 
         <!-- Pane 3a: on-site QR Ph payment -->
@@ -344,7 +344,7 @@ $csrf = $csrf_token ?? '';
             <p class="text-center text-[11px] text-gray-400"><i class="fas fa-lock mr-1"></i> Card details are sent directly to PayMongo over TLS. Your bank may ask for OTP/3DS.</p>
         </div>
 
-        <p class="mt-4 text-center text-[11px] text-gray-400"><i class="fas fa-shield-halved mr-1"></i> Paid securely on ginto.ai. QR Ph &amp; card, incl. 12% VAT.</p>
+        <p class="mt-4 text-center text-[11px] text-gray-400"><i class="fas fa-shield-halved mr-1"></i> Paid securely on silverqueen.pro. QR Ph &amp; card, incl. 12% VAT.</p>
     </div>
 </div>
 

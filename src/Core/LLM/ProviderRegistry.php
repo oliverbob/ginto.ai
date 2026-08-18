@@ -40,7 +40,7 @@ class ProviderRegistry
             'supports_tools' => true,
         ],
         'ginto_tunnel' => [
-            'base_url' => 'https://ollama.ginto.ai/v1/',
+            'base_url' => 'https://ollama.silverqueen.pro/v1/',
             'env_key' => 'GINTO_TUNNEL_API_KEY',
             'display_name' => 'Ginto Tunnel',
             'supports_tools' => true,

@@ -25,7 +25,7 @@ $isLocal = (
 
 // If proxied from local, force remote domain
 if ($isLocal && isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-    define('BASE_URL', 'https://ginto.ai');
+    define('BASE_URL', 'https://silverqueen.pro');
 } else {
     define('BASE_URL', $scheme . '://' . $host);
 }

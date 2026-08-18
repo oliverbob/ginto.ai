@@ -15,7 +15,7 @@ $ogDesc  = !empty($_sfDesc)
 $ogImage = !empty($_sfBanner) ? $_sfBanner : (!empty($_sfLogo) ? $_sfLogo : '/assets/images/mall-og.png');
 $ogType  = 'website';
 $_proto  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-$_host   = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+$_host   = $_SERVER['HTTP_HOST'] ?? 'silverqueen.pro';
 $ogUrl   = $_proto . '://' . $_host . '/mall/' . rawurlencode($_sfSlug);
 
 $page = 'storefront';

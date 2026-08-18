@@ -78,7 +78,7 @@ class LxdSandboxManager
                     'available' => false,
                     'error' => 'lxc_sudo_permission',
                     'message' => 'The web server user needs passwordless sudo access to lxc.',
-                    'install_command' => 'sudo bash ~/ginto.ai/bin/ginto.sh install'
+                    'install_command' => 'sudo bash ~/silverqueen.pro/bin/ginto.sh install'
                 ];
             }
             
@@ -96,7 +96,7 @@ class LxdSandboxManager
                 'available' => false,
                 'error' => 'lxc_execution_failed',
                 'message' => 'Failed to execute lxc: ' . $errorMsg,
-                'install_command' => 'sudo bash ~/ginto.ai/bin/ginto.sh install'
+                'install_command' => 'sudo bash ~/silverqueen.pro/bin/ginto.sh install'
             ];
         }
         
@@ -107,7 +107,7 @@ class LxdSandboxManager
                 'available' => false,
                 'error' => 'base_container_missing',
                 'message' => 'The ginto-sandbox template container is not available.',
-                'install_command' => 'sudo bash ~/ginto.ai/bin/ginto.sh install'
+                'install_command' => 'sudo bash ~/silverqueen.pro/bin/ginto.sh install'
             ];
         }
         

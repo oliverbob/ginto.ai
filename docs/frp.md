@@ -1,4 +1,4 @@
-# FRP on ginto.ai
+# FRP on silverqueen.pro
 
 There are **two independent frps servers** running on `149.28.145.52`. They are
 not redundant copies of each other and they are not interchangeable. Changing
@@ -8,7 +8,7 @@ one to look like the other will break whatever depends on it.
 
 | | Wildcard server | Dedicated server |
 |---|---|---|
-| Purpose | Public `*.ginto.ai` subdomain tunnels | Separate, purpose-built tunnelling |
+| Purpose | Public `*.silverqueen.pro` subdomain tunnels | Separate, purpose-built tunnelling |
 | systemd unit | `ginto-frps.service` | `frps.service` |
 | Binary | `/opt/frp/frps` | `/home/oliverbob/frp/frps` |
 | Config | `/etc/frp/frps.toml` | `/home/oliverbob/frp/frps.toml` |
@@ -23,7 +23,7 @@ The dedicated server on `7700` has **no vhost ports configured at all**, so it
 cannot serve `http`/`https` subdomain proxies — it exists for its own use case
 and must be left alone. Everything below concerns the wildcard server only.
 
-## How a `*.ginto.ai` request is served
+## How a `*.silverqueen.pro` request is served
 
 ```
 Browser  ──TLS──►  Caddy :443            (terminates TLS, on-demand cert)
@@ -43,13 +43,13 @@ Browser  ──TLS──►  Caddy :443            (terminates TLS, on-demand ce
 Relevant pieces:
 
 - `/etc/caddy/Caddyfile` — global `on_demand_tls { ask http://localhost:8000/api/tunnel/verify }`
-- `/etc/caddy/sites-enabled/tunnels.caddy` — the `*.ginto.ai` block; forwards to `127.0.0.1:7080`
+- `/etc/caddy/sites-enabled/tunnels.caddy` — the `*.silverqueen.pro` block; forwards to `127.0.0.1:7080`
 - `TunnelController::verifyTunnel()` — gates certificate issuance per subdomain
 - `custom404Page = /var/www/frp/404.html` — the "Tunnel Not Found" page frps serves when no proxy matches
 
 ## The rule that matters for clients
 
-**A proxy for `*.ginto.ai` must be `type = "http"`.**
+**A proxy for `*.silverqueen.pro` must be `type = "http"`.**
 
 Caddy terminates TLS at the edge and forwards plaintext to the frps **HTTP**
 vhost on `:7080`. An `https`-type proxy is registered on the **HTTPS** vhost
@@ -61,9 +61,9 @@ Symptom checklist for that failure:
 
 ```bash
 # on the server
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: sub.ginto.ai' http://127.0.0.1:7080/     # 404
-curl -sk --resolve sub.ginto.ai:7443:127.0.0.1 -o /dev/null -w '%{http_code}\n' \
-     https://sub.ginto.ai:7443/                                                             # 200/303
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: sub.silverqueen.pro' http://127.0.0.1:7080/     # 404
+curl -sk --resolve sub.silverqueen.pro:7443:127.0.0.1 -o /dev/null -w '%{http_code}\n' \
+     https://sub.silverqueen.pro:7443/                                                             # 200/303
 ```
 
 A 404 on `:7080` together with a real response on `:7443` means the client
@@ -91,7 +91,7 @@ it in TLS for the local app. Do not emit `localIP`/`localPort` next to a
 `plugin` block — the plugin owns the local endpoint.
 
 The gntl client implements this in `_frp_exposure_plan()` and
-`render_frpc_config()`, keyed off `FRP_EDGE_TLS_HOSTS` (default `ginto.ai`) so
+`render_frpc_config()`, keyed off `FRP_EDGE_TLS_HOSTS` (default `silverqueen.pro`) so
 that pointing gntl at any other frps leaves its behaviour unchanged.
 
 ## Authorising a tunnel: `POST /api/tunnel/bind`
@@ -101,7 +101,7 @@ authorise itself. No session, no CSRF (the caller is an frpc host, not a
 browser), and no admin step.
 
 ```bash
-curl -X POST https://ginto.ai/api/tunnel/bind \
+curl -X POST https://silverqueen.pro/api/tunnel/bind \
      -H 'Content-Type: application/json' \
      -d '{"key":"gtnl-...","local_port":2026,"client":"my-host"}'
 ```
@@ -141,7 +141,7 @@ back to `/etc/frp/frps.env`.
 
 ## Authorisation is enforced per request
 
-`*.ginto.ai` runs every request through Caddy `forward_auth` to
+`*.silverqueen.pro` runs every request through Caddy `forward_auth` to
 `/api/tunnel/authz` before it reaches frps. A subdomain serves only while the
 online proxy publishes an account key that is valid, so revoking or deleting a
 key at `/account/keys` stops the tunnel on the next request - no restart and no
@@ -153,7 +153,7 @@ Browser ──► Caddy ──► forward_auth /api/tunnel/authz ──► 204 �
                               └── 403 "tunnel not authorised"
 ```
 
-The subrequest must carry `Host: ginto.ai` and pass the real hostname in
+The subrequest must carry `Host: silverqueen.pro` and pass the real hostname in
 `X-Tunnel-Host`. The app routes by `Host`, so a subdomain Host makes it relay
 the check into that very tunnel, which answers from the tunnelled app instead
 of the gate.

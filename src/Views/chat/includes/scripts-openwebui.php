@@ -192,7 +192,7 @@
         isInstalling = false;
         updateOpenWebuiUI();
         
-        // Register the OpenWebUI domain with Caddy (only for LXD backend - creates oi.ginto.ai proxy)
+        // Register the OpenWebUI domain with Caddy (only for LXD backend - creates oi.silverqueen.pro proxy)
         if (sandboxBackend === 'lxd') {
           try {
             const csrfToken = await getCsrfToken();
@@ -394,7 +394,7 @@
   }
   
   async function openOpenWebUI() {
-    const url = openWebuiUrl || (sandboxBackend === 'lxd' ? 'https://oi.ginto.ai/' : null);
+    const url = openWebuiUrl || (sandboxBackend === 'lxd' ? 'https://oi.silverqueen.pro/' : null);
     if (!url) {
       showToast('OpenWebUI URL not available. Is it running?', 'error');
       return;
@@ -662,7 +662,7 @@
               placeholder="my-openwebui"
               pattern="[a-z0-9][a-z0-9-]{1,30}[a-z0-9]"
               maxlength="32">
-            <span class="text-gray-400">.ginto.ai</span>
+            <span class="text-gray-400">.silverqueen.pro</span>
           </div>
           <p class="text-gray-500 text-xs mt-1">3-32 characters, lowercase letters, numbers, and hyphens</p>
         </div>
@@ -725,7 +725,7 @@
               class="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-purple-500" 
               value="${tunnelSubdomain || ''}"
               readonly>
-            <span class="text-gray-400">.ginto.ai</span>
+            <span class="text-gray-400">.silverqueen.pro</span>
           </div>
           <p class="text-gray-500 text-xs mt-1">3-32 characters, lowercase letters, and hyphens</p>
         </div>

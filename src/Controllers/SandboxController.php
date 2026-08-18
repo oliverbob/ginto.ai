@@ -628,10 +628,10 @@ class SandboxController
         }
         
         // Handle sandbox_type selection (docker vs lxc)
-        // On live (ginto.ai), only Docker is allowed for free users; LXC requires Enterprise
+        // On live (silverqueen.pro), only Docker is allowed for free users; LXC requires Enterprise
         $requestedType = $data['sandbox_type'] ?? 'docker';
-        $isLive = (strpos($_SERVER['HTTP_HOST'] ?? '', 'ginto.ai') !== false) || 
-                  (($_ENV['APP_URL'] ?? '') === 'https://ginto.ai');
+        $isLive = (strpos($_SERVER['HTTP_HOST'] ?? '', 'silverqueen.pro') !== false) || 
+                  (($_ENV['APP_URL'] ?? '') === 'https://silverqueen.pro');
         
         if ($isLive && $requestedType === 'lxc') {
             // Check if user has Enterprise subscription
@@ -1006,8 +1006,8 @@ class SandboxController
                 'message' => 'Starting Ginto installation...',
                 'result' => [
                     'action' => 'ginto_install',
-                    'command' => 'sudo bash ~/ginto.ai/bin/ginto.sh install',
-                    'message' => 'I\'ll start the Ginto installation for you. This will install LXC/LXD and set up the sandbox system. Please run this command in your server\'s SSH terminal: sudo bash ~/ginto.ai/bin/ginto.sh install'
+                    'command' => 'sudo bash ~/silverqueen.pro/bin/ginto.sh install',
+                    'message' => 'I\'ll start the Ginto installation for you. This will install LXC/LXD and set up the sandbox system. Please run this command in your server\'s SSH terminal: sudo bash ~/silverqueen.pro/bin/ginto.sh install'
                 ]
             ]);
             exit;
@@ -1479,7 +1479,7 @@ class SandboxController
             
             // Use subdomain for LXD (online), direct IP for Docker (offline)
             if ($backend === 'lxd') {
-                $openwebuiUrl = 'https://oi.ginto.ai/';
+                $openwebuiUrl = 'https://oi.silverqueen.pro/';
             } else {
                 // Docker backend - use direct IP access
                 $openwebuiUrl = "http://{$hostIp}:8088/";
@@ -1720,7 +1720,7 @@ INSTALLSCRIPT
             
             // Use subdomain for LXD (online), direct IP for Docker (offline)
             if ($backend === 'lxd') {
-                $openwebuiUrl = 'https://oi.ginto.ai/';
+                $openwebuiUrl = 'https://oi.silverqueen.pro/';
             } else {
                 // Docker backend - use direct IP access
                 $openwebuiUrl = "http://{$hostIp}:8088/";
@@ -1879,7 +1879,7 @@ INSTALLSCRIPT
     }
     
     /**
-     * Register OpenWebUI domain (oi.ginto.ai) with Caddy proxy to sandbox:8088
+     * Register OpenWebUI domain (oi.silverqueen.pro) with Caddy proxy to sandbox:8088
      * Called after OpenWebUI installation completes to set up the reverse proxy
      * ADMIN ONLY - Only administrators can register OpenWebUI domains
      */
@@ -1926,18 +1926,18 @@ INSTALLSCRIPT
             }
             
             $containerName = \Ginto\Helpers\UnifiedSandbox::containerName($sandboxId);
-            $domain = 'oi.ginto.ai';
-            $parentZone = 'ginto.ai';
+            $domain = 'oi.silverqueen.pro';
+            $parentZone = 'silverqueen.pro';
             $proxyTarget = "http://{$sandboxIp}:8088";
             
             // Get server public IP for DNS record
             $serverIp = $this->getServerPublicIp();
             
-            // Create DNS A record for oi.ginto.ai in ginto.ai zone
+            // Create DNS A record for oi.silverqueen.pro in silverqueen.pro zone
             $dnsResult = $this->createSubdomainDnsRecord($domain, $parentZone, $serverIp);
             
             // Generate Caddy config for OpenWebUI proxy
-            // Same-origin with ginto.ai - no complex CORS needed
+            // Same-origin with silverqueen.pro - no complex CORS needed
             $caddyConfig = <<<CADDY
 {$domain} {
     reverse_proxy {$proxyTarget} {
@@ -1961,7 +1961,7 @@ CADDY;
             $configFile = "/etc/caddy/sites-available/{$domain}.caddy";
             
             // Write Caddy config to sites-available only
-            // Note: oi.ginto.ai is handled in tunnels.caddy, this is for reference/backup
+            // Note: oi.silverqueen.pro is handled in tunnels.caddy, this is for reference/backup
             if (file_put_contents($configFile, $caddyConfig) === false) {
                 echo json_encode(['success' => false, 'error' => 'Failed to write Caddy config']);
                 exit;
@@ -2056,7 +2056,7 @@ CADDY;
             
             // Generate alphanumeric subdomain (8 chars)
             $subdomain = $this->generateCloudSubdomain();
-            $domain = "{$subdomain}.ginto.ai";
+            $domain = "{$subdomain}.silverqueen.pro";
             
             // Expiry: 5 minutes from now
             $expiresIn = 300; // 5 minutes
@@ -2194,7 +2194,7 @@ CADDY;
             'success' => true,
             'active' => $isActive,
             'subdomain' => $subdomain,
-            'url' => $isActive ? "https://{$subdomain}.ginto.ai/" : null,
+            'url' => $isActive ? "https://{$subdomain}.silverqueen.pro/" : null,
             'expires_at' => $expiresAt,
             'remaining' => max(0, $expiresAt - time())
         ]);

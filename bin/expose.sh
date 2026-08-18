@@ -5,15 +5,15 @@
 # Usage: ./expose.sh [subdomain] [local_port]
 #
 # Examples:
-#   ./expose.sh myapp 8088       # Expose port 8088 as myapp.ginto.ai
+#   ./expose.sh myapp 8088       # Expose port 8088 as myapp.silverqueen.pro
 #   ./expose.sh                  # Interactive mode
 #
 
 set -e
 
 # Use wss:// with path /tunnel/ws (Caddy proxies to tunnel server)
-TUNNEL_SERVER="${GINTO_TUNNEL_SERVER:-wss://ginto.ai/tunnel/ws}"
-TUNNEL_HTTP="${GINTO_TUNNEL_HTTP:-https://ginto.ai}"
+TUNNEL_SERVER="${GINTO_TUNNEL_SERVER:-wss://silverqueen.pro/tunnel/ws}"
+TUNNEL_HTTP="${GINTO_TUNNEL_HTTP:-https://silverqueen.pro}"
 DEFAULT_PORT=8088
 AUTH_TOKEN="${GINTO_AUTH_TOKEN:-}"
 MAX_RECONNECT_ATTEMPTS=5
@@ -154,7 +154,7 @@ run_tunnel() {
                     if [ "$authenticated" = "false" ]; then
                         local mins=$((expires_in / 60))
                         echo -e "${YELLOW}⚠ Tunnel expires in ${mins} minutes${NC}"
-                        echo -e "  Register at ${BLUE}https://ginto.ai/register${NC} for non-expiring tunnels"
+                        echo -e "  Register at ${BLUE}https://silverqueen.pro/register${NC} for non-expiring tunnels"
                     else
                         echo -e "${GREEN}✓ Authenticated - tunnel will not expire${NC}"
                     fi
@@ -264,7 +264,7 @@ PORT="${2:-$DEFAULT_PORT}"
 # Interactive mode if no subdomain provided
 if [ -z "$SUBDOMAIN" ]; then
     echo "Enter a subdomain for your tunnel:"
-    echo -e "  Your URL will be: ${BLUE}[subdomain].ginto.ai${NC}"
+    echo -e "  Your URL will be: ${BLUE}[subdomain].silverqueen.pro${NC}"
     echo ""
     read -p "Subdomain: " SUBDOMAIN
     echo ""

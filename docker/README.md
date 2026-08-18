@@ -6,8 +6,8 @@ This directory contains the Docker configuration for running Ginto AI in contain
 
 ```bash
 # Clone the repository
-git clone https://github.com/oliverbob/ginto.ai.git
-cd ginto.ai
+git clone https://github.com/oliverbob/silverqueen.pro.git
+cd silverqueen.pro
 
 # Copy environment file and configure
 cp docker/.env.example .env

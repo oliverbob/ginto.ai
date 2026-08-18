@@ -11,7 +11,7 @@ All notable changes to Ginto will be documented in this file.
   - **Client components**: `ginto-frpc.sh` helper script, `frpc.toml.example` configuration template
   - **Systemd service**: `ginto-frps.service` for production deployment
   - **Caddy integration**: `caddy-frp.conf` for wildcard subdomain routing
-  - **Quick install**: `curl -sSL https://ginto.ai/frp/install.sh | bash`
+  - **Quick install**: `curl -sSL https://silverqueen.pro/frp/install.sh | bash`
 
 - **FRP API endpoints** (`FrpController.php`)
   - `GET /frp/install.sh` - Serve client installer script
@@ -40,7 +40,7 @@ All notable changes to Ginto will be documented in this file.
 
 - Token-based authentication for secure tunnel access
 - Multiple protocol support: HTTP, HTTPS, TCP, UDP, STCP (secret TCP)
-- Custom subdomain support (`myapp.ginto.ai`)
+- Custom subdomain support (`myapp.silverqueen.pro`)
 - Load balancing across multiple clients
 - Health checks for automatic failover
 - Dashboard for monitoring (frps built-in)
@@ -51,7 +51,7 @@ All notable changes to Ginto will be documented in this file.
 - frp version: 0.66.0
 - Server: binds to port 7000, vhost HTTP on 7080, vhost HTTPS on 7443
 - TLS enabled by default for client connections
-- Wildcard DNS: `*.ginto.ai` → Caddy → frps vhost port
+- Wildcard DNS: `*.silverqueen.pro` → Caddy → frps vhost port
 - frpc config stored in `~/.ginto-frp/frpc-{subdomain}.toml`
 - Logs stored in `/tmp/frpc-{subdomain}.log`
 - Uses `subdomain` field (not `customDomains`) for frps subDomainHost compatibility
@@ -68,7 +68,7 @@ All notable changes to Ginto will be documented in this file.
 
 ### Changed
 
-- **OpenWebUI domain** - Switched from `oi.saichat.pro` to `oi.ginto.ai` for same-origin iframe embedding
+- **OpenWebUI domain** - Switched from `oi.saichat.pro` to `oi.silverqueen.pro` for same-origin iframe embedding
   - Eliminates cross-origin storage issues (localStorage/JWT tokens now shared)
   - Simplified Caddy config (removed CORS headers)
   - Assets and authentication work seamlessly in iframe

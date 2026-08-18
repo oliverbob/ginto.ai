@@ -2,7 +2,7 @@
 /**
  * Cloud Proxy Controller
  * 
- * Handles proxying requests from cloud subdomains (*.ginto.ai) to sandbox containers.
+ * Handles proxying requests from cloud subdomains (*.silverqueen.pro) to sandbox containers.
  * This is called by Caddy for cloud subdomains that are not FRP tunnels.
  */
 
@@ -22,7 +22,7 @@ class CloudProxyController
     /**
      * Get routing information for a cloud subdomain
      * Called by Caddy to determine where to proxy
-     * GET /api/cloud/route?domain=subdomain.ginto.ai
+     * GET /api/cloud/route?domain=subdomain.silverqueen.pro
      */
     public function getRoute(): void
     {
@@ -333,7 +333,7 @@ class CloudProxyController
         <h1>{$title}</h1>
         <p>{$message}</p>
         <p>{$suggestion}</p>
-        <a href="https://ginto.ai/chat" class="btn">← Back to Ginto AI</a>
+        <a href="https://silverqueen.pro/chat" class="btn">← Back to Ginto AI</a>
     </div>
 </body>
 </html>

@@ -4,11 +4,11 @@ namespace Ginto\Support;
 use Ginto\Core\Database;
 
 /**
- * Turns a relay bearer token into "which ginto.ai member is this, and what may
+ * Turns a relay bearer token into "which silverqueen.pro member is this, and what may
  * they see".
  *
  * The caller is a machine, not a person. SilverQueen sits behind the gntl tunnel
- * on sq.ginto.ai and reaches this host over HTTPS; nobody logs in on the way. It
+ * on sq.silverqueen.pro and reaches this host over HTTPS; nobody logs in on the way. It
  * names the member it is acting for by putting their `users.username` in the
  * `sub` claim of a token signed with a secret both sides hold, and this class is
  * the other half of that handshake.

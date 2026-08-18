@@ -674,7 +674,7 @@ class ApiController extends Controller
 
         $value = $this->sanitizeOpenAiCompatibleBaseUrl($baseUrl);
         if (empty($value)) {
-            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.silverqueen.pro/v1/');
         }
         if (empty($value)) {
             return;
@@ -708,7 +708,7 @@ class ApiController extends Controller
 
         $value = $this->sanitizeOpenAiCompatibleBaseUrl($baseUrl);
         if (empty($value)) {
-            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+            $value = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.silverqueen.pro/v1/');
         }
         if (empty($value)) {
             return;
@@ -736,8 +736,8 @@ class ApiController extends Controller
 
     private function resolveTunnelBaseUrl(?int $userId, bool $isAdmin): string
     {
-        $fallback = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/')
-            ?: 'https://ollama.ginto.ai/v1/';
+        $fallback = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.silverqueen.pro/v1/')
+            ?: 'https://ollama.silverqueen.pro/v1/';
 
         if (!$this->db) {
             return $fallback;
@@ -1659,7 +1659,7 @@ class ApiController extends Controller
                 if ($provider === 'ginto_tunnel') {
                     $sanitizedBaseUrl = $this->sanitizeOpenAiCompatibleBaseUrl($base_url);
                     if (empty($sanitizedBaseUrl)) {
-                        $sanitizedBaseUrl = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.ginto.ai/v1/');
+                        $sanitizedBaseUrl = $this->sanitizeOpenAiCompatibleBaseUrl($this->getEnvVar('GINTO_TUNNEL_BASE_URL') ?: 'https://ollama.silverqueen.pro/v1/');
                     }
                     if (empty($sanitizedBaseUrl)) {
                         http_response_code(400);

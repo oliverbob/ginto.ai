@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# Rotate the relay signing secret shared by ginto.ai and its callers.
+# Rotate the relay signing secret shared by silverqueen.pro and its callers.
 #
 # The secret lives in a file on two separate hosts, so it cannot change on both
 # at the same instant. Rotating naively means every request in the gap is
 # refused, and the gap lasts as long as it takes to edit the second file. This
 # script uses the overlap RelayAuth supports instead, in three phases:
 #
-#   1. accept  — the new secret goes on ginto.ai as RELAY_JWT_SECRET and the old
+#   1. accept  — the new secret goes on silverqueen.pro as RELAY_JWT_SECRET and the old
 #                one moves to RELAY_JWT_SECRET_PREVIOUS. Both are now honoured,
 #                so callers still signing with the old secret keep working.
 #   2. issue   — callers are updated to sign with the new secret.
@@ -19,9 +19,9 @@
 # live call before it reports success.
 #
 # Usage:
-#   bin/rotate-relay-secret.sh accept            # phase 1, on ginto.ai
+#   bin/rotate-relay-secret.sh accept            # phase 1, on silverqueen.pro
 #   bin/rotate-relay-secret.sh issue <secret>    # phase 2, on each caller
-#   bin/rotate-relay-secret.sh retire            # phase 3, on ginto.ai
+#   bin/rotate-relay-secret.sh retire            # phase 3, on silverqueen.pro
 #   bin/rotate-relay-secret.sh status            # what is configured right now
 #
 # For the common case where both checkouts are on this machine, `local` does all
@@ -102,7 +102,7 @@ export CALLER_DIR
 case "${1:-}" in
 
   status)
-    section "ginto.ai — $GINTO_ENV"
+    section "silverqueen.pro — $GINTO_ENV"
     note "RELAY_JWT_SECRET          $(fingerprint "$(get_env "$GINTO_ENV" RELAY_JWT_SECRET)")"
     note "RELAY_JWT_SECRET_PREVIOUS $(fingerprint "$(get_env "$GINTO_ENV" RELAY_JWT_SECRET_PREVIOUS)")"
     if [ -f "$CALLER_ENV" ]; then
@@ -122,7 +122,7 @@ case "${1:-}" in
     ;;
 
   accept)
-    section "Phase 1 — ginto.ai accepts a new secret alongside the old one"
+    section "Phase 1 — silverqueen.pro accepts a new secret alongside the old one"
     old=$(get_env "$GINTO_ENV" RELAY_JWT_SECRET)
     [ -z "$old" ] && die "RELAY_JWT_SECRET is not set; nothing to rotate from"
     new=$(openssl rand -hex 32)

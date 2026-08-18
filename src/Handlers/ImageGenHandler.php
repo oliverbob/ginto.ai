@@ -204,7 +204,7 @@ class ImageGenHandler
 
         $computeMode = $this->envValue('IMAGEGEN_COMPUTE_MODE', 'auto');
         if ($computeMode === 'gpu') {
-            return 'https://vision.ginto.ai/api/generate';
+            return 'https://vision.silverqueen.pro/api/generate';
         }
         if ($computeMode === 'cpu') {
             return self::SDCPU_API_URL;
@@ -212,7 +212,7 @@ class ImageGenHandler
 
         $sdcpuActive = $this->isEnvEnabled('SDCPU_ACTIVE');
         if ($sdcpuActive && $sdcpuTunnelEnabled) {
-            return 'https://vision.ginto.ai/api/generate';
+            return 'https://vision.silverqueen.pro/api/generate';
         }
         return self::SDCPU_API_URL;
     }

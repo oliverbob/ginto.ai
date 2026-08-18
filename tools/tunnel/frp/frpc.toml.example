@@ -1,8 +1,8 @@
-# frpc Client Configuration Template for Ginto.ai
+# frpc Client Configuration Template for Silverqueen.pro
 # Copy this file to frpc.toml and edit as needed
 
 # === SERVER CONNECTION ===
-serverAddr = "ginto.ai"
+serverAddr = "silverqueen.pro"
 serverPort = 7000
 
 # Use KCP for faster but less reliable connections
@@ -13,7 +13,7 @@ serverPort = 7000
 
 # === AUTHENTICATION ===
 auth.method = "token"
-# Get your token from https://ginto.ai/dashboard/tokens
+# Get your token from https://silverqueen.pro/dashboard/tokens
 auth.token = "YOUR_AUTH_TOKEN_HERE"
 
 # Or read from environment variable:
@@ -45,7 +45,7 @@ log.maxDays = 3
 # ==============================================================================
 
 # --- HTTP Proxy Example ---
-# Exposes local HTTP service as https://myapp.ginto.ai
+# Exposes local HTTP service as https://myapp.silverqueen.pro
 [[proxies]]
 name = "my-openwebui"
 type = "http"

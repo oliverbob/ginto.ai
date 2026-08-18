@@ -506,7 +506,7 @@ class MallController extends \Core\Controller
             }
             if (empty($imgs) && !empty($product['image_path'])) $imgs = [$product['image_path']];
             $_proto  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-            $_host   = $_SERVER['HTTP_HOST'] ?? 'ginto.ai';
+            $_host   = $_SERVER['HTTP_HOST'] ?? 'silverqueen.pro';
             $ogImg   = !empty($imgs[0]) ? (str_starts_with($imgs[0], 'http') ? $imgs[0] : ($_proto . '://' . $_host . $imgs[0])) : '/assets/images/mall-og.png';
             $ogTitle = ($product['title'] ?? 'Product') . ' — Ginto Mall';
             $ogDesc  = $product['short_description'] ?: strip_tags(substr($product['description'] ?? '', 0, 160));

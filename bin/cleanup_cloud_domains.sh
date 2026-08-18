@@ -10,8 +10,8 @@ CADDY_AVAILABLE="/etc/caddy/sites-available"
 CADDY_ENABLED="/etc/caddy/sites-enabled"
 RELOAD_NEEDED=0
 
-# Find cloud subdomain configs (*.ginto.ai.caddy files with "Ginto Cloud" in them)
-for config in "$CADDY_AVAILABLE"/*.ginto.ai.caddy; do
+# Find cloud subdomain configs (*.silverqueen.pro.caddy files with "Ginto Cloud" in them)
+for config in "$CADDY_AVAILABLE"/*.silverqueen.pro.caddy; do
     [ -f "$config" ] || continue
     
     # Check if it's a cloud subdomain (has our marker comment)

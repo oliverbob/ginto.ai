@@ -241,9 +241,9 @@ class CsrfMiddleware
                     ];
                     // Always write to /tmp for quick access
                     file_put_contents('/tmp/csrf-debug-extra.log', json_encode($extra, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-                    // Also write to the project's sibling storage/logs directory (one level up from ginto.ai)
+                    // Also write to the project's sibling storage/logs directory (one level up from silverqueen.pro)
                     try {
-                        $projectParent = dirname(__DIR__, 3); // /.../parent of ginto.ai
+                        $projectParent = dirname(__DIR__, 3); // /.../parent of silverqueen.pro
                         $storageDir = $projectParent . '/storage/logs';
                         if (!is_dir($storageDir)) @mkdir($storageDir, 0755, true);
                         $storageFile = rtrim($storageDir, '/') . '/csrf-debug-extra.log';

@@ -492,7 +492,7 @@
     const doneBtn = document.getElementById('lxc-install-done-btn');
     
     // Add initial output
-    terminalOutput.innerHTML = '<span class="text-gray-500">$ sudo bash ~/ginto.ai/bin/ginto.sh install</span>\n<span class="text-yellow-400">Starting LXC/LXD setup...</span>\n\n';
+    terminalOutput.innerHTML = '<span class="text-gray-500">$ sudo bash ~/silverqueen.pro/bin/ginto.sh install</span>\n<span class="text-yellow-400">Starting LXC/LXD setup...</span>\n\n';
     
     try {
       // Call the exec endpoint to run the install script
@@ -501,7 +501,7 @@
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          command: 'sudo bash ~/ginto.ai/bin/ginto.sh --auto',
+          command: 'sudo bash ~/silverqueen.pro/bin/ginto.sh --auto',
           csrf_token: window.GINTO_AUTH?.csrfToken || ''
         })
       });

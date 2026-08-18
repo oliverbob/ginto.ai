@@ -100,7 +100,7 @@
                             Overview
                         </h2>
                         <p>
-                            Ginto ("<strong>Ginto</strong>," "<strong>we</strong>," "<strong>our</strong>," or "<strong>us</strong>") is an AI-powered platform providing conversational intelligence, code generation, sandbox environments, multimedia tools, and related services (collectively, the "<strong>Services</strong>"). This Privacy Policy describes how we collect, use, disclose, and safeguard personal information when you access or use the Services through our website (<a href="https://ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">https://ginto.ai</a>), mobile applications, or any other interface we provide.
+                            Ginto ("<strong>Ginto</strong>," "<strong>we</strong>," "<strong>our</strong>," or "<strong>us</strong>") is an AI-powered platform providing conversational intelligence, code generation, sandbox environments, multimedia tools, and related services (collectively, the "<strong>Services</strong>"). This Privacy Policy describes how we collect, use, disclose, and safeguard personal information when you access or use the Services through our website (<a href="https://silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">https://silverqueen.pro</a>), mobile applications, or any other interface we provide.
                         </p>
                         <p class="mt-3">
                             By using the Services, you acknowledge that you have read and understood this Privacy Policy. If you do not agree, please discontinue use of the Services.
@@ -421,7 +421,7 @@
                             </div>
                         </div>
                         <p class="mt-4 text-sm">
-                            To exercise any of the above rights, please contact us at <a href="mailto:privacy@ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@ginto.ai</a>. We will respond within <strong>15 business days</strong> of receiving a verified request, consistent with NPC guidelines.
+                            To exercise any of the above rights, please contact us at <a href="mailto:privacy@silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@silverqueen.pro</a>. We will respond within <strong>15 business days</strong> of receiving a verified request, consistent with NPC guidelines.
                         </p>
                     </section>
 
@@ -457,7 +457,7 @@
                                     <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                         <td class="px-4 py-3 font-medium text-gray-800 dark:text-gray-200">Analytics</td>
                                         <td class="px-4 py-3">Aggregate, anonymized statistics about platform usage to improve the Services.</td>
-                                        <td class="px-4 py-3"><a href="mailto:privacy@ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">Opt-out by request</a></td>
+                                        <td class="px-4 py-3"><a href="mailto:privacy@silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">Opt-out by request</a></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -474,7 +474,7 @@
                             Minors
                         </h2>
                         <p>
-                            The Services are intended for users who are at least <strong>18 years of age</strong>, or the age of majority in their jurisdiction. We do not knowingly collect personal information from children under 18. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately at <a href="mailto:privacy@ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@ginto.ai</a> and we will delete such information promptly.
+                            The Services are intended for users who are at least <strong>18 years of age</strong>, or the age of majority in their jurisdiction. We do not knowingly collect personal information from children under 18. If you are a parent or guardian and believe your child has provided us with personal information, please contact us immediately at <a href="mailto:privacy@silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@silverqueen.pro</a> and we will delete such information promptly.
                         </p>
                         <p class="mt-3">
                             Where consent of a parent or legal guardian is required for minors under applicable law (e.g., the Philippine Child Safety Act), we will take appropriate steps to verify and obtain such consent before processing.
@@ -601,11 +601,11 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-envelope text-teal-500 w-5 text-center"></i>
-                                <a href="mailto:privacy@ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@ginto.ai</a>
+                                <a href="mailto:privacy@silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">privacy@silverqueen.pro</a>
                             </div>
                             <div class="flex items-center gap-3">
                                 <i class="fas fa-globe text-teal-500 w-5 text-center"></i>
-                                <a href="https://ginto.ai" class="text-teal-600 dark:text-teal-400 hover:underline">https://ginto.ai</a>
+                                <a href="https://silverqueen.pro" class="text-teal-600 dark:text-teal-400 hover:underline">https://silverqueen.pro</a>
                             </div>
                         </div>
                         <p class="mt-4 text-sm text-gray-500 dark:text-gray-400">
