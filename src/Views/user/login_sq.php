@@ -416,16 +416,19 @@ function sqLogin(e) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-            identifier: document.getElementById('sq-identifier').value.trim(),
-            password:   document.getElementById('pw-sqs').value
+            email:    document.getElementById('sq-identifier').value.trim(),
+            password: document.getElementById('pw-sqs').value
         })
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.success && data.token) {
-            window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(data.token);
+        if (data.access_token) {
+            localStorage.setItem('sq_token', data.access_token);
+            localStorage.setItem('sq_refresh', data.refresh_token || '');
+            localStorage.setItem('sq_user', JSON.stringify(data.user || {}));
+            window.location.href = 'https://sq.silverqueen.pro/wallet';
         } else {
-            errEl.textContent = data.error || 'Login failed. Please try again.';
+            errEl.textContent = data.error || data.message || 'Login failed. Please try again.';
             errEl.style.display = 'block';
             btn.textContent = 'Login to SilverQueen';
             btn.disabled = false;
