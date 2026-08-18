@@ -111,11 +111,11 @@
         transition: all 0.2s;
     }
     .sq-btn:active { transform: scale(0.98); }
-    .sq-btn-sq {
-        background: linear-gradient(135deg, #7c3aed, #a855f7);
+    .sq-btn-ginto {
+        background: linear-gradient(135deg, #bfa14a, #d4a843);
     }
-    .sq-btn-sq:hover {
-        background: linear-gradient(135deg, #6d28d9, #9333ea);
+    .sq-btn-ginto:hover {
+        background: linear-gradient(135deg, #a8903d, #c49a38);
     }
     .sq-btn-sqs {
         background: linear-gradient(135deg, #6366f1, #818cf8);
@@ -162,8 +162,8 @@
         text-transform: uppercase;
     }
     .sq-badge-main {
-        background: rgba(124, 58, 237, 0.12);
-        color: #7c3aed;
+        background: rgba(191, 161, 74, 0.12);
+        color: #bfa14a;
     }
     .sq-badge-sub {
         background: rgba(99, 102, 241, 0.12);
@@ -248,10 +248,11 @@
 
     <div class="sq-row">
 
-        <!-- silverqueen.pro (left / default) -->
+        <!-- Ginto (left / default) -->
         <div class="sq-card">
+            <img src="/assets/images/ginto.png" alt="Ginto" style="width:56px;height:56px;border-radius:50%;box-shadow:0 0 12px rgba(191,161,74,0.4);margin:0 auto 0.75rem;display:block;">
             <span class="sq-badge sq-badge-main">Default</span>
-            <h2 style="font-size:1.25rem;font-weight:700;text-align:center;margin:0.5rem 0 0.25rem;color:var(--text-primary);">SilverQueen</h2>
+            <h2 style="font-size:1.25rem;font-weight:700;text-align:center;margin:0.5rem 0 0.25rem;color:var(--text-primary);">Ginto</h2>
             <p style="text-align:center;font-size:0.85rem;margin-bottom:1.25rem;color:var(--text-secondary);">silverqueen.pro</p>
 
             <form action="https://silverqueen.pro/login" method="POST">
@@ -267,13 +268,13 @@
                         <svg class="pw-closed" style="width:20px;height:20px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.065-7 9.542-7 1.05 0 2.05.15 3 .425M12 5c4.477 0 8.268 2.943 9.542 7a10.04 10.04 0 01-1.5 3.5M16.5 13.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
                     </button>
                 </div>
-                <button type="submit" class="sq-btn sq-btn-sq" style="margin-top:0.5rem;">Login to SilverQueen</button>
+                <button type="submit" class="sq-btn sq-btn-ginto" style="margin-top:0.5rem;">Login to Ginto</button>
             </form>
 
             <div class="sq-footer-links">
-                <a href="https://silverqueen.pro/register" class="sq-link">Create an account</a>
+                <a href="https://silverqueen.pro/register" class="sq-link" style="color:#bfa14a;">Create an account</a>
                 <span>|</span>
-                <a href="https://silverqueen.pro/forgot-password" class="sq-link">Forgot password?</a>
+                <a href="https://silverqueen.pro/forgot-password" class="sq-link" style="color:#bfa14a;">Forgot password?</a>
             </div>
         </div>
 
