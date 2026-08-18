@@ -3295,7 +3295,7 @@ prompt_configuration() {
             return 0
         fi
         if $HAVE_TTY; then
-            log_prompt "$prompt_text"
+            log_prompt "$prompt_text" >&2   # <-- was: log_prompt "$prompt_text"
             if [[ "$is_secret" == "true" ]]; then
                 read -r -s -p "> " result < /dev/tty
                 echo "" >&2
