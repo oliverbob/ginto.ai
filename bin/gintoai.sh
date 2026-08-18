@@ -3337,9 +3337,21 @@ prompt_configuration() {
             log_info "Using GINTO_UPDATE_MODE=$reinstall_choice"
         fi
 
-        if [[ "$reinstall_choice" == "2" ]]; then
+                if [[ "$reinstall_choice" == "2" ]]; then
             log_warn "Fresh install selected - clearing all checkpoints..."
             clear_checkpoint
+
+            # Actually wipe .env so setup_env() creates a clean one from
+            # .env.example instead of patching a handful of keys inside the
+            # old file (which left stale/unrelated config behind).
+            if [ -f "$PROJECT_DIR/.env" ]; then
+                local backup_env="$PROJECT_DIR/.env.bak.$(date +%Y%m%d_%H%M%S)"
+                cp "$PROJECT_DIR/.env" "$backup_env"
+                rm -f "$PROJECT_DIR/.env"
+                log_info "Backed up old .env to $(basename "$backup_env") and removed it"
+            fi
+            rm -f "$PROJECT_DIR/.legacy-install"
+
             SKIP_CONFIGURED=false
             # Falls through to the full configuration flow below. clear_checkpoint
             # already removed CHECKPOINT_CONFIG so the load_config short-circuit
