@@ -342,21 +342,9 @@
                 <h2>SilverQueen</h2>
                 <p>sq.silverqueen.pro</p>
             </div>
-            <form action="https://sq.silverqueen.pro/login" method="POST">
-                <div class="sq-field">
-                    <label>Email, Username, or Phone</label>
-                    <input type="text" name="identifier" required placeholder="Enter your email, username, or phone" class="sq-input sqs-focus">
-                </div>
-                <div class="sq-field sq-pw-wrap">
-                    <label>Password</label>
-                    <input type="password" name="password" id="pw-sqs" required placeholder="Password" class="sq-input sqs-focus" style="padding-right:2.75rem;">
-                    <button type="button" onclick="togglePw('pw-sqs',this)" class="sq-pw-toggle" aria-label="Toggle password">
-                        <svg class="pw-open" style="display:none;width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-                        <svg class="pw-closed" style="width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.065-7 9.542-7 1.05 0 2.05.15 3 .425M12 5c4.477 0 8.268 2.943 9.542 7a10.04 10.04 0 01-1.5 3.5M16.5 13.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
-                    </button>
-                </div>
-                <button type="submit" class="sq-btn sq-btn-sqs">Login to SilverQueen</button>
-            </form>
+            <div style="text-align:center;padding:1.5rem 0 0.5rem;">
+                <a href="https://sq.silverqueen.pro/login" class="sq-btn sq-btn-sqs" style="display:inline-block;text-decoration:none;padding:0.7rem 2rem;">Login to SilverQueen</a>
+            </div>
             <div class="sq-footer-links">
                 <a href="https://sq.silverqueen.pro/register" class="sq-link sq-link-sqs">Create an account</a>
                 <span>|</span>
@@ -366,9 +354,7 @@
 
     </div>
 
-    <p style="margin-top:1.75rem;text-align:center;font-size:0.75rem;color:var(--text-secondary);opacity:0.5;">
-        Both platforms share the same credentials.
-    </p>
+
 
 </div>
 
