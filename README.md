@@ -286,7 +286,7 @@ domain/email prompt.
 
 ```bash
 # 1. Clear any leftover checkpoint/config from a previous run
-sudo bash bin/gintoai.sh reset
+sudo bash ./gintoai.sh reset
 
 # 2. Re-run the installer (skip SDCPU image generation if you don't need it)
 sudo ./run.sh install --skip sdcpu

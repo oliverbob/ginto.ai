@@ -111,6 +111,11 @@ cmd_novnc_local() {
     bash "$SCRIPT_DIR/bin/gintoai.sh" novnc-local
 }
 
+cmd_reset() {
+    log_info "Clearing installation checkpoint via bin/gintoai.sh..."
+    bash "$SCRIPT_DIR/bin/gintoai.sh" reset
+}
+
 cmd_local_tunnel() {
     if [ "${EUID:-$(id -u)}" -ne 0 ]; then
         log_error "local-tunnel requires root. Run: sudo ./run.sh local-tunnel"
@@ -180,6 +185,9 @@ case "${1:-help}" in
         ;;
     novnc-local)
         cmd_novnc_local
+        ;;
+    reset)
+        cmd_reset
         ;;
     local-tunnel)
         cmd_local_tunnel
