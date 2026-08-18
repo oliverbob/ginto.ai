@@ -1525,6 +1525,30 @@ EOF
             fi
         fi
         
+                # Load the PowerDNS MySQL schema if the domains table doesn't exist yet
+        # (fresh DB, or a DB that predates PowerDNS being added). Without this,
+        # pdns_server starts, connects fine, then crash-loops on its first query.
+        local table_exists
+        table_exists=$(mysql -N -B -e "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='${DB_NAME:-ginto}' AND table_name='domains';" 2>/dev/null || echo 0)
+        if [ "$table_exists" == "0" ]; then
+            log_info "PowerDNS schema not found in database, loading it..."
+            local schema_file
+            schema_file=$(find /usr/share/doc -iname "schema.mysql.sql*" -path "*pdns*" 2>/dev/null | head -1)
+            if [ -n "$schema_file" ]; then
+                if [[ "$schema_file" == *.gz ]]; then
+                    zcat "$schema_file" | sudo mysql "${DB_NAME:-ginto}"
+                else
+                    sudo mysql "${DB_NAME:-ginto}" < "$schema_file"
+                fi
+                log_success "PowerDNS schema loaded into ${DB_NAME:-ginto}"
+            else
+                log_warn "Could not locate PowerDNS schema file — pdns.service will fail to start until it's loaded manually"
+                log_info "See: https://doc.powerdns.com/authoritative/backends/generic-mysql.html"
+            fi
+        else
+            log_info "PowerDNS schema already present in database"
+        fi
+
         # Enable and start PowerDNS
         sudo systemctl enable pdns
         sudo systemctl restart pdns
