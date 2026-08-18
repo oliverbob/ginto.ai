@@ -1,27 +1,19 @@
 # FRP on silverqueen.pro
 
-There are **two independent frps servers** running on `149.28.145.52`. They are
-not redundant copies of each other and they are not interchangeable. Changing
-one to look like the other will break whatever depends on it.
+## Quick setup
 
-## The two servers
+To install the FRP wildcard server on a fresh VPS:
 
-| | Wildcard server | Dedicated server |
-|---|---|---|
-| Purpose | Public `*.silverqueen.pro` subdomain tunnels | Separate, purpose-built tunnelling |
-| systemd unit | `ginto-frps.service` | `frps.service` |
-| Binary | `/opt/frp/frps` | `/home/oliverbob/frp/frps` |
-| Config | `/etc/frp/frps.toml` | `/home/oliverbob/frp/frps.toml` |
-| Secrets | `/etc/frp/frps.env` (`FRP_AUTH_TOKEN`, `FRP_DASHBOARD_PWD`) | inline in its own config |
-| Control port | `7000` | `7700` |
-| HTTP vhost | `7080` | *none* |
-| HTTPS vhost | `7443` | *none* |
-| Dashboard | `127.0.0.1:7500` | *none* |
-| Fronted by Caddy | yes | no |
+```bash
+sudo ./bin/setup_tunnel_server.sh --user oliverbob --domain silverqueen.pro
+```
 
-The dedicated server on `7700` has **no vhost ports configured at all**, so it
-cannot serve `http`/`https` subdomain proxies — it exists for its own use case
-and must be left alone. Everything below concerns the wildcard server only.
+See [docs/setup_tunnel_server.md](setup_tunnel_server.md) for full options.
+
+---
+
+The wildcard server runs frps and serves public `*.silverqueen.pro` subdomain
+tunnels. It is the only frps instance that matters for the tunnel system.
 
 ## How a `*.silverqueen.pro` request is served
 
@@ -171,14 +163,13 @@ Two consequences worth knowing:
 ## Inspecting live state
 
 ```bash
-# which proxies are registered, and on which vhost
+# check frps status and registered proxies
+ps aux | grep '[f]rps'
+ss -ltnp | grep -E ':7000|:7080|:7443|:7500'
+
 set -a; . /etc/frp/frps.env; set +a
 curl -s -u "admin:$FRP_DASHBOARD_PWD" http://127.0.0.1:7500/api/proxy/http  | jq .
 curl -s -u "admin:$FRP_DASHBOARD_PWD" http://127.0.0.1:7500/api/proxy/https | jq .
-
-# both servers, so you can tell them apart at a glance
-ps aux | grep '[f]rps'
-ss -ltnp | grep -E ':7000|:7080|:7443|:7500|:7700'
 ```
 
 `/api/proxy/http` listing a subdomain is what makes it reachable through Caddy.

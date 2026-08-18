@@ -850,14 +850,22 @@ TOML;
     {
         $domain = $_GET['domain'] ?? '';
         
-        // Must be a valid *.silverqueen.pro subdomain (2-32 chars)
-        if (!preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.ginto\.ai$/', $domain, $matches)) {
+        // Must be a valid *.silverqueen.pro or *.ginto.ai subdomain (2-32 chars)
+        $allowedDomains = ['silverqueen.pro', 'ginto.ai'];
+        $matched = false;
+        $subdomain = '';
+        foreach ($allowedDomains as $baseDomain) {
+            if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.' . preg_quote($baseDomain, '/') . '$/', $domain, $matches)) {
+                $subdomain = $matches[1];
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
             http_response_code(400);
             echo "Invalid domain format";
             return;
         }
-        
-        $subdomain = $matches[1];
 
         // If an operator key is enabled for this subdomain, only approve if the currently-online
         // FRP proxy presents the matching key via proxy metas.
@@ -2127,9 +2135,14 @@ TOML;
         $host = explode(':', $host)[0];
 
         $subdomain = '';
-        if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.ginto\.ai$/', $host, $m)) {
-            $subdomain = $m[1];
-        } elseif (isset($_GET['subdomain'])) {
+        $allowedDomains = ['silverqueen.pro', 'ginto.ai'];
+        foreach ($allowedDomains as $baseDomain) {
+            if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.' . preg_quote($baseDomain, '/') . '$/', $host, $m)) {
+                $subdomain = $m[1];
+                break;
+            }
+        }
+        if ($subdomain === '' && isset($_GET['subdomain'])) {
             $subdomain = strtolower(preg_replace('/[^a-z0-9\-]/', '', (string)$_GET['subdomain']));
         }
 
