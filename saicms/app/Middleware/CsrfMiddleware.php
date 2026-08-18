@@ -13,10 +13,17 @@ class CsrfMiddleware
     {
         // We only need to check non-safe methods. GET, HEAD, OPTIONS are generally safe.
         if ($_SERVER['REQUEST_METHOD'] === 'POST' || $_SERVER['REQUEST_METHOD'] === 'PUT' || $_SERVER['REQUEST_METHOD'] === 'DELETE') {
-            
+
             // Start the session if it's not already started
             if (session_status() == PHP_SESSION_NONE) {
                 session_start();
+            }
+
+            // Paths that don't need CSRF (JSON API endpoints authenticating via credentials)
+            $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?? '';
+            $skipPaths = ['/api/auth/cross-login', '/login-m'];
+            if (in_array($path, $skipPaths)) {
+                return;
             }
 
             // Get the token stored in the session

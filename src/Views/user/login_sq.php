@@ -342,9 +342,22 @@
                 <h2>SilverQueen</h2>
                 <p>sq.silverqueen.pro</p>
             </div>
-            <div style="text-align:center;padding:1.5rem 0 0.5rem;">
-                <a href="https://sq.silverqueen.pro/login" class="sq-btn sq-btn-sqs" style="display:inline-block;text-decoration:none;padding:0.7rem 2rem;">Login to SilverQueen</a>
-            </div>
+            <form id="sq-form" onsubmit="return sqLogin(event)">
+                <div class="sq-field">
+                    <label>Email, Username, or Phone</label>
+                    <input type="text" name="identifier" id="sq-identifier" required placeholder="Enter your email, username, or phone" class="sq-input sqs-focus">
+                </div>
+                <div class="sq-field sq-pw-wrap">
+                    <label>Password</label>
+                    <input type="password" name="password" id="pw-sqs" required placeholder="Password" class="sq-input sqs-focus" style="padding-right:2.75rem;">
+                    <button type="button" onclick="togglePw('pw-sqs',this)" class="sq-pw-toggle" aria-label="Toggle password">
+                        <svg class="pw-open" style="display:none;width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        <svg class="pw-closed" style="width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.065-7 9.542-7 1.05 0 2.05.15 3 .425M12 5c4.477 0 8.268 2.943 9.542 7a10.04 10.04 0 01-1.5 3.5M16.5 13.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
+                    </button>
+                </div>
+                <div id="sq-error" style="display:none;color:#ef4444;font-size:0.82rem;margin-bottom:0.75rem;text-align:center;"></div>
+                <button type="submit" id="sq-submit-btn" class="sq-btn sq-btn-sqs">Login to SilverQueen</button>
+            </form>
             <div class="sq-footer-links">
                 <a href="https://sq.silverqueen.pro/register" class="sq-link sq-link-sqs">Create an account</a>
                 <span>|</span>
@@ -388,6 +401,43 @@ function togglePw(id, btn) {
     input.type = isOpen ? 'password' : 'text';
     btn.querySelector('.pw-open').style.display = isOpen ? 'none' : 'block';
     btn.querySelector('.pw-closed').style.display = isOpen ? 'block' : 'none';
+}
+
+function sqLogin(e) {
+    e.preventDefault();
+    var errEl = document.getElementById('sq-error');
+    var btn   = document.getElementById('sq-submit-btn');
+    errEl.style.display = 'none';
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+
+    fetch('https://sq.silverqueen.pro/api/auth/cross-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+            identifier: document.getElementById('sq-identifier').value.trim(),
+            password:   document.getElementById('pw-sqs').value
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success && data.token) {
+            window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(data.token);
+        } else {
+            errEl.textContent = data.error || 'Login failed. Please try again.';
+            errEl.style.display = 'block';
+            btn.textContent = 'Login to SilverQueen';
+            btn.disabled = false;
+        }
+    })
+    .catch(function() {
+        errEl.textContent = 'Network error. Please try again.';
+        errEl.style.display = 'block';
+        btn.textContent = 'Login to SilverQueen';
+        btn.disabled = false;
+    });
+    return false;
 }
 </script>
 

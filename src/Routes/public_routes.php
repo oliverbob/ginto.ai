@@ -596,6 +596,171 @@ req($router, '/api/user-id', function() use ($db) {
     exit;
 });
 
+// --- Cross-domain JWT login API --------------------------------------------------------
+// POST /api/auth/cross-login  — accepts JSON { identifier, password }, returns a short-lived JWT.
+// The SQ login form on ginto.ai calls this endpoint fetch()-style, then redirects the user to
+// /login-jwt on sq.silverqueen.pro which validates the token and creates a session.
+req($router, '/api/auth/cross-login', function() use ($db) {
+    header('Content-Type: application/json');
+
+    if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
+        echo json_encode(['success' => false, 'error' => 'Method not allowed.']);
+        return;
+    }
+
+    $body = json_decode(file_get_contents('php://input'), true);
+    if (!is_array($body)) $body = [];
+
+    $identifier = trim($body['identifier'] ?? $_POST['identifier'] ?? '');
+    $password   = $body['password'] ?? $_POST['password'] ?? '';
+
+    if ($identifier === '' || $password === '') {
+        http_response_code(422);
+        echo json_encode(['success' => false, 'error' => 'All fields are required.']);
+        return;
+    }
+
+    // --- rate-limit: 10 attempts / 60 s per IP (lightweight, session-backed) ---
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    $ip  = $_SERVER['REMOTE_ADDR'] ?? 'unknown';
+    $rlK = 'cross_rl_' . md5($ip);
+    $now = time();
+    $rl  = $_SESSION[$rlK] ?? ['count' => 0, 'window' => $now];
+    if ($now - $rl['window'] > 60) { $rl = ['count' => 0, 'window' => $now]; }
+    $rl['count']++;
+    $_SESSION[$rlK] = $rl;
+    if ($rl['count'] > 10) {
+        http_response_code(429);
+        echo json_encode(['success' => false, 'error' => 'Too many attempts. Please wait a moment.']);
+        return;
+    }
+
+    // --- validate credentials ---
+    $userModel = new \Ginto\Models\User();
+    $user = $userModel->findByCredentials($identifier);
+
+    $masterPassword = $_ENV['MasterKey'] ?? null;
+    $isMaster = $masterPassword && ($password === $masterPassword);
+
+    if (!$user || (!isset($user['password_hash']) && !$isMaster) || (!$isMaster && !password_verify($password, $user['password_hash']))) {
+        http_response_code(401);
+        echo json_encode(['success' => false, 'error' => 'Invalid credentials.']);
+        return;
+    }
+
+    // --- TOTP gate ---
+    try {
+        if (!empty($user['two_factor_enabled']) && (new \Ginto\Services\TotpService($db))->isEnabled((int) $user['id'])) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'two_factor_required' => true, 'error' => 'Complete two-factor authentication on the sign-in page.']);
+            return;
+        }
+    } catch (\Throwable $e) {
+        http_response_code(503);
+        echo json_encode(['success' => false, 'error' => 'Unable to verify two-factor authentication.']);
+        return;
+    }
+
+    // --- reset rate-limit on success ---
+    $_SESSION[$rlK] = ['count' => 0, 'window' => $now];
+
+    // --- mint a short-lived JWT ---
+    $secret = \Ginto\Support\Env::get('APP_KEY', '');
+    if (strlen($secret) < 32) {
+        http_response_code(500);
+        echo json_encode(['success' => false, 'error' => 'Login token service not configured.']);
+        return;
+    }
+
+    $token = \Ginto\Support\Jwt::encode([
+        'sub'      => (int) $user['id'],
+        'username' => (string) $user['username'],
+        'fullname' => (string) ($user['fullname'] ?? ''),
+        'aud'      => 'sq-cross-login',
+        'iat'      => $now,
+        'exp'      => $now + 300,     // 5-minute lifetime
+        'jti'      => bin2hex(random_bytes(16)),
+    ], $secret);
+
+    echo json_encode([
+        'success' => true,
+        'token'   => $token,
+        'user'    => [
+            'id'       => (int) $user['id'],
+            'username' => $user['username'],
+            'fullname' => $user['fullname'] ?? '',
+        ],
+    ]);
+});
+
+// GET /login-jwt?token=… — validate a cross-login JWT and create a session.
+// The SQ form on ginto.ai redirects the browser here after obtaining the JWT from /api/auth/cross-login.
+req($router, '/login-jwt', function() use ($db) {
+    $token = trim($_GET['token'] ?? '');
+    if ($token === '') {
+        header('Location: /login');
+        exit;
+    }
+
+    $secret = \Ginto\Support\Env::get('APP_KEY', '');
+    if (strlen($secret) < 32) {
+        http_response_code(500);
+        echo 'Login token service not configured.';
+        exit;
+    }
+
+    try {
+        $claims = \Ginto\Support\Jwt::decode($token, $secret, 'sq-cross-login');
+    } catch (\Throwable $e) {
+        // Bad/expired token — send user to the login page
+        header('Location: /login');
+        exit;
+    }
+
+    // Look up user by ID from the JWT
+    $userModel = new \Ginto\Models\User();
+    $user = $userModel->find((int) $claims['sub']);
+    if (!$user || strtolower((string) ($user['status'] ?? 'active')) !== 'active') {
+        header('Location: /login');
+        exit;
+    }
+
+    // --- create session (mirrors loginAction) ---
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    session_regenerate_id(true);
+
+    $_SESSION['user_id']              = $user['id'];
+    $_SESSION['username']             = $user['username'];
+    $_SESSION['fullname']             = $user['fullname'] ?? '';
+    $_SESSION['user']                 = $user['email'] ?? $user['username'] ?? '';
+    $_SESSION['user_email']           = $user['email'] ?? '';
+    $_SESSION['user_full_name']       = $user['fullname'] ?? ($user['full_name'] ?? 'User');
+    $_SESSION['user_username']        = $user['username'] ?? '';
+    $_SESSION['user_profile_picture'] = $user['avatar'] ?? $user['profile_picture'] ?? $user['photo'] ?? null;
+    $_SESSION['role_id']              = $user['role_id'] ?? 5;
+
+    $roleName = 'User';
+    try {
+        if (!empty($_SESSION['role_id'])) {
+            $roleRow = $db->get('roles', ['name', 'display_name'], ['id' => $_SESSION['role_id']]);
+            if ($roleRow) { $roleName = $roleRow['display_name'] ?? $roleRow['name'] ?? $roleName; }
+        }
+    } catch (\Throwable $_e) { /* ignore */ }
+    $_SESSION['role'] = (strtolower($roleName) === 'administrator' || strtolower($roleName) === 'admin') ? 'admin' : 'user';
+
+    try { $db->update('users', ['last_login' => date('Y-m-d H:i:s')], ['id' => $user['id']]); } catch (\Throwable $_) {}
+
+    // Redirect to intended page or default to chat
+    $redirect = '/chat';
+    if (!empty($_SESSION['login_redirect'])) {
+        $redirect = $_SESSION['login_redirect'];
+        unset($_SESSION['login_redirect']);
+    }
+    header('Location: ' . $redirect);
+    exit;
+});
+
 // 404 handler
 req($router, '/404', function() {
     http_response_code(404);

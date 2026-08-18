@@ -31,6 +31,7 @@ class CsrfMiddleware
         '/debug/session-set',             // Debug helper: allow localhost POST to set session for testing
         '/login',                         // Login form — cross-origin POST from hub page; no session to protect
         '/login-m',                       // Mobile app JSON login — authenticates via credentials, no CSRF session
+        '/api/auth/cross-login',          // Cross-domain JWT login — credentials-only, no session cookie to protect
         '/logout-m',                      // Mobile app JSON logout — kills session, CSRF not applicable
         '/api/tunnel/bind',               // Tunnel clients (frpc hosts) authenticate with a gtnl- key, not a browser session
         '/api/v1/relay/trade/buy',        // Relay callers carry a signed, single-use token; there is no session to hold a CSRF token

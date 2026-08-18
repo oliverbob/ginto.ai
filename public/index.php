@@ -37,14 +37,16 @@ $envFileExists = file_exists(ROOT_PATH . '/.env');
 $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
 $path = parse_url($requestUri, PHP_URL_PATH);
 
-// CORS: Allow *.silverqueen.pro subdomains and local dev origins to call API endpoints directly.
-// This enables the gntl codex frontend to call /api and /api/code-token cross-origin without
-// routing inference streams back through the frp tunnel.
+// CORS: Allow *.silverqueen.pro subdomains, *.ginto.ai, bare ginto.ai, and local dev origins to call API endpoints cross-origin.
+// This enables the SQ login form on ginto.ai to fetch() to sq.silverqueen.pro, and vice versa.
 $_gntl_origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 if (
     $_gntl_origin
     && (
-        preg_match('#^https://[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.ginto\.ai$#', $_gntl_origin)
+        $_gntl_origin === 'https://ginto.ai'
+        || preg_match('#^https://[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.ginto\.ai$#', $_gntl_origin)
+        || $_gntl_origin === 'https://silverqueen.pro'
+        || preg_match('#^https://[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.silverqueen\.pro$#', $_gntl_origin)
         || preg_match('#^https?://localhost(?::\d{1,5})?$#', $_gntl_origin)
         || preg_match('#^https?://127\.0\.0\.1(?::\d{1,5})?$#', $_gntl_origin)
     )
