@@ -263,7 +263,7 @@
     }
     .sq-subtitle {
         text-align: center;
-        margin-bottom: 2rem;
+        margin-bottom: 1.25rem;
         color: var(--text-secondary);
     }
     .sq-powered {
@@ -273,7 +273,7 @@
         opacity: 0.6;
         transition: opacity 0.2s;
         text-decoration: none;
-        margin-bottom: 1.5rem;
+        margin-bottom: 0.75rem;
     }
     .sq-powered:hover { opacity: 1; }
     .sq-powered span {
