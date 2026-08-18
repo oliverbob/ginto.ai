@@ -274,6 +274,74 @@ Ginto AI fully supports Windows via WSL2 with Ubuntu. Both the core AI agent and
    sudo ./run.sh install
    ```
 
+
+## Reinstalling / Reconfiguring (`--skip sdcpu`)
+
+If you need to re-run the installer on a system that already has Ginto
+installed — e.g. to change your domain, TLS email, or database — always
+clear the install checkpoint first. Otherwise the installer may resume
+from a stale checkpoint left by a previous run (for example, if an
+earlier run failed partway through) and silently skip steps like the
+domain/email prompt.
+
+```bash
+# 1. Clear any leftover checkpoint/config from a previous run
+sudo bash bin/gintoai.sh reset
+
+# 2. Re-run the installer (skip SDCPU image generation if you don't need it)
+sudo ./run.sh install --skip sdcpu
+```
+
+When prompted, choose: 
+
+```bash Fresh install - Remove all and reinstall from scratch
+```
+
+
+This clears checkpoints, backs up and removes your existing `.env`
+(saved as `.env.bak.<timestamp>` in the project root — delete it once
+you've confirmed the new install works and copied out anything you
+still need, like old API keys), and walks you through the full
+configuration flow again, including:
+
+- **Server mode** — Local (`localhost`) or Live (your own domain with HTTPS)
+- **Domain name** — required only if you choose Live mode
+- **TLS certificate email** — used by Let's Encrypt as an ACME account
+  contact. It does **not** need to be a live/monitored mailbox and is
+  never verified at issuance time — any syntactically valid address
+  works, though using one you actually control is recommended in case
+  Let's Encrypt ever needs to reach you (e.g. a mass revocation event)
+- **Database name/user/password**
+- **llama.cpp install mode**
+
+### If the installer fails partway through
+
+Some steps (PowerDNS, in particular) can leave a stale checkpoint if
+they fail. If a re-run seems to skip prompts it should be asking, or
+seems to silently jump to a later step, always run `reset` first:
+
+```bash
+sudo bash bin/gintoai.sh reset
+```
+
+This is safe to run anytime — it only clears `.install_checkpoint` and
+`.install_config`, never your actual `.env`, database, or installed
+packages.
+
+### Skipping optional components
+
+- `--skip sdcpu` — skip AI image generation (SDCPU), ~2GB and several
+  minutes of install time
+- `--skip powerdns` — skip the PowerDNS authoritative DNS server
+  (only needed if you're hosting DNS zones through Ginto)
+- Combine with a comma: `--skip sdcpu,powerdns`
+
+Example, full fresh reinstall without SDCPU or PowerDNS:
+```bash
+sudo bash bin/gintoai.sh reset
+sudo ./run.sh install --skip sdcpu,powerdns
+```
+
 ---
 ##  Quick Start
 
