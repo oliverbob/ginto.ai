@@ -288,6 +288,7 @@
 
         <!-- sq.silverqueen.pro (right) -->
         <div class="sq-card">
+            <img src="/assets/images/ginto.png" alt="SilverQueen" style="width:56px;height:56px;border-radius:50%;box-shadow:0 0 12px rgba(99,102,241,0.4);margin:0 auto 0.75rem;display:block;">
             <span class="sq-badge sq-badge-sub">Sub-Platform</span>
             <h2 style="font-size:1.25rem;font-weight:700;text-align:center;margin:0.5rem 0 0.25rem;color:var(--text-primary);">SQ Platform</h2>
             <p style="text-align:center;font-size:0.85rem;margin-bottom:1.25rem;color:var(--text-secondary);">sq.silverqueen.pro</p>
