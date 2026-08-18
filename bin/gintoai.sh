@@ -2522,6 +2522,23 @@ setup_env() {
     update_env_var "DB_NAME" "$DB_NAME"
     update_env_var "DB_USER" "$DB_USER"
     update_env_var "DB_PASS" "$DB_PASS" "true"
+
+    # Generate APP_KEY only if it doesn't already exist — this key encrypts/
+    # signs sessions and stored data, so rotating it on an existing install
+    # would invalidate active sessions and any data encrypted with the old
+    # key. Only ever set once, on first creation of .env.
+    if ! grep -q "^APP_KEY=" "$env_file" 2>/dev/null || [ -z "$(grep '^APP_KEY=' "$env_file" | cut -d'=' -f2-)" ]; then
+        if command -v php &>/dev/null; then
+            local app_key
+            app_key=$(php -r "echo bin2hex(random_bytes(32)), PHP_EOL;")
+            update_env_var "APP_KEY" "$app_key"
+            log_info "Generated new APP_KEY"
+        else
+            log_warn "php not found — could not generate APP_KEY. Set it manually before starting the app."
+        fi
+    else
+        log_info "Preserving existing APP_KEY"
+    fi
     
     # Set APP_URL based on Caddy mode
     if [[ "$CADDY_LIVE_MODE" == "yes" ]]; then
