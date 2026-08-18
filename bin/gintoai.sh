@@ -3272,6 +3272,42 @@ detect_existing_docker_installation() {
 
 # Ask all interactive questions upfront (Ollama-style)
 prompt_configuration() {
+    # Shared tty-availability check, computed once, reused by every prompt below
+    # instead of only the first one. This was the actual bug: only reinstall_choice
+    # checked for a usable /dev/tty; every prompt after it (domain, TLS email, DB
+    # creds, llama.cpp) did a bare `read ... < /dev/tty` with no guard, so in a
+    # non-interactive session those failed outright under `set -e` and killed the
+    # script silently instead of falling back to a sane default or env var.
+    local HAVE_TTY=false
+    if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
+        HAVE_TTY=true
+    fi
+
+    # Small helper: prompt interactively if we have a tty, otherwise use the
+    # given env var (if set) or fall back to a default. Centralizes the pattern
+    # instead of repeating a tty check + read + fallback at every call site.
+    prompt_or_env() {
+        local prompt_text="$1" env_value="$2" default_value="$3" is_secret="${4:-false}"
+        local result=""
+        if [ -n "$env_value" ]; then
+            echo "$result_from_env" >/dev/null 2>&1  # no-op, keeps shellcheck quiet
+            printf '%s' "$env_value"
+            return 0
+        fi
+        if $HAVE_TTY; then
+            log_prompt "$prompt_text"
+            if [[ "$is_secret" == "true" ]]; then
+                read -r -s -p "> " result < /dev/tty
+                echo "" >&2
+            else
+                read -r -p "> " result < /dev/tty
+            fi
+            printf '%s' "${result:-$default_value}"
+        else
+            printf '%s' "$default_value"
+        fi
+    }
+
     # First check if core installation already exists
     if detect_existing_installation; then
         log_step "Existing installation detected"
@@ -3282,40 +3318,39 @@ prompt_configuration() {
         echo "  - Composer: $(composer --version --no-interaction 2>/dev/null | awk '{print $3}')"
         echo "  - .env: configured"
         echo ""
-        
-        # Check for non-interactive mode (env var or no tty)
+
         local reinstall_choice="${GINTO_UPDATE_MODE:-}"
         if [ -z "$reinstall_choice" ]; then
-            if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
-                # Give user a choice
+            if $HAVE_TTY; then
                 echo "  1) Update only     - Pull changes, run migrations (recommended)"
                 echo "  2) Fresh install   - Remove all and reinstall from scratch"
                 echo ""
                 log_prompt "Choose option (1-2) [default: 1]:"
                 read -r -p "> " reinstall_choice < /dev/tty
             else
-                # Non-interactive mode - default to update
                 log_info "Non-interactive mode detected, defaulting to update..."
+                log_info "To force a fresh install (needed to change domain/email) without a tty, run:"
+                log_info "  GINTO_UPDATE_MODE=2 GINTO_DOMAIN=example.com GINTO_TLS_EMAIL=admin@example.com ./run.sh install"
                 reinstall_choice="1"
             fi
         else
             log_info "Using GINTO_UPDATE_MODE=$reinstall_choice"
         fi
-        
+
         if [[ "$reinstall_choice" == "2" ]]; then
             log_warn "Fresh install selected - clearing all checkpoints..."
             clear_checkpoint
-            # Continue to full configuration prompts
             SKIP_CONFIGURED=false
+            # Falls through to the full configuration flow below. clear_checkpoint
+            # already removed CHECKPOINT_CONFIG so the load_config short-circuit
+            # further down won't fire — but we don't rely on that alone; see the
+            # explicit `return` removal note below.
         else
-            # ALWAYS fix permissions on re-run (idempotent)
             log_info "Checking file permissions..."
             fix_permissions
             log_success "Permissions verified"
-            
             log_info "Skipping configuration prompts - will only update and run migrations"
-            
-            # Read existing database credentials from .env
+
             if [ -f "$PROJECT_DIR/.env" ]; then
                 DB_NAME=$(grep -E '^DB_NAME=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "ginto")
                 DB_USER=$(grep -E '^DB_USER=' "$PROJECT_DIR/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "ginto")
@@ -3324,13 +3359,9 @@ prompt_configuration() {
                 [ -z "$DB_NAME" ] && DB_NAME="ginto"
                 [ -z "$DB_USER" ] && DB_USER="ginto"
             else
-                DB_NAME="ginto"
-                DB_USER="ginto"
-                DB_PASS=""
-                SANDBOX_MODE_ENV=""
+                DB_NAME="ginto"; DB_USER="ginto"; DB_PASS=""; SANDBOX_MODE_ENV=""
             fi
-            
-            # Always check if Docker is installed - offer to install if not
+
             if ! command -v docker &>/dev/null; then
                 echo ""
                 log_step "Docker Installation"
@@ -3339,22 +3370,22 @@ prompt_configuration() {
                 echo "    - Docker-based sandboxes (isolated code execution)"
                 echo "    - Running user code in containers"
                 echo ""
-                
-                # Check for non-interactive mode
-                local docker_choice=""
-                if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
-                    echo "  1) Install Docker now (recommended for production)"
-                    echo "  2) Skip - I don't need Docker sandboxes"
-                    echo ""
-                    log_prompt "Choose option (1-2) [default: 1]:"
-                    read -r -p "> " docker_choice < /dev/tty
-                else
-                    log_info "Non-interactive mode - will attempt to install Docker..."
-                    docker_choice="1"
+
+                local docker_choice="${GINTO_DOCKER_CHOICE:-}"
+                if [ -z "$docker_choice" ]; then
+                    if $HAVE_TTY; then
+                        echo "  1) Install Docker now (recommended for production)"
+                        echo "  2) Skip - I don't need Docker sandboxes"
+                        echo ""
+                        log_prompt "Choose option (1-2) [default: 1]:"
+                        read -r -p "> " docker_choice < /dev/tty
+                    else
+                        log_info "Non-interactive mode - will attempt to install Docker..."
+                        docker_choice="1"
+                    fi
                 fi
-                
+
                 if [[ "$docker_choice" != "2" ]]; then
-                    # Need to detect OS first if not already done
                     if [ -z "${OS:-}" ]; then
                         if [ -f /etc/os-release ]; then
                             . /etc/os-release
@@ -3362,12 +3393,9 @@ prompt_configuration() {
                             OS_VERSION=$VERSION_ID
                         fi
                     fi
-                    
-                    # Install Docker
                     install_docker_engine
                     install_docker_compose
-                    
-                    # Set SANDBOX_MODE=docker in .env if not already set
+
                     if [ -f "$PROJECT_DIR/.env" ]; then
                         if ! grep -q "^SANDBOX_MODE=" "$PROJECT_DIR/.env"; then
                             echo "SANDBOX_MODE=docker" >> "$PROJECT_DIR/.env"
@@ -3377,8 +3405,7 @@ prompt_configuration() {
                             log_info "Updated SANDBOX_MODE=docker in .env"
                         fi
                     fi
-                    
-                    # Build sandbox image if not present
+
                     log_step "Checking sandbox image..."
                     if ! docker images | grep -q "ginto-sandbox"; then
                         log_info "Building sandbox image..."
@@ -3386,34 +3413,28 @@ prompt_configuration() {
                     else
                         log_success "Sandbox image already exists"
                     fi
-                    
                     log_success "Docker installation complete!"
                 else
                     log_info "Skipping Docker installation."
                     log_info "To install Docker later: curl -fsSL https://get.docker.com | sh"
                 fi
             else
-                # Docker is already installed - show status
                 local docker_version=$(docker --version 2>/dev/null | awk '{print $3}' | tr -d ',')
                 log_info "Docker already installed: $docker_version"
-                
-                # Ensure user is in docker group
+
                 if ! groups "$INSTALL_USER" | grep -q docker; then
                     log_info "Adding $INSTALL_USER to docker group..."
                     sudo usermod -aG docker "$INSTALL_USER"
                     log_warn "You may need to log out and back in for docker group membership to take effect"
                 fi
-                
-                # Ensure www-data is in docker group (for PHP/web sandbox creation)
+
                 if id www-data &>/dev/null && ! groups www-data | grep -q docker; then
                     log_info "Adding www-data to docker group for web sandbox access..."
                     sudo usermod -aG docker www-data
-                    # Restart PHP-FPM to pick up group change
                     sudo systemctl restart php*-fpm 2>/dev/null || true
                     log_success "www-data added to docker group"
                 fi
-                
-                # Ensure SANDBOX_MODE=docker is set
+
                 if [ -f "$PROJECT_DIR/.env" ]; then
                     if ! grep -q "^SANDBOX_MODE=" "$PROJECT_DIR/.env"; then
                         echo "SANDBOX_MODE=docker" >> "$PROJECT_DIR/.env"
@@ -3421,11 +3442,9 @@ prompt_configuration() {
                     fi
                 fi
             fi
-            
-            # SDCPU Installation Check
+
             SDCPU_DIR="$PROJECT_DIR/tools/sdcpu"
             if [ -f "$SDCPU_DIR/requirements.txt" ] && [ -f "$SDCPU_DIR/src/api_server.py" ]; then
-                # SDCPU source exists - check if already installed
                 if [ ! -d "$SDCPU_DIR/venv" ] || [ ! -f "$SDCPU_DIR/venv/bin/python" ]; then
                     echo ""
                     log_step "SDCPU Installation (AI Image Generation)"
@@ -3433,19 +3452,21 @@ prompt_configuration() {
                     echo "  SDCPU is an AI image generation tool that runs on CPU."
                     echo "  It requires ~2GB of disk space and takes a few minutes to install."
                     echo ""
-                    
-                    local sdcpu_choice=""
-                    if [ -t 0 ] && [ -r /dev/tty ] && (echo -n "" > /dev/tty) 2>/dev/null; then
-                        echo "  1) Install SDCPU now"
-                        echo "  2) Skip - I don't need AI image generation"
-                        echo ""
-                        log_prompt "Choose option (1-2) [default: 2]:"
-                        read -r -p "> " sdcpu_choice < /dev/tty
-                    else
-                        log_info "Non-interactive mode - skipping SDCPU..."
-                        sdcpu_choice="2"
+
+                    local sdcpu_choice="${GINTO_SDCPU_CHOICE:-}"
+                    if [ -z "$sdcpu_choice" ]; then
+                        if $HAVE_TTY; then
+                            echo "  1) Install SDCPU now"
+                            echo "  2) Skip - I don't need AI image generation"
+                            echo ""
+                            log_prompt "Choose option (1-2) [default: 2]:"
+                            read -r -p "> " sdcpu_choice < /dev/tty
+                        else
+                            log_info "Non-interactive mode - skipping SDCPU..."
+                            sdcpu_choice="2"
+                        fi
                     fi
-                    
+
                     if [[ "$sdcpu_choice" == "1" ]]; then
                         install_sdcpu
                         configure_sdcpu_service
@@ -3458,22 +3479,26 @@ prompt_configuration() {
                     log_info "SDCPU already installed (venv exists)"
                 fi
             fi
-            
+
             CADDY_LIVE_MODE="skip"
             CADDY_DOMAIN=""
             CADDY_TLS_EMAIL=""
             SKIP_CONFIGURED=true
-            SKIP_DB_USER_SETUP=true  # Don't touch existing database user
-            
-            # Skip to final steps - only run dependencies, env check, and summary
-            # This prevents re-running installation steps on existing systems
+            SKIP_DB_USER_SETUP=true
+
             save_checkpoint "install_dependencies"
+            # Explicit return — this is the ONLY branch that should skip the
+            # domain/TLS/DB prompts below. The fresh-install branch above falls
+            # through intentionally; it must NOT hit this return.
             return 0
         fi
     fi
-    
-    # Check if we're resuming and config exists
-    if load_config 2>/dev/null; then
+
+    # Only reachable via: no existing install, OR "fresh install" was chosen above.
+    # Guard against a stale saved config short-circuiting a deliberate fresh
+    # install: if the user explicitly chose "2) Fresh install", skip the resume
+    # check entirely even if a config file somehow survived clear_checkpoint.
+    if [ -z "${_GINTO_FORCE_FRESH_PROMPTS:-}" ] && load_config 2>/dev/null; then
         log_info "Loaded saved configuration from previous run"
         log_info "  Mode: ${CADDY_LIVE_MODE:-local}"
         if [[ "${CADDY_LIVE_MODE:-no}" == "yes" ]]; then
@@ -3482,40 +3507,33 @@ prompt_configuration() {
         log_info "  Database: ${DB_NAME:-ginto} (user: ${DB_USER:-ginto})"
         return 0
     fi
-    
+
     SKIP_CONFIGURED=false
     echo ""
     log_step "Configuration"
     echo ""
-    
-    # Caddy mode
-    echo ""
-    echo "  1) Local     - localhost on port 80 (development)"
-    echo "  2) Live      - Configure domain with HTTPS (production)"
-    echo ""
-    log_prompt "Choose server mode (1-2) [default: 1]:"
-    read -r -p "> " server_choice < /dev/tty
-    
+
+    # Caddy mode — env vars let this run fully non-interactively:
+    #   GINTO_SERVER_MODE=2 GINTO_DOMAIN=example.com GINTO_TLS_EMAIL=admin@example.com
+    local server_choice
+    server_choice=$(prompt_or_env "Choose server mode (1-2) [default: 1]:
+  1) Local     - localhost on port 80 (development)
+  2) Live      - Configure domain with HTTPS (production)" "${GINTO_SERVER_MODE:-}" "1")
+
     if [[ "$server_choice" == "2" ]]; then
         CADDY_LIVE_MODE="yes"
-        echo ""
-        log_prompt "Enter your domain name (e.g., example.com):"
-        read -r -p "> " CADDY_DOMAIN < /dev/tty
-        
+        CADDY_DOMAIN=$(prompt_or_env "Enter your domain name (e.g., example.com):" "${GINTO_DOMAIN:-}" "")
         if [ -z "$CADDY_DOMAIN" ]; then
-            log_error "Domain name is required for live server mode"
+            log_error "Domain name is required for live server mode (set GINTO_DOMAIN if running non-interactively)"
             exit 1
         fi
-        
-        log_prompt "Enter your email for TLS certificate (e.g., admin@$CADDY_DOMAIN):"
-        read -r -p "> " CADDY_TLS_EMAIL < /dev/tty
-        CADDY_TLS_EMAIL="${CADDY_TLS_EMAIL:-admin@$CADDY_DOMAIN}"
+        CADDY_TLS_EMAIL=$(prompt_or_env "Enter your email for TLS certificate (e.g., admin@$CADDY_DOMAIN):" "${GINTO_TLS_EMAIL:-}" "admin@$CADDY_DOMAIN")
     else
         CADDY_LIVE_MODE="no"
         CADDY_DOMAIN=""
         CADDY_TLS_EMAIL=""
     fi
-    
+
     # Database configuration
     echo ""
     log_step "Database Configuration"
@@ -3523,60 +3541,61 @@ prompt_configuration() {
     log_info "The installer will create a MariaDB database and user for Ginto."
     log_info "Do NOT use 'root' - create a dedicated user for security."
     echo ""
-    
-    log_prompt "Enter database name (default: ginto):"
-    read -r -p "> " DB_NAME < /dev/tty
-    DB_NAME="${DB_NAME:-ginto}"
-    
-    log_prompt "Enter database username (default: ginto):"
-    read -r -p "> " DB_USER < /dev/tty
-    DB_USER="${DB_USER:-ginto}"
-    
-    # Validate username is not root
+
+    DB_NAME=$(prompt_or_env "Enter database name (default: ginto):" "${GINTO_DB_NAME:-}" "ginto")
+    DB_USER=$(prompt_or_env "Enter database username (default: ginto):" "${GINTO_DB_USER:-}" "ginto")
+
     if [[ "$DB_USER" == "root" ]]; then
         log_warn "Using 'root' is not recommended for application access."
-        echo ""
-        echo "  1) Change username (recommended)"
-        echo "  2) Keep 'root' anyway"
-        echo ""
-        log_prompt "Choose option (1-2) [default: 1]:"
-        read -r -p "> " root_choice < /dev/tty
-        if [[ "$root_choice" != "2" ]]; then
-            log_prompt "Enter database username:"
-            read -r -p "> " DB_USER < /dev/tty
-            DB_USER="${DB_USER:-ginto}"
+        if $HAVE_TTY && [ -z "${GINTO_DB_USER:-}" ]; then
+            echo "  1) Change username (recommended)"
+            echo "  2) Keep 'root' anyway"
+            echo ""
+            log_prompt "Choose option (1-2) [default: 1]:"
+            read -r -p "> " root_choice < /dev/tty
+            if [[ "$root_choice" != "2" ]]; then
+                log_prompt "Enter database username:"
+                read -r -p "> " DB_USER < /dev/tty
+                DB_USER="${DB_USER:-ginto}"
+            fi
+        else
+            log_warn "Non-interactive/env-provided 'root' — keeping as-is. Set GINTO_DB_USER to override."
         fi
     fi
-    
-    # Password prompt with confirmation
-    while true; do
-        log_prompt "Enter database password for '$DB_USER':"
-        read -r -s -p "> " DB_PASS < /dev/tty
-        echo ""
-        
-        if [ -z "$DB_PASS" ]; then
-            log_error "Password cannot be empty. Please enter a password."
-            continue
-        fi
-        
-        log_prompt "Confirm database password:"
-        read -r -s -p "> " DB_PASS_CONFIRM < /dev/tty
-        echo ""
-        
-        if [ "$DB_PASS" != "$DB_PASS_CONFIRM" ]; then
-            log_error "Passwords do not match. Please try again."
+
+    DB_PASS="${GINTO_DB_PASS:-}"
+    if [ -z "$DB_PASS" ]; then
+        if $HAVE_TTY; then
+            while true; do
+                log_prompt "Enter database password for '$DB_USER':"
+                read -r -s -p "> " DB_PASS < /dev/tty
+                echo ""
+                if [ -z "$DB_PASS" ]; then
+                    log_error "Password cannot be empty. Please enter a password."
+                    continue
+                fi
+                log_prompt "Confirm database password:"
+                read -r -s -p "> " DB_PASS_CONFIRM < /dev/tty
+                echo ""
+                if [ "$DB_PASS" != "$DB_PASS_CONFIRM" ]; then
+                    log_error "Passwords do not match. Please try again."
+                else
+                    break
+                fi
+            done
         else
-            break
+            log_error "No tty available and GINTO_DB_PASS not set — cannot prompt for a database password."
+            log_error "Re-run with: GINTO_DB_PASS='yourpassword' ./run.sh install ..."
+            exit 1
         fi
-    done
-    
+    fi
+
     log_success "Database configuration: $DB_NAME with user '$DB_USER'"
-    
+
     # llama.cpp configuration
     echo ""
     log_step "llama.cpp Configuration"
-    
-    # Check if already installed
+
     local LLAMACPP_BIN="$INSTALL_USER_HOME/llama.cpp/build/bin"
     if [ -f "$LLAMACPP_BIN/llama-server" ] || [ -f "$LLAMACPP_BIN/llama-cli" ]; then
         log_info "llama.cpp already installed at $INSTALL_USER_HOME/llama.cpp"
@@ -3584,33 +3603,22 @@ prompt_configuration() {
         log_success "Skipping llama.cpp installation (already installed)"
     else
         log_info "llama.cpp provides local LLM inference for offline AI."
-        echo ""
-        echo "  1) Download only        - I'll compile it myself"
-        echo "  2) Download and compile - Maximum native support (may take time)"
-        echo "  3) Skip                 - Don't install llama.cpp"
-        echo ""
-        
-        log_prompt "Choose llama.cpp option (1-3) [default: 2]:"
-        read -r -p "> " llamacpp_choice < /dev/tty
-        
+        local llamacpp_choice
+        llamacpp_choice=$(prompt_or_env "Choose llama.cpp option (1-3) [default: 2]:
+  1) Download only        - I'll compile it myself
+  2) Download and compile - Maximum native support (may take time)
+  3) Skip                 - Don't install llama.cpp" "${GINTO_LLAMACPP_MODE:-}" "2")
+
         case "${llamacpp_choice}" in
-            1|download)
-                LLAMACPP_MODE="download"
-                ;;
-            3|skip)
-                LLAMACPP_MODE="skip"
-                ;;
-            *)
-                LLAMACPP_MODE="compile"
-                ;;
+            1|download) LLAMACPP_MODE="download" ;;
+            3|skip)     LLAMACPP_MODE="skip" ;;
+            *)          LLAMACPP_MODE="compile" ;;
         esac
-        
         log_success "Selected llama.cpp option: $LLAMACPP_MODE"
     fi
-    
-    # Save config for potential resume
+
     save_config
-    
+
     echo ""
     log_info "Configuration saved. Starting unattended installation..."
     echo ""
