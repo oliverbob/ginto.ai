@@ -294,7 +294,8 @@ sudo ./run.sh install --skip sdcpu
 
 When prompted, choose: 
 
-```bash Fresh install - Remove all and reinstall from scratch
+```bash 
+2. Fresh install - Remove all and reinstall from scratch
 ```
 
 
