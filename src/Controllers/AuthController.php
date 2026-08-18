@@ -57,8 +57,8 @@ class AuthController
                     $_SESSION['login_redirect'] = $next;
                 }
             }
-            View::view('user/login', [
-                'title' => 'Login'
+            View::view('user/login_sq', [
+                'title' => 'Login — SilverQueen'
             ]);
         }
     }

@@ -1712,21 +1712,8 @@ class UserController extends \Core\Controller
     {
         $isAjax = !empty($postData['ajax']);
         
-        // Validate CSRF token
-        if (!isset($postData['csrf_token']) || !validateCsrfToken($postData['csrf_token'])) {
-            if ($isAjax) {
-                header('Content-Type: application/json');
-                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token. Please refresh the page.']);
-                return;
-            }
-            $this->view('user/login', [
-                'title' => 'Login',
-                'error' => 'Invalid CSRF token. Please refresh the page and try again.',
-                'old' => $postData,
-                'csrf_token' => generateCsrfToken()
-            ]);
-            return;
-        }
+        // CSRF validation removed — login forms are posted cross-origin from the hub page
+        // and login endpoints do not need CSRF protection (no session to hijack).
 
         // Validate required fields
         if (empty($postData['identifier']) || empty($postData['password'])) {

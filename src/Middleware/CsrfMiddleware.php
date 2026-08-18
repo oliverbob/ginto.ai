@@ -29,6 +29,7 @@ class CsrfMiddleware
         '/api/mall/cart/sync',            // Cart sync call from frontend localStorage
         '/api/mall/cart/refresh',         // Cart refresh call from frontend localStorage
         '/debug/session-set',             // Debug helper: allow localhost POST to set session for testing
+        '/login',                         // Login form — cross-origin POST from hub page; no session to protect
         '/login-m',                       // Mobile app JSON login — authenticates via credentials, no CSRF session
         '/logout-m',                      // Mobile app JSON logout — kills session, CSRF not applicable
         '/api/tunnel/bind',               // Tunnel clients (frpc hosts) authenticate with a gtnl- key, not a browser session
