@@ -422,13 +422,19 @@ function sqLogin(e) {
     })
     .then(function(r) { return r.json(); })
     .then(function(data) {
-        if (data.access_token) {
-            localStorage.setItem('sq_token', data.access_token);
-            localStorage.setItem('sq_refresh', data.refresh_token || '');
-            localStorage.setItem('sq_user', JSON.stringify(data.user || {}));
+        var user = data.data || data;
+        var tokens = user.tokens || data.tokens || {};
+        var accessToken = tokens.access_token || user.access_token || data.access_token;
+        if (accessToken) {
+            localStorage.setItem('sq_token', accessToken);
+            localStorage.setItem('sq_refresh', tokens.refresh_token || user.refresh_token || '');
+            localStorage.setItem('sq_user', JSON.stringify(user.user || user));
             window.location.href = 'https://sq.silverqueen.pro/wallet';
         } else {
-            errEl.textContent = data.error || data.message || 'Login failed. Please try again.';
+            var errMsg = (user.error && typeof user.error === 'string') ? user.error
+                : (data.error && typeof data.error === 'string') ? data.error
+                : (user.message || data.message || 'Login failed. Please try again.');
+            errEl.textContent = errMsg;
             errEl.style.display = 'block';
             btn.textContent = 'Login to SilverQueen';
             btn.disabled = false;
