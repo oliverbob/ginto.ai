@@ -425,11 +425,12 @@ function sqLogin(e) {
         var user = data.data || data;
         var tokens = user.tokens || data.tokens || {};
         var accessToken = tokens.access_token || user.access_token || data.access_token;
+        var refreshToken = tokens.refresh_token || user.refresh_token || '';
         if (accessToken) {
             localStorage.setItem('sq_token', accessToken);
-            localStorage.setItem('sq_refresh', tokens.refresh_token || user.refresh_token || '');
+            localStorage.setItem('sq_refresh', refreshToken);
             localStorage.setItem('sq_user', JSON.stringify(user.user || user));
-            window.location.href = 'https://sq.silverqueen.pro/wallet';
+            window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
         } else {
             var errMsg = (user.error && typeof user.error === 'string') ? user.error
                 : (data.error && typeof data.error === 'string') ? data.error
