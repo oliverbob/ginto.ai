@@ -356,6 +356,10 @@
                     </button>
                 </div>
                 <div id="sq-error" style="display:none;color:#ef4444;font-size:0.82rem;margin-bottom:0.75rem;text-align:center;"></div>
+                <div id="sq-2fa-section" style="display:none;margin-bottom:0.75rem;">
+                    <label style="display:block;font-size:0.8rem;color:#94a3b8;margin-bottom:0.35rem;">Two-Factor Code</label>
+                    <input type="text" id="sq-2fa-code" placeholder="Enter 6-digit code or recovery code" class="sq-input sqs-focus" maxlength="20" style="width:100%;box-sizing:border-box;">
+                </div>
                 <button type="submit" id="sq-submit-btn" class="sq-btn sq-btn-sqs">Login to SilverQueen</button>
             </form>
             <div class="sq-footer-links">
@@ -407,7 +411,53 @@ function sqLogin(e) {
     e.preventDefault();
     var errEl = document.getElementById('sq-error');
     var btn   = document.getElementById('sq-submit-btn');
+    var twofa = document.getElementById('sq-2fa-section');
+    var twofaInput = document.getElementById('sq-2fa-code');
     errEl.style.display = 'none';
+
+    // If 2FA section is visible, we're on step 2 — submit the code.
+    if (twofa.style.display !== 'none') {
+        var code = twofaInput.value.trim();
+        if (!code) { errEl.textContent = 'Enter your code.'; errEl.style.display = 'block'; return false; }
+        btn.textContent = 'Verifying…';
+        btn.disabled = true;
+
+        fetch('https://sq.silverqueen.pro/api/auth/cross-login/verify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ temp_token: sqTempToken, code: code })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var user = data.data || data;
+            var tokens = user.tokens || data.tokens || {};
+            var accessToken = tokens.access_token || user.access_token || data.access_token;
+            if (accessToken) {
+                localStorage.setItem('sq_token', accessToken);
+                localStorage.setItem('sq_refresh', tokens.refresh_token || '');
+                localStorage.setItem('sq_user', JSON.stringify(user.user || user));
+                window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
+            } else {
+                var errMsg = (user.error && typeof user.error === 'string') ? user.error
+                    : (data.error && typeof data.error === 'string') ? data.error
+                    : 'Invalid code. Please try again.';
+                errEl.textContent = errMsg;
+                errEl.style.display = 'block';
+                btn.textContent = 'Verify Code';
+                btn.disabled = false;
+            }
+        })
+        .catch(function() {
+            errEl.textContent = 'Network error. Please try again.';
+            errEl.style.display = 'block';
+            btn.textContent = 'Verify Code';
+            btn.disabled = false;
+        });
+        return false;
+    }
+
+    // Step 1 — submit identifier + password.
     btn.textContent = 'Signing in…';
     btn.disabled = true;
 
@@ -426,6 +476,16 @@ function sqLogin(e) {
         var tokens = user.tokens || data.tokens || {};
         var accessToken = tokens.access_token || user.access_token || data.access_token;
         var refreshToken = tokens.refresh_token || user.refresh_token || '';
+
+        if (user.requires_2fa) {
+            sqTempToken = user.temp_token || '';
+            twofa.style.display = 'block';
+            twofaInput.focus();
+            btn.textContent = 'Verify Code';
+            btn.disabled = false;
+            return;
+        }
+
         if (accessToken) {
             localStorage.setItem('sq_token', accessToken);
             localStorage.setItem('sq_refresh', refreshToken);
@@ -449,6 +509,7 @@ function sqLogin(e) {
     });
     return false;
 }
+var sqTempToken = '';
 </script>
 
 </body></html>
