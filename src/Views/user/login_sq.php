@@ -416,8 +416,8 @@ function sqLogin(e) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-            email:    document.getElementById('sq-identifier').value.trim(),
-            password: document.getElementById('pw-sqs').value
+            identifier: document.getElementById('sq-identifier').value.trim(),
+            password:   document.getElementById('pw-sqs').value
         })
     })
     .then(function(r) { return r.json(); })
