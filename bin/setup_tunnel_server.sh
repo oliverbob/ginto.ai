@@ -175,12 +175,14 @@ fi
 if [[ ! -f "$FRP_WWW_DIR/404.html" ]] || [[ "$FORCE_INSTALL" == "true" ]]; then
     cat > "$FRP_WWW_DIR/404.html" << 'HTMLEOF'
 <!DOCTYPE html>
-<html><head><title>Tunnel Not Found</title>
+<html><head><title>Site not live yet</title>
 <style>body{font-family:sans-serif;text-align:center;padding:80px 20px;color:#555}
-h1{font-size:2em;margin-bottom:.5em}p{font-size:1.2em}</style></head>
-<body><h1>404 - Tunnel Not Found</h1>
-<p>This subdomain has no active tunnel.</p>
-<p>If this is your tunnel, ensure your frpc client is connected and the proxy type is <code>http</code>.</p>
+h1{font-size:2em;margin-bottom:.5em}p{font-size:1.2em}a{color:#667eea}</style></head>
+<body><h1>This site isn't live yet</h1>
+<p>No site is answering on this address right now.</p>
+<p>To bring it online, sign in at <a href="https://silverqueen.pro/account/keys">silverqueen.pro/account/keys</a>,
+add or copy your access key, then start your site from your device - it goes live immediately.</p>
+<p>Already set up? Make sure your site has been started once on your device.</p>
 </body></html>
 HTMLEOF
     chown "$FRP_USER:$FRP_USER" "$FRP_WWW_DIR/404.html"
