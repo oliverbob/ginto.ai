@@ -175,15 +175,63 @@ fi
 if [[ ! -f "$FRP_WWW_DIR/404.html" ]] || [[ "$FORCE_INSTALL" == "true" ]]; then
     cat > "$FRP_WWW_DIR/404.html" << 'HTMLEOF'
 <!DOCTYPE html>
-<html><head><title>Site not live yet</title>
-<style>body{font-family:sans-serif;text-align:center;padding:80px 20px;color:#555}
-h1{font-size:2em;margin-bottom:.5em}p{font-size:1.2em}a{color:#667eea}</style></head>
-<body><h1>This site isn't live yet</h1>
-<p>No site is answering on this address right now.</p>
-<p>To bring it online, sign in at <a href="https://silverqueen.pro/account/keys">silverqueen.pro/account/keys</a>,
-add or copy your access key, then start your site from your device - it goes live immediately.</p>
-<p>Already set up? Make sure your site has been started once on your device.</p>
-</body></html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Site not active — Silverqueen.pro</title>
+    <style>
+        :root { --ink:#1a1f2e; --muted:#5c6470; --line:#e6e8ec; --accent:#2563eb; --bg:#f7f8fa; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+               background:var(--bg); color:var(--ink); min-height:100vh; display:flex;
+               align-items:center; justify-content:center; padding:24px; line-height:1.55; }
+        .card { background:#fff; border:1px solid var(--line); border-radius:12px; max-width:560px; width:100%; padding:48px 40px; }
+        .brand { font-size:15px; font-weight:700; letter-spacing:.02em; color:var(--accent); margin-bottom:28px; }
+        h1 { font-size:24px; font-weight:650; margin-bottom:10px; }
+        .lede { color:var(--muted); font-size:16px; margin-bottom:28px; }
+        .steps { list-style:none; counter-reset:step; margin-bottom:32px; }
+        .steps li { counter-increment:step; position:relative; padding:0 0 18px 44px; font-size:15px; }
+        .steps li:last-child { padding-bottom:0; }
+        .steps li::before { content:counter(step); position:absolute; left:0; top:0; width:28px; height:28px;
+               border-radius:50%; background:var(--accent); color:#fff; font-size:14px; font-weight:600;
+               display:flex; align-items:center; justify-content:center; }
+        .steps b { font-weight:600; }
+        .steps code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; background:var(--bg);
+               border:1px solid var(--line); border-radius:4px; padding:1px 6px; white-space:nowrap; }
+        .btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; padding:12px 24px;
+               border-radius:8px; font-weight:600; font-size:15px; }
+        .btn:hover { filter:brightness(1.08); }
+        details { margin-top:32px; border-top:1px solid var(--line); padding-top:20px; }
+        summary { cursor:pointer; font-weight:600; font-size:15px; list-style-position:inside; }
+        details ul { margin:14px 0 0; padding-left:22px; color:var(--muted); font-size:14.5px; }
+        details li { margin-bottom:8px; }
+        details b { color:var(--ink); font-weight:600; }
+        @media (max-width:480px) { .card { padding:36px 24px; } h1 { font-size:21px; } }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="brand">silverqueen.pro</div>
+        <h1>This address isn't serving a site yet</h1>
+        <p class="lede">Nothing is answering here right now. It takes one key and one start to go live.</p>
+        <ol class="steps">
+            <li>Sign in at <b>silverqueen.pro</b> and open <code>Account&nbsp;&rarr;&nbsp;Keys</code>.</li>
+            <li>Add or copy your access key — it pairs this address with your device.</li>
+            <li>Start your site on your device. It goes live immediately.</li>
+        </ol>
+        <a href="https://silverqueen.pro/account/keys" class="btn">Set up my site</a>
+        <details>
+            <summary>Already set up, still seeing this page?</summary>
+            <ul>
+                <li><b>The site isn't running.</b> Start it once from your device, then refresh here.</li>
+                <li><b>Check the address.</b> A typo lands on an address nothing claims.</li>
+                <li><b>Your key was regenerated.</b> Add the new one from Account &rarr; Keys and restart your site.</li>
+            </ul>
+        </details>
+    </main>
+</body>
+</html>
 HTMLEOF
     chown "$FRP_USER:$FRP_USER" "$FRP_WWW_DIR/404.html"
     log_success "404 page written"
