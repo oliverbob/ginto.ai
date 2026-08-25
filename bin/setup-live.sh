@@ -42,7 +42,6 @@ sed -i \
     -e "s|^srt: yes|srt: no|" \
     -e "s|^webrtc: yes|webrtc: no|" \
     -e "s|^hlsAlwaysRemux: no|hlsAlwaysRemux: yes|" \
-    -e "s|^hlsSegmentCount: 7|hlsSegmentCount: 3|" \
     "$INSTALL_DIR/mediamtx.yml"
 
 echo "==> Writing systemd unit …"
@@ -77,10 +76,11 @@ if ! grep -q 'handle /live/\*' "$CADDYFILE" 2>/dev/null; then
     echo "==> Adding /live/* HLS proxy to Caddyfile …"
 
     # Insert right after the 'encode zstd gzip' line.
+    # No strip_prefix: MediaMTX serves at /live/<key>/... which is the same
+    # path the RTMP publisher used, so the Caddy route is a straight proxy.
     sed -i "/encode zstd gzip/a\\
 \\
     handle /live/* {\\
-        uri strip_prefix /live\\
         reverse_proxy 127.0.0.1:${HLS_PORT} {\\
             flush_interval -1\\
             transport http {\\
