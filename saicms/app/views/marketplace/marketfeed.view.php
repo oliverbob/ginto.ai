@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="68b861a77ef73ec6386b72eb2046fddddc5d1037dfb6af363407e50813423e13">
+    <meta name="csrf-token" content="<?php echo htmlspecialchars($_SESSION['csrf_token'] ?? ''); ?>">
         <link href="/assets/favicon/favicon.ico" rel="shortcut icon" type="image/x-icon" />
     <title>Dashboard - Sai</title>
     <script src="https://cdn.tailwindcss.com"></script>
