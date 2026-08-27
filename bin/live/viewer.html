@@ -1,0 +1,65 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SilverQueen — reference live stream</title>
+<style>
+ *{box-sizing:border-box;margin:0;padding:0}
+ body{background:#0a0d14;color:#e6e9ef;font:15px/1.6 system-ui,-apple-system,sans-serif;padding:24px;max-width:900px;margin:0 auto}
+ h1{font-size:20px;margin-bottom:2px}
+ .sub{color:#7d8598;font-size:13px;margin-bottom:18px}
+ video{width:100%;display:block;background:#000;border-radius:10px}
+ #log{margin-top:16px;background:#0f131c;border:1px solid #1e2534;border-radius:8px;padding:12px;
+      font:12px/1.7 ui-monospace,Menlo,monospace;max-height:260px;overflow-y:auto;white-space:pre-wrap}
+ .ok{color:#4ade80}.err{color:#f87171}.dim{color:#7d8598}
+ code{background:#0f131c;padding:2px 6px;border-radius:4px;font-size:13px}
+</style>
+<h1>Reference live stream</h1>
+<p class="sub">Published by <code>stream_claude.py</code> — Python draws the frames, ffmpeg encodes and pushes RTMP. Public, no sign-in.</p>
+<video id="v" controls muted playsinline autoplay></video>
+<div id="log"></div>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<script>
+const box = document.getElementById('log');
+const say = (m, c='') => {
+  box.innerHTML += `<span class="${c}">${new Date().toLocaleTimeString()}  ${m}</span>\n`;
+  box.scrollTop = box.scrollHeight;
+};
+const SRC = 'https://silverqueen.pro/stream/claude/index.m3u8';
+const video = document.getElementById('v');
+let hls;
+
+function start() {
+  // One instance, always. Creating a second Hls against the same element is
+  // how the old test page ended up fighting itself over the MediaSource.
+  if (hls) { hls.destroy(); hls = null; }
+
+  if (window.Hls && Hls.isSupported()) {
+    hls = new Hls({ lowLatencyMode: true, backBufferLength: 30 });
+    hls.loadSource(SRC);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => {
+      say(`manifest parsed — ${d.levels.length} level(s)`, 'ok');
+      video.play().catch(e => say('autoplay blocked: ' + e.message, 'dim'));
+    });
+    hls.on(Hls.Events.FRAG_LOADED, (_, d) =>
+      say(`segment ${d.frag.sn} loaded (${(d.frag.stats?.total ?? 0)} bytes)`, 'dim'));
+    hls.on(Hls.Events.ERROR, (_, d) => {
+      say(`${d.type} / ${d.details}`, 'err');
+      // Only fatal errors need us; hls.js recovers from the rest by itself,
+      // and tearing the player down on a warning is what makes a stream look
+      // broken when it is merely buffering.
+      if (!d.fatal) return;
+      if (d.type === Hls.ErrorTypes.NETWORK_ERROR) { say('retrying…', 'dim'); hls.startLoad(); }
+      else if (d.type === Hls.ErrorTypes.MEDIA_ERROR) { say('recovering media…', 'dim'); hls.recoverMediaError(); }
+      else { say('restarting in 4s', 'dim'); setTimeout(start, 4000); }
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    say('native HLS', 'ok');
+    video.src = SRC;
+  } else {
+    say('this browser cannot play HLS', 'err');
+  }
+}
+say('loading ' + SRC, 'dim');
+start();
+</script>
