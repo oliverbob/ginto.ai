@@ -103,10 +103,33 @@ YAML
 echo "==> Writing hooks …"
 cat > "$INSTALL_DIR/hook-publish.sh" <<HOOK
 #!/bin/bash
+# RTMP connecting is not the same as a playable stream. An encoder that sends
+# one keyframe and no more keeps the connection open and the path "ready" while
+# MediaMTX, which starts every segment on a keyframe, never closes one and
+# never writes a playlist. Announcing on connect put a live badge on streams
+# whose index.m3u8 was a 404 for their whole duration.
+#
+# So wait for the playlist. If it never appears, say nothing: the broadcast
+# stays "created", the page keeps showing connecting, and nobody is invited to
+# watch a stream that cannot play.
 KEY="\${MTX_PATH#live/}"
-SIG=\$(printf "%s|%s" "publish" "\$KEY" | openssl dgst -sha256 -hmac "${LIVE_HOOK_SECRET}" -hex 2>/dev/null | awk '{print \$NF}')
-curl -s --max-time 5 -X POST "${COMCHAIN_HOOKS}/publish" \\
-  -d "key=\$KEY" -d "sig=\$SIG" >/dev/null 2>&1
+PLAYLIST="${HLS_DIR}/\${MTX_PATH}/index.m3u8"
+
+for _ in \$(seq 1 40); do
+  [ -s "\$PLAYLIST" ] && break
+  sleep 0.5
+done
+
+if [ -s "\$PLAYLIST" ]; then
+  SIG=\$(printf "%s|%s" "publish" "\$KEY" | openssl dgst -sha256 -hmac "${LIVE_HOOK_SECRET}" -hex 2>/dev/null | awk '{print \$NF}')
+  curl -s --max-time 5 -X POST "${COMCHAIN_HOOKS}/publish" \\
+    -d "key=\$KEY" -d "sig=\$SIG" >/dev/null 2>&1
+else
+  logger -t mediamtx-hook "no HLS playlist for \$KEY after 20s; not announcing it live"
+fi
+
+# Stay alive regardless: MediaMTX SIGINTs this on disconnect, and that is what
+# triggers runOnNotReady.
 exec sleep 86400
 HOOK
 
