@@ -1725,6 +1725,34 @@ $router->req('/api/tunnel/access-key/revoke', 'TunnelController@revokeAccessKey'
 $router->req('/api/tunnel/access-key/reactivate', 'TunnelController@reactivateAccessKey', ['POST']);
 $router->req('/api/tunnel/access-key/delete', 'TunnelController@deleteAccessKey', ['POST']);
 
+// Admin-gated content: /stream/test/claude.md is served only to logged-in
+// ginto.ai admins so the HLS debug notes stay internal while the test
+// page at /stream/test stays open to anyone. Caddy routes only that exact
+// path here; everything else under /stream/* is served from disk by file_server.
+$router->req('/admin/stream-notes', function() {
+    if (session_status() !== PHP_SESSION_ACTIVE) { @session_start(); }
+    if (!\Ginto\Controllers\UserController::isAdmin()) {
+        http_response_code(403);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'Forbidden — sign in as an admin first.';
+        return;
+    }
+    $files = ['/opt/mediamtx/claude.md', '/home/oliverbob/ginto.ai/stream/claude.md'];
+    $file = '';
+    foreach ($files as $candidate) {
+        if (file_exists($candidate)) { $file = $candidate; break; }
+    }
+    if ($file === '') {
+        http_response_code(404);
+        header('Content-Type: text/plain; charset=utf-8');
+        echo 'claude.md not found.';
+        return;
+    }
+    header('Content-Type: text/markdown; charset=utf-8');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    echo file_get_contents($file);
+});
+
 // Member Messenger routes (Facebook-like chat between members)
 $router->req('/messenger', 'MessengerController@index');
 $router->req('/messenger/conversations', 'MessengerController@getConversations');
