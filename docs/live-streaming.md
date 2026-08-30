@@ -19,6 +19,12 @@ Caddy  handle_path /stream/*  → file_server over that directory
 Viewers  https://silverqueen.pro/stream/<stream_key>/index.m3u8   (video.js in the chat page)
 ```
 
+Since 2026-08-31 a broadcast is also **recorded**, uploaded to B2 and posted to
+the feed once it ends. That half is documented in `~/repo/comchain/RECORDING.md`
+— read it before changing the hooks, and note that the $5/month gate deciding
+*who* gets a server recording is **not built yet**, so the pipeline currently
+records everyone.
+
 The media server, not the API, decides when a broadcast is really live. The row
 goes `created` when someone taps Go live, `live` only when frames actually
 arrive, and `ended` when the encoder disconnects — however it disconnected.
@@ -30,7 +36,7 @@ That is why a crashed phone cannot leave a ghost stream standing.
 |---|---|
 | `~/AndroidStudioProjects/silverqueen-apk` | `LiveStreamActivity` — camera, encoder, RTMP push. `LiveStreamService` — the foreground service that makes holding the camera legal. `MainActivity.SilverQueenBridge.liveStart/liveStop/liveState` — the JS bridge. |
 | `~/repo/comchain` (CT108) | `Api\LiveController` + `LiveBroadcast` — minting keys, the two webhooks, the viewer count, the went-live push. `app/views/chat/index.view.php` — the Go live sheet and the video.js watch player. |
-| `~/repo/ginto.ai` (interserver) | `bin/setup-live.sh` — provisions MediaMTX, the hooks, the systemd unit and the Caddy route. `/admin/stream-notes` in `src/Routes/web.php` — the admin gate on `/stream/test/claude.md`. |
+| `~/repo/ginto.ai` (interserver) | `bin/setup-live.sh` — provisions MediaMTX, the hooks, the systemd unit and the Caddy route, and now the recorder. `bin/live/hls-repair.sh` — the watchdog for streams with no second keyframe. `bin/live/publish-recording.php` — uploads a finished recording to B2 and tells comchain. `src/Helpers/B2Helper::uploadFile()` — the streaming upload. `/admin/stream-notes` in `src/Routes/web.php` — the admin gate on `/stream/test/claude.md`. |
 
 ## Hosts
 
