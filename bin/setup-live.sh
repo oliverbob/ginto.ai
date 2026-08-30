@@ -6,8 +6,11 @@
 #   1. MediaMTX (RTMP ingest → HLS segments written to disk) on :1935 / :8888
 #   2. runOnReady / runOnNotReady hooks that tell comchain a broadcast started
 #      and ended, signed with the shared LIVE_HOOK_SECRET
-#   3. A systemd unit for the mediamtx binary
-#   4. A Caddy route at silverqueen.pro/stream/* serving those segments
+#   3. Recording: the publish hook asks comchain whether this broadcaster has
+#      paid for it, and only then runs `ffmpeg -c copy` beside the stream. The
+#      unpublish hook closes the file and hands it to bin/live/publish-recording.php
+#   4. A systemd unit for the mediamtx binary
+#   5. A Caddy route at silverqueen.pro/stream/* serving those segments
 #
 # Prerequisites:
 #   - Ubuntu, root SSH
@@ -178,12 +181,32 @@ fi
 # Real broadcasts only. A stream key is 64 hex characters; the reference stream
 # is "claude", runs around the clock, and recording it would fill the disk by
 # the weekend.
+#
+# And paid broadcasts only. Recording is a \$5/month subscription — see
+# comchain's RECORDING.md — and the check belongs here, before ffmpeg starts,
+# rather than in the publisher afterwards: an unentitled broadcast recorded and
+# then discarded has already spent the disk and the CPU, which is the whole of
+# what is being sold.
+#
+# Failing closed, in both directions. curl answers nothing on a timeout and the
+# grep finds nothing, so a comchain that is down or slow means no recording —
+# never a recording nobody paid for. Five seconds because an encoder is already
+# connected and waiting on this hook; the live stream itself is unaffected
+# either way, since the publish announcement above has already gone.
 if [[ "\$KEY" =~ ^[0-9a-f]{64}\$ ]]; then
-  ffmpeg -nostdin -loglevel error \\
-    -i "rtmp://127.0.0.1:${RTMP_PORT}/\${MTX_PATH}" \\
-    -c copy -movflags frag_keyframe+empty_moov -t 14400 \\
-    -f mp4 "${REC_DIR}/\${KEY}.mp4" >/dev/null 2>&1 &
-  echo \$! > "/tmp/rec-\${KEY}.pid"
+  SIG=\$(printf "%s|%s" "entitled" "\$KEY" | openssl dgst -sha256 -hmac "${LIVE_HOOK_SECRET}" -hex 2>/dev/null | awk '{print \$NF}')
+  MAY_RECORD=\$(curl -s --max-time 5 -X POST "${COMCHAIN_HOOKS}/entitled" \\
+    -d "key=\$KEY" -d "sig=\$SIG" 2>/dev/null | grep -o '"record":[[:space:]]*true')
+
+  if [ -n "\$MAY_RECORD" ]; then
+    ffmpeg -nostdin -loglevel error \\
+      -i "rtmp://127.0.0.1:${RTMP_PORT}/\${MTX_PATH}" \\
+      -c copy -movflags frag_keyframe+empty_moov -t 14400 \\
+      -f mp4 "${REC_DIR}/\${KEY}.mp4" >/dev/null 2>&1 &
+    echo \$! > "/tmp/rec-\${KEY}.pid"
+  else
+    logger -t mediamtx-hook "not recording \$KEY: no entitlement"
+  fi
 fi
 
 # Stay alive regardless: MediaMTX SIGINTs this on disconnect, and that is what
