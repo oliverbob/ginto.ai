@@ -28,6 +28,13 @@ MEDIA_VERSION="v1.20.1"
 MEDIA_URL="https://github.com/bluenviron/mediamtx/releases/download/${MEDIA_VERSION}/mediamtx_${MEDIA_VERSION}_linux_amd64.tar.gz"
 INSTALL_DIR="/opt/mediamtx"
 HLS_DIR="${INSTALL_DIR}/hls"
+# Recordings live beside the HLS, but they are the opposite kind of thing: HLS
+# is a sliding window MediaMTX throws away, a recording is the lasting copy and
+# the only one that reaches the feed.
+REC_DIR="${INSTALL_DIR}/recordings"
+# Where this repo is checked out on the host, so the hooks can reach the
+# publisher. su - oliverbob; cd ginto.ai; git pull is how it gets there.
+GINTO_DIR="${GINTO_DIR:-/home/oliverbob/ginto.ai}"
 CADDYFILE="/etc/caddy/Caddyfile"
 RTMP_PORT=1935
 HLS_PORT=8888
@@ -100,6 +107,9 @@ YAML
 # publisher, and sends it SIGINT on disconnect — which is what triggers
 # runOnNotReady. A hook that exits after its curl ends the broadcast the
 # instant it begins.
+mkdir -p "$REC_DIR"
+chmod 755 "$REC_DIR"
+
 echo "==> Writing hooks …"
 cat > "$INSTALL_DIR/hook-publish.sh" <<HOOK
 #!/bin/bash
@@ -128,6 +138,38 @@ else
   logger -t mediamtx-hook "no HLS playlist for \$KEY after 20s; not announcing it live"
 fi
 
+# ── Recording ────────────────────────────────────────────────────────────────
+#
+# Live is watched by whoever happens to be there. The recording is the reason
+# everybody else ever sees it, and it is what goes into the feed afterwards.
+#
+# ffmpeg reads the stream back out of MediaMTX rather than MediaMTX writing it
+# itself. Native \`record:\` would work, but it lives in mediamtx.yml, and
+# changing that means a restart — which ends every broadcast on air. A hook is
+# exec'd per publish, so a change here reaches the next broadcast and never one
+# already running.
+#
+# -c copy: no re-encode. The phone already made H.264 and making it again would
+# cost CPU on a shared box and quality for nothing.
+#
+# frag_keyframe+empty_moov: playable even if ffmpeg is killed rather than asked
+# to stop. A plain MP4 writes its index last, so a broadcast that ended in a
+# crash would leave a file no player will open.
+#
+# -t 14400: four hours. Not a view on how long anyone should talk — a bound on
+# how much disk one forgotten encoder can take.
+#
+# Real broadcasts only. A stream key is 64 hex characters; the reference stream
+# is "claude", runs around the clock, and recording it would fill the disk by
+# the weekend.
+if [[ "\$KEY" =~ ^[0-9a-f]{64}\$ ]]; then
+  ffmpeg -nostdin -loglevel error \\
+    -i "rtmp://127.0.0.1:${RTMP_PORT}/\${MTX_PATH}" \\
+    -c copy -movflags frag_keyframe+empty_moov -t 14400 \\
+    -f mp4 "${REC_DIR}/\${KEY}.mp4" >/dev/null 2>&1 &
+  echo \$! > "/tmp/rec-\${KEY}.pid"
+fi
+
 # Stay alive regardless: MediaMTX SIGINTs this on disconnect, and that is what
 # triggers runOnNotReady.
 exec sleep 86400
@@ -139,6 +181,36 @@ KEY="\${MTX_PATH#live/}"
 SIG=\$(printf "%s|%s" "unpublish" "\$KEY" | openssl dgst -sha256 -hmac "${LIVE_HOOK_SECRET}" -hex 2>/dev/null | awk '{print \$NF}')
 curl -s --max-time 5 -X POST "${COMCHAIN_HOOKS}/unpublish" \\
   -d "key=\$KEY" -d "sig=\$SIG" >/dev/null 2>&1 &
+
+# ── Close the recording and hand it to the publisher ─────────────────────────
+#
+# After the unpublish call above, never before: marking the broadcast ended is
+# what takes the live badge off everybody's screen, and that must not wait on
+# a file being closed.
+#
+# SIGINT rather than SIGKILL — ffmpeg finalises on an interrupt and leaves a
+# truncated file on a kill. The wait is bounded because a hook that hangs holds
+# up MediaMTX's own teardown.
+RECPID="/tmp/rec-\${KEY}.pid"
+if [ -f "\$RECPID" ]; then
+  PID=\$(cat "\$RECPID")
+  kill -INT "\$PID" 2>/dev/null
+  for _ in \$(seq 1 20); do
+    kill -0 "\$PID" 2>/dev/null || break
+    sleep 0.5
+  done
+  kill -9 "\$PID" 2>/dev/null
+  rm -f "\$RECPID"
+
+  # Detached with setsid: uploading gigabytes must outlive this hook, and
+  # MediaMTX kills the hook's process group when the path goes away.
+  REC="${REC_DIR}/\${KEY}.mp4"
+  if [ -s "\$REC" ]; then
+    setsid php "${GINTO_DIR}/bin/live/publish-recording.php" "\$KEY" "\$REC" \\
+      >/dev/null 2>&1 < /dev/null &
+  fi
+fi
+
 exit 0
 HOOK
 
