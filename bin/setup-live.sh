@@ -110,6 +110,13 @@ YAML
 mkdir -p "$REC_DIR"
 chmod 755 "$REC_DIR"
 
+# The HLS repair watchdog. It has lived on the host and not in this script
+# since it was written, which meant re-provisioning silently removed it — and
+# removed with it the only thing that gets a playlist out of a stream whose
+# encoder never sends a second keyframe.
+echo "==> Installing the HLS repair watchdog …"
+install -m 700 "$(dirname "$0")/live/hls-repair.sh" "$INSTALL_DIR/hls-repair.sh"
+
 echo "==> Writing hooks …"
 cat > "$INSTALL_DIR/hook-publish.sh" <<HOOK
 #!/bin/bash
@@ -125,7 +132,16 @@ cat > "$INSTALL_DIR/hook-publish.sh" <<HOOK
 KEY="\${MTX_PATH#live/}"
 PLAYLIST="${HLS_DIR}/\${MTX_PATH}/index.m3u8"
 
-for _ in \$(seq 1 40); do
+# Started now, while the opening keyframe is still in MediaMTX's buffer for new
+# readers. It exits immediately and costs nothing when the muxer is writing
+# normally, and it is the only thing that produces a playlist for a stream
+# whose encoder sends one keyframe and never another.
+${INSTALL_DIR}/hls-repair.sh "\$MTX_PATH" >/dev/null 2>&1 &
+
+# Thirty seconds. The repair path needs longer than a healthy stream does, and
+# announcing a broadcast whose playlist has not appeared puts a live badge on a
+# 404 for its whole duration.
+for _ in \$(seq 1 60); do
   [ -s "\$PLAYLIST" ] && break
   sleep 0.5
 done
@@ -135,7 +151,7 @@ if [ -s "\$PLAYLIST" ]; then
   curl -s --max-time 5 -X POST "${COMCHAIN_HOOKS}/publish" \\
     -d "key=\$KEY" -d "sig=\$SIG" >/dev/null 2>&1
 else
-  logger -t mediamtx-hook "no HLS playlist for \$KEY after 20s; not announcing it live"
+  logger -t mediamtx-hook "no HLS playlist for \$KEY after 30s; not announcing it live"
 fi
 
 # ── Recording ────────────────────────────────────────────────────────────────

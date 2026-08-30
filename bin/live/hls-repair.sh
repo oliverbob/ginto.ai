@@ -32,7 +32,14 @@ done
 mkdir -p "$DIR"
 logger -t hls-repair "no playlist for ${MTX_PATH} after 6s; starting repair transcode"
 
-ffmpeg -hide_banner -loglevel warning -rtsp_transport tcp \
+# -flags2 +showall is what makes this possible at all. Without it the decoder
+# waits for an IDR that is never coming and emits nothing, which is why the
+# first version of this script attached to the stream and still produced no
+# playlist. With it, frames come out from the first packet: visibly degraded
+# until the picture settles, which is worth far more than a 404.
+ffmpeg -hide_banner -loglevel warning \
+    -fflags +genpts+discardcorrupt -err_detect ignore_err -flags2 +showall \
+    -rtsp_transport tcp \
     -i "rtsp://127.0.0.1:8554/${MTX_PATH}" \
     -c:v libx264 -preset veryfast -tune zerolatency -profile:v high \
     -b:v 2000k -maxrate 2000k -bufsize 4000k \
