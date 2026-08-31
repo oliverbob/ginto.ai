@@ -30,6 +30,17 @@
     reverse_proxy @websocket php:8080
     
     # WebSocket proxy for messenger (Ratchet on port 31827)
+    # The trading desk stream. The public path carries a -ws suffix and is
+    # rewritten to /ltrading, which is the route start_rachet_stream.php
+    # actually registers. Without it the wallet's /trade page connects to a
+    # 404 and sits on "reconnecting" forever.
+    handle /ltrading-ws/* {
+        uri path_regexp .* /ltrading
+        reverse_proxy php:31827 {
+            header_up Host localhost
+        }
+    }
+
     handle /messenger-ws/* {
         uri path_regexp .* /messenger
         reverse_proxy php:31827 {
