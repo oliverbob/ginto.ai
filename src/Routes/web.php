@@ -1843,6 +1843,11 @@ $router->get('/api/academy/movers', 'AcademyController@movers'); // server-side 
 $router->get('/academy/bot', 'AcademyController@bot');            // members: read-only Live Bot Lab (testnet)
 $router->get('/academy/bot/data', 'AcademyController@botData');   // members: testnet bot snapshot JSON
 $router->get('/academy/markets', 'AcademyController@markets');    // members: popular/gainers/losers pairs
+// Public relay of the same sweep, for the feed's market card on comchain. That
+// page cannot hold a session here and must not talk to an exchange itself —
+// this host is the relay, and it speaks to Binance once for everybody.
+$router->get('/market/gainers', 'AcademyController@publicMarkets');
+$router->get('/market/klines', 'AcademyController@publicKlines');
 $router->get('/academy/klines', 'AcademyController@klines');      // members: OHLC candles (TradingView chart)
 $router->post('/academy/bot/analyze', 'AcademyController@analyze'); // members: AI analysis of a chosen coin (advisory)
 $router->get('/academy/wallet', 'AcademyController@wallet');      // members: this learner's own $10k paper wallet + positions

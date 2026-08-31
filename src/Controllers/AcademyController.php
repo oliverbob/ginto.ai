@@ -202,6 +202,34 @@ class AcademyController
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->requireMemberJson();
+        $this->marketsBody();
+    }
+
+    /**
+     * GET /market/gainers — the same sweep, without the member gate.
+     *
+     * The feed on comchain draws a "what is going up" card and needs this. It
+     * cannot use /academy/markets: that wants a session on this host, and a
+     * member reading the feed has one on the wallet instead. It also must not
+     * go to Binance itself — this is the relay, and the exchange is spoken to
+     * from here, once, on everyone's behalf.
+     *
+     * Public because it is public information: today's prices, already cached
+     * for thirty seconds and already computed for the members' screen. Nothing
+     * here is anybody's account.
+     */
+    public function publicMarkets(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        // Read cross-origin by the feed, which is served from another host.
+        header('Access-Control-Allow-Origin: *');
+        header('Cache-Control: public, max-age=30');
+        $this->marketsBody();
+    }
+
+    /** The sweep itself, shared by the member route and the public one. */
+    private function marketsBody(): void
+    {
         $cf = (defined('STORAGE_PATH') ? STORAGE_PATH : sys_get_temp_dir()) . '/academy_markets.json';
         if (is_file($cf) && (time() - filemtime($cf) < 30)) { echo (string) file_get_contents($cf); exit; }
         $stable = ['USDC','BUSD','TUSD','FDUSD','DAI','USDP','USTC','EUR','GBP','AEUR','USD1','EURI','XUSD'];
@@ -232,6 +260,20 @@ class AcademyController
     {
         header('Content-Type: application/json; charset=utf-8');
         $this->requireMemberJson();
+        $this->klinesBody();
+    }
+
+    /** GET /market/klines — the same candles, ungated, for the feed's card. */
+    public function publicKlines(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Access-Control-Allow-Origin: *');
+        header('Cache-Control: public, max-age=30');
+        $this->klinesBody();
+    }
+
+    private function klinesBody(): void
+    {
         $symbol   = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) ($_GET['symbol'] ?? 'BTCUSDT'))) ?: 'BTCUSDT';
         $interval = preg_replace('/[^0-9a-zA-Z]/', '', (string) ($_GET['interval'] ?? '15m'));
         if (!in_array($interval, ['1s', '1m', '5m', '15m', '30m', '1h', '2h', '4h', '1d', '1w', '1M'], true)) $interval = '15m';
