@@ -99,6 +99,42 @@
             font-size: 15px;
         }
         .btn:hover { filter: brightness(1.08); }
+        .btn[disabled] { opacity: .6; cursor: default; filter: none; }
+        /* The row the two buttons share. Retrying is the thing most people
+           landing here actually want — they were sent by a link and the site
+           is simply not up yet — so it leads, and setting up sits beside it
+           for the person this address belongs to. */
+        .actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        .btn.secondary {
+            background: transparent;
+            color: var(--accent);
+            border: 1px solid var(--line);
+        }
+        .status {
+            margin-top: 14px;
+            font-size: 14px;
+            color: var(--muted);
+            min-height: 20px;
+        }
+        .status b { color: var(--ink); font-weight: 600; }
+        .spin {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            margin-right: 7px;
+            vertical-align: -2px;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            border-radius: 50%;
+            animation: spin .7s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
         details {
             margin-top: 32px;
             border-top: 1px solid var(--line);
@@ -137,7 +173,15 @@
             <li>Start your site on your device. It goes live immediately.</li>
         </ol>
 
-        <a href="https://silverqueen.pro/account/keys" class="btn">Set up my site</a>
+        <div class="actions">
+            <button type="button" class="btn" id="retry">Try again</button>
+            <a href="https://silverqueen.pro/account/keys" class="btn secondary">Set up my site</a>
+        </div>
+
+        <p class="status" id="status"></p>
+        <noscript>
+            <p class="status">Start your site, then reload this page.</p>
+        </noscript>
 
         <details>
             <summary>Already set up, still seeing this page?</summary>
@@ -148,5 +192,118 @@
             </ul>
         </details>
     </main>
+
+<script>
+(function () {
+  'use strict';
+
+  /*
+   * Waiting for the site to come up, without making anybody watch for it.
+   *
+   * This page is what the tunnel serves when nothing is answering on the
+   * address. Almost everybody who lands here was sent by a link and simply
+   * arrived before the site was started — so the useful thing is not advice,
+   * it is to notice the moment it starts and go there.
+   *
+   * It asks for this same address rather than reloading on a timer, because a
+   * reload that finds the site still down flashes the page and loses the
+   * scroll for nothing. The request is cheap and silent, and the page only
+   * actually reloads once the answer changes — at which point the reload
+   * lands on the real site.
+   *
+   * The tunnel answers 404 for an address nothing is serving; that is this
+   * page. Anything else means something is there now.
+   */
+
+  var retry  = document.getElementById('retry');
+  var status = document.getElementById('status');
+
+  /* Backing off: eager while somebody is likely still watching, then slower,
+     so a tab left open for an hour is not asking every ten seconds all day. */
+  var DELAYS = [5000, 5000, 10000, 10000, 20000, 30000, 60000];
+  var attempt = 0;
+  var timer = null;
+  var checking = false;
+
+  function say(html) { status.innerHTML = html; }
+
+  function schedule() {
+    clearTimeout(timer);
+
+    /* Nobody is looking. Stop asking; the visibility handler picks it up
+       again when they come back. */
+    if (document.hidden) return;
+
+    var wait = DELAYS[Math.min(attempt, DELAYS.length - 1)];
+    timer = setTimeout(check, wait);
+
+    var secs = Math.round(wait / 1000);
+    say('Checking again in ' + secs + ' second' + (secs === 1 ? '' : 's') + '.');
+  }
+
+  function check(manual) {
+    if (checking) return;
+
+    checking = true;
+    retry.disabled = true;
+    say('<span class="spin"></span>Checking\u2026');
+
+    /* The root, not this exact path. Being down is a property of the whole
+       address, but a 404 is not — once the site is up it may quite reasonably
+       answer 404 for the deep link that brought somebody here, and watching
+       that path would then wait forever on a site that had already started.
+       The reload still goes to where they actually wanted to be.
+
+       cache: no-store so an intermediary cannot answer with the very page
+       being displayed. A HEAD is enough and costs the site nothing. */
+    fetch(window.location.origin + '/', { method: 'HEAD', cache: 'no-store' })
+      .then(function (res) {
+        if (res.status !== 404) {
+          say('<b>It\u2019s up.</b> Taking you there\u2026');
+          window.location.reload();
+          return true;
+        }
+
+        return false;
+      })
+      .catch(function () {
+        /* A failed request is not an answer. Treat it as still down and try
+           again rather than reporting a problem that may not exist. */
+        return false;
+      })
+      .then(function (found) {
+        checking = false;
+        retry.disabled = false;
+
+        if (found) return;
+
+        attempt++;
+
+        if (manual) {
+          say('Still not answering. <b>Start your site</b> and this page will notice.');
+          setTimeout(schedule, 2500);
+          return;
+        }
+
+        schedule();
+      });
+  }
+
+  retry.addEventListener('click', function () {
+    attempt = 0;          /* asking by hand means start being eager again */
+    clearTimeout(timer);
+    check(true);
+  });
+
+  /* Coming back to the tab is the likeliest moment for it to have changed. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { clearTimeout(timer); return; }
+    attempt = 0;
+    check(false);
+  });
+
+  schedule();
+})();
+</script>
 </body>
 </html>
