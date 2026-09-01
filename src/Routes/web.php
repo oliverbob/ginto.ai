@@ -1567,6 +1567,12 @@ $router->req('/user', 'UserController@user');
 // Webhooks
 $router->req('/webhook', 'WebhookController@webhook');
 $router->req('/webhooks/paymongo', 'WebhookController@paymongoWebhook', ['POST', 'GET']);
+
+// The payments relay for sq.silverqueen.pro. PayMongo's key lives on this
+// domain and only this domain; the wallet asks here for a QR rather than
+// holding a copy of the credentials. Authenticated by a signature over the
+// body — see SqRelayController for why not an IP allowlist.
+$router->req('/relay/paymongo/qr', 'SqRelayController@createQr', ['POST']);
 $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // Editor routes

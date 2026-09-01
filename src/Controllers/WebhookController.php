@@ -775,6 +775,80 @@ class WebhookController
     }
 
     /**
+     * Pass a payment event on to sq.silverqueen.pro.
+     *
+     * PayMongo is registered against this domain, so every QR payment the
+     * wallet takes — classroom tuition, a teacher's subscription — is told to
+     * this endpoint. This server has no idea what any of them were *for*;
+     * sq does, because sq is where the intent id was minted and recorded.
+     *
+     * Best effort by design, and quiet about failing. PayMongo retries a
+     * delivery it did not get a 2xx for, and if this were allowed to fail the
+     * whole webhook the retries would re-run every handler above as well —
+     * including the ones that have already credited somebody. So a relay that
+     * cannot get through is logged and swallowed, and sq reconciles by asking
+     * about intents it is still waiting on.
+     *
+     * Signed the same way sq signs its calls here: HMAC over timestamp and
+     * body, so neither can be altered without the other, and a captured
+     * request cannot be replayed tomorrow.
+     */
+    private function relayToSilverQueen(string $eventType, array $event, string $rawBody): void
+    {
+        $secret = (string) (getenv('SQ_RELAY_SECRET') ?: ($_ENV['SQ_RELAY_SECRET'] ?? ''));
+        $url    = (string) (getenv('SQ_RELAY_URL')
+            ?: ($_ENV['SQ_RELAY_URL'] ?? 'https://sq.silverqueen.pro/api/v1/internal/paymongo'));
+
+        if ($secret === '') {
+            error_log('sq relay: SQ_RELAY_SECRET is not set — event ' . $eventType . ' not relayed');
+
+            return;
+        }
+
+        $body = json_encode([
+            'event_type' => $eventType,
+            'event'      => $event,
+        ]);
+
+        if ($body === false) {
+            return;
+        }
+
+        $when      = (string) time();
+        $signature = hash_hmac('sha256', $when . '.' . $body, $secret);
+
+        try {
+            $ch = curl_init($url);
+
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $body,
+                CURLOPT_RETURNTRANSFER => true,
+                // Short: PayMongo is waiting on this request, and a slow
+                // relay would turn a delivered event into a retried one.
+                CURLOPT_TIMEOUT        => 8,
+                CURLOPT_CONNECTTIMEOUT => 4,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'X-SQ-Timestamp: ' . $when,
+                    'X-SQ-Signature: ' . $signature,
+                ],
+            ]);
+
+            $response = curl_exec($ch);
+            $status   = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            curl_close($ch);
+
+            if ($status < 200 || $status >= 300) {
+                error_log('sq relay: ' . $eventType . ' returned ' . $status . ' — ' . substr((string) $response, 0, 200));
+            }
+        } catch (\Throwable $e) {
+            error_log('sq relay: ' . $eventType . ' failed — ' . $e->getMessage());
+        }
+    }
+
+    /**
      * Handle incoming PayMongo webhook events.
      * Endpoint: POST /webhooks/paymongo
      *
@@ -831,9 +905,21 @@ class WebhookController
             switch ($eventType) {
                 case 'payment.paid':
                     $this->handlePaymongoPaymentPaid($event);
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
+                    break;
+
+                // QR PH, which is what the wallet's classrooms are paid with.
+                // Nothing here knows what the money was for — sq does — so
+                // these are acknowledged and passed straight on.
+                case 'qr.paid':
+                case 'qrph.paid':
+                case 'qr.expired':
+                case 'qrph.expired':
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
                     break;
                 case 'payment.failed':
                     $this->handlePaymongoPaymentFailed($event);
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
                     break;
                 case 'checkout_session.payment.paid':
                     $this->handleGintoPayCheckoutPaid($event);
