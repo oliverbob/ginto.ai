@@ -37,6 +37,16 @@ class CsrfMiddleware
         '/api/v1/relay/trade/buy',        // Relay callers carry a signed, single-use token; there is no session to hold a CSRF token
         '/api/v1/relay/trade/sell',
         '/api/v1/relay/analyze',
+        // The payments relay for sq.silverqueen.pro. There is no session and
+        // no browser here — sq authenticates with an HMAC over the timestamp
+        // and the exact body, which SqRelayController checks before it does
+        // anything at all. A CSRF token would be a token protecting nothing.
+        '/relay/paymongo/qr',
+        // PayMongo's own deliveries. Signed by PayMongo and verified against
+        // PAYMONGO_WEBHOOK_SECRET in the handler; a rejection here would show
+        // up as a disabled endpoint on their dashboard rather than as an error
+        // anybody sees.
+        '/webhooks/paymongo',
     ];
 
     /**
