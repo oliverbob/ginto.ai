@@ -146,12 +146,20 @@ ss -lntu 2>/dev/null | grep -E ':(7880|7881|7882)\b' | sed 's/^/  /' || true
 say "[7/7] Caddy"
 
 CADDYFILE=/etc/caddy/Caddyfile
-SNIPPET=/etc/caddy/conf.d/livekit.caddy
+# sites-enabled, not conf.d — and that is not a style choice.
+#
+# The on-demand TLS verifier in this repo (TunnelController::verifyTunnel)
+# approves a certificate when /etc/caddy/sites-enabled/<domain>.caddy exists.
+# That is the hook this host already has for "a subdomain that is served here
+# but is not a tunnel", which is exactly what the SFU is. Putting the snippet
+# anywhere else leaves the verifier saying no, and a refusal from it looks like
+# a broken TLS handshake with nothing in the log.
+SNIPPET=/etc/caddy/sites-enabled/sfu.silverqueen.pro.caddy
 
 if [ ! -f "$CADDYFILE" ]; then
     warn "  No $CADDYFILE — skipping. Point sfu.silverqueen.pro at 127.0.0.1:7880 yourself."
 else
-    install -d -m 0755 /etc/caddy/conf.d
+    install -d -m 0755 /etc/caddy/sites-enabled
 
     cat > "$SNIPPET" <<'CADDY'
 # LiveKit signalling. Written by ginto.ai/bin/install-livekit.sh — edit there.
@@ -161,28 +169,18 @@ else
 # Caddy prefers the more specific host, so the order in the file does not
 # matter, but the specificity does.
 sfu.silverqueen.pro {
-	# An ordinary certificate, not an on-demand one.
-	#
-	# This host's global block gates on-demand TLS behind
-	# /api/tunnel/verify, which approves the subdomains that are registered
-	# tunnels. The SFU is not a tunnel, so the ask said no and the handshake
-	# failed with "tlsv1 alert internal error" and nothing in the log — a
-	# refusal that looks exactly like a broken server. Naming an email here
-	# issues it the ordinary way, as the apex block does.
-	tls admin@silverqueen.pro
-
 	# WebSocket upgrades need nothing special in Caddy v2 — reverse_proxy
 	# carries them. The SFU binds to loopback, so this is the only way in.
 	reverse_proxy 127.0.0.1:7880
 }
 CADDY
 
-    if grep -q 'conf.d/\*.caddy' "$CADDYFILE"; then
-        echo -e "  ${DIM}Caddyfile already imports conf.d${NC}"
+    if grep -q 'sites-enabled/\*.caddy' "$CADDYFILE"; then
+        echo -e "  ${DIM}Caddyfile already imports sites-enabled${NC}"
     else
         cp "$CADDYFILE" "$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
-        printf '\n# Site snippets installed by scripts. See ginto.ai/bin/.\nimport /etc/caddy/conf.d/*.caddy\n' >> "$CADDYFILE"
-        echo "  added an import for conf.d (previous file kept as .bak)"
+        printf '\n# Site snippets installed by scripts. See ginto.ai/bin/.\nimport /etc/caddy/sites-enabled/*.caddy\n' >> "$CADDYFILE"
+        echo "  added an import for sites-enabled (previous file kept as .bak)"
     fi
 
     if caddy validate --config "$CADDYFILE" >/dev/null 2>&1; then
