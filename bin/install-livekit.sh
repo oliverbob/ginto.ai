@@ -63,7 +63,11 @@ else
 fi
 
 install -d -m 0755 -o livekit -g livekit /var/log/livekit
-install -d -m 0750 /etc/livekit
+
+# root:livekit, not root:root. The config inside is 0640 root:livekit, but a
+# directory the service cannot traverse makes that irrelevant — the first run
+# failed with "permission denied" on a file it had every right to read.
+install -d -m 0750 -o root -g livekit /etc/livekit
 
 # ── 3. keys, generated once ──────────────────────────────────────────────────
 say "[3/6] API keys"
