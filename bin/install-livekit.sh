@@ -161,6 +161,16 @@ else
 # Caddy prefers the more specific host, so the order in the file does not
 # matter, but the specificity does.
 sfu.silverqueen.pro {
+	# An ordinary certificate, not an on-demand one.
+	#
+	# This host's global block gates on-demand TLS behind
+	# /api/tunnel/verify, which approves the subdomains that are registered
+	# tunnels. The SFU is not a tunnel, so the ask said no and the handshake
+	# failed with "tlsv1 alert internal error" and nothing in the log — a
+	# refusal that looks exactly like a broken server. Naming an email here
+	# issues it the ordinary way, as the apex block does.
+	tls admin@silverqueen.pro
+
 	# WebSocket upgrades need nothing special in Caddy v2 — reverse_proxy
 	# carries them. The SFU binds to loopback, so this is the only way in.
 	reverse_proxy 127.0.0.1:7880
