@@ -1,0 +1,37 @@
+[Unit]
+Description=LiveKit SFU (silverqueen.pro)
+Documentation=https://docs.livekit.io
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=livekit
+Group=livekit
+
+# The keys, root-readable only, kept out of the unit and out of the repo.
+EnvironmentFile=/etc/livekit/livekit.env
+ExecStart=/usr/local/bin/livekit-server --config /etc/livekit/livekit.yaml
+
+Restart=on-failure
+RestartSec=3
+
+# This box also serves the website. A media server that decides to use every
+# core during a busy room would take silverqueen.pro down with it, so it is
+# capped below the machine and told to yield.
+CPUQuota=140%
+MemoryMax=700M
+Nice=5
+
+# It needs a network socket and nothing else on this filesystem.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/livekit
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
