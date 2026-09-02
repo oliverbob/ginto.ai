@@ -42,7 +42,7 @@ echo "=========================================="
 echo
 
 # ── 1. the binary ────────────────────────────────────────────────────────────
-say "[1/6] livekit-server"
+say "[1/7] livekit-server"
 
 if command -v livekit-server >/dev/null 2>&1; then
     echo -e "  ${DIM}already installed: $(livekit-server --version 2>&1 | head -1)${NC}"
@@ -53,7 +53,7 @@ else
 fi
 
 # ── 2. an account that owns nothing ──────────────────────────────────────────
-say "[2/6] service account"
+say "[2/7] service account"
 
 if id livekit >/dev/null 2>&1; then
     echo -e "  ${DIM}user 'livekit' exists${NC}"
@@ -70,7 +70,7 @@ install -d -m 0755 -o livekit -g livekit /var/log/livekit
 install -d -m 0750 -o root -g livekit /etc/livekit
 
 # ── 3. keys, generated once ──────────────────────────────────────────────────
-say "[3/6] API keys"
+say "[3/7] API keys"
 
 FRESH=0
 
@@ -99,7 +99,7 @@ set -a; . /etc/livekit/livekit.env; set +a
     || die "  /etc/livekit/livekit.env is missing a key or a secret."
 
 # ── 4. the config the repository owns ────────────────────────────────────────
-say "[4/6] /etc/livekit/livekit.yaml"
+say "[4/7] /etc/livekit/livekit.yaml"
 
 # envsubst only for the two names we mean, so a ${...} anywhere else in the
 # template survives untouched.
@@ -111,7 +111,7 @@ chown root:livekit /etc/livekit/livekit.yaml
 echo "  written from tools/livekit/livekit.yaml.tmpl"
 
 # ── 5. the service ───────────────────────────────────────────────────────────
-say "[5/6] systemd"
+say "[5/7] systemd"
 
 install -m 0644 "$UNIT" /etc/systemd/system/livekit.service
 systemctl daemon-reload
@@ -127,7 +127,7 @@ else
 fi
 
 # ── 6. does it actually answer ───────────────────────────────────────────────
-say "[6/6] checking"
+say "[6/7] checking"
 
 for i in $(seq 1 10); do
     if curl -fsS -m 2 http://127.0.0.1:7880/ >/dev/null 2>&1; then break; fi
@@ -142,28 +142,59 @@ fi
 
 ss -lntu 2>/dev/null | grep -E ':(7880|7881|7882)\b' | sed 's/^/  /' || true
 
+# ── 7. the public signalling socket ──────────────────────────────────────────
+say "[7/7] Caddy"
+
+CADDYFILE=/etc/caddy/Caddyfile
+SNIPPET=/etc/caddy/conf.d/livekit.caddy
+
+if [ ! -f "$CADDYFILE" ]; then
+    warn "  No $CADDYFILE — skipping. Point sfu.silverqueen.pro at 127.0.0.1:7880 yourself."
+else
+    install -d -m 0755 /etc/caddy/conf.d
+
+    cat > "$SNIPPET" <<'CADDY'
+# LiveKit signalling. Written by ginto.ai/bin/install-livekit.sh — edit there.
+#
+# A named block, so it wins over the *.silverqueen.pro wildcard below it: the
+# wildcard sends everything to the frp vhost, and signalling is not a tunnel.
+# Caddy prefers the more specific host, so the order in the file does not
+# matter, but the specificity does.
+sfu.silverqueen.pro {
+	# WebSocket upgrades need nothing special in Caddy v2 — reverse_proxy
+	# carries them. The SFU binds to loopback, so this is the only way in.
+	reverse_proxy 127.0.0.1:7880
+}
+CADDY
+
+    if grep -q 'conf.d/\*.caddy' "$CADDYFILE"; then
+        echo -e "  ${DIM}Caddyfile already imports conf.d${NC}"
+    else
+        cp "$CADDYFILE" "$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
+        printf '\n# Site snippets installed by scripts. See ginto.ai/bin/.\nimport /etc/caddy/conf.d/*.caddy\n' >> "$CADDYFILE"
+        echo "  added an import for conf.d (previous file kept as .bak)"
+    fi
+
+    if caddy validate --config "$CADDYFILE" >/dev/null 2>&1; then
+        # Validating as root leaves a root-owned file in Caddy's log directory,
+        # and Caddy then refuses to start. Hand it back before reloading.
+        chown -R caddy:caddy /var/log/caddy 2>/dev/null || true
+        systemctl reload caddy
+        echo "  sfu.silverqueen.pro -> 127.0.0.1:7880, Caddy reloaded"
+    else
+        caddy validate --config "$CADDYFILE" 2>&1 | tail -5 | sed 's/^/    /'
+        warn "  Caddy did not validate. The snippet is written but NOT live."
+    fi
+fi
+
 echo
 echo "=========================================="
 say " Done."
 echo "=========================================="
 echo
-echo "Still to do by hand, once:"
-echo
-echo "  1. Caddy — terminate TLS for the signalling socket:"
-echo
-echo "       sfu.silverqueen.pro {"
-echo "           reverse_proxy 127.0.0.1:7880"
-echo "       }"
-echo
-echo "     then: caddy validate --config /etc/caddy/Caddyfile"
-echo "           chown -R caddy:caddy /var/log/caddy"
-echo "           systemctl reload caddy"
-echo
-echo "  2. Firewall — media needs these open from the internet:"
-echo "       udp/7882   the one media port"
-echo "       tcp/7881   fallback where UDP is blocked"
-echo
-echo "  3. DNS — sfu.silverqueen.pro -> this host."
+echo "Checked, and already true on this host:"
+echo "  DNS       *.silverqueen.pro resolves here, so sfu.silverqueen.pro does"
+echo "  Firewall  none active — udp/7882 and tcp/7881 are reachable"
 echo
 
 if [ "$FRESH" -eq 1 ]; then
