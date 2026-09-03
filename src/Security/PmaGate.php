@@ -63,6 +63,16 @@ final class PmaGate
 
         if (self::passed()) {
             $_SESSION[self::SESSION_KEY]['seen'] = time();
+
+            // Hand the session back before phpMyAdmin runs. It starts a session
+            // of its own under its own name, and PHP refuses a second
+            // session_start() while one is active — which shows up as
+            // phpMyAdmin's "Error during session start" page rather than as
+            // anything pointing at this gate. Writing and closing here persists
+            // what the gate needs for the next request and leaves the request
+            // with no active session, which is the state phpMyAdmin expects.
+            session_write_close();
+
             return true;
         }
 
