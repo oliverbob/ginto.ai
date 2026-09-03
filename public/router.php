@@ -10,6 +10,25 @@ $uri = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
 $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
 $hostNoPort = preg_replace('/:\\d+$/', '', $host);
 
+// phpMyAdmin lives in the webroot and answers to the open internet, so put a
+// TOTP challenge in front of it. This runs before the static-file fallthrough
+// at the bottom of this file, which means an unauthenticated request never
+// reaches phpMyAdmin's own code — that ordering is what protects against
+// phpMyAdmin's bugs and not merely against a guessed database password.
+//
+// The class is required by path rather than through the autoloader on purpose.
+// An optimised classmap does not know a newly deployed file until
+// composer dump-autoload runs, and a gate that disappears when the autoload
+// map is stale is not a gate. A missing file fatals here, which is the right
+// direction to fail.
+if (preg_match('#^/pma(/|$)#', $uri) === 1) {
+    require_once dirname(__DIR__) . '/src/Security/PmaGate.php';
+
+    if (!\Ginto\Security\PmaGate::guard()) {
+        return true;
+    }
+}
+
 function ginto_bootstrap_db(): ?\Medoo\Medoo {
     static $db = null;
     static $did = false;
