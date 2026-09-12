@@ -122,6 +122,83 @@ class SqRelayController
     }
 
     /**
+     * What PayMongo says about one intent sq is still waiting on.
+     *
+     * The other half of createQr, and it exists because a webhook is not a
+     * guarantee. sq settles a top-up when a `payment.paid` delivery arrives;
+     * if one is never sent, arrives while sq is restarting, or is refused for a
+     * signature it cannot check, the money is with PayMongo and the row is
+     * `awaiting` for ever — somebody paid and nothing on the platform knows.
+     *
+     * There is a second reason, found on 2026-09-12. Our QR is a PaymentIntent
+     * with a qrph payment method attached, not PayMongo's standalone QR
+     * resource, so `qr.expired` is never about one of ours — those deliveries
+     * come from the In-Store QR product on the same account. Nothing tells us
+     * one of our codes lapsed. Asking is the only way to find out.
+     *
+     * Read-only, and it answers with a status and nothing else: no amounts, no
+     * payer, no card. sq already knows what the payment was for and how much —
+     * it minted the intent — and the one thing it cannot know is what the
+     * gateway thinks now.
+     */
+    public function intentStatus()
+    {
+        header('Content-Type: application/json');
+
+        $raw = file_get_contents('php://input') ?: '';
+
+        if (!$this->authentic($raw)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'unauthorised']);
+            exit();
+        }
+
+        $in    = json_decode($raw, true);
+        $piId  = is_array($in) ? trim((string) ($in['pi_id'] ?? '')) : '';
+
+        // Shape-checked before it reaches the gateway. Anything else is either
+        // a bug on sq's side or somebody probing, and neither is worth an
+        // outbound request on our PayMongo key.
+        if ($piId === '' || !preg_match('/^pi_[A-Za-z0-9]+$/', $piId)) {
+            http_response_code(422);
+            echo json_encode(['error' => 'bad_intent']);
+            exit();
+        }
+
+        if (!PayMongoHandler::isConfigured()) {
+            http_response_code(503);
+            echo json_encode(['error' => 'paymongo_not_configured']);
+            exit();
+        }
+
+        try {
+            $result = (new PayMongoHandler())->getPaymentIntentStatus($piId);
+
+            if (empty($result['success'])) {
+                error_log('sq relay: intent status failed — ' . json_encode($result));
+
+                http_response_code(502);
+                echo json_encode(['error' => 'gateway_refused']);
+                exit();
+            }
+
+            http_response_code(200);
+            echo json_encode([
+                'pi_id'      => $piId,
+                'status'     => (string) $result['status'],
+                'payment_id' => $result['payment_id'] ?? null,
+            ]);
+            exit();
+        } catch (\Throwable $e) {
+            error_log('sq relay: ' . $e->getMessage());
+
+            http_response_code(502);
+            echo json_encode(['error' => 'gateway_error']);
+            exit();
+        }
+    }
+
+    /**
      * Whether this request really came from sq, and recently.
      *
      * Signature is HMAC-SHA256 over "timestamp.body" so neither can be changed

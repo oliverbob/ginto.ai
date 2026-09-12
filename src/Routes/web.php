@@ -1573,6 +1573,10 @@ $router->req('/webhooks/paymongo', 'WebhookController@paymongoWebhook', ['POST',
 // holding a copy of the credentials. Authenticated by a signature over the
 // body — see SqRelayController for why not an IP allowlist.
 $router->req('/relay/paymongo/qr', 'SqRelayController@createQr', ['POST']);
+// What the gateway says about an intent sq is still waiting on. A webhook is
+// not a guarantee, and our QR is a PaymentIntent rather than a QR resource, so
+// nothing tells us when one of our codes lapses. Asking is the only way.
+$router->req('/relay/paymongo/status', 'SqRelayController@intentStatus', ['POST']);
 $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // Editor routes
