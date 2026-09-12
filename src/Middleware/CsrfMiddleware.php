@@ -42,6 +42,12 @@ class CsrfMiddleware
         // and the exact body, which SqRelayController checks before it does
         // anything at all. A CSRF token would be a token protecting nothing.
         '/relay/paymongo/qr',
+        // And the status door beside it, on exactly the same reasoning. It was
+        // added to the router without being added here, which does not read as
+        // a missing exemption from the outside: an unexempt POST is refused
+        // with "Invalid CSRF token" and a 403, the same answer an unregistered
+        // path gives, so the route looked like it had never been added at all.
+        '/relay/paymongo/status',
         // PayMongo's own deliveries. Signed by PayMongo and verified against
         // PAYMONGO_WEBHOOK_SECRET in the handler; a rejection here would show
         // up as a disabled endpoint on their dashboard rather than as an error
