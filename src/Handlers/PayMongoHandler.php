@@ -378,6 +378,30 @@ class PayMongoHandler
         $status   = $attrs['status'] ?? 'unknown';
         $payments = $attrs['payments'] ?? [];
 
+        /*
+         * The code itself, when the intent still has one.
+         *
+         * `next_action` stays on a PaymentIntent for as long as it is waiting,
+         * which is what makes an unexpired QR re-servable: a member who closes
+         * the screen and comes back for the same amount gets the code they were
+         * already given rather than a second one. The same extraction the
+         * attach response goes through, because it is the same field.
+         */
+        $qrImage    = '';
+        $qrString   = '';
+        $nextAction = $attrs['next_action'] ?? [];
+        $nextType   = $nextAction['type'] ?? '';
+
+        if ($nextType === 'consume_qr') {
+            $code     = $nextAction['code'] ?? [];
+            $qrImage  = $code['image_url'] ?? '';
+            $qrString = $code['id']        ?? '';
+        } elseif ($nextType === 'display_qr_code') {
+            $displayDetails = $nextAction['display_details'] ?? [];
+            $qrImage  = $displayDetails['qr_image']  ?? '';
+            $qrString = $displayDetails['qr_string'] ?? '';
+        }
+
         // Extract the finalized charge ID (pay_xxxxxxxx) from the first payment object
         $paymentId = null;
         if (!empty($payments[0]['id'])) {
@@ -389,6 +413,8 @@ class PayMongoHandler
             'status'     => $status,
             'payment_id' => $paymentId,   // pay_xxxxxxxx — the actual charge object
             'payments'   => $payments,
+            'qr_image'   => $qrImage,
+            'qr_string'  => $qrString,
         ];
     }
 

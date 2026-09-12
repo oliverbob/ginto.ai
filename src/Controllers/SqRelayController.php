@@ -187,6 +187,17 @@ class SqRelayController
                 'pi_id'      => $piId,
                 'status'     => (string) $result['status'],
                 'payment_id' => $result['payment_id'] ?? null,
+                /*
+                 * The code, when the intent still carries one.
+                 *
+                 * So sq can hand a member back the QR it already minted for
+                 * them instead of a second one for the same money. This is the
+                 * payer's own code for their own pending payment, and it is
+                 * already on their screen — returning it discloses nothing they
+                 * were not just shown.
+                 */
+                'qr_image'   => (string) ($result['qr_image'] ?? ''),
+                'qr_string'  => (string) ($result['qr_string'] ?? ''),
             ]);
             exit();
         } catch (\Throwable $e) {
