@@ -84,7 +84,24 @@ rtmpAddress: :${RTMP_PORT}
 hls: yes
 hlsAddress: :${HLS_PORT}
 hlsVariant: mpegts
-hlsSegmentCount: 3
+# How much of the broadcast stays fetchable, and why it is not three.
+#
+# It was hlsSegmentCount: 3 with one-second segments — a three-second window.
+# MediaMTX unlinks anything older, so a viewer even slightly behind the live
+# edge asks for a segment that has already been deleted and gets a 404. The
+# player then excludes the playlist, retries, falls further behind, and spins
+# for ever on a stream that is being published perfectly.
+#
+# Found from a viewer's console: the .m3u8 loaded every time and the segments
+# it named — 37, 42, 45, 49, 55 — came back 404, non-contiguous, because the
+# player was chasing a window narrower than its own latency. On the server the
+# stream directory held the two playlists and no .ts files at all.
+#
+# Ten one-second segments keeps the low-latency intent — the live edge is still
+# about three seconds old — and gives a client ten seconds of slack instead of
+# three. Apple's own guidance is a window of at least three times the target
+# duration; this is ten.
+hlsSegmentCount: 10
 hlsSegmentDuration: 1s
 hlsAlwaysRemux: yes
 hlsDirectory: ${HLS_DIR}
