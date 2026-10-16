@@ -169,6 +169,14 @@ else
 # Caddy prefers the more specific host, so the order in the file does not
 # matter, but the specificity does.
 sfu.silverqueen.pro {
+	# Under the on-demand wildcard Caddy skips issuing at startup (the
+	# wildcard "covers" this host) and then never issues at all -- every
+	# handshake failed with "alert internal error". Ask on demand, like
+	# the wildcard does; the global ask approves it.
+	tls {
+		on_demand
+	}
+
 	# WebSocket upgrades need nothing special in Caddy v2 — reverse_proxy
 	# carries them. The SFU binds to loopback, so this is the only way in.
 	reverse_proxy 127.0.0.1:7880
