@@ -38,6 +38,11 @@
         ];
     }, $products ?? [])) ?>;
 
+    /* The same seller's SilverQueen mall listings (SilverQueenShelf), first so
+       they are seen. Bought there: each carries `ext_url` and is drawn by
+       sqCard(), never put in this cart. */
+    PRODUCTS.unshift(...<?= json_encode(array_values($sq_items ?? []), JSON_UNESCAPED_SLASHES) ?>);
+
     const CSRF_TOKEN = <?= json_encode($csrf_token ?? '') ?>;
     const SELLER_ID  = <?= json_encode(isset($storefront['user_id']) ? (int)$storefront['user_id'] : 0) ?>; // 0 = marketplace
     const PLACEHOLDER = '/assets/images/placeholder_ceramic.svg';
@@ -422,6 +427,7 @@
 
         const frag = document.createDocumentFragment();
         list.forEach(p => {
+            if (p.ext_url) { frag.appendChild(sqCard(p)); return; }
             const card = document.createElement('div');
             card.className = 'product-card';
             card.dataset.id = p.id;
@@ -1267,10 +1273,42 @@
         return matchCat && matchSearch;
     }
 
+    /*
+     * A listing sold in the SilverQueen mall. Same card, but everything on it
+     * goes to SilverQueen, where it is bought: there is no product of ours
+     * behind it to quick-view or put in the cart.
+     */
+    function sqCard(p) {
+        const card = document.createElement('div');
+        card.className = 'product-card product-card--sq';
+        card.dataset.id = p.id;
+        const imgs   = (p.imgs && p.imgs.length) ? p.imgs : (p.img ? [p.img] : []);
+        const href   = esc(p.ext_url);
+        const multi  = imgs.length > 1 ? `<span class="card-multi-badge">&#128247; ${imgs.length}</span>` : '';
+        card.innerHTML = `
+            <a class="product-img-wrap" href="${href}" style="display:block;" aria-label="${esc(p.title)} on SilverQueen">
+                <img class="product-img" src="${esc(imgs[0] || PLACEHOLDER)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
+                <span class="product-badge">SilverQueen</span>
+                ${multi}
+            </a>
+            <div class="product-body">
+                <div class="product-title">${esc(p.title)}</div>
+                <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
+                <div style="display:flex;gap:7px;margin-top:8px;">
+                    <a class="product-add-btn" href="${href}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;" aria-label="Buy ${esc(p.title)} on SilverQueen">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+                        Buy on SilverQueen
+                    </a>
+                </div>
+            </div>`;
+        return card;
+    }
+
     function appendProducts(list) {
         if (!grid || !list.length) return;
         const frag = document.createDocumentFragment();
         list.forEach(p => {
+            if (p.ext_url) { frag.appendChild(sqCard(p)); return; }
             const card = document.createElement('div');
             card.className = 'product-card';
             card.dataset.id = p.id;

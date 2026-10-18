@@ -60,6 +60,8 @@ class MallCheckoutController extends Controller
             'title' => ($data['storefront']['display_name'] ?? 'Storefront') . ' - Ginto Mall',
             'categories' => $this->db->select('categories', '*', ['ORDER' => ['name' => 'ASC']]) ?: [],
             'products' => $data['products'],
+            // The same seller's SilverQueen mall listings, read live (MALL-SYNC.md).
+            'sq_items' => \Ginto\Services\SilverQueenShelf::forSeller($sellerId),
             'storefront' => $data['storefront'],
             'csrf_token' => generateCsrfToken(),
             'mall_unread_notifications' => $userId > 0 ? $this->commerce->getMallUnreadNotificationCount($userId) : 0,
