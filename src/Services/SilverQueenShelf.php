@@ -59,7 +59,7 @@ class SilverQueenShelf
                 'imgs'     => array_values(array_filter((array) ($it['imgs'] ?? []))),
                 'desc'     => (string) ($it['desc'] ?? ''),
                 'slug'     => '',
-                'badge'    => 'SilverQueen',
+                'badge'    => null,
                 'seller_slug' => null,
                 'seller_name' => null,
                 'seller_id'   => $sellerId,

@@ -1286,18 +1286,17 @@
         const href   = esc(p.ext_url);
         const multi  = imgs.length > 1 ? `<span class="card-multi-badge">&#128247; ${imgs.length}</span>` : '';
         card.innerHTML = `
-            <a class="product-img-wrap" href="${href}" style="display:block;" aria-label="${esc(p.title)} on SilverQueen">
+            <a class="product-img-wrap" href="${href}" style="display:block;" aria-label="${esc(p.title)}">
                 <img class="product-img" src="${esc(imgs[0] || PLACEHOLDER)}" alt="${esc(p.title)}" loading="lazy" onerror="this.src=PLACEHOLDER">
-                <span class="product-badge">SilverQueen</span>
                 ${multi}
             </a>
             <div class="product-body">
                 <div class="product-title">${esc(p.title)}</div>
                 <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
                 <div style="display:flex;gap:7px;margin-top:8px;">
-                    <a class="product-add-btn" href="${href}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;" aria-label="Buy ${esc(p.title)} on SilverQueen">
-                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
-                        Buy on SilverQueen
+                    <a class="product-add-btn" href="${href}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;" aria-label="Buy ${esc(p.title)}">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h2l2.2 10.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>
+                        Buy
                     </a>
                 </div>
             </div>`;
