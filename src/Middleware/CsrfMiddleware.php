@@ -48,6 +48,9 @@ class CsrfMiddleware
         // with "Invalid CSRF token" and a 403, the same answer an unregistered
         // path gives, so the route looked like it had never been added at all.
         '/relay/paymongo/status',
+        // A SilverQueen shop's storefront, provisioned here. The same HMAC,
+        // checked by SqMallRelayController before anything else.
+        '/relay/mall/provision',
         // PayMongo's own deliveries. Signed by PayMongo and verified against
         // PAYMONGO_WEBHOOK_SECRET in the handler; a rejection here would show
         // up as a disabled endpoint on their dashboard rather than as an error

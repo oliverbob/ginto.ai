@@ -216,7 +216,7 @@ class SqRelayController
      * without the other, and hash_equals compares in constant time — a plain
      * === leaks how much of a guess was right, one byte at a time.
      */
-    private function authentic(string $raw): bool
+    public function authentic(string $raw): bool
     {
         $secret = (string) (getenv('SQ_RELAY_SECRET') ?: ($_ENV['SQ_RELAY_SECRET'] ?? ''));
 

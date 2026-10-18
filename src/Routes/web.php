@@ -1577,6 +1577,9 @@ $router->req('/relay/paymongo/qr', 'SqRelayController@createQr', ['POST']);
 // not a guarantee, and our QR is a PaymentIntent rather than a QR resource, so
 // nothing tells us when one of our codes lapses. Asking is the only way.
 $router->req('/relay/paymongo/status', 'SqRelayController@intentStatus', ['POST']);
+// A SilverQueen shop, given its storefront here (and an account if it has
+// none). Same signature as the PayMongo relay -- see SqMallRelayController.
+$router->req('/relay/mall/provision', 'SqMallRelayController@provision', ['POST']);
 $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // Editor routes

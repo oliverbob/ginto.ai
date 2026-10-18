@@ -1927,7 +1927,7 @@ class MallCommerceService
         return ['id' => (int)$this->db->id(), 'updated' => false];
     }
 
-    private function sanitizeSlug(string $value): string
+    public function sanitizeSlug(string $value): string
     {
         $value = strtolower(trim($value));
         $value = preg_replace('/[^a-z0-9-]+/', '-', $value) ?? '';
@@ -1935,7 +1935,7 @@ class MallCommerceService
         return substr($value, 0, 64);
     }
 
-    private function uniqueStorefrontSlug(string $baseSlug): string
+    public function uniqueStorefrontSlug(string $baseSlug): string
     {
         $slug = $baseSlug;
         $i = 2;
