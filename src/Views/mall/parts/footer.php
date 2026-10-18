@@ -1385,7 +1385,9 @@
             if (Array.isArray(json.products)) {
                 const normalised = json.products.map(normaliseProduct);
                 const ids = new Set(normalised.map(p => p.id));
-                state.products  = [...normalised, ...state.products.filter(p => !ids.has(p.id))];
+                // The seller's SilverQueen listings stay first (sqCard).
+                const sq = state.products.filter(p => p.ext_url);
+                state.products  = [...sq, ...normalised, ...state.products.filter(p => !p.ext_url && !ids.has(p.id))];
                 state.localPool = [...state.products];
                 state.hasMore   = !!json.has_more;
                 state.page      = 1;
