@@ -1294,10 +1294,15 @@
                 <div class="product-title">${esc(p.title)}</div>
                 <div class="product-price">${esc(formatPrice(p.price, p.currency))}</div>
                 <div style="display:flex;gap:7px;margin-top:8px;">
-                    <a class="product-add-btn" href="${href}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;" aria-label="Buy ${esc(p.title)}">
+                    ${p.buyable === false
+                        ? `<button class="product-add-btn" type="button" disabled style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;opacity:.55;cursor:default;" title="This shop is still being set up.">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                        Not yet open
+                    </button>`
+                        : `<a class="product-add-btn" href="${href}" style="flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;" aria-label="Buy ${esc(p.title)}">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h2l2.2 10.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L20 8H6"/><circle cx="10" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/></svg>
                         Buy
-                    </a>
+                    </a>`}
                 </div>
             </div>`;
         return card;

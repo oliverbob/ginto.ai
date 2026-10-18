@@ -64,6 +64,8 @@ class SilverQueenShelf
                 'seller_name' => null,
                 'seller_id'   => $sellerId,
                 'ext_url'  => $url,
+                // Not yet cleared to sell on SilverQueen: shown, Buy waits.
+                'buyable'  => ($it['buyable'] ?? true) !== false,
             ];
         }
 
