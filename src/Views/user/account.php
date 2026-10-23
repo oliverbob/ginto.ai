@@ -112,15 +112,29 @@ $csrf = $_SESSION['csrf_token'] ?? '';
       </div>
 
       <div id="apiKeysListStatus" style="font-size:12px; color:#64748b; margin-bottom:8px;">Loading keys…</div>
-      <div style="overflow:auto; border:1px solid #e2e8f0; border-radius:8px;">
-        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+      <style>
+        /* Readable in light and dark (owner, 2026-10-23: "I see only white in
+           the table header"). The colors were inline and light-only. */
+        #apiKeysWrap { overflow:auto; border:1px solid #e2e8f0; border-radius:8px; }
+        #apiKeysTable th { background:#f8fafc; color:#0f172a; text-align:left; font-weight:600; }
+        #apiKeysTable th, #apiKeysTable td { padding:8px; border-bottom:1px solid #e2e8f0; }
+        #apiKeysTable tbody tr:last-child td { border-bottom:0; }
+        #apiKeysTable button[data-revoke-id] { color:#b91c1c; font-weight:600; }
+        .dark #apiKeysWrap { border-color:#334155; }
+        .dark #apiKeysTable th { background:#1e293b; color:#e2e8f0; }
+        .dark #apiKeysTable th, .dark #apiKeysTable td { border-bottom-color:#334155; }
+        .dark #apiKeysTable td { color:#e2e8f0; }
+        .dark #apiKeysTable button[data-revoke-id] { color:#fca5a5; }
+      </style>
+      <div id="apiKeysWrap">
+        <table id="apiKeysTable" style="width:100%; border-collapse:collapse; font-size:13px;">
           <thead>
-            <tr style="background:#f8fafc; text-align:left;">
-              <th style="padding:8px; border-bottom:1px solid #e2e8f0;">Name</th>
-              <th style="padding:8px; border-bottom:1px solid #e2e8f0;">Created</th>
-              <th style="padding:8px; border-bottom:1px solid #e2e8f0;">Last used</th>
-              <th style="padding:8px; border-bottom:1px solid #e2e8f0;">Status</th>
-              <th style="padding:8px; border-bottom:1px solid #e2e8f0;">Action</th>
+            <tr>
+              <th>Name</th>
+              <th>Created</th>
+              <th>Last used</th>
+              <th>Status</th>
+              <th>Action</th>
             </tr>
           </thead>
           <tbody id="apiKeysListBody"></tbody>
@@ -465,11 +479,11 @@ button, a { user-select:none; }
       var statusText = revoked ? 'revoked' : 'active';
       var action = revoked ? '<span style="color:#94a3b8;">—</span>' : '<button type="button" data-revoke-id="'+ id +'">Revoke</button>';
       return '<tr>'
-        + '<td style="padding:8px; border-bottom:1px solid #e2e8f0;">' + name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>'
-        + '<td style="padding:8px; border-bottom:1px solid #e2e8f0;">' + created + '</td>'
-        + '<td style="padding:8px; border-bottom:1px solid #e2e8f0;">' + used + '</td>'
-        + '<td style="padding:8px; border-bottom:1px solid #e2e8f0;">' + statusText + '</td>'
-        + '<td style="padding:8px; border-bottom:1px solid #e2e8f0;">' + action + '</td>'
+        + '<td>' + name.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</td>'
+        + '<td>' + created + '</td>'
+        + '<td>' + used + '</td>'
+        + '<td>' + statusText + '</td>'
+        + '<td>' + action + '</td>'
         + '</tr>';
     }).join('');
 
