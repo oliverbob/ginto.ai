@@ -15,7 +15,10 @@ if [ -f "$WEB_PID_FILE" ]; then
   fi
 fi
 
-nohup php -S 0.0.0.0:8000 -t public public/router.php > /tmp/ginto-web.log 2>&1 &
+# Appended, never truncated, and kept out of /tmp (owner, 2026-10-24: keep
+# request logs). /etc/logrotate.d/ginto-web rotates it weekly.
+LOG_DIR="$HOME/storage/logs"; mkdir -p "$LOG_DIR"
+nohup php -S 0.0.0.0:8000 -t public public/router.php >> "$LOG_DIR/web-server.log" 2>&1 &
 echo $! > "$WEB_PID_FILE"
 echo "Started web server on :8000 with router (pid $(cat $WEB_PID_FILE))"
 
