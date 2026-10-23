@@ -335,15 +335,9 @@ req($router, '/user/commissions', function() use ($db) {
 
 // Compact-only user network view
 req($router, '/user/network-tree/compact-view', function() use ($db) {
-    if (empty($_SESSION['user_id'])) {
-        try {
-            $userId = $db->get('users', 'id', ['username' => 'oliverbob']);
-            if ($userId) {
-                $_SESSION['user_id'] = (int)$userId;
-            }
-        } catch (\Throwable $_) {
-        }
-    }
+    // Signed-in members only. This used to sign ANY visitor in as the owner
+    // (a dev convenience left live; closed 2026-10-23).
+    if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
     $viewPath = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';
     if (file_exists($viewPath)) { include $viewPath; exit; }
     $fallback = ROOT_PATH . '/src/Views/users/network-tree/compact-view.php';
@@ -502,12 +496,9 @@ req($router, '/api/subscription/activate', function() use ($db) {
 
 // Circle view
 req($router, '/user/network-tree/circle-view', function() use ($db) {
-    if (empty($_SESSION['user_id'])) {
-        try {
-            $userId = $db->get('users', 'id', ['username' => 'oliverbob']);
-            if ($userId) { $_SESSION['user_id'] = (int)$userId; }
-        } catch (\Throwable $_) { }
-    }
+    // Signed-in members only. This used to sign ANY visitor in as the owner
+    // (a dev convenience left live; closed 2026-10-23).
+    if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
     $viewPath = ROOT_PATH . '/src/Views/user/network-tree/circle-view.php';
     if (file_exists($viewPath)) { include $viewPath; exit; }
     $fallback = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';

@@ -1045,17 +1045,9 @@ class UserController extends \Core\Controller
      */
     public function networkTreeCompact(): void
     {
-        // Dev convenience: if no session user, try to auto-login user 'oliverbob'
-        if (empty($_SESSION['user_id'])) {
-            try {
-                $userId = $this->db->get('users', 'id', ['username' => 'oliverbob']);
-                if ($userId) {
-                    $_SESSION['user_id'] = (int)$userId;
-                }
-            } catch (\Throwable $_) {
-                // ignore - proceed without login if DB not available
-            }
-        }
+        // Signed-in members only. This used to sign ANY visitor in as the owner
+        // (a dev convenience left live; closed 2026-10-23).
+        if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
         
         // Include the compact view file
         $viewPath = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';

@@ -882,17 +882,9 @@ $router->req('/user/commissions', function() use ($db) {
 
 // Compact-only user network view (dev route)
 $router->req('/user/network-tree/compact-view', function() use ($db) {
-    // Dev convenience: if no session user, try to auto-login user 'oliverbob'
-    if (empty($_SESSION['user_id'])) {
-        try {
-            $userId = $db->get('users', 'id', ['username' => 'oliverbob']);
-            if ($userId) {
-                $_SESSION['user_id'] = (int)$userId;
-            }
-        } catch (\Throwable $_) {
-            // ignore - proceed without login if DB not available
-        }
-    }
+    // Signed-in members only. This used to sign ANY visitor in as the owner
+    // (a dev convenience left live; closed 2026-10-23).
+    if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
     // Include the compact view file at `src/Views/user/network-tree/compact-view.php`
     // (previously lived at `Views/...`)
     $viewPath = ROOT_PATH . '/src/Views/user/network-tree/compact-view.php';
@@ -1076,6 +1068,9 @@ $router->req('/dev/csrf', function() use ($db) {
 
 // Dev helper: quickly log in as the 'oliverbob' user (localhost only)
 $router->req('/dev/login/oliverbob', function() use ($db) {
+    // Closed 2026-10-23: behind the proxy every visitor is 127.0.0.1, so the
+    // localhost check below let anyone sign in as this account.
+    http_response_code(404); exit;
     $remote = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
     if (!in_array($remote, ['127.0.0.1', '::1'])) {
         http_response_code(403);
@@ -1106,6 +1101,9 @@ $router->req('/dev/login/oliverbob', function() use ($db) {
 
 // Dev helper: quickly log in as the 'admin' user (localhost only)
 $router->req('/dev/login/admin', function() use ($db) {
+    // Closed 2026-10-23: behind the proxy every visitor is 127.0.0.1, so the
+    // localhost check below let anyone sign in as this account.
+    http_response_code(404); exit;
     $remote = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
     if (!in_array($remote, ['127.0.0.1', '::1'])) {
         http_response_code(403);
@@ -1312,17 +1310,9 @@ $router->req('/dev/editor/chat_local_test', function() use ($db) {
 
 // Circle view (derived from compact template)
 $router->req('/user/network-tree/circle-view', function() use ($db) {
-    // Dev convenience: if no session user, try to auto-login user 'oliverbob'
-    if (empty($_SESSION['user_id'])) {
-        try {
-            $userId = $db->get('users', 'id', ['username' => 'oliverbob']);
-            if ($userId) {
-                $_SESSION['user_id'] = (int)$userId;
-            }
-        } catch (\Throwable $_) {
-            // ignore - proceed without login if DB not available
-        }
-    }
+    // Signed-in members only. This used to sign ANY visitor in as the owner
+    // (a dev convenience left live; closed 2026-10-23).
+    if (empty($_SESSION['user_id'])) { header('Location: /login'); exit; }
 
     $viewPath = ROOT_PATH . '/src/Views/user/network-tree/circle-view.php';
     if (file_exists($viewPath)) {
