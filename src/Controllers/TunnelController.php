@@ -885,6 +885,16 @@ TOML;
             }
         }
         
+        // Our own www, which Caddy serves as a redirect to the apex (owner,
+        // 2026-10-23: "Fix that certificate problem"). The wildcard site makes
+        // Caddy fetch it on demand, so it must be allowed here; no tunnel can
+        // take it, because the www site block answers before the wildcard.
+        if ($domain === 'www.silverqueen.pro') {
+            http_response_code(200);
+            echo "OK - site alias";
+            return;
+        }
+
         // Check reserved subdomains - deny certificate
         $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
         if (in_array($subdomain, $reserved)) {
