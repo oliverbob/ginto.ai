@@ -144,39 +144,10 @@ class CsrfMiddleware
             // Check if this path should skip CSRF
             $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
             $path = self::normalizePath($path);
-            // Log received token & session token (temp debug)
-            $received = $_POST['_csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '(none)';
-            error_log('CsrfMiddleware: path=' . $path . ' method=' . $method . ' received_token=' . (is_string($received) ? substr($received,0,64) : '(array)'));
-            error_log('CsrfMiddleware: session_csrf=' . ($_SESSION['csrf_token'] ?? '(none)'));
-            error_log('CsrfMiddleware: session_id=' . session_id() . ' session_name=' . session_name() . ' cookie=' . ($_COOKIE[session_name()] ?? '(none)'));
-            // Dump session contents (trim to avoid huge logs)
-            error_log('CsrfMiddleware: session_dump=' . substr(var_export(array_intersect_key($_SESSION, array_flip(['csrf_token','user_id'])), true), 0, 400));
-
-            // ALSO write debug info to /tmp to guarantee it is visible from the container
-            try {
-                $debug = [
-                    'ts' => date('c'),
-                    'path' => $path,
-                    'method' => $method,
-                    'received_token' => is_string($received) ? substr($received, 0, 256) : '(array)',
-                    'session_csrf' => $_SESSION['csrf_token'] ?? '(none)',
-                    'session_id' => session_id(),
-                    'session_name' => session_name(),
-                    'cookie_value' => $_COOKIE[session_name()] ?? '(none)',
-                ];
-                file_put_contents('/tmp/csrf-debug.log', json_encode($debug, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-                // Also write to application storage logs for easier discovery (should be writable by php-fpm)
-                try {
-                    $storageLog = defined('STORAGE_PATH') ? rtrim(STORAGE_PATH, '/') . '/logs/csrf-debug.log' : '/var/log/csrf-debug.log';
-                    if (!is_dir(dirname($storageLog))) @mkdir(dirname($storageLog), 0755, true);
-                    file_put_contents($storageLog, json_encode($debug, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-                } catch (\Throwable $e) {
-                    error_log('CsrfMiddleware: failed to write storage debug file: ' . $e->getMessage());
-                }
-            } catch (\Throwable $e) {
-                // If writing fails, emit an error_log but continue
-                error_log('CsrfMiddleware: failed to write /tmp debug file: ' . $e->getMessage());
-            }
+            // No request logging here (2026-10-24): an earlier debug block wrote
+            // the CSRF token and the session cookie of EVERY post to
+            // /tmp/csrf-debug.log (world-readable) and storage/logs -- i.e. live
+            // logins. Removed; the logs were emptied and those sessions ended.
 
             // Special-case /chat: allow if request originates from localhost or
             // if caller supplies a valid admin token header. Otherwise require CSRF.
@@ -184,9 +155,8 @@ class CsrfMiddleware
                 $remote = $_SERVER['REMOTE_ADDR'] ?? '';
                 $tokenHeader = $_SERVER['HTTP_X_GINTO_ADMIN_TOKEN'] ?? $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? null;
                 $expected = getenv('GINTO_ADMIN_TOKEN') ?: getenv('ADMIN_TOKEN');
-                if ($remote === '127.0.0.1' || $remote === '::1') {
-                    return;
-                }
+                // No localhost pass: behind the proxy every visitor arrives as
+                // 127.0.0.1, so it waived CSRF for everyone (closed 2026-10-24).
                 if ($expected && $tokenHeader && hash_equals((string)$expected, (string)$tokenHeader)) {
                     return;
                 }
@@ -235,47 +205,9 @@ class CsrfMiddleware
                 exit;
             }
             if (!$token || !validateCsrfToken($token)) {
-                // Extra debug: capture request headers and raw body to /tmp for live troubleshooting
-                try {
-                    // Prefer cached raw body when available
-                    $rawBodyDebug = $rawBody ?? ($GLOBALS['_RAW_BODY'] ?? @file_get_contents('php://input'));
-                    $allHeaders = [];
-                    if (function_exists('getallheaders')) {
-                        $allHeaders = getallheaders();
-                    } else {
-                        // Fallback: collect common HTTP_ SERVER_ vars
-                        foreach ($_SERVER as $k => $v) {
-                            if (strpos($k, 'HTTP_') === 0) { $allHeaders[$k] = $v; }
-                        }
-                    }
-                    $extra = [
-                        'ts' => date('c'),
-                        'path' => $path,
-                        'method' => $method,
-                        'token_present' => $token !== null,
-                        'token_value' => is_string($token) ? substr($token,0,256) : null,
-                        'headers' => $allHeaders,
-                        'cookies' => array_intersect_key($_COOKIE, array_flip([session_name()])),
-                        'raw_body_snippet' => is_string($rawBodyDebug) ? substr($rawBodyDebug,0,2000) : null,
-                        'session_csrf' => $_SESSION['csrf_token'] ?? null,
-                        'session_id' => session_id(),
-                    ];
-                    // Always write to /tmp for quick access
-                    file_put_contents('/tmp/csrf-debug-extra.log', json_encode($extra, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-                    // Also write to the project's sibling storage/logs directory (one level up from silverqueen.pro)
-                    try {
-                        $projectParent = dirname(__DIR__, 3); // /.../parent of silverqueen.pro
-                        $storageDir = $projectParent . '/storage/logs';
-                        if (!is_dir($storageDir)) @mkdir($storageDir, 0755, true);
-                        $storageFile = rtrim($storageDir, '/') . '/csrf-debug-extra.log';
-                        file_put_contents($storageFile, json_encode($extra, JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND | LOCK_EX);
-                    } catch (\Throwable $_) {
-                        // ignore storage write failures; /tmp is primary fallback
-                    }
-                } catch (\Throwable $_) {
-                    error_log('CsrfMiddleware: failed to write extra debug: ' . $_->getMessage());
-                }
-
+                // Nothing about the request is written down: an earlier debug
+                // block logged its headers, cookie and body (passwords on a
+                // login form) to /tmp. Removed 2026-10-24.
                 http_response_code(403);
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
