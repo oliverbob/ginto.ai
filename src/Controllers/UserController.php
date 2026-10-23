@@ -359,7 +359,9 @@ class UserController extends \Core\Controller
             $user = $this->db->get('users', ['email', 'username'], ['id' => (int) $_SESSION['user_id']]) ?: [];
             $label = (string) ($user['email'] ?: $user['username'] ?: ('user-' . $_SESSION['user_id']));
             $totp = new \Ginto\Services\TotpService($this->db);
-            echo json_encode(['success' => true] + $totp->createEnrollment((int) $_SESSION['user_id'], $label));
+            $enrol = $totp->createEnrollment((int) $_SESSION['user_id'], $label);
+            $enrol['qr'] = \Ginto\Services\TotpService::qrSvg($enrol['uri']);
+            echo json_encode(['success' => true] + $enrol);
         } catch (\Throwable $e) {
             error_log('TOTP enrollment error: ' . $e->getMessage());
             http_response_code(503); echo json_encode(['success' => false, 'error' => 'Unable to start two-factor setup.']);

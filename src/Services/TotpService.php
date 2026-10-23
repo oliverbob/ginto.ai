@@ -39,11 +39,43 @@ class TotpService
                 $insert->execute([$userId, $this->encrypt($secret)]);
             }
         }
-        $issuer = 'Ginto AI';
+        $issuer = 'SilverQueen';
         $uri = 'otpauth://totp/' . rawurlencode($issuer . ':' . $label)
             . '?secret=' . rawurlencode($secret) . '&issuer=' . rawurlencode($issuer)
             . '&algorithm=SHA1&digits=6&period=30';
         return ['secret' => $secret, 'uri' => $uri];
+    }
+
+    /**
+     * The setup link as a scannable QR code (SVG), so a phone can add the
+     * account without the key being typed. Uses the Bacon QR library that
+     * ships inside the installed phpMyAdmin; null when it is not there, and
+     * the page then shows the key alone.
+     */
+    public static function qrSvg(string $uri): ?string
+    {
+        $base = dirname(__DIR__, 2) . '/vendor/phpmyadmin/phpmyadmin/vendor';
+        $map  = ['BaconQrCode\\' => $base . '/bacon/bacon-qr-code/src/', 'DASPRiD\\Enum\\' => $base . '/dasprid/enum/src/'];
+        if (!is_dir($map['BaconQrCode\\'])) return null;
+        spl_autoload_register(static function (string $class) use ($map): void {
+            foreach ($map as $prefix => $dir) {
+                if (str_starts_with($class, $prefix)) {
+                    $file = $dir . str_replace('\\', '/', substr($class, strlen($prefix))) . '.php';
+                    if (is_file($file)) require_once $file;
+                    return;
+                }
+            }
+        });
+        try {
+            $renderer = new \BaconQrCode\Renderer\ImageRenderer(
+                new \BaconQrCode\Renderer\RendererStyle\RendererStyle(220, 2),
+                new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
+            );
+            return (new \BaconQrCode\Writer($renderer))->writeString($uri);
+        } catch (\Throwable $e) {
+            error_log('TOTP QR render failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     public function confirmEnrollment(int $userId, string $code): bool
