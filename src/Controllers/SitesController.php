@@ -48,13 +48,32 @@ class SitesController extends \Core\Controller
 
     public function plans()
     {
-        $this->page('sites/plans', ['title' => 'Plans · SilverQueen Sites'] + $this->founding());
+        $this->rememberPlan();
+        // "Start with Gold" goes where this person's next step is, carrying the choice.
+        $uid = $this->userId();
+        $n = $uid ? (new Names($this->db))->of($uid) : null;
+        $next = $n && Trial::phase($n, (new Subscriptions($this->db))->current($uid)) !== 'none' && $n['preview_id'] ? '/sites/me' : '/sites/start';
+        $this->page('sites/plans', ['title' => 'Plans · SilverQueen Sites', 'next' => $next] + $this->founding());
     }
 
     public function start()
     {
+        $this->rememberPlan();
+        $uid = $this->userId();
+        $n = $uid ? (new Names($this->db))->of($uid) : null;
+        $held = $n && Trial::phase($n, (new Subscriptions($this->db))->current($uid)) !== 'none' ? $n : null;
         $this->page('sites/start', ['title' => 'Start it now · SilverQueen Sites', 'open' => $this->canBuild(),
+            'held' => $held, 'plan' => Config::plan((string) ($_SESSION['sites_plan'] ?? '')) ? (string) $_SESSION['sites_plan'] : null,
             'csrf_token' => generateCsrfToken(true)] + $this->founding());
+    }
+
+    /** The plan someone picked on the card or the Plans page, kept until checkout so they never pick twice. */
+    private function rememberPlan(): void
+    {
+        $p = (string) ($_GET['plan'] ?? '');
+        if (Config::plan($p) !== null) {
+            $_SESSION['sites_plan'] = $p;
+        }
     }
 
     /** POST /sites/start (multipart: photos[], description, csrf_token) */
@@ -83,8 +102,10 @@ class SitesController extends \Core\Controller
             return $this->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
         Previews::spawn($p['id']);
+        // A held name's site goes to the dashboard to be reviewed and paid; anyone else sees the open preview.
+        $next = $held && Trial::phase($held, null) !== 'none' ? '/sites/me' : '/sites/p/' . $p['token'];
 
-        return $this->json(['ok' => true, 'token' => $p['token'], 'url' => '/sites/p/' . $p['token']]);
+        return $this->json(['ok' => true, 'token' => $p['token'], 'url' => $next]);
     }
 
     public function status($token)
@@ -158,6 +179,7 @@ class SitesController extends \Core\Controller
     /** GET /sites/me -- the seller's own: review, plan and pay, renewal, credits. */
     public function me()
     {
+        $this->rememberPlan();
         $uid = $this->userId();
         if (!$uid) {
             header('Location: /login?next=' . rawurlencode('/sites/me'));
@@ -169,6 +191,7 @@ class SitesController extends \Core\Controller
         $sub   = (new Subscriptions($this->db))->current($uid);
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Sites', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'phase' => Trial::phase($name, $sub),
+            'plan_pick' => (string) ($_SESSION['sites_plan'] ?? ''),
             'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
             'live' => $name && Publisher::isLive((string) $name['name']), 'csrf_token' => generateCsrfToken()] + $this->founding());
     }
@@ -293,6 +316,7 @@ class SitesController extends \Core\Controller
             return $this->page('sites/gone', ['title' => 'That link has expired']);
         }
         session_regenerate_id(true);
+        $this->rememberPlan();
         $_SESSION['sites_uid'] = $m['uid'];
         $_SESSION['sites_member_name'] = $m['name'];
         header('Location: ' . $m['to']);

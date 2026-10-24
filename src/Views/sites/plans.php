@@ -74,7 +74,7 @@ $name = preg_match(Config::NAME_RE, (string) ($_GET['name'] ?? '')) ? (string) $
     <div class="tg"><?= $e($tags[$id]) ?></div>
     <div class="pr">₱<?= number_format($p['php']) ?> <small>/ month</small></div>
     <ul><?php foreach ($keys[$id] as $k): ?><li><?= $yes ?><span><?= $e($k) ?></span></li><?php endforeach; ?></ul>
-    <a class="btn <?= $id === 'gold' ? 'gold' : 'ghost' ?>" href="/sites/start<?= $name !== '' ? '?name=' . $e($name) : '' ?>"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Start with <?= $e($p['name']) ?></a>
+    <a class="btn <?= $id === 'gold' ? 'gold' : 'ghost' ?>" href="<?= $e(($next ?? '/sites/start') . '?plan=' . $id) ?>"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg> Start with <?= $e($p['name']) ?></a>
   </div>
 <?php endforeach; ?>
 </div>

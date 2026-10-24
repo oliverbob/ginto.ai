@@ -129,7 +129,7 @@ if (($phase ?? '') === 'trial'): ?>
     <p class="muted" style="margin:0">Monthly, cancel anytime. <?= $slotsLeft > 0 ? '<b style="color:var(--gold-fg)">' . $slotsLeft . ' Founding slots left</b>: your price stays locked for as long as you stay.' : '' ?></p>
     <div class="plans3">
       <?php foreach (Config::PLANS as $id => $p): ?>
-      <label class="pc"><input type="radio" name="plan" value="<?= $e($id) ?>" <?= $id === 'gold' ? 'checked' : '' ?>>
+      <label class="pc"><input type="radio" name="plan" value="<?= $e($id) ?>" <?= $id === (Config::plan((string) ($plan_pick ?? '')) ? $plan_pick : 'gold') ? 'checked' : '' ?>>
         <b><?= $e($p['name']) ?></b><div class="pr">₱<?= number_format($p['php']) ?> <small>/ month</small></div>
         <ul><li><?= number_format($p['credits']) ?> AI credits a month</li><li><?= $p['storage_gb'] ?> GB · <?= $p['listings'] === null ? 'Unlimited' : $p['listings'] ?> products</li>
           <li><?= $p['chat'] ? 'AI chats with your customers' : 'AI writes for you' ?></li><li><?= $p['domain'] ? 'Your own domain' : 'Your .silverqueen.pro address' ?></li></ul>

@@ -50,6 +50,15 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
   <div class="steps"><span><b>1</b> Upload photos</span><span><b>2</b> Tell us your shop</span><span><b>3</b> Preview free</span><span><b>4</b> Claim your name</span></div>
 </section>
 
+<?php if (!empty($held)): $pl = $plan ? \Ginto\Sites\Config::plan($plan) : null; ?>
+<section class="card claim" style="border-color:var(--gold)">
+  <p class="lab">Your site</p>
+  <h2 class="serif" style="font-size:26px;margin:0"><?= $e($held['name']) ?><span class="muted" style="font-family:Inter,sans-serif;font-size:.6em">.silverqueen.pro</span></h2>
+  <p class="muted" style="margin:8px 0 0"><?= $pl ? $e($pl['name']) . ' plan · ' : '' ?><b>1 · Build it here</b> → 2 · Review it → 3 · Go live.
+    <?php if (!empty($held['preview_id'])): ?> Your site is already built: <a href="/sites/me">review it and go live</a>.<?php else: ?> Upload your product photos and describe your shop below.<?php endif; ?></p>
+</section>
+<?php endif; ?>
+
 <?php if ($claimToken !== ''): ?>
 <section class="card claim" id="claim">
   <p class="lab">Claim your name</p>
