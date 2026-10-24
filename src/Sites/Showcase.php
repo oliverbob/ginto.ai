@@ -64,6 +64,7 @@ final class Showcase
             'tagline'  => $text($plan['brand']['tagline'] ?? '', 120),
             'headline' => $text($plan['hero']['headline'] ?? '', 100),
             'sub'      => $text($plan['hero']['subheadline'] ?? '', 160),
+            'about'    => $text($plan['about']['body'] ?? '', 900),
             'theme'    => $theme,
             'look'     => Templates::get($p['template'] ?? null)['name'],
             'products' => $products,
