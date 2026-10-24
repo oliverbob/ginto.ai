@@ -55,6 +55,8 @@ class SitesCardController
             'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
             // The feed's promotions: paid, live sites, never the viewer's own.
             'showcase' => ['ok' => true, 'sites' => $this->showcase($db, $uid, !empty($in['preview']))],
+            // Several live, paid sites by name: for the feed's site posts.
+            'cards' => ['ok' => true, 'sites' => $this->cards($db, (array) ($in['names'] ?? []))],
             default => ['ok' => false, 'error' => 'Unknown action.'],
         };
         echo json_encode($out);
@@ -94,6 +96,28 @@ class SitesCardController
             $own = $n ? $sc->of($n) : null;
             if ($own && $own['products'] !== []) {
                 $out[] = $own + ['founding' => false, 'preview' => true];
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return array<string,array> name => card, for live paid sites only (never a trial or a preview) */
+    private function cards($db, array $names): array
+    {
+        $names = array_slice(array_values(array_filter($names, static fn ($n) => is_string($n) && preg_match(\Ginto\Sites\Config::NAME_RE, $n) === 1)), 0, 30);
+        if ($names === []) {
+            return [];
+        }
+        $sc = new \Ginto\Sites\Showcase($db);
+        $out = [];
+        foreach ($db->select('sites_names', '*', ['name' => $names, 'status' => 'active']) ?: [] as $n) {
+            if (!\Ginto\Sites\Publisher::isLive((string) $n['name'])) {
+                continue;
+            }
+            $c = $sc->of($n);
+            if ($c) {
+                $out[(string) $n['name']] = $c;
             }
         }
 

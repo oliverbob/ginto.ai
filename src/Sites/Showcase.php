@@ -69,6 +69,7 @@ final class Showcase
             'products' => $products,
             // Whose it is in the app, so its Page shows their own profile cover and photo.
             'member'   => Members::identity((int) $name['user_id']),
+            'visits'   => (int) ((new Publisher($this->db))->visitTotals()[(string) $name['name']] ?? 0),
         ];
     }
 

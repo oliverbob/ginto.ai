@@ -118,6 +118,26 @@ final class Publisher
     }
 
     /** Signed the way the production server checks every relay (its RelaySignature): HMAC of "ts.body" with SQ_RELAY_SECRET. */
+    /** Every visit each site ever had (90 days kept), cached ten minutes: {name: visits}. */
+    public function visitTotals(): array
+    {
+        $cache = STORAGE_PATH . '/cache/sites-visits.json';
+        if (is_file($cache) && filemtime($cache) > time() - 600) {
+            $j = json_decode((string) file_get_contents($cache), true);
+            if (is_array($j)) {
+                return $j;
+            }
+        }
+        $out = [];
+        foreach ($this->stats() as $name => $byDay) {
+            $out[(string) $name] = array_sum(array_map(static fn ($c) => (int) ($c[0] ?? 0), is_array($byDay) ? $byDay : []));
+        }
+        @mkdir(dirname($cache), 0755, true);
+        @file_put_contents($cache, json_encode($out));
+
+        return $out;
+    }
+
     /** Visits per site per day, as the Sites server counts them: {name: {date: [views, visitors]}}. */
     public function stats(): array
     {
