@@ -343,12 +343,14 @@ final class Renderer
             // On phones the panel fills exactly what the keyboard leaves.
             . 'function fit(){var v=window.visualViewport;P.style.setProperty("--vh",(v?v.height:innerHeight)+"px");if(v&&P.classList.contains("on")&&innerWidth<=600)P.style.top=v.offsetTop+"px"}'
             . 'if(window.visualViewport){visualViewport.addEventListener("resize",fit);visualViewport.addEventListener("scroll",fit)}fit();'
+            // Our own addresses become links, made as elements: an answer is never set as HTML.
+            . 'function link(el,t){t.split(/(https:\\/\\/[^\\s<>"]+)/).forEach(function(p,i){if(i%2&&/^https:\\/\\/([a-z0-9-]+\\.)?silverqueen\\.pro\\//i.test(p)){var a=document.createElement("a");a.href=p.replace(/[.,!?)]+$/,"");a.textContent=a.href;a.target="_blank";a.rel="noopener";a.style.color="var(--qc)";a.style.fontWeight="600";el.appendChild(a);el.appendChild(document.createTextNode(p.slice(a.href.length)))}else el.appendChild(document.createTextNode(p))})}'
             . 'function add(c,t){var d=document.createElement("div");d.className=c;d.textContent=t;M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
             . 'var PEN=' . json_encode('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>') . ';'
             . 'function wait(){var d=document.createElement("div");d.className="a wait";d.setAttribute("aria-label","Writing");d.innerHTML=PEN+"<span class=dots><i></i><i></i><i></i></span>";M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
             . 'function ask(t){t=t.trim();if(!t)return;var ch=M.querySelector(".chips");if(ch)ch.remove();add("q",t);H.push({role:"visitor",text:t});var w=wait();'
             . 'fetch("https://silverqueen.pro/sites/chat",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({name:N,messages:H.slice(-6)})})'
-            . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.className="a";w.textContent=x;M.scrollTop=M.scrollHeight;if(d&&d.ok)H.push({role:"shop",text:x})})'
+            . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.className="a";w.textContent="";link(w,x);M.scrollTop=M.scrollHeight;if(d&&d.ok)H.push({role:"shop",text:x})})'
             . '.catch(function(){w.className="a";w.textContent="No connection. Please try again."})}'
             . 'B.onclick=function(){P.classList.add("on");B.style.display="none";fit();if(!M.children.length){add("a","Hi! What would you like to know about our shop?");'
             . 'var c=document.createElement("div");c.className="chips";["What do you sell?","How do I order?","How can I contact you?"].forEach(function(t){var b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=function(){ask(t)};c.appendChild(b)});M.appendChild(c)}};'
