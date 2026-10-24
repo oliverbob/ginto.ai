@@ -63,7 +63,7 @@ class SitesController extends \Core\Controller
         $n = $uid ? (new Names($this->db))->of($uid) : null;
         $held = $n && Trial::phase($n, (new Subscriptions($this->db))->current($uid)) !== 'none' ? $n : null;
         $this->page('sites/start', ['title' => 'Start it now · SilverQueen Sites', 'open' => $this->canBuild(),
-            'held' => $held, 'plan' => Config::plan((string) ($_SESSION['sites_plan'] ?? '')) ? (string) $_SESSION['sites_plan'] : null,
+            'held' => $held, 'suggest' => $uid && Members::isMember($uid) ? Members::photos($uid) : [], 'plan' => Config::plan((string) ($_SESSION['sites_plan'] ?? '')) ? (string) $_SESSION['sites_plan'] : null,
             'csrf_token' => generateCsrfToken(true)] + $this->founding());
     }
 
@@ -90,12 +90,16 @@ class SitesController extends \Core\Controller
             return $this->json(['ok' => false, 'error' => 'Your site is waiting for its plan. Choose one to add photos or rebuild; until then you can edit its words.'], 402);
         }
         $files = $this->uploaded('photos');
-        if (count($files) > Photos::MAX_PER_SITE) {
+        // Picks from their own SilverQueen photos: only URLs that are in their own list.
+        $picked = array_values(array_unique(array_filter((array) ($_POST['picks'] ?? []), 'is_string')));
+        $mine = $picked && Members::isMember($this->userId()) ? array_column(Members::photos($this->userId()), 'url') : [];
+        $picked = array_values(array_intersect($picked, $mine));
+        if (count($files) + count($picked) > Photos::MAX_PER_SITE) {
             return $this->json(['ok' => false, 'error' => 'Up to ' . Photos::MAX_PER_SITE . ' photos for a preview.'], 422);
         }
         try {
             $photos = new Photos($this->db);
-            $shas = array_map(static fn ($f) => $photos->ingest($f), $files);
+            $shas = array_merge(array_map(static fn ($u) => $photos->ingestUrl($u), $picked), array_map(static fn ($f) => $photos->ingest($f), $files));
             $p = (new Previews($this->db))->create((string) ($_POST['description'] ?? ''), $shas, $this->deviceId(), $this->clientIp(),
                 $this->userId() ?: null, $this->isAdmin());
         } catch (LimitReached | \InvalidArgumentException $e) {

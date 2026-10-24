@@ -57,6 +57,39 @@ final class Photos
         return $sha;
     }
 
+    /**
+     * Take one photo from the member's own SilverQueen photos. The caller passes
+     * only URLs from that member's own list (Members::photos), never one a
+     * browser sent in, so this server is never made to fetch an arbitrary address.
+     */
+    public function ingestUrl(string $url): string
+    {
+        if (!str_starts_with($url, 'https://')) {
+            throw new \InvalidArgumentException('That photo could not be used.');
+        }
+        $tmp = tempnam(sys_get_temp_dir(), 'sqsp');
+        $fh = fopen($tmp, 'wb');
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_FILE => $fh, CURLOPT_TIMEOUT => 25, CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_NOPROGRESS => false,
+            CURLOPT_PROGRESSFUNCTION => static fn ($c, $dlTotal, $dl) => $dl > self::MAX_BYTES ? 1 : 0,
+        ]);
+        $ok = curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        fclose($fh);
+        try {
+            if (!$ok || $status !== 200) {
+                throw new \InvalidArgumentException('One of your SilverQueen photos could not be fetched. Try again.');
+            }
+
+            return $this->ingest($tmp);
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
     /** Longest edge at most 1024 px, re-encoded as JPEG (which also drops the camera's EXIF, location included). */
     private static function shrink(string $src, int $type, string $dest): array
     {

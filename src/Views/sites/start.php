@@ -13,10 +13,18 @@ include __DIR__ . '/_frame.php';
 .steps span{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px;background:var(--panel2)}
 .steps b{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--gold);color:var(--gold-ink);font-size:11px}
 .builder{margin:28px auto 0;max-width:760px;padding:22px}
-.drop{border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
+.drop{display:block;box-sizing:border-box;width:100%;border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
 .drop:hover,.drop.over{border-color:var(--gold);background:var(--panel2)}
-.drop svg{width:34px;height:34px;color:var(--gold-fg)}
+.drop svg{display:block;margin:0 auto;width:34px;height:34px;color:var(--gold-fg)}
+.drop>span{display:block;margin-top:2px}
 .drop strong{display:block;margin-top:8px;font-size:16px}
+.sugg{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin:0 0 14px}
+.sugg button{position:relative;aspect-ratio:1;padding:0;border:2px solid transparent;border-radius:12px;overflow:hidden;background:var(--panel2);cursor:pointer}
+.sugg button img{width:100%;height:100%;object-fit:cover;display:block}
+.sugg button[aria-pressed=true]{border-color:var(--gold)}
+.sugg button i{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.5);border:2px solid #fff}
+.sugg button[aria-pressed=true] i{background:var(--gold);border-color:var(--gold)}
+.sugg button[aria-pressed=true] i::after{content:'';position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid var(--gold-ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:12px}
 .thumbs div{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--panel2)}
 .thumbs img{width:100%;height:100%;object-fit:cover}
@@ -71,7 +79,16 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 
 <?php if (!empty($open)): ?>
 <form class="card builder" id="builder" onsubmit="return false" enctype="multipart/form-data">
+  <?php if (!empty($suggest)): ?>
+  <p class="lab">From your SilverQueen photos</p>
+  <p class="muted" style="margin:-4px 0 10px;font-size:13px">Your most-loved photos first. Tap the ones that show what you sell.</p>
+  <div class="sugg" id="sugg">
+    <?php foreach ($suggest as $sp): ?><button type="button" aria-pressed="false" data-url="<?= $e($sp['url']) ?>"><img src="<?= $e($sp['thumb']) ?>" alt="" loading="lazy"><i></i></button><?php endforeach; ?>
+  </div>
+  <p class="lab">Or add photos from your phone</p>
+  <?php else: ?>
   <p class="lab">Your products</p>
+  <?php endif; ?>
   <label class="drop" id="drop">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="9" cy="11" r="2"/><path d="M21 17l-5-5-9 8"/></svg>
     <strong>Add your product photos</strong>
@@ -116,6 +133,14 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
   const form = $('builder');
   if (form) {
     let files = [];
+    const picks = new Set();
+    document.querySelectorAll('#sugg button').forEach((b) => b.addEventListener('click', () => {
+      const on = b.getAttribute('aria-pressed') !== 'true';
+      if (on && files.length + picks.size >= 12) { tell('bad', 'Up to 12 photos for a preview.'); return; }
+      b.setAttribute('aria-pressed', String(on));
+      if (on) picks.add(b.dataset.url); else picks.delete(b.dataset.url);
+      tell('', '');
+    }));
     const thumbs = $('thumbs'), say = $('say'), desc = $('desc'), go = $('go');
     const tell = (kind, text) => { say.className = 'say' + (kind ? ' ' + kind : ''); say.textContent = text; };
     const paint = () => {
@@ -133,7 +158,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
     const add = (list) => {
       for (const f of list) {
         if (!/^image\/(jpeg|png|webp)$/.test(f.type)) { tell('bad', 'Use JPG, PNG or WebP photos.'); continue; }
-        if (files.length >= 12) { tell('bad', 'Up to 12 photos for a preview.'); break; }
+        if (files.length + picks.size >= 12) { tell('bad', 'Up to 12 photos for a preview.'); break; }
         files.push(f);
       }
       paint();
@@ -152,11 +177,12 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
     };
 
     go.addEventListener('click', async () => {
-      if (!files.length) { tell('bad', 'Add at least one product photo.'); return; }
+      if (!files.length && !picks.size) { tell('bad', 'Pick or add at least one product photo.'); return; }
       if (desc.value.trim().length < 20) { tell('bad', 'Tell us a little more about your shop (a sentence or two).'); desc.focus(); return; }
       go.disabled = true; tell('', 'Uploading your photos…');
       const body = new FormData();
       files.forEach((f) => body.append('photos[]', f));
+      picks.forEach((u) => body.append('picks[]', u));
       body.append('description', desc.value);
       body.append('csrf_token', csrf);
       let r;

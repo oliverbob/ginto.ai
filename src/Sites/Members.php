@@ -84,6 +84,36 @@ final class Members
         return ['uid' => $uid, 'name' => (string) ($c['name'] ?? ''), 'to' => str_starts_with($to, '/sites/') ? $to : '/sites/me'];
     }
 
+    /**
+     * The member's own SilverQueen photos, as suggestions for the builder (their
+     * posts on the chat, never their phone). @return list<array{url:string, thumb:string}>
+     */
+    public static function photos(int $uid): array
+    {
+        $identity = self::identity($uid);
+        $secret = (string) (Env::get('SITES_CARD_SECRET', '') ?? '');
+        if ($identity === null || $secret === '') {
+            return [];
+        }
+        $body = (string) json_encode(['identity' => $identity]);
+        $ts = (string) time();
+        $ch = curl_init('https://comchain.silverqueen.pro/api/v1/internal/sites-photos');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-SQ-Timestamp: ' . $ts,
+                'X-SQ-Signature: ' . hash_hmac('sha256', $ts . '.' . $body, $secret)],
+            CURLOPT_POSTFIELDS => $body,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        $out = is_string($raw) ? json_decode($raw, true) : null;
+        $out = is_array($out) && isset($out['data']) ? $out['data'] : $out;
+        $list = is_array($out) && is_array($out['photos'] ?? null) ? $out['photos'] : [];
+
+        return array_values(array_filter(array_map(static fn ($p) => is_array($p) && is_string($p['url'] ?? null) && str_starts_with($p['url'], 'https://')
+            ? ['url' => $p['url'], 'thumb' => is_string($p['thumb'] ?? null) && str_starts_with($p['thumb'], 'https://') ? $p['thumb'] : $p['url']] : null, $list)));
+    }
+
     private static function key(): string
     {
         $k = (string) (Env::get('APP_KEY', '') ?? '');
