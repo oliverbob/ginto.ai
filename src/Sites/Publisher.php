@@ -56,7 +56,8 @@ final class Publisher
         }
         $left = max(1, (int) ceil((strtotime((string) $n['trial_until']) - time()) / 3600));
 
-        return $this->push($n, 200, ['trial_hours' => $left, 'claim_url' => 'https://silverqueen.pro/sites/me']);
+        return $this->push($n, 200, ['trial_hours' => $left, 'trial_until' => strtotime((string) $n['trial_until']),
+            'claim_url' => 'https://silverqueen.pro/sites/me']);
     }
 
     /** Render the name's reviewed draft and send it to the Sites slice. */

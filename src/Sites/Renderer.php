@@ -94,7 +94,7 @@ final class Renderer
 
     /**
      * @param list<string> $photoUrls in plan photo order
-     * @param array{preview_hours?:int, trial_hours?:int, claim_url?:string, contact_url?:string, founding?:bool,
+     * @param array{preview_hours?:int, trial_hours?:int, trial_until?:int, claim_url?:string, contact_url?:string, founding?:bool,
      *              template?:string, videos?:array<int,string>} $opts
      */
     public static function html(array $plan, array $photoUrls, array $opts = []): string
@@ -198,7 +198,16 @@ final class Renderer
 
         $banner = '';
         if (isset($opts['trial_hours'])) {
-            $banner = '<div class="pv"><span><b>Free trial</b> &middot; ' . (int) $opts['trial_hours'] . ' hour' . ((int) $opts['trial_hours'] === 1 ? '' : 's') . ' left</span>'
+            // The end time, not the hours left: the page is written once and read for hours,
+            // and "5 hours left" stayed 5 all afternoon (owner's phone, 2026-10-24).
+            $when = '';
+            if (!empty($opts['trial_until'])) {
+                $end = (new \DateTimeImmutable('@' . (int) $opts['trial_until']))->setTimezone(new \DateTimeZone('Asia/Manila'));
+                $today = (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))->format('Y-m-d') === $end->format('Y-m-d');
+                $when = 'until ' . $end->format($today ? 'g:i A' : 'M j, g:i A');
+            }
+            $banner = '<div class="pv"><span><b>Free trial</b> &middot; ' . ($when !== '' ? $when
+                    : (int) $opts['trial_hours'] . ' hour' . ((int) $opts['trial_hours'] === 1 ? '' : 's') . ' left') . '</span>'
                 . '<a href="' . $e($opts['claim_url'] ?? 'https://silverqueen.pro/sites/me') . '">Go live &rarr;</a></div>';
         } elseif (isset($opts['preview_hours'])) {
             $banner = '<div class="pv"><span><b>Free preview</b> &middot; disappears in ' . (int) $opts['preview_hours'] . ' hours</span>'
