@@ -30,7 +30,7 @@ final class Publisher
         return preg_match(Config::NAME_RE, $name) === 1 && is_file(self::LIVE_DIR . '/' . $name);
     }
 
-    /** @return array{ok:bool, url?:string, error?:string} */
+    /** A paid site, live for good. @return array{ok:bool, url?:string, error?:string} */
     public function publish(int $userId): array
     {
         $n = $this->db->get('sites_names', '*', ['user_id' => $userId]);
@@ -38,6 +38,30 @@ final class Publisher
         if (!$n || $n['status'] !== 'active' || !$sub) {
             return ['ok' => false, 'error' => 'There is no paid site to publish.'];
         }
+        $plan = Config::plan((string) $sub['plan']) ?? Config::PLANS['silver'];
+
+        return $this->push($n, (int) $plan['storage_gb'] * 1024, ['founding' => (bool) $sub['founding']]);
+    }
+
+    /**
+     * The free trial: the held name live for its first hours, with a banner that
+     * says so and counts down (owner, 2026-10-24: "they need to see the preview
+     * (as 5 hour free trial)"). Nothing is published once the trial is over.
+     */
+    public function publishTrial(int $userId): array
+    {
+        $n = $this->db->get('sites_names', '*', ['user_id' => $userId]);
+        if (!$n || $n['status'] !== 'held' || empty($n['trial_until']) || strtotime((string) $n['trial_until']) <= time()) {
+            return ['ok' => false, 'error' => 'The free trial is over. Choose a plan to go live.'];
+        }
+        $left = max(1, (int) ceil((strtotime((string) $n['trial_until']) - time()) / 3600));
+
+        return $this->push($n, 200, ['trial_hours' => $left, 'claim_url' => 'https://silverqueen.pro/sites/me']);
+    }
+
+    /** Render the name's reviewed draft and send it to the Sites slice. */
+    private function push(array $n, int $quotaMb, array $opts): array
+    {
         $prev = $n['preview_id'] ? $this->db->get('sites_previews', '*', ['id' => (int) $n['preview_id']]) : null;
         $site = $prev && $prev['site'] ? json_decode((string) $prev['site'], true) : null;
         if (!is_array($site) || empty($site['plan'])) {
@@ -55,16 +79,13 @@ final class Publisher
             $files[$path] = base64_encode((string) file_get_contents(Photos::path($sha)));
             $urls[$i] = '/' . $path;
         }
-        $plan = Config::plan((string) $sub['plan']) ?? Config::PLANS['silver'];
         $contact = (string) ($site['contact'] ?? '');
-        $html = Renderer::html($site['plan'], array_values(array_replace(array_fill(0, count($shas), ''), $urls)), [
-            'contact_url' => $contact !== '' ? $contact : '#shop',
-            'founding'    => (bool) $sub['founding'],
-        ]);
+        $html = Renderer::html($site['plan'], array_values(array_replace(array_fill(0, count($shas), ''), $urls)),
+            $opts + ['contact_url' => $contact !== '' ? $contact : '#shop']);
         $files['index.html'] = base64_encode($html);
-        $files['robots.txt'] = base64_encode("User-agent: *\nAllow: /\n");
+        $files['robots.txt'] = base64_encode(isset($opts['trial_hours']) ? "User-agent: *\nDisallow: /\n" : "User-agent: *\nAllow: /\n");
 
-        $r = $this->call('publish', ['name' => $n['name'], 'files' => $files, 'quota_mb' => (int) $plan['storage_gb'] * 1024]);
+        $r = $this->call('publish', ['name' => $n['name'], 'files' => $files, 'quota_mb' => $quotaMb]);
         if (empty($r['ok'])) {
             Subscriptions::log('PUBLISH FAILED ' . $n['name'] . ': ' . ($r['error'] ?? '?'));
 
@@ -74,7 +95,7 @@ final class Publisher
             @mkdir(self::LIVE_DIR, 0755, true);
         }
         @file_put_contents(self::LIVE_DIR . '/' . $n['name'], date('c'));
-        Subscriptions::log('PUBLISHED ' . $n['name'] . ' (' . round(($r['bytes'] ?? 0) / 1048576, 1) . ' MB)');
+        Subscriptions::log((isset($opts['trial_hours']) ? 'TRIAL ' : 'PUBLISHED ') . $n['name'] . ' (' . round(($r['bytes'] ?? 0) / 1048576, 1) . ' MB)');
 
         return ['ok' => true, 'url' => 'https://' . $n['name'] . '.silverqueen.pro'];
     }

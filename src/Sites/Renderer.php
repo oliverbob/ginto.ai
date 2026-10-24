@@ -128,13 +128,16 @@ final class Renderer
         }
 
         $banner = '';
-        if ($preview) {
+        if (isset($opts['trial_hours'])) {
+            $banner = '<div class="pv"><span><b>Free trial</b> · ' . (int) $opts['trial_hours'] . ' hour' . ((int) $opts['trial_hours'] === 1 ? '' : 's') . ' left</span>'
+                . '<a href="' . $e($opts['claim_url'] ?? 'https://silverqueen.pro/sites/me') . '">Go live &rarr;</a></div>';
+        } elseif ($preview) {
             $banner = '<div class="pv"><span><b>Free preview</b> · disappears in ' . (int) $opts['preview_hours'] . ' hours</span>'
                 . '<a href="' . $e($opts['claim_url'] ?? '/sites/start') . '">Claim your name &rarr;</a></div>';
         }
 
         return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . ($preview ? '<meta name="robots" content="noindex,nofollow">' : '')
+            . ($preview || isset($opts['trial_hours']) ? '<meta name="robots" content="noindex,nofollow">' : '')
             . '<title>' . $e($brand) . '</title>'
             . '<meta name="description" content="' . $e($plan['brand']['tagline'] ?: $plan['hero']['subheadline']) . '">'
             . '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'

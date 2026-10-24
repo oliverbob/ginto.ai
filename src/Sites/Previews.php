@@ -104,6 +104,17 @@ final class Previews
             $q->execute([$id]);
             $this->db->update('sites_previews', ['status' => 'ready', 'site' => json_encode(['plan' => $plan, 'photos' => $photos]),
                 'cost_usd' => (float) $q->fetchColumn()], ['id' => $id]);
+
+            // A held name with no site yet takes this one, and its free trial goes up.
+            if ($row['user_id'] !== null) {
+                $uid  = (int) $row['user_id'];
+                $held = $this->db->get('sites_names', '*', ['user_id' => $uid, 'status' => 'held']);
+                if ($held && empty($held['preview_id'])) {
+                    $this->db->update('sites_names', ['preview_id' => $id], ['name' => $held['name']]);
+                    $this->db->update('sites_previews', ['expires_at' => date('Y-m-d H:i:s', time() + 30 * 86400)], ['id' => $id]);
+                    (new Publisher($this->db))->publishTrial($uid);
+                }
+            }
         } catch (\Throwable $e) {
             $this->db->update('sites_previews', ['status' => 'failed',
                 'error' => mb_substr($e instanceof LimitReached ? $e->getMessage() : 'We could not build it this time. Please try again.', 0, 255)], ['id' => $id]);

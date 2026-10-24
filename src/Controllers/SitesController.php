@@ -8,6 +8,8 @@ use Ginto\Sites\LimitReached;
 use Ginto\Sites\Meter;
 use Ginto\Sites\Publisher;
 use Ginto\Sites\Subscriptions;
+use Ginto\Sites\Members;
+use Ginto\Sites\Trial;
 use Ginto\Sites\Names;
 use Ginto\Sites\Photos;
 use Ginto\Sites\Previews;
@@ -63,6 +65,10 @@ class SitesController extends \Core\Controller
         }
         if (!$this->canBuild()) {
             return $this->json(['ok' => false, 'error' => 'SilverQueen Sites opens soon.'], 403);
+        }
+        $held = $this->userId() ? (new Names($this->db))->of($this->userId()) : null;
+        if (!Trial::canAdd($held, $this->userId() ? (new Subscriptions($this->db))->current($this->userId()) : null)) {
+            return $this->json(['ok' => false, 'error' => 'Your site is waiting for its plan. Choose one to add photos or rebuild; until then you can edit its words.'], 402);
         }
         $files = $this->uploaded('photos');
         if (count($files) > Photos::MAX_PER_SITE) {
@@ -142,6 +148,9 @@ class SitesController extends \Core\Controller
         }
         $prev = !empty($in['token']) ? (new Previews($this->db))->byToken((string) $in['token']) : null;
         $r = (new Names($this->db))->claim((string) ($in['name'] ?? ''), $this->userId(), $prev ? (int) $prev['id'] : null);
+        if (!empty($r['ok']) && empty($r['mine'])) {
+            (new Trial($this->db))->start($this->userId(), (string) ($_SESSION['sites_member_name'] ?? ''));
+        }
 
         return $this->json($r + ['next' => $r['ok'] ? '/sites/me' : null], $r['ok'] ? 200 : 422);
     }
@@ -159,6 +168,7 @@ class SitesController extends \Core\Controller
         $draft = $this->draft($uid);
         $sub   = (new Subscriptions($this->db))->current($uid);
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Sites', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
+            'phase' => Trial::phase($name, $sub),
             'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
             'live' => $name && Publisher::isLive((string) $name['name']), 'csrf_token' => generateCsrfToken()] + $this->founding());
     }
@@ -219,7 +229,9 @@ class SitesController extends \Core\Controller
         if (!$draft || empty($draft['site']['reviewed_at'])) {
             return $this->json(['ok' => false, 'error' => 'Review your site first: nothing goes live until you have.'], 422);
         }
-        $u = $this->db->get('users', ['email', 'firstname', 'lastname', 'username'], ['id' => $uid]) ?: [];
+        $u = Members::isMember($uid)
+            ? ['email' => 'member' . Members::identity($uid) . '@silverqueen.pro', 'firstname' => (string) ($_SESSION['sites_member_name'] ?? 'SilverQueen member')]
+            : ($this->db->get('users', ['email', 'firstname', 'lastname', 'username'], ['id' => $uid]) ?: []);
         $r = (new Subscriptions($this->db))->checkout($uid, (string) ($in['plan'] ?? ''), (string) ($u['email'] ?? ''),
             trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) ?: (string) ($u['username'] ?? ''));
 
@@ -264,12 +276,26 @@ class SitesController extends \Core\Controller
 
     private function canBuild(): bool
     {
-        return Config::isPublic() || $this->isAdmin();
+        return Config::isPublic() || $this->isAdmin() || Members::isMember($this->userId());
     }
 
+    /** A silverqueen.pro account, or a SilverQueen member who came in from the feed card (Sites only). */
     private function userId(): int
     {
-        return (int) ($_SESSION['user_id'] ?? 0);
+        return (int) ($_SESSION['user_id'] ?? 0) ?: (int) ($_SESSION['sites_uid'] ?? 0);
+    }
+
+    /** GET /sites/enter?t= -- the feed card's one-time way in, for the Sites dashboard only. */
+    public function enter()
+    {
+        $m = Members::consume((string) ($_GET['t'] ?? ''));
+        if (!$m) {
+            return $this->page('sites/gone', ['title' => 'That link has expired']);
+        }
+        session_regenerate_id(true);
+        $_SESSION['sites_uid'] = $m['uid'];
+        $_SESSION['sites_member_name'] = $m['name'];
+        header('Location: ' . $m['to']);
     }
 
     private function isAdmin(): bool

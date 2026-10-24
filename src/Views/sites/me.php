@@ -52,6 +52,23 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
   <?php if ($live): ?><a class="btn gold" href="https://<?= $e($name['name']) ?>.silverqueen.pro" target="_blank" rel="noopener"><?= $icon('<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>') ?> Open my site</a><?php endif; ?>
 </section>
 
+<?php
+$clock = static function ($until): string {
+    $s = max(0, strtotime((string) $until) - time());
+    return $s >= 3600 ? floor($s / 3600) . 'h ' . floor(($s % 3600) / 60) . 'm' : max(1, (int) ceil($s / 60)) . ' min';
+};
+if (($phase ?? '') === 'trial'): ?>
+<section class="card sec" style="border-color:var(--gold)">
+  <b>🎉 Free trial: your site is live for <?= $e($clock($name['trial_until'])) ?> more.</b>
+  <p class="muted" style="margin:6px 0 0">Look at it, share it, show it around. Choose a plan below to keep it up for good. Until then you can edit its words, not add to it.</p>
+</section>
+<?php elseif (($phase ?? '') === 'grace'): ?>
+<section class="card sec" style="border-color:var(--bad)">
+  <b>Your free trial has ended. Choose a plan within <?= $e($clock($name['release_at'])) ?> to keep <?= $e($name['name']) ?>.silverqueen.pro.</b>
+  <p class="muted" style="margin:6px 0 0">After that the name is released for others. Your site and photos stay saved with you.</p>
+</section>
+<?php endif; ?>
+
 <?php if (!$name || !$draft): ?>
 <section class="card sec">
   <h2 class="serif">Start with a free preview</h2>

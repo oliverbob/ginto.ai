@@ -1382,6 +1382,8 @@ $router->req('/marketplace/sellers/storefront/save', 'SellerController@storefron
 
 // Mall storefront, checkout, wallet, and order lifecycle routes
 $router->req('/marketplace', 'MallController@marketplace');
+// The Sites ad on the SilverQueen feed holds names here (signed by the chat server; no session).
+$router->post('/api/internal/sites-card', 'SitesCardController@handle');
 // The SilverQueen /superadmin API Keys page reaches this host's keys here (signed; no session).
 $router->post('/api/internal/api-keys', 'ApiKeysRelayController@handle');
 
@@ -1395,6 +1397,7 @@ $router->post('/sites/claim', 'SitesController@claim');
 $router->get('/sites/photo/{sha}', 'SitesController@photo');
 $router->get('/sites/p/{token}/status', 'SitesController@status');
 $router->get('/sites/p/{token}', 'SitesController@preview');
+$router->get('/sites/enter', 'SitesController@enter');
 $router->get('/sites/me', 'SitesController@me');
 $router->post('/sites/me/review', 'SitesController@review');
 $router->post('/sites/me/checkout', 'SitesController@checkout');
