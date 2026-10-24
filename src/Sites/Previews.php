@@ -28,7 +28,7 @@ final class Previews
      * @param list<string> $shas
      * @return array{id:int, token:string}
      */
-    public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt): array
+    public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt, array $media = [], ?string $template = null): array
     {
         $description = trim($description);
         if (mb_strlen($description) < self::MIN_DESCRIPTION) {
@@ -55,6 +55,7 @@ final class Previews
         $this->db->insert('sites_previews', [
             'token' => $token, 'user_id' => $userId, 'device_hash' => $device, 'ip_hash' => $ipHash,
             'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
+            'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
             'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
         ]);
 

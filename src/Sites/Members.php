@@ -110,8 +110,15 @@ final class Members
         $out = is_array($out) && isset($out['data']) ? $out['data'] : $out;
         $list = is_array($out) && is_array($out['photos'] ?? null) ? $out['photos'] : [];
 
-        return array_values(array_filter(array_map(static fn ($p) => is_array($p) && is_string($p['url'] ?? null) && str_starts_with($p['url'], 'https://')
-            ? ['url' => $p['url'], 'thumb' => is_string($p['thumb'] ?? null) && str_starts_with($p['thumb'], 'https://') ? $p['thumb'] : $p['url']] : null, $list)));
+        $https = static fn ($v): ?string => is_string($v) && str_starts_with($v, 'https://') ? $v : null;
+
+        return array_values(array_filter(array_map(static fn ($p) => is_array($p) && $https($p['url'] ?? null) ? [
+            'url'     => $p['url'],
+            'thumb'   => $https($p['thumb'] ?? null) ?? $p['url'],
+            'kind'    => in_array($p['kind'] ?? 'photo', ['photo', 'video', 'youtube'], true) ? $p['kind'] : 'photo',
+            'video'   => $https($p['video'] ?? null),
+            'caption' => mb_substr(trim((string) ($p['caption'] ?? '')), 0, 220),
+        ] : null, $list)));
     }
 
     private static function key(): string

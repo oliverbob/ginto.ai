@@ -25,6 +25,15 @@ include __DIR__ . '/_frame.php';
 .sugg button i{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.5);border:2px solid #fff}
 .sugg button[aria-pressed=true] i{background:var(--gold);border-color:var(--gold)}
 .sugg button[aria-pressed=true] i::after{content:'';position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid var(--gold-ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
+.sugg .k{position:absolute;left:5px;bottom:5px;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.6);color:#fff}
+.pickbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 10px}
+.aitag{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--gold-fg);background:rgba(224,178,60,.14);padding:4px 10px;border-radius:999px}
+.btn.sm{padding:9px 14px;font-size:13.5px}
+.tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px}
+.tpl{position:relative;display:block;cursor:pointer;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.tpl input{position:absolute;opacity:0;pointer-events:none}.tpl:has(input:checked){border-color:var(--gold)}
+.tpl .sw{height:54px;display:flex;align-items:flex-end;gap:4px;padding:8px}.tpl .sw i{flex:1;height:60%;border-radius:4px}
+.tpl b{display:block;padding:8px 10px 0;font-size:14px}.tpl small{display:block;padding:0 10px 10px;font-size:12px;color:var(--muted);line-height:1.35}
 .thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:8px;margin-top:12px}
 .thumbs div{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--panel2)}
 .thumbs img{width:100%;height:100%;object-fit:cover}
@@ -82,8 +91,12 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
   <?php if (!empty($suggest)): ?>
   <p class="lab">From your SilverQueen photos</p>
   <p class="muted" style="margin:-4px 0 10px;font-size:13px">Your most-loved photos first. Tap the ones that show what you sell.</p>
+  <div class="pickbar">
+    <button class="btn ghost sm" type="button" id="surprise"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/></svg> Surprise me</button>
+    <span class="aitag" id="aiPicked" hidden>✨ Chosen by SilverQueen AI · change any of them</span>
+  </div>
   <div class="sugg" id="sugg">
-    <?php foreach ($suggest as $sp): ?><button type="button" aria-pressed="false" data-url="<?= $e($sp['url']) ?>"><img src="<?= $e($sp['thumb']) ?>" alt="" loading="lazy"><i></i></button><?php endforeach; ?>
+    <?php foreach ($suggest as $i => $sp): ?><button type="button" aria-pressed="false" data-i="<?= (int) $i ?>" data-url="<?= $e($sp['url']) ?>" data-cap="<?= $e($sp['caption']) ?>" title="<?= $e(mb_substr($sp['caption'], 0, 120)) ?>"><img src="<?= $e($sp['thumb']) ?>" alt="" loading="lazy"><i></i><?= $sp['kind'] !== 'photo' ? '<span class="k" aria-label="' . ($sp['kind'] === 'youtube' ? 'YouTube' : 'Video') . '"><svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></span>' : '' ?></button><?php endforeach; ?>
   </div>
   <p class="lab">Or add photos from your phone</p>
   <?php else: ?>
@@ -96,7 +109,21 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
     <input id="files" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden>
   </label>
   <div class="thumbs" id="thumbs"></div>
+  <div class="pickbar" style="margin-top:16px">
+    <p class="lab" style="margin:0">About your shop</p>
+    <?php if (!empty($suggest)): ?><button class="btn ghost sm" type="button" id="aiDesc"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/></svg> Enable auto-generated prompt with AI</button><?php endif; ?>
+    <span class="aitag" id="aiWrote" hidden>✨ Written by SilverQueen AI · edit freely</span>
+  </div>
   <textarea id="desc" maxlength="2000" placeholder="Tell SilverQueen AI about your shop: what you sell, who it is for, what makes it yours. Write it in English, Filipino or Bisaya."></textarea>
+  <p class="lab" style="margin-top:18px">Choose your look</p>
+  <div class="tpls" id="tpls">
+    <?php foreach (\Ginto\Sites\Templates::ALL as $tid => $t):
+      $pal = is_array($t['palette']) ? $t['palette'] : ['#fff7ec', '#1b1814', '#8a3b12', '#e0b23c', '#f3e9d8']; ?>
+    <label class="tpl"><input type="radio" name="tpl" value="<?= $e($tid) ?>" <?= $tid === \Ginto\Sites\Templates::DEFAULT ? 'checked' : '' ?>>
+      <span class="sw" style="background:<?= $e($pal[0]) ?>"><i style="background:<?= $e($pal[2]) ?>"></i><i style="background:<?= $e($pal[4]) ?>;height:85%"></i><i style="background:<?= $e($pal[1]) ?>;height:40%"></i></span>
+      <b><?= $e($t['name']) ?></b><small><?= $e($t['line']) ?></small></label>
+    <?php endforeach; ?>
+  </div>
   <div class="row">
     <button class="btn gold" id="go" type="button"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/></svg> Build my free preview</button>
     <span class="muted" style="font-size:13px">No account, no payment.</span>
@@ -134,12 +161,22 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
   if (form) {
     let files = [];
     const picks = new Set();
+    // The no-AI draft: the seller's own captions, stitched, until they type or ask the AI.
+    let typed = false, aiWrote = false;
+    const draft = () => {
+      if (typed || aiWrote) return;
+      const caps = [...document.querySelectorAll('#sugg button[aria-pressed=true]')].map((b) => b.dataset.cap).filter(Boolean).slice(0, 5);
+      const nm = <?= json_encode(!empty($held) ? (string) $held['name'] : '') ?>;
+      desc.value = caps.length ? (nm ? nm + '. ' : '') + 'From my posts: ' + caps.map((c) => '"' + c.slice(0, 140) + '"').join(' ') : '';
+      $('count').textContent = desc.value.length.toLocaleString() + ' / 2,000';
+    };
     document.querySelectorAll('#sugg button').forEach((b) => b.addEventListener('click', () => {
       const on = b.getAttribute('aria-pressed') !== 'true';
       if (on && files.length + picks.size >= 12) { tell('bad', 'Up to 12 photos for a preview.'); return; }
       b.setAttribute('aria-pressed', String(on));
       if (on) picks.add(b.dataset.url); else picks.delete(b.dataset.url);
       tell('', '');
+      draft();
     }));
     const thumbs = $('thumbs'), say = $('say'), desc = $('desc'), go = $('go');
     const tell = (kind, text) => { say.className = 'say' + (kind ? ' ' + kind : ''); say.textContent = text; };
@@ -168,8 +205,36 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
     ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.add('over'); }));
     ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (ev) => { ev.preventDefault(); drop.classList.remove('over'); }));
     drop.addEventListener('drop', (ev) => add(ev.dataTransfer.files));
+    desc.addEventListener('input', () => { typed = true; });
     desc.addEventListener('input', () => { $('count').textContent = desc.value.length.toLocaleString() + ' / 2,000'; });
 
+    const sur = $('surprise');
+    if (sur) sur.addEventListener('click', async () => {
+      sur.disabled = true; tell('', 'SilverQueen AI is choosing…');
+      let r = {};
+      try { r = await (await fetch('/sites/surprise', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ csrf_token: csrf }) })).json(); } catch (e) {}
+      sur.disabled = false;
+      if (!r.ok) { tell('bad', r.error || 'Could not choose right now.'); return; }
+      picks.clear();
+      document.querySelectorAll('#sugg button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+      r.pick.forEach((i) => { const b = document.querySelector('#sugg button[data-i="' + i + '"]'); if (b && picks.size + files.length < 12) { b.setAttribute('aria-pressed', 'true'); picks.add(b.dataset.url); } });
+      $('aiPicked').hidden = false;
+      $('aiPicked').textContent = r.by_ai ? '✨ Chosen by SilverQueen AI · change any of them' : 'Your most-loved posts · change any of them';
+      tell('', ''); draft();
+    });
+    const aid = $('aiDesc');
+    if (aid) aid.addEventListener('click', async () => {
+      if (!picks.size) { tell('bad', 'Pick a few photos or videos first, or press Surprise me.'); return; }
+      aid.disabled = true; tell('', 'SilverQueen AI is writing about your shop…');
+      let r = {};
+      try { r = await (await fetch('/sites/describe', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ csrf_token: csrf, picks: [...picks], name: <?= json_encode(!empty($held) ? (string) $held['name'] : '') ?> }) })).json(); } catch (e) {}
+      aid.disabled = false;
+      if (!r.ok) { tell('bad', r.error || 'Not written. Try again.'); return; }
+      desc.value = r.text; aiWrote = true; typed = false;
+      $('aiWrote').hidden = false; tell('', '');
+      $('count').textContent = desc.value.length.toLocaleString() + ' / 2,000';
+    });
     const steps = [...document.querySelectorAll('#progress li')];
     let tick = 0;
     const advance = () => {
@@ -185,6 +250,8 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
       picks.forEach((u) => body.append('picks[]', u));
       body.append('description', desc.value);
       body.append('csrf_token', csrf);
+      const tp = document.querySelector('input[name=tpl]:checked');
+      if (tp) body.append('template', tp.value);
       let r;
       try { r = await (await fetch('/sites/start', { method: 'POST', body, credentials: 'same-origin' })).json(); }
       catch (e) { r = { ok: false, error: 'The upload did not go through. Check your connection and try again.' }; }

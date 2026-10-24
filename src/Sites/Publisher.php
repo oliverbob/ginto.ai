@@ -81,7 +81,8 @@ final class Publisher
         }
         $contact = (string) ($site['contact'] ?? '');
         $html = Renderer::html($site['plan'], array_values(array_replace(array_fill(0, count($shas), ''), $urls)),
-            $opts + ['contact_url' => $contact !== '' ? $contact : '#shop']);
+            $opts + ['contact_url' => $contact !== '' ? $contact : '#shop', 'template' => $prev['template'] ?? null,
+                     'videos' => json_decode((string) ($prev['media'] ?? ''), true) ?: []]);
         $files['index.html'] = base64_encode($html);
         $files['robots.txt'] = base64_encode(isset($opts['trial_hours']) ? "User-agent: *\nDisallow: /\n" : "User-agent: *\nAllow: /\n");
 

@@ -110,6 +110,20 @@ if (($phase ?? '') === 'trial'): ?>
   </form>
 </section>
 
+<section class="card sec" id="look">
+  <h2 class="serif">Your look</h2>
+  <p class="muted" style="margin:0">Twelve designs for the same site. Switching is free and instant<?= in_array($phase ?? '', ['trial', 'live'], true) ? ', and your site at ' . $e($name['name']) . '.silverqueen.pro changes with it' : '' ?>.</p>
+  <div class="tpls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px">
+    <?php foreach (\Ginto\Sites\Templates::ALL as $tid => $t):
+      $pal = is_array($t['palette']) ? $t['palette'] : ['#fff7ec', '#1b1814', '#8a3b12', '#e0b23c', '#f3e9d8']; ?>
+    <label class="pc" style="padding:0;overflow:hidden"><input type="radio" name="look" value="<?= $e($tid) ?>" <?= ($draft['template'] ?? '') === $tid ? 'checked' : '' ?>>
+      <span style="display:flex;align-items:flex-end;gap:4px;height:48px;padding:8px;background:<?= $e($pal[0]) ?>"><i style="flex:1;height:60%;border-radius:4px;background:<?= $e($pal[2]) ?>"></i><i style="flex:1;height:85%;border-radius:4px;background:<?= $e($pal[4]) ?>"></i><i style="flex:1;height:40%;border-radius:4px;background:<?= $e($pal[1]) ?>"></i></span>
+      <b style="display:block;padding:8px 10px 0;font-size:14px"><?= $e($t['name']) ?></b><small style="display:block;padding:0 10px 10px;font-size:12px;color:var(--muted)"><?= $e($t['line']) ?></small></label>
+    <?php endforeach; ?>
+  </div>
+  <p class="say" id="lookSay" aria-live="polite"></p>
+</section>
+
 <section class="card sec" id="pay">
   <?php if ($active): $pl = Config::plan((string) $sub['plan']); ?>
     <h2 class="serif">2 · Your plan: <?= $e($pl['name'] ?? '') ?></h2>
@@ -176,7 +190,12 @@ if (($phase ?? '') === 'trial'): ?>
     save.disabled = false;
     if (!r.ok) { tell($('rvSay'), 'bad', r.error || 'Not saved.'); return; }
     tell($('rvSay'), 'ok', r.republished ? 'Saved, and your live site is updated.' : 'Saved. You can choose your plan now.');
-    const go = $('payGo');
+    document.querySelectorAll('input[name=look]').forEach((r) => r.addEventListener('change', async () => {
+    tell($('lookSay'), '', 'Switching…');
+    const res = await post('/sites/me/template', { id: r.value });
+    tell($('lookSay'), res.ok ? 'ok' : 'bad', res.ok ? ('Now ' + res.name + (res.republished ? '. Your site is updated.' : '.')) : (res.error || 'Not switched.'));
+  }));
+  const go = $('payGo');
     if (go) { go.disabled = false; go.removeAttribute('title'); tell($('paySay'), '', ''); }
   });
 

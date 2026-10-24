@@ -10,6 +10,8 @@ use Ginto\Sites\Publisher;
 use Ginto\Sites\Subscriptions;
 use Ginto\Sites\Members;
 use Ginto\Sites\Trial;
+use Ginto\Sites\Templates;
+use Ginto\Sites\Ai;
 use Ginto\Sites\Names;
 use Ginto\Sites\Photos;
 use Ginto\Sites\Previews;
@@ -101,8 +103,16 @@ class SitesController extends \Core\Controller
         $files = $this->uploaded('photos');
         // Picks from their own SilverQueen photos: only URLs that are in their own list.
         $picked = array_values(array_unique(array_filter((array) ($_POST['picks'] ?? []), 'is_string')));
-        $mine = $picked && Members::isMember($this->userId()) ? array_column(Members::photos($this->userId()), 'url') : [];
-        $picked = array_values(array_intersect($picked, $mine));
+        $own = $picked && Members::isMember($this->userId()) ? Members::photos($this->userId()) : [];
+        $picked = array_values(array_intersect($picked, array_column($own, 'url')));
+        // Which picks are videos: their place in the site -> the video to play.
+        $videoOf = array_column(array_filter($own, static fn ($o) => !empty($o['video'])), 'video', 'url');
+        $media = [];
+        foreach ($picked as $i => $u) {
+            if (isset($videoOf[$u])) {
+                $media[$i] = $videoOf[$u];
+            }
+        }
         if (count($files) + count($picked) > Photos::MAX_PER_SITE) {
             return $this->json(['ok' => false, 'error' => 'Up to ' . Photos::MAX_PER_SITE . ' photos for a preview.'], 422);
         }
@@ -110,7 +120,7 @@ class SitesController extends \Core\Controller
             $photos = new Photos($this->db);
             $shas = array_merge(array_map(static fn ($u) => $photos->ingestUrl($u), $picked), array_map(static fn ($f) => $photos->ingest($f), $files));
             $p = (new Previews($this->db))->create((string) ($_POST['description'] ?? ''), $shas, $this->deviceId(), $this->clientIp(),
-                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember());
+                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember(), $media, (string) ($_POST['template'] ?? ''));
         } catch (LimitReached | \InvalidArgumentException $e) {
             return $this->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
@@ -148,7 +158,8 @@ class SitesController extends \Core\Controller
         $hours = max(1, (int) ceil((strtotime((string) $row['expires_at']) - time()) / 3600));
         header('Content-Type: text/html; charset=utf-8');
         echo Renderer::html($site['plan'], array_map(static fn ($s) => '/sites/photo/' . $s, $shas),
-            ['preview_hours' => $hours, 'claim_url' => '/sites/start?claim=' . $row['token'] . '#claim']);
+            ['preview_hours' => $hours, 'claim_url' => '/sites/start?claim=' . $row['token'] . '#claim',
+             'template' => $row['template'] ?? null, 'videos' => json_decode((string) ($row['media'] ?? ''), true) ?: []]);
     }
 
     public function photo($sha)
@@ -285,6 +296,112 @@ class SitesController extends \Core\Controller
         return $this->json((new Subscriptions($this->db))->confirm($uid));
     }
 
+    /**
+     * POST /sites/surprise -- SilverQueen AI picks the posts that look like
+     * products (owner, 2026-10-24: "auto-generation of choices or 'surprise me'
+     * button but instruct the user that it is auto-generated with AI").
+     * Answers indexes into the member's own suggestions.
+     */
+    public function surprise()
+    {
+        $uid = $this->userId();
+        $own = Members::isMember($uid) ? Members::photos($uid) : [];
+        if ($own === []) {
+            return $this->json(['ok' => false, 'error' => 'There are no SilverQueen photos to choose from yet.'], 422);
+        }
+        $lines = [];
+        foreach ($own as $i => $o) {
+            $lines[] = $i . ' [' . $o['kind'] . '] ' . ($o['caption'] !== '' ? mb_substr($o['caption'], 0, 120) : '(no caption)');
+        }
+        $pick = [];
+        try {
+            $r = (new Ai(new Meter($this->db)))->chat('description', [
+                ['role' => 'system', 'content' => self::SURPRISE_PROMPT],
+                ['role' => 'user', 'content' => implode("\n", $lines)],
+            ], ['user_id' => $uid, 'json' => true]);
+            $j = json_decode($r['content'], true);
+            $pick = array_values(array_filter(array_map('intval', (array) ($j['pick'] ?? [])), static fn ($i) => isset($own[$i])));
+        } catch (\Throwable $e) {
+            $pick = [];
+        }
+        $byAi = $pick !== [];
+        if (!$byAi) {
+            // AI unavailable: the most-loved ones with words, which is the order they came in.
+            foreach ($own as $i => $o) {
+                if ($o['caption'] !== '' && count($pick) < 6) {
+                    $pick[] = $i;
+                }
+            }
+        }
+
+        return $this->json(['ok' => true, 'pick' => array_slice(array_unique($pick), 0, 8), 'by_ai' => $byAi]);
+    }
+
+    /**
+     * POST /sites/describe {picks, name} -- the first AI step: what was picked,
+     * summarised into the shop description the builder works from (owner,
+     * 2026-10-24: "enable auto-generated prompt with AI"). The member edits it.
+     */
+    public function describe()
+    {
+        $uid = $this->userId();
+        $in = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        $own = Members::isMember($uid) ? Members::photos($uid) : [];
+        $want = array_flip(array_filter((array) ($in['picks'] ?? []), 'is_string'));
+        $caps = [];
+        foreach ($own as $o) {
+            if (isset($want[$o['url']]) && $o['caption'] !== '') {
+                $caps[] = '- [' . $o['kind'] . '] ' . $o['caption'];
+            }
+        }
+        $name = mb_substr(trim((string) ($in['name'] ?? '')), 0, 60);
+        if ($caps === [] && $name === '') {
+            return $this->json(['ok' => false, 'error' => 'Pick a few photos or videos first.'], 422);
+        }
+        try {
+            $r = (new Ai(new Meter($this->db)))->chat('description', [
+                ['role' => 'system', 'content' => self::DESCRIBE_PROMPT],
+                ['role' => 'user', 'content' => 'Shop name: ' . ($name ?: '(not given)') . "\nThe seller's own posts:\n" . implode("\n", array_slice($caps, 0, 12))],
+            ], ['user_id' => $uid]);
+            $text = trim(preg_replace('/\s+/u', ' ', strip_tags($r['content'])));
+        } catch (\Throwable $e) {
+            return $this->json(['ok' => false, 'error' => 'SilverQueen AI is busy right now. Your own draft is still there; try again shortly.'], 503);
+        }
+
+        return $this->json(['ok' => $text !== '', 'text' => mb_substr($text, 0, 1200)]);
+    }
+
+    /** POST /sites/me/template {id} -- the same site, drawn in another of the twelve. Free: no AI. */
+    public function template()
+    {
+        $uid = $this->userId();
+        $in = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        $draft = $this->draft($uid);
+        if (!$draft) {
+            return $this->json(['ok' => false, 'error' => 'Build your site first.'], 422);
+        }
+        $id = Templates::get((string) ($in['id'] ?? ''))['id'];
+        $this->db->update('sites_previews', ['template' => $id], ['id' => $draft['id']]);
+        $n = (new Names($this->db))->of($uid);
+        $sub = (new Subscriptions($this->db))->current($uid);
+        $phase = Trial::phase($n, $sub);
+        $pub = $phase === 'live' ? (new Publisher($this->db))->publish($uid) : ($phase === 'trial' ? (new Publisher($this->db))->publishTrial($uid) : ['ok' => false]);
+
+        return $this->json(['ok' => true, 'template' => $id, 'name' => Templates::ALL[$id]['name'], 'republished' => !empty($pub['ok'])]);
+    }
+
+    private const SURPRISE_PROMPT = 'You help a SilverQueen member pick which of their own posts to show on their online shop. '
+        . 'Each line is: index [kind] caption. Choose up to 8 that most likely show a product, a service, their work, or their '
+        . 'business; skip greetings, memes, quotes and personal life. Answer ONLY with JSON: {"pick":[indexes]}.';
+
+    private const DESCRIBE_PROMPT = 'You write the shop description a site builder will work from, for a Filipino seller on '
+        . 'SilverQueen, using ONLY what their own posts say. In 60 to 110 words say: what they sell or offer, who it is for, '
+        . 'what makes it theirs, and the tone of the shop. Write in the language the posts mostly use. Never invent prices, '
+        . 'stock, awards, reviews or promises. Plain text, no lists, no headings.';
+
     /** The account's claimed preview, as its draft site. */
     private function draft(int $uid): ?array
     {
@@ -292,13 +409,14 @@ class SitesController extends \Core\Controller
         if (!$n || !$n['preview_id']) {
             return null;
         }
-        $p = $this->db->get('sites_previews', ['id', 'site', 'photos', 'status'], ['id' => (int) $n['preview_id'], 'user_id' => $uid]);
+        $p = $this->db->get('sites_previews', ['id', 'site', 'photos', 'status', 'template'], ['id' => (int) $n['preview_id'], 'user_id' => $uid]);
         if (!$p || $p['status'] !== 'ready') {
             return null;
         }
         $site = json_decode((string) $p['site'], true);
 
-        return is_array($site) ? ['id' => (int) $p['id'], 'site' => $site, 'photos' => json_decode((string) $p['photos'], true) ?: []] : null;
+        return is_array($site) ? ['id' => (int) $p['id'], 'site' => $site, 'photos' => json_decode((string) $p['photos'], true) ?: [],
+            'template' => Templates::get($p['template'] ?? null)['id']] : null;
     }
 
     // ---------------------------------------------------------------------
