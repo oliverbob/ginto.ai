@@ -109,6 +109,10 @@ final class Publisher
         $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
         $out = is_string($raw) ? json_decode($raw, true) : null;
+        // The production API wraps every answer: {"success":..., "data":{...}, "error":{...}}.
+        if (is_array($out) && array_key_exists('data', $out) && array_key_exists('success', $out)) {
+            $out = is_array($out['data']) ? $out['data'] : ['ok' => false, 'error' => (string) ($out['error']['message'] ?? 'The Sites host refused.')];
+        }
 
         return is_array($out) ? $out : ['ok' => false, 'error' => 'The Sites host did not answer (' . $status . ').'];
     }
