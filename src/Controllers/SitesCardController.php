@@ -133,6 +133,8 @@ class SitesCardController
             // Their own site, as the feed card shows it once they have one.
             'site'        => $n && $hasDraft && $phase !== 'none' ? (new \Ginto\Sites\Showcase($db))->of($n) : null,
             'founding'    => $sub && $sub['status'] === 'active' && !empty($sub['founding']),
+            'plan'        => $sub && $sub['status'] === 'active' ? (string) $sub['plan'] : null,
+            'complimentary' => Subscriptions::isComplimentary($sub),
         ];
     }
 
