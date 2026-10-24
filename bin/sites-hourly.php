@@ -20,6 +20,9 @@ $db = Ginto\Core\Database::getInstance();
 foreach ((new Ginto\Sites\Subscriptions($db))->confirmPending() as $live) {
     echo date('c'), " paid and live: {$live}", PHP_EOL;
 }
+foreach ((new Ginto\Sites\Subscriptions($db))->remindRenewals() as $n) {
+    echo date('c'), " renewal reminder: {$n}", PHP_EOL;
+}
 $r = (new Ginto\Sites\Trial($db))->tick();
 if ($r['ended'] !== [] || $r['released'] !== []) {
     echo date('c'), ' trial ended: ', implode(', ', $r['ended']) ?: '-', '; released: ', implode(', ', $r['released']) ?: '-', PHP_EOL;

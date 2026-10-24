@@ -222,6 +222,44 @@ final class Subscriptions
         return $out;
     }
 
+    /**
+     * Renewal reminders in the member's bell: three days before the month ends,
+     * the day before, and once it has ended (before the grace days run out).
+     * Complimentary plans are never reminded. @return list<string> names reminded
+     */
+    public function remindRenewals(): array
+    {
+        $out = [];
+        $now = time();
+        foreach ($this->db->select('sites_subscriptions', '*', ['status' => 'active', 'payment_ref[!]' => 'complimentary',
+            'period_end[<]' => date('Y-m-d H:i:s', $now + 3 * 86400)]) ?: [] as $s) {
+            $end = strtotime((string) $s['period_end']);
+            $sent = (int) $s['reminded'];
+            $plan = Config::plan((string) $s['plan']);
+            $price = '₱' . number_format((int) $s['price_php']);
+            $day = date('j F', $end);
+            $site = $s['name'] . '.silverqueen.pro';
+            $how = ' Open SilverQueen, tap Pages, then Site, to pay the next month by QR Ph.';
+            [$bit, $text] = match (true) {
+                $end <= $now && !($sent & 4) => [4, "{$site}'s month ended on {$day}. Pay {$price} within " . self::GRACE_DAYS
+                    . ' days to keep it up' . ($s['founding'] ? ' and keep your Founding price' : '') . '; after that the site comes down, but your work stays.' . $how],
+                $end > $now && $end - $now <= 86400 && !($sent & 2) => [2, "{$site} renews tomorrow ({$day}): {$price} for another month of " . ($plan['name'] ?? 'your plan') . '.' . $how],
+                $end > $now + 86400 && !($sent & 1) => [1, "{$site} renews on {$day}: {$price} for another month of " . ($plan['name'] ?? 'your plan') . '.' . $how],
+                default => [0, ''],
+            };
+            if ($bit === 0) {
+                continue;
+            }
+            // A reminder skipped because a later one is due counts as sent.
+            $this->db->update('sites_subscriptions', ['reminded' => $sent | $bit | ($bit === 4 ? 3 : ($bit === 2 ? 1 : 0))], ['id' => (int) $s['id']]);
+            Trial::remind((int) $s['user_id'], $text);
+            self::log("RENEWAL REMINDER {$bit} {$s['name']}");
+            $out[] = (string) $s['name'];
+        }
+
+        return $out;
+    }
+
     /** Daily: a month unpaid past its end plus the grace days lapses, and the site is taken down. */
     public function lapseDue(): array
     {
