@@ -212,23 +212,31 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
     desc.addEventListener('input', () => { $('count').textContent = desc.value.length.toLocaleString() + ' / 2,000'; });
 
     const sur = $('surprise');
-    if (sur) sur.addEventListener('click', async () => {
-      sur.disabled = true; tell('', 'SilverQueen AI is choosing…');
+    // SilverQueen AI picks the posts; used by Surprise me and, when nothing is picked
+    // yet, by the auto-generated prompt too (owner, 2026-10-24: pressing it before
+    // Surprise me "will look like a bug").
+    async function surpriseMe() {
+      if (sur) sur.disabled = true;
+      tell('', 'SilverQueen AI is choosing…');
       let r = {};
       try { r = await (await fetch('/sites/surprise', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf }, body: JSON.stringify({ csrf_token: csrf }) })).json(); } catch (e) {}
-      sur.disabled = false;
-      if (!r.ok) { tell('bad', r.error || 'Could not choose right now.'); return; }
+      if (sur) sur.disabled = false;
+      if (!r.ok) { tell('bad', r.error || 'Could not choose right now.'); return false; }
       picks.clear();
       document.querySelectorAll('#sugg button').forEach((b) => b.setAttribute('aria-pressed', 'false'));
       r.pick.forEach((i) => { const b = document.querySelector('#sugg button[data-i="' + i + '"]'); if (b && picks.size + files.length < 12) { b.setAttribute('aria-pressed', 'true'); picks.add(b.dataset.url); } });
       $('aiPicked').hidden = false;
       $('aiPicked').textContent = r.by_ai ? '✨ Chosen by SilverQueen AI · change any of them' : 'Your most-loved posts · change any of them';
       tell('', ''); draft();
-    });
+      return picks.size > 0;
+    }
+    if (sur) sur.addEventListener('click', () => { surpriseMe(); });
     const aid = $('aiDesc');
     if (aid) aid.addEventListener('click', async () => {
-      if (!picks.size) { tell('bad', 'Pick a few photos or videos first, or press Surprise me.'); return; }
-      aid.disabled = true; tell('', 'SilverQueen AI is writing about your shop…');
+      aid.disabled = true;
+      // Nothing picked yet: SilverQueen AI picks first, then writes.
+      if (!picks.size && !(await surpriseMe())) { aid.disabled = false; return; }
+      tell('', 'SilverQueen AI is writing about your shop…');
       let r = {};
       try { r = await (await fetch('/sites/describe', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
         body: JSON.stringify({ csrf_token: csrf, picks: [...picks], name: <?= json_encode(!empty($held) ? (string) $held['name'] : '') ?> }) })).json(); } catch (e) {}
