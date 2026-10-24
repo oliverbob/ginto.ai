@@ -118,6 +118,7 @@ final class Members
             'kind'    => in_array($p['kind'] ?? 'photo', ['photo', 'video', 'youtube'], true) ? $p['kind'] : 'photo',
             'video'   => $https($p['video'] ?? null),
             'caption' => mb_substr(trim((string) ($p['caption'] ?? '')), 0, 220),
+            'post'    => isset($p['post']) ? (int) $p['post'] : null,
         ] : null, $list)));
     }
 

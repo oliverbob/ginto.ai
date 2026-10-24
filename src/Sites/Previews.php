@@ -31,7 +31,7 @@ final class Previews
     /** How often one day's free preview may be rebuilt in place. */
     public const REBUILDS_A_DAY = 5;
 
-    public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt, array $media = [], ?string $template = null): array
+    public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt, array $media = [], ?string $template = null, array $posts = []): array
     {
         $description = trim($description);
         if (mb_strlen($description) < self::MIN_DESCRIPTION) {
@@ -68,7 +68,7 @@ final class Previews
                     $this->db->update('sites_previews', [
                         'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
                         'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
-                        'rebuilds[+]' => 1, 'user_id' => $userId ?: null,
+                        'rebuilds[+]' => 1, 'user_id' => $userId ?: null, 'posts' => $posts ? json_encode(array_values($posts)) : null,
                         'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
                     ], ['id' => (int) $own['id']]);
 
@@ -85,6 +85,7 @@ final class Previews
             'token' => $token, 'user_id' => $userId, 'device_hash' => $device, 'ip_hash' => $ipHash,
             'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
             'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
+            'posts' => $posts ? json_encode(array_values($posts)) : null,
             'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
         ]);
 

@@ -115,6 +115,14 @@ final class Publisher
     }
 
     /** Signed the way the production server checks every relay (its RelaySignature): HMAC of "ts.body" with SQ_RELAY_SECRET. */
+    /** Visits per site per day, as the Sites server counts them: {name: {date: [views, visitors]}}. */
+    public function stats(): array
+    {
+        $r = $this->call('stats', []);
+
+        return is_array($r['days'] ?? null) ? $r['days'] : [];
+    }
+
     private function call(string $action, array $data): array
     {
         $secret = (string) (Env::get('SQ_RELAY_SECRET', '') ?? '');

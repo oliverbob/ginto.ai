@@ -23,6 +23,10 @@ foreach ((new Ginto\Sites\Subscriptions($db))->confirmPending() as $live) {
 foreach ((new Ginto\Sites\Subscriptions($db))->remindRenewals() as $n) {
     echo date('c'), " renewal reminder: {$n}", PHP_EOL;
 }
+// Visits to sites, counted as views of the posts they show.
+foreach ((new Ginto\Sites\Insights($db))->creditVisits() as $n => $views) {
+    echo date('c'), " visits credited: {$n} +{$views}", PHP_EOL;
+}
 $r = (new Ginto\Sites\Trial($db))->tick();
 if ($r['ended'] !== [] || $r['released'] !== []) {
     echo date('c'), ' trial ended: ', implode(', ', $r['ended']) ?: '-', '; released: ', implode(', ', $r['released']) ?: '-', PHP_EOL;

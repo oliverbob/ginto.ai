@@ -166,6 +166,9 @@ class SitesController extends \Core\Controller
         $picked = array_values(array_intersect($picked, array_column($own, 'url')));
         // Which picks are videos: their place in the site -> the video to play.
         $videoOf = array_column(array_filter($own, static fn ($o) => !empty($o['video'])), 'video', 'url');
+        // And which post each pick is, so visits to the site count as its views; uploads have none.
+        $postOf = array_column(array_filter($own, static fn ($o) => !empty($o['post'])), 'post', 'url');
+        $posts = array_merge(array_map(static fn ($u) => $postOf[$u] ?? null, $picked), array_fill(0, count($files), null));
         $media = [];
         foreach ($picked as $i => $u) {
             if (isset($videoOf[$u])) {
@@ -179,7 +182,7 @@ class SitesController extends \Core\Controller
             $photos = new Photos($this->db);
             $shas = array_merge(array_map(static fn ($u) => $photos->ingestUrl($u), $picked), array_map(static fn ($f) => $photos->ingest($f), $files));
             $p = (new Previews($this->db))->create((string) ($_POST['description'] ?? ''), $shas, $this->deviceId(), $this->clientIp(),
-                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember() || $this->stillBuilding(), $media, (string) ($_POST['template'] ?? ''));
+                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember() || $this->stillBuilding(), $media, (string) ($_POST['template'] ?? ''), $posts);
         } catch (LimitReached | \InvalidArgumentException $e) {
             return $this->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
