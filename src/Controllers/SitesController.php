@@ -283,6 +283,7 @@ class SitesController extends \Core\Controller
         }
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'owner' => $this->canSimulate(), 'simulated' => $sim,
+            'test_php' => Config::testPrice(Members::identity($uid)),
             'phase' => Trial::phase($name, $sub),
             'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,
             'just_paid' => isset($_GET['paid']),

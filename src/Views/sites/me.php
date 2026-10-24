@@ -170,6 +170,7 @@ if (($phase ?? '') === 'trial'): ?>
       <?php elseif ($credits['warn']): ?><p class="say bad">You have used <?= $pct ?>% of this month's AI credits.</p><?php endif; ?>
     </div>
     <?php endif; ?>
+    <?php if (!empty($test_php)): ?><div class="act"><button class="btn gold" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/>') ?> Test a real payment: ₱<?= (int) $test_php ?> by QR Ph</button><span class="say">Only you see this. The real road at a small amount.</span></div><?php endif; ?>
     <?php if (!$comp): ?><div class="act"><button class="btn ghost" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>') ?> Pay next month now</button></div><?php endif; ?>
   <?php else: ?>
     <h2 class="serif">2 · Choose your plan and go live</h2>

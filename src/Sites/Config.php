@@ -124,6 +124,19 @@ final class Config
         return (float) self::env('SITES_PREVIEW_BUDGET_PHP', '1000');
     }
 
+    /**
+     * The owner's live payment test (owner, 2026-10-24: "retest mine with a ₱25
+     * purchase, then let's make it live with the right amount"): while
+     * SITES_TEST_PHP is set, the owner (identity 10) pays that amount by real QR
+     * Ph, never a Founding slot. Unset, and everybody pays the real price.
+     */
+    public static function testPrice(?int $identity): ?int
+    {
+        $php = (int) self::env('SITES_TEST_PHP', '0');
+
+        return $identity === 10 && $php > 0 ? $php : null;
+    }
+
     public static function foundingCap(): int
     {
         return max(1, (int) self::env('SITES_FOUNDING_CAP', '20'));

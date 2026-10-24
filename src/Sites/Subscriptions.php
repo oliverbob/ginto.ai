@@ -36,7 +36,7 @@ final class Subscriptions
     {
         $identity = Members::identity($userId);
         $plan = $identity !== null ? (Config::COMPLIMENTARY[$identity] ?? null) : null;
-        if ($plan === null) {
+        if ($plan === null || Config::testPrice($identity) !== null) {
             return null;
         }
         $cur = $this->current($userId);
@@ -82,7 +82,8 @@ final class Subscriptions
         if ($plan === null) {
             return ['ok' => false, 'error' => 'Choose Silver, Gold or Crown.'];
         }
-        if ($this->complimentary($userId)) {
+        $test = Config::testPrice(Members::identity($userId));
+        if ($test === null && $this->complimentary($userId)) {
             return ['ok' => true, 'paid' => true, 'qr_image' => '', 'amount' => 0, 'founding' => false];
         }
         $name = (new Names($this->db))->of($userId);
@@ -98,6 +99,10 @@ final class Subscriptions
         $renewing = $last && $last['status'] === 'active';
         $founding = $renewing ? (bool) $last['founding'] : $this->foundingTaken() < Config::foundingCap();
         $price = $renewing && $last['plan'] === $planId && $last['founding'] ? (int) $last['price_php'] : (int) $plan['php'];
+        if ($test !== null) {
+            // The owner's live test: the real road at a small amount, never a Founding slot.
+            [$price, $founding] = [$test, false];
+        }
 
         $handler = new \Ginto\Handlers\PayMongoHandler();
 
@@ -177,7 +182,8 @@ final class Subscriptions
 
         // Paid. A renewal extends from the end of the paid month; a new one starts now.
         $prev  = $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => 'active', 'ORDER' => ['id' => 'DESC']]);
-        $start = $prev && strtotime((string) $prev['period_end']) > time() ? (string) $prev['period_end'] : date('Y-m-d H:i:s');
+        // A complimentary plan never pushes a paid month into its own far-off end.
+        $start = $prev && !self::isComplimentary($prev) && strtotime((string) $prev['period_end']) > time() ? (string) $prev['period_end'] : date('Y-m-d H:i:s');
         if ($prev) {
             $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['id' => (int) $prev['id']]);
         }
