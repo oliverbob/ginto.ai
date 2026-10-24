@@ -98,8 +98,13 @@ if (($phase ?? '') === 'trial'): ?>
 
 <?php if (!$name || !$draft): ?>
 <section class="sec">
+  <?php if ($name): ?>
+  <h2 class="serif">Build <?= $e($name['name']) ?>.silverqueen.pro</h2>
+  <p class="muted">The name is yours. Pick your photos and tell SilverQueen AI about your shop: your site is built in about a minute and comes back here for your review.</p>
+  <?php else: ?>
   <h2 class="serif">Start with a free preview</h2>
   <p class="muted">Upload your product photos and tell SilverQueen AI about your shop. When you like it, claim your name and come back here.</p>
+  <?php endif; ?>
   <a class="btn gold" href="/sites/start"><?= $icon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>') ?> Start it now</a>
 </section>
 <?php else: ?>

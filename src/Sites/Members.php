@@ -121,6 +121,41 @@ final class Members
         ] : null, $list)));
     }
 
+    /**
+     * The member's Page and Store as their site shows them (comchain's signed
+     * sites-page): their public profile and their real Mall shop. Empty when
+     * they are not a member or comchain does not answer; the site then simply
+     * goes without those two sections.
+     *
+     * @return array{profile?:array, shop?:?array}
+     */
+    public static function page(int $uid): array
+    {
+        $identity = self::identity($uid);
+        $secret = (string) (Env::get('SITES_CARD_SECRET', '') ?? '');
+        if ($identity === null || $secret === '') {
+            return [];
+        }
+        $body = (string) json_encode(['identity' => $identity]);
+        $ts = (string) time();
+        $ch = curl_init('https://comchain.silverqueen.pro/api/v1/internal/sites-page');
+        curl_setopt_array($ch, [
+            CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+            CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'X-SQ-Timestamp: ' . $ts,
+                'X-SQ-Signature: ' . hash_hmac('sha256', $ts . '.' . $body, $secret)],
+            CURLOPT_POSTFIELDS => $body,
+        ]);
+        $raw = curl_exec($ch);
+        curl_close($ch);
+        $out = is_string($raw) ? json_decode($raw, true) : null;
+        $out = is_array($out) && isset($out['data']) ? $out['data'] : $out;
+        if (!is_array($out) || empty($out['ok'])) {
+            return [];
+        }
+
+        return ['profile' => is_array($out['profile'] ?? null) ? $out['profile'] : null, 'shop' => is_array($out['shop'] ?? null) ? $out['shop'] : null];
+    }
+
     private static function key(): string
     {
         $k = (string) (Env::get('APP_KEY', '') ?? '');
