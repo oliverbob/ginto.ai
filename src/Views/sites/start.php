@@ -47,7 +47,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 <section class="hero">
   <h1>Your own Page. Your own Site. <span class="gold-text">Your own Store.</span></h1>
   <p>Upload your product photos. SilverQueen AI recognizes your products, writes your descriptions, matches your colors, and builds your site.</p>
-  <div class="steps"><span><b>1</b> Upload photos</span><span><b>2</b> Tell us your shop</span><span><b>3</b> Preview free</span><span><b>4</b> Claim your name</span></div>
+  <?php if (empty($held)): ?><div class="steps"><span><b>1</b> Upload photos</span><span><b>2</b> Tell us your shop</span><span><b>3</b> Preview free</span><span><b>4</b> Claim your name</span></div><?php endif; ?>
 </section>
 
 <?php if (!empty($held)): $pl = $plan ? \Ginto\Sites\Config::plan($plan) : null; ?>
