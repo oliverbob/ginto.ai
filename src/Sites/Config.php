@@ -7,7 +7,7 @@ namespace Ginto\Sites;
 use Ginto\Support\Env;
 
 /**
- * Everything SilverQueen Sites decides by number, in one place.
+ * Everything SilverQueen Premium decides by number, in one place.
  *
  * No feature names a model, a price or a limit: it asks here. Models and the
  * money ceilings can be moved from .env (SITES_*), everything else is the

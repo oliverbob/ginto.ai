@@ -1,6 +1,6 @@
 <?php
 /*
- * The SilverQueen Sites frame: head, header, and the terms footer every Sites
+ * The SilverQueen Premium frame: head, header, and the terms footer every Sites
  * page carries. Usage: $frame = 'open' (before the page) / 'close' (after).
  * The footer is the owner's terms in brief (2026-10-24), naming the company
  * only as the one that MANAGES SilverQueen.
@@ -12,7 +12,7 @@ if (($frame ?? 'open') === 'open'): ?>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title><?= $e($title ?? 'SilverQueen Sites') ?></title>
+<title><?= $e($title ?? 'SilverQueen Premium') ?></title>
 <meta name="description" content="Your own Page. Your own Site. Your own Store. All on SilverQueen.">
 <meta name="theme-color" content="#0b0e14">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -51,7 +51,7 @@ svg.i{width:18px;height:18px;flex:none}
 <body>
 <div class="wrap">
 <header class="top">
-  <a class="logo" href="/sites"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7z"/></svg> SilverQueen Sites</a>
+  <a class="logo" href="/sites"><svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 7l4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7z"/></svg> SilverQueen Premium</a>
   <nav>
     <a href="/sites" <?= ($nav ?? '') === 'dir' ? 'aria-current="page"' : '' ?>>Directory</a>
     <a href="/sites/plans" <?= ($nav ?? '') === 'plans' ? 'aria-current="page"' : '' ?>>Plans</a>
@@ -61,7 +61,7 @@ svg.i{width:18px;height:18px;flex:none}
 </header>
 <?php else: ?>
 <footer class="terms">
-  <p>SilverQueen is managed by Ginto Services Corporation (SEC Reg. No. 2026040246055-25). SilverQueen Pages, Sites and Stores are
+  <p>SilverQueen is managed by Ginto Services Corporation (SEC Reg. No. 2026040246055-25). SilverQueen Premium are
      monthly hosting and builder services. Plans are services, not investments. They grant no ownership of any server or company
      asset and no right to profits or returns. Plans are non-transferable. Cancel anytime; the Founding price ends if the
      subscription lapses. <a href="https://silverqueen.pro/terms">Terms</a></p>

@@ -27,7 +27,7 @@ final class ApiKeys
             'prefix' => 'gsk_',
             'models' => 'https://api.groq.com/openai/v1/models',
             'site'   => 'https://console.groq.com/keys',
-            'uses'   => 'SilverQueen Sites AI (photo recognition, site builder, captions, customer chat), Live chat, speech to text',
+            'uses'   => 'SilverQueen Premium AI (photo recognition, site builder, captions, customer chat), Live chat, speech to text',
         ],
         'cerebras' => [
             'label'  => 'Cerebras',

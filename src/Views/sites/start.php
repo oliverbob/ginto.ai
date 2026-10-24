@@ -140,7 +140,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 <?php else: ?>
 <section class="card builder soon">
   <h2 class="serif" style="font-size:28px">Opening soon</h2>
-  <p class="muted">SilverQueen Sites is getting ready for its Founding Members. See the plans while you wait.</p>
+  <p class="muted">SilverQueen Premium is getting ready for its Founding Members. See the plans while you wait.</p>
   <a class="btn gold" href="/sites/plans">See the plans</a>
 </section>
 <?php endif; ?>

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * SilverQueen Sites, once a day: a month unpaid past its end (plus the grace
+ * SilverQueen Premium, once a day: a month unpaid past its end (plus the grace
  * days) lapses, its site is taken down and its Founding price is gone; QR codes
  * nobody paid in a day are dropped. Cron: /etc/cron.d/ginto-sites-daily.
  */

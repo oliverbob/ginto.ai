@@ -60,7 +60,7 @@ final class Subscriptions
         $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending']);
 
         $handler = new \Ginto\Handlers\PayMongoHandler();
-        $r = $handler->initQrph($price, $email, $displayName ?: 'SilverQueen member', '', 'SilverQueen Sites ' . $plan['name'] . ' — ' . $name['name']);
+        $r = $handler->initQrph($price, $email, $displayName ?: 'SilverQueen member', '', 'SilverQueen Premium ' . $plan['name'] . ' — ' . $name['name']);
         if (empty($r['success'])) {
             return ['ok' => false, 'error' => (string) ($r['message'] ?? 'The QR code could not be made. Try again.')];
         }

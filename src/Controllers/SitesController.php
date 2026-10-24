@@ -18,7 +18,7 @@ use Ginto\Sites\Previews;
 use Ginto\Sites\Renderer;
 
 /**
- * SilverQueen Pages, Sites and Stores -- the public side (owner, 2026-10-24).
+ * SilverQueen Premium -- the public side (owner, 2026-10-24).
  *
  *   /sites               the Directory and the founding slots (also sites.silverqueen.pro)
  *   /sites/plans         Silver, Gold, Crown, and the terms in brief
@@ -43,7 +43,7 @@ class SitesController extends \Core\Controller
 
     public function directory()
     {
-        $this->page('sites/directory', ['title' => 'SilverQueen Sites Directory'] + $this->founding() + [
+        $this->page('sites/directory', ['title' => 'SilverQueen Premium Directory'] + $this->founding() + [
             'sites' => $this->db->select('sites_names', ['name', 'updated_at'], ['status' => 'active', 'ORDER' => ['updated_at' => 'DESC'], 'LIMIT' => 200]) ?: [],
         ]);
     }
@@ -55,7 +55,7 @@ class SitesController extends \Core\Controller
         $uid = $this->userId();
         $n = $uid ? (new Names($this->db))->of($uid) : null;
         $next = $n && Trial::phase($n, (new Subscriptions($this->db))->current($uid)) !== 'none' && $n['preview_id'] ? '/sites/me' : '/sites/start';
-        $this->page('sites/plans', ['title' => 'Plans · SilverQueen Sites', 'next' => $next] + $this->founding());
+        $this->page('sites/plans', ['title' => 'Plans · SilverQueen Premium', 'next' => $next] + $this->founding());
     }
 
     public function start()
@@ -64,7 +64,7 @@ class SitesController extends \Core\Controller
         $uid = $this->userId();
         $n = $uid ? (new Names($this->db))->of($uid) : null;
         $held = $n && Trial::phase($n, (new Subscriptions($this->db))->current($uid)) !== 'none' ? $n : null;
-        $this->page('sites/start', ['title' => 'Start it now · SilverQueen Sites', 'open' => $this->canBuild(),
+        $this->page('sites/start', ['title' => 'Start it now · SilverQueen Premium', 'open' => $this->canBuild(),
             'held' => $held, 'suggest' => $uid && Members::isMember($uid) ? Members::photos($uid) : [], 'plan' => Config::plan((string) ($_SESSION['sites_plan'] ?? '')) ? (string) $_SESSION['sites_plan'] : null,
             'csrf_token' => generateCsrfToken(true)] + $this->founding());
     }
@@ -94,7 +94,7 @@ class SitesController extends \Core\Controller
             return $this->json(['ok' => false, 'error' => 'This page has expired. Reload it and try again.'], 419);
         }
         if (!$this->canBuild()) {
-            return $this->json(['ok' => false, 'error' => 'SilverQueen Sites opens soon.'], 403);
+            return $this->json(['ok' => false, 'error' => 'SilverQueen Premium opens soon.'], 403);
         }
         $held = $this->userId() ? (new Names($this->db))->of($this->userId()) : null;
         if (!Trial::canAdd($held, $this->userId() ? (new Subscriptions($this->db))->current($this->userId()) : null)) {
@@ -213,7 +213,7 @@ class SitesController extends \Core\Controller
         $name  = (new Names($this->db))->of($uid);
         $draft = $this->draft($uid);
         $sub   = (new Subscriptions($this->db))->current($uid);
-        $this->page('sites/me', ['title' => 'My Site · SilverQueen Sites', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
+        $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'phase' => Trial::phase($name, $sub),
             'plan_pick' => (string) ($_SESSION['sites_plan'] ?? ''),
             'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
@@ -270,7 +270,7 @@ class SitesController extends \Core\Controller
             return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
         }
         if (!Config::isPublic() && !$this->isAdmin()) {
-            return $this->json(['ok' => false, 'error' => 'SilverQueen Sites opens soon.'], 403);
+            return $this->json(['ok' => false, 'error' => 'SilverQueen Premium opens soon.'], 403);
         }
         $draft = $this->draft($uid);
         if (!$draft || empty($draft['site']['reviewed_at'])) {

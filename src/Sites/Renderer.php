@@ -221,7 +221,7 @@ final class Renderer
             . ($highs !== '' ? '<section class="hls-wrap"><div class="hls">' . $highs . '</div></section>' : '')
             . '<section class="close" id="contact"><h2>' . $e($plan['closing']['headline'] ?: 'Thank you for visiting') . '</h2>'
             . '<a class="btn" href="' . $e($contact) . '"' . $ext . '>' . $e($plan['closing']['cta']) . '</a></section>'
-            . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Sites'
+            . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Premium'
             . (!empty($opts['founding']) ? ' &middot; <span class="fb">&#127941; Founding Member</span>' : '') . '</footer>'
             . '</body></html>';
     }

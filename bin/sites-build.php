@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * Builds one SilverQueen Sites free preview, in the background.
+ * Builds one SilverQueen Premium free preview, in the background.
  * Started by Ginto\Sites\Previews::spawn; safe to run by hand: php bin/sites-build.php <preview id>
  */
 

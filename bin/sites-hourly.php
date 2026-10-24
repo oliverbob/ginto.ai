@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /*
- * SilverQueen Sites, every hour: free trials that ended come down (one reminder
+ * SilverQueen Premium, every hour: free trials that ended come down (one reminder
  * to the member's bell), held names nobody paid for in 24 more hours are
  * released (their work stays). Cron: /etc/cron.d/ginto-sites-hourly.
  */

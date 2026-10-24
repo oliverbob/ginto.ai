@@ -1387,7 +1387,7 @@ $router->post('/api/internal/sites-card', 'SitesCardController@handle');
 // The SilverQueen /superadmin API Keys page reaches this host's keys here (signed; no session).
 $router->post('/api/internal/api-keys', 'ApiKeysRelayController@handle');
 
-// SilverQueen Pages, Sites and Stores (owner, 2026-10-24). See src/Sites/.
+// SilverQueen Premium (owner, 2026-10-24). See src/Sites/.
 $router->get('/sites', 'SitesController@directory');
 $router->get('/sites/plans', 'SitesController@plans');
 $router->get('/sites/start', 'SitesController@start');
