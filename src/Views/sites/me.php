@@ -77,7 +77,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 <?php endif; ?>
 <?php if (!empty($just_paid) && ($phase ?? '') === 'live'): ?>
 <section class="card sec" style="border-color:var(--ok)"><b>🎉 Paid. <?= $e($name['name']) ?>.silverqueen.pro is live.</b>
-  <p class="muted" style="margin:6px 0 0">Thank you<?= !empty($sub['founding']) ? ', Founding Member' : '' ?>. Your price is locked for as long as you stay.</p></section>
+  <p class="muted" style="margin:6px 0 0"><?= !empty($sub['founding']) ? 'Thank you, Founding Member. Your price is locked for as long as you stay.' : 'Thank you. Your plan renews monthly; pay any time before it ends.' ?></p></section>
 <?php endif; ?>
 <?php
 $clock = static function ($until): string {
