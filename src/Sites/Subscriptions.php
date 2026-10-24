@@ -67,9 +67,11 @@ final class Subscriptions
             if (!empty($st['success']) && ($st['status'] ?? '') === 'succeeded') {
                 return ['ok' => true, 'sub_id' => (int) $open['id'], 'paid' => true, 'qr_image' => '', 'amount' => $price, 'founding' => (bool) $open['founding']];
             }
-            if (!empty($st['success']) && !empty($st['qr_image'])) {
+            $exp = strtotime((string) ($st['qr_expires_at'] ?? '')) ?: time() + 1800;
+            if (!empty($st['success']) && !empty($st['qr_image']) && $exp > time() + 120) {
                 return ['ok' => true, 'sub_id' => (int) $open['id'], 'qr_image' => (string) $st['qr_image'],
-                    'qr_string' => (string) ($st['qr_string'] ?? ''), 'amount' => $price, 'founding' => (bool) $open['founding']];
+                    'qr_string' => (string) ($st['qr_string'] ?? ''), 'amount' => $price, 'founding' => (bool) $open['founding'],
+                    'expires_at' => (string) ($st['qr_expires_at'] ?? '')];
             }
         }
 
@@ -86,7 +88,8 @@ final class Subscriptions
         ]);
 
         return ['ok' => true, 'sub_id' => (int) $this->db->id(), 'qr_image' => (string) $r['qr_image'],
-            'qr_string' => (string) ($r['qr_string'] ?? ''), 'amount' => $price, 'founding' => $founding];
+            'qr_string' => (string) ($r['qr_string'] ?? ''), 'amount' => $price, 'founding' => $founding,
+            'expires_at' => (string) ($r['qr_expires_at'] ?? '')];
     }
 
     /**
@@ -102,6 +105,7 @@ final class Subscriptions
         $handler = new \Ginto\Handlers\PayMongoHandler();
         $sub = null;
         $waiting = false;
+        $open = null; // the newest pending code: its expiry, and whether it can still be scanned
         foreach ($candidates as $c) {
             if (empty($c['payment_ref'])) {
                 continue;
@@ -112,11 +116,18 @@ final class Subscriptions
                 break;
             }
             $waiting = $waiting || $c['status'] === 'pending';
+            if ($open === null && $c['status'] === 'pending') {
+                $open = ['sub_id' => (int) $c['id'], 'expires_at' => (string) ($st['qr_expires_at'] ?? ''),
+                    'expired' => !empty($st['success']) && (empty($st['qr_image'])
+                        || (($t = strtotime((string) ($st['qr_expires_at'] ?? ''))) && $t < time()))];
+            }
         }
         if (!$sub) {
             $active = $this->current($userId);
 
-            return ['status' => $active && $active['status'] === 'active' ? 'active' : ($waiting ? 'waiting' : 'none')];
+            $status = $active && $active['status'] === 'active' ? 'active' : ($waiting ? 'waiting' : 'none');
+
+            return ['status' => $status] + ($status === 'waiting' && $open ? $open : []);
         }
         // A paid code that was replaced: the replacement is moot.
         $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending', 'id[!]' => (int) $sub['id']]);

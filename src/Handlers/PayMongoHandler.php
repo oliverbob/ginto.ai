@@ -329,6 +329,7 @@ class PayMongoHandler
         // Extract QR code from next_action
         $qrImage  = '';
         $qrString = '';
+        $qrExpires = '';
         $nextAction = $attrs['next_action'] ?? [];
         $nextType   = $nextAction['type'] ?? '';
 
@@ -337,6 +338,7 @@ class PayMongoHandler
             $code     = $nextAction['code'] ?? [];
             $qrImage  = $code['image_url'] ?? '';   // base64 data URI
             $qrString = $code['id']        ?? '';   // QR code identifier
+            $qrExpires = $code['expires_at'] ?? ''; // a QR Ph code lives 30 minutes
         } elseif ($nextType === 'display_qr_code') {
             // Legacy path (kept for compatibility)
             $displayDetails = $nextAction['display_details'] ?? [];
@@ -348,6 +350,7 @@ class PayMongoHandler
             'success'   => true,
             'status'    => $status,
             'qr_image'  => $qrImage,
+            'qr_expires_at' => $qrExpires,
             'qr_string' => $qrString,
             'next_action' => $nextAction,
             'pi_id'     => $response['data']['id'] ?? $piId,
@@ -389,6 +392,7 @@ class PayMongoHandler
          */
         $qrImage    = '';
         $qrString   = '';
+        $qrExpires  = '';
         $nextAction = $attrs['next_action'] ?? [];
         $nextType   = $nextAction['type'] ?? '';
 
@@ -396,6 +400,7 @@ class PayMongoHandler
             $code     = $nextAction['code'] ?? [];
             $qrImage  = $code['image_url'] ?? '';
             $qrString = $code['id']        ?? '';
+            $qrExpires = $code['expires_at'] ?? '';
         } elseif ($nextType === 'display_qr_code') {
             $displayDetails = $nextAction['display_details'] ?? [];
             $qrImage  = $displayDetails['qr_image']  ?? '';
@@ -415,6 +420,7 @@ class PayMongoHandler
             'payments'   => $payments,
             'qr_image'   => $qrImage,
             'qr_string'  => $qrString,
+            'qr_expires_at' => $qrExpires,
         ];
     }
 
@@ -512,6 +518,7 @@ class PayMongoHandler
             'pm_id'     => $pmId,
             'qr_image'  => $attachResult['qr_image'],
             'qr_string' => $attachResult['qr_string'],
+            'qr_expires_at' => $attachResult['qr_expires_at'] ?? '',
             'status'    => $attachResult['status'],
         ];
     }

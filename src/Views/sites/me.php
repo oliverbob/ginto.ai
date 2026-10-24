@@ -47,6 +47,17 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .btn .spin{width:16px;height:16px;border-width:2px}@keyframes spn{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
 .qr img{width:240px;max-width:100%;aspect-ratio:1;background:#fff;border-radius:12px;padding:8px}
+.qact{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:14px}
+.qleft{margin:4px 0 0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}.qleft b{color:var(--gold-fg)}
+.qnote{margin:12px auto 0;max-width:420px;font-size:13px;color:var(--muted)}
+.steps{list-style:none;display:flex;margin:6px 0 16px;padding:0;font-size:12.5px;color:var(--muted)}
+.steps li{flex:1;display:grid;justify-items:center;gap:8px;position:relative}
+.steps li::before{content:'';position:relative;z-index:1;width:22px;height:22px;box-sizing:border-box;border-radius:50%;border:2px solid var(--line);background:var(--bg);display:grid;place-items:center;font-size:12px;font-weight:800}
+.steps li+li::after{content:'';position:absolute;top:10px;right:50%;width:100%;height:2px;background:var(--line)}
+.steps li.done{color:var(--fg)}.steps li.done::before{content:'✓';border-color:var(--gold);background:var(--gold);color:var(--gold-ink)}
+.steps li.done+li::after,.steps li.done+li.done::after{background:var(--gold)}
+.steps li.now{color:var(--fg);font-weight:700}.steps li.now::before{border-color:var(--line);border-top-color:var(--gold);animation:spn .8s linear infinite}
+.qbig{margin:0;font-size:17px;font-weight:700}
 .cr{display:flex;justify-content:space-between;font-weight:700;margin-bottom:8px}
 @media (max-width:760px){.row2,.plans3{grid-template-columns:1fr}.plans3{gap:8px}.pc{padding:12px 14px}.pc b{display:inline;font-size:16px}.pc .pr{display:inline;font-size:18px;margin:0 0 0 8px}.pc .pr small{font-size:12px}.pc ul{display:flex;flex-wrap:wrap;gap:2px 12px;margin:6px 0 0;font-size:12.5px}.prod{grid-template-columns:1fr;gap:12px}.prod img{aspect-ratio:16/10}}
 </style>
@@ -165,14 +176,38 @@ if (($phase ?? '') === 'trial'): ?>
       <span class="say" id="paySay" aria-live="polite"><?= $reviewed ? '' : 'Review your site first.' ?></span>
     </div>
   <?php endif; ?>
-  <div class="qr<?= !empty($pending) ? ' on' : '' ?>" id="qr" data-waiting="<?= !empty($pending) ? '1' : '' ?>">
-    <p style="margin:0 0 10px;font-weight:700">Scan with GCash, Maya or your bank app</p>
-    <div class="qrwait" id="qrWait"><span class="spin" aria-hidden="true"></span><span id="qrWaitWord"><?= !empty($pending) ? 'Loading your QR code…' : 'Making your QR code…' ?></span></div>
-    <img id="qrImg" alt="QR Ph code" hidden>
-    <div style="margin-top:12px"><a class="btn ghost" id="qrDown" href="/sites/me/qr.png?download=1" download<?= empty($pending) ? ' hidden' : '' ?>><?= $icon('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>') ?> Download QR</a></div>
-    <p style="margin:10px 0 0;font-size:22px;font-weight:800" id="qrAmt"><?= !empty($pending) ? '₱' . number_format((int) $pending['price_php']) . ($pending['founding'] ? ' · 🏅 Founding Member' : '') : '' ?></p>
-    <p class="muted" style="margin:6px 0 0;font-size:13px">Pay it any time: we notice by ourselves and bring you to your live site.</p>
-    <p class="say" id="qrSay" aria-live="polite">Waiting for your payment…</p>
+  <div class="qr<?= !empty($pending) ? ' on' : '' ?>" id="qr" data-waiting="<?= !empty($pending) ? '1' : '' ?>" data-sub="<?= !empty($pending) ? (int) $pending['id'] : '' ?>" data-plan="<?= !empty($pending) ? $e($pending['plan']) : '' ?>">
+    <div id="qrCode">
+      <p class="qbig" style="margin-bottom:10px">Scan with GCash, Maya or your bank app</p>
+      <div class="qrwait" id="qrWait"><span class="spin" aria-hidden="true"></span><span id="qrWaitWord"><?= !empty($pending) ? 'Loading your QR code…' : 'Making your QR code…' ?></span></div>
+      <img id="qrImg" alt="QR Ph code" hidden>
+      <p style="margin:10px 0 0;font-size:22px;font-weight:800" id="qrAmt"><?= !empty($pending) ? '₱' . number_format((int) $pending['price_php']) . ($pending['founding'] ? ' · 🏅 Founding Member' : '') : '' ?></p>
+      <p class="qleft" id="qrLeft" aria-live="off"></p>
+      <div class="qact">
+        <button class="btn gold" id="qrPaid" type="button"><?= $icon('<path d="M20 6 9 17l-5-5"/>') ?> I have paid</button>
+        <a class="btn ghost" id="qrDown" href="/sites/me/qr.png?download=1" download<?= empty($pending) ? ' hidden' : '' ?>><?= $icon('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>') ?> Download QR</a>
+      </div>
+      <p class="qnote">Pay before the code expires. When it goes through, your site goes live by itself, even if you close this page.</p>
+      <p class="say" id="qrSay" aria-live="polite"></p>
+    </div>
+    <div id="qrCheck" hidden>
+      <ol class="steps"><li class="done">You paid</li><li class="now">Your bank confirms</li><li>Your site goes live</li></ol>
+      <p class="qbig" id="ckSay" aria-live="polite">Confirming your payment…</p>
+      <p class="qleft" id="ckTime">Usually under a minute.</p>
+      <div class="qact" id="ckMore" hidden>
+        <button class="btn gold" id="ckWait" type="button"><?= $icon('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>') ?> Keep waiting</button>
+        <button class="btn ghost" id="ckBack" type="button"><?= $icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/>') ?> Show the code again</button>
+      </div>
+      <p class="qnote">Your payment is never lost: when it arrives, your site goes live by itself, even if you close this page.</p>
+    </div>
+    <div id="qrGone" hidden>
+      <p class="qbig">This code expired<span id="goneAt"></span>.</p>
+      <p class="qnote" style="margin-top:6px">Not paid yet? Make a new one, at the same price.</p>
+      <div class="qact">
+        <button class="btn gold" id="qrNew" type="button"><?= $icon('<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>') ?> Make a new code</button>
+        <button class="btn ghost" id="qrPaidLate" type="button"><?= $icon('<path d="M20 6 9 17l-5-5"/>') ?> I paid it already</button>
+      </div>
+    </div>
   </div>
 </section>
 <?php endif; ?>
@@ -219,7 +254,69 @@ if (($phase ?? '') === 'trial'): ?>
     tell($('lookSay'), res.ok ? 'ok' : 'bad', res.ok ? ('Now ' + res.name + (res.republished ? '. Your site is updated.' : '.')) : (res.error || 'Not switched.'));
   }));
 
+  /*
+   * The code and what comes after it, like a payment app's own flow (owner, 2026-10-24):
+   * the code with its time left, "I have paid", then the bank confirming with
+   * "Keep waiting" when it is slow, and a new code once one expires. One poller
+   * asks the server; a payment made in time always counts, even arriving late.
+   */
+  const qr = $('qr');
+  const Q = { expires: 0, expired: false, mode: '', since: 0 };
+  const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) { return null; } return null; };
+  const claimKey = () => 'sqp-claimed-' + (qr ? qr.dataset.sub : '');
+  const clock = (ms) => { const t = Math.max(0, Math.round(ms / 1000)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+  function mode(m) {
+    Q.mode = m;
+    $('qrCode').hidden = m !== 'code'; $('qrCheck').hidden = m !== 'check'; $('qrGone').hidden = m !== 'gone';
+    if (m === 'check') { Q.since = Date.now(); $('ckMore').hidden = true; $('ckSay').textContent = 'Confirming your payment…'; }
+    if (m === 'gone' && Q.expires) $('goneAt').textContent = ' at ' + new Date(Q.expires).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+  function tick() {
+    if (!qr || !qr.classList.contains('on')) return;
+    const left = Q.expires - Date.now();
+    if (Q.mode === 'code' && Q.expires) {
+      if (left <= 0 || Q.expired) { mode('gone'); return; }
+      $('qrLeft').innerHTML = 'Valid for <b>' + clock(left) + '</b>';
+    }
+    if (Q.mode === 'check') {
+      const gone = Date.now() - Q.since;
+      if (gone >= 90000 && $('ckMore').hidden) {
+        $('ckMore').hidden = false;
+        $('ckSay').textContent = 'Not received yet.';
+        $('ckTime').textContent = 'Some banks take a few minutes to send it. We keep checking either way.';
+      } else if ($('ckMore').hidden) {
+        $('ckTime').textContent = 'Checking for ' + clock(gone) + ' · usually under a minute.';
+      }
+    }
+  }
+  function learn(st) {
+    if (st.expires_at) Q.expires = Date.parse(st.expires_at) || Q.expires;
+    if (typeof st.expired === 'boolean') Q.expired = st.expired;
+    if (st.sub_id && qr) qr.dataset.sub = st.sub_id;
+  }
+  // Paid while away? Asked now, every few seconds, and every time they come back (from GCash, another tab).
+  async function checkPaid() {
+    let st = {};
+    try { st = await (await fetch('/sites/me/checkout', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+    if (st.status === 'active') {
+      store(claimKey(), null);
+      if (Q.mode === 'check') { $('qrCheck').querySelectorAll('.steps li').forEach((li) => { li.className = 'done'; }); $('ckSay').textContent = 'Paid. Your site is going live…'; }
+      setTimeout(() => location.assign('/sites/me?paid=1'), Q.mode === 'check' ? 900 : 0);
+      return;
+    }
+    if (st.status === 'waiting') { learn(st); tick(); }
+  }
   let polling = 0;
+  let ticking = 0;
+  const poll = () => { clearInterval(polling); polling = setInterval(checkPaid, 4000); if (!ticking) ticking = setInterval(tick, 1000); };
+  function showCode() {
+    $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; };
+    $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'Checking the code…'; checkPaid(); };
+    $('qrImg').hidden = true; $('qrWait').hidden = false;
+    $('qrImg').src = '/sites/me/qr.png?t=' + Date.now();
+    $('qrDown').hidden = false;
+  }
+
   async function pay(plan) {
     const say = $('paySay') || $('qrSay');
     const btn = $('payGo');
@@ -227,44 +324,41 @@ if (($phase ?? '') === 'trial'): ?>
     // Making the code takes PayMongo a few seconds, and the image a few more: say so at once.
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" aria-hidden="true"></span> Making your QR code…'; }
     $('qrImg').hidden = true; $('qrWait').hidden = false; $('qrWaitWord').textContent = 'Making your QR code…';
-    $('qrAmt').textContent = ''; tell($('qrSay'), '', '');
-    $('qr').classList.add('on');
-    $('qr').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    $('qrAmt').textContent = ''; $('qrLeft').textContent = ''; tell($('qrSay'), '', '');
+    Q.expires = 0; Q.expired = false; mode('code');
+    qr.classList.add('on');
+    qr.scrollIntoView({ behavior: 'smooth', block: 'center' });
     const r = await post('/sites/me/checkout', { plan });
     if (btn) { btn.disabled = false; btn.innerHTML = label; }
-    if (!r.ok) { $('qr').classList.remove('on'); tell(say, 'bad', r.error || 'The QR code could not be made.'); return; }
-    if (r.paid) { $('qrWaitWord').textContent = 'Already paid. Publishing your site…'; }
+    if (!r.ok) { qr.classList.remove('on'); tell(say, 'bad', r.error || 'The QR code could not be made.'); return; }
+    qr.dataset.plan = plan;
+    if (r.paid) { checkPaid(); return; }
+    learn(r);
     $('qrWaitWord').textContent = 'Loading the code…';
-    $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; tell($('qrSay'), '', 'Waiting for your payment…'); };
-    $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'The code did not load. Press Pay again.'; };
-    if (!r.paid) { $('qrImg').src = '/sites/me/qr.png?t=' + Date.now(); $('qrDown').hidden = false; }
+    showCode();
     $('qrAmt').textContent = '₱' + Number(r.amount).toLocaleString('en-PH') + (r.founding ? ' · 🏅 Founding Member' : '');
-    clearInterval(polling);
-    polling = setInterval(async () => {
-      let s = {};
-      try { s = await (await fetch('/sites/me/checkout', { credentials: 'same-origin' })).json(); } catch (e) { return; }
-      if (s.status === 'active') {
-        clearInterval(polling);
-        tell($('qrSay'), 'ok', s.published ? 'Paid. Your site is live!' : 'Paid. Publishing your site…');
-        setTimeout(() => location.assign('/sites/me?paid=1'), 1200);
-      }
-    }, 3000);
+    tick(); poll();
   }
-  // Paid while away? Check now, and every time they come back to this page (from GCash, another tab).
-  async function checkPaid() {
-    let st = {};
-    try { st = await (await fetch('/sites/me/checkout', { credentials: 'same-origin' })).json(); } catch (e) { return; }
-    if (st.status === 'active') location.assign('/sites/me?paid=1');
+
+  if (qr && qr.dataset.waiting === '1') {
+    // "I have paid" survives a reload for as long as the code could have been paid (30 minutes).
+    const claimed = Number(store(claimKey()) || 0);
+    mode(claimed && Date.now() - claimed < 1800000 ? 'check' : 'code');
+    if (Q.mode === 'check') Q.since = claimed;
+    showCode(); checkPaid(); poll();
   }
-  const waitingQr = $('qr') && $('qr').dataset.waiting === '1';
-  if (waitingQr) {
-    $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; tell($('qrSay'), '', 'Waiting for your payment…'); };
-    $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'Paid already? Checking…'; checkPaid(); };
-    $('qrImg').src = '/sites/me/qr.png?t=' + Date.now();
-    checkPaid();
-    polling = setInterval(checkPaid, 4000);
+  if (qr) {
+    const claim = () => { store(claimKey(), String(Date.now())); mode('check'); tick(); checkPaid(); };
+    $('qrPaid').addEventListener('click', claim);
+    $('qrPaidLate').addEventListener('click', claim);
+    $('ckWait').addEventListener('click', () => { mode('check'); tick(); checkPaid(); });
+    $('ckBack').addEventListener('click', () => { store(claimKey(), null); mode(Q.expired || (Q.expires && Q.expires < Date.now()) ? 'gone' : 'code'); tick(); });
+    $('qrNew').addEventListener('click', () => {
+      const c = document.querySelector('input[name=plan]:checked');
+      pay(qr.dataset.plan || (c ? c.value : 'silver'));
+    });
   }
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && ($('qr') || {}).classList && $('qr').classList.contains('on')) checkPaid(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && qr && qr.classList.contains('on')) checkPaid(); });
 
   // A change of plan is kept at once, so the app and every page show the same choice.
   document.querySelectorAll('input[name=plan]').forEach((r) => r.addEventListener('change', () => { post('/sites/me/plan', { plan: r.value }); }));
