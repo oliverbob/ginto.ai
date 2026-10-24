@@ -153,8 +153,10 @@ if (($phase ?? '') === 'trial'): ?>
 <section class="sec" id="pay" style="scroll-margin-top:12px">
   <?php if ($active): $pl = Config::plan((string) $sub['plan']); ?>
     <h2 class="serif">2 · Your plan: <?= $e($pl['name'] ?? '') ?></h2>
+    <?php $comp = \Ginto\Sites\Subscriptions::isComplimentary($sub); ?>
+    <?php if ($comp): ?><p class="muted" style="margin:0"><b style="color:var(--gold-fg)">Complimentary</b> · every <?= $e($pl['name'] ?? '') ?> feature, nothing to pay.</p><?php else: ?>
     <p class="muted" style="margin:0">₱<?= number_format((int) $sub['price_php']) ?> a month<?= $sub['founding'] ? ' · <b style="color:var(--gold-fg)">🏅 Founding Member</b>, price locked while you stay' : '' ?>.
-      Paid until <b><?= $e(date('j F Y', strtotime((string) $sub['period_end']))) ?></b>.</p>
+      Paid until <b><?= $e(date('j F Y', strtotime((string) $sub['period_end']))) ?></b>.</p><?php endif; ?>
     <?php if ($credits): $pct = min(100, (int) round($credits['used'] / max(1, $credits['quota']) * 100)); ?>
     <div style="margin-top:16px">
       <div class="cr"><span>AI credits used</span><span style="color:<?= $credits['warn'] ? 'var(--bad)' : 'var(--gold-fg)' ?>"><?= number_format($credits['used']) ?> / <?= number_format($credits['quota']) ?></span></div>
@@ -163,7 +165,7 @@ if (($phase ?? '') === 'trial'): ?>
       <?php elseif ($credits['warn']): ?><p class="say bad">You have used <?= $pct ?>% of this month's AI credits.</p><?php endif; ?>
     </div>
     <?php endif; ?>
-    <div class="act"><button class="btn ghost" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>') ?> Pay next month now</button></div>
+    <?php if (!$comp): ?><div class="act"><button class="btn ghost" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>') ?> Pay next month now</button></div><?php endif; ?>
   <?php else: ?>
     <h2 class="serif">2 · Choose your plan and go live</h2>
     <p class="muted" style="margin:0">Monthly, cancel anytime. <?= $slotsLeft > 0 ? '<b style="color:var(--gold-fg)">' . $slotsLeft . ' Founding slots left</b>: your price stays locked for as long as you stay.' : '' ?></p>

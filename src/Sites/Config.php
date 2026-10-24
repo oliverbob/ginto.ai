@@ -143,6 +143,13 @@ final class Config
      */
     public const SIMULATORS = [10, 20];
 
+    /**
+     * Complimentary plans, never paid (owner, 2026-10-24: "just let eleanor and
+     * myself have the free ... give her only until the 2nd best tier, but to me
+     * give me the crown"). Comchain identity => plan.
+     */
+    public const COMPLIMENTARY = [10 => 'crown', 20 => 'gold'];
+
     public const NAME_RE = '/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$/';
 
     public const RESERVED = [

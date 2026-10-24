@@ -27,6 +27,46 @@ final class Subscriptions
         return $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => ['active', 'pending'], 'ORDER' => ['id' => 'DESC']]) ?: null;
     }
 
+    /**
+     * A complimentary member's plan (Config::COMPLIMENTARY): once they hold a
+     * name, an active ₱0 subscription with no end in practice, the name active
+     * and the site published. Never a Founding slot. Safe to call often.
+     */
+    public function complimentary(int $userId): ?array
+    {
+        $identity = Members::identity($userId);
+        $plan = $identity !== null ? (Config::COMPLIMENTARY[$identity] ?? null) : null;
+        if ($plan === null) {
+            return null;
+        }
+        $cur = $this->current($userId);
+        if ($cur && $cur['status'] === 'active' && $cur['plan'] === $plan && (int) $cur['price_php'] === 0) {
+            return $cur;
+        }
+        $name = (new Names($this->db))->of($userId);
+        if (!$name || !in_array($name['status'], ['held', 'active'], true)) {
+            return null;
+        }
+        $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => ['pending', 'active']]);
+        $this->db->insert('sites_subscriptions', [
+            'user_id' => $userId, 'name' => $name['name'], 'plan' => $plan, 'price_php' => 0, 'founding' => 0,
+            'status' => 'active', 'payment_ref' => 'complimentary', 'period_start' => date('Y-m-d H:i:s'),
+            'period_end' => date('Y-m-d H:i:s', strtotime('+100 years')),
+        ]);
+        $this->db->update('sites_names', ['status' => 'active', 'plan_choice' => $plan], ['user_id' => $userId]);
+        self::log("COMPLIMENTARY {$plan} user {$userId} {$name['name']}");
+        if ($this->db->get('sites_previews', ['id'], ['id' => (int) $name['preview_id'], 'status' => 'ready'])) {
+            (new Publisher($this->db))->publish($userId);
+        }
+
+        return $this->current($userId);
+    }
+
+    public static function isComplimentary(?array $sub): bool
+    {
+        return $sub !== null && ($sub['payment_ref'] ?? '') === 'complimentary';
+    }
+
     public function foundingTaken(): int
     {
         return (int) $this->db->count('sites_subscriptions', ['founding' => 1, 'status' => ['active', 'lapsed', 'cancelled']]);
@@ -41,6 +81,9 @@ final class Subscriptions
         $plan = Config::plan($planId);
         if ($plan === null) {
             return ['ok' => false, 'error' => 'Choose Silver, Gold or Crown.'];
+        }
+        if ($this->complimentary($userId)) {
+            return ['ok' => true, 'paid' => true, 'qr_image' => '', 'amount' => 0, 'founding' => false];
         }
         $name = (new Names($this->db))->of($userId);
         if (!$name) {

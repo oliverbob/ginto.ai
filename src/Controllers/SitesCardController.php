@@ -112,6 +112,8 @@ class SitesCardController
 
     private function state($db, int $uid, string $who): array
     {
+        // The owner's complimentary plans take effect the moment there is a name.
+        (new Subscriptions($db))->complimentary($uid);
         $n = (new Names($db))->of($uid);
         $sub = (new Subscriptions($db))->current($uid);
         $phase = Trial::phase($n, $sub);

@@ -238,6 +238,7 @@ class SitesController extends \Core\Controller
         $r = (new Names($this->db))->claim((string) ($in['name'] ?? ''), $this->userId(), $prev ? (int) $prev['id'] : null);
         if (!empty($r['ok']) && empty($r['mine'])) {
             (new Trial($this->db))->start($this->userId(), (string) ($_SESSION['sites_member_name'] ?? ''));
+            (new Subscriptions($this->db))->complimentary($this->userId());
         }
 
         return $this->json($r + ['next' => $r['ok'] ? '/sites/me' : null], $r['ok'] ? 200 : 422);
@@ -253,6 +254,7 @@ class SitesController extends \Core\Controller
 
             return;
         }
+        (new Subscriptions($this->db))->complimentary($uid);
         $name  = (new Names($this->db))->of($uid);
         $draft = $this->draft($uid);
         $sub   = (new Subscriptions($this->db))->current($uid);

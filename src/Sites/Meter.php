@@ -107,7 +107,17 @@ final class Meter
     {
         $sub = $this->db->get('sites_subscriptions', ['period_start'], ['user_id' => $userId, 'status' => 'active', 'ORDER' => ['id' => 'DESC']]);
 
-        return !empty($sub['period_start']) ? (string) $sub['period_start'] : $this->monthStart();
+        if (empty($sub['period_start'])) {
+            return $this->monthStart();
+        }
+        // Credits are monthly: from the latest monthly anniversary, so a plan with
+        // a long period (the owner's complimentary ones) still renews every month.
+        $start = (string) $sub['period_start'];
+        while (strtotime($start . ' +1 month') <= time()) {
+            $start = date('Y-m-d H:i:s', strtotime($start . ' +1 month'));
+        }
+
+        return $start;
     }
 
     private function monthStart(): string
