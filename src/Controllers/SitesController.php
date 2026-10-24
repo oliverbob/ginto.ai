@@ -95,16 +95,14 @@ class SitesController extends \Core\Controller
 
     /**
      * Who may press "Simulate payment success": the owner, and the members he
-     * named (identity 20, Eleanor Rojas, owner 2026-10-24). They see the real
-     * QR like anyone; the button only plays the paid moment, nothing is saved.
+     * named (Config::SIMULATORS). They see the real QR like anyone; the button
+     * only plays the paid moment, nothing is saved.
      */
-    private const SIMULATORS = [10, 20];
-
     private function canSimulate(): bool
     {
         $uid = $this->userId();
 
-        return $this->isOwner() || (Members::isMember($uid) && in_array(Members::identity($uid), self::SIMULATORS, true));
+        return $this->isOwner() || (Members::isMember($uid) && in_array(Members::identity($uid), Config::SIMULATORS, true));
     }
 
     /** GET /sites/me/sim.js -- the payment simulation; only those who may simulate are ever sent it. */

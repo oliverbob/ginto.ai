@@ -54,7 +54,7 @@ class SitesCardController
             'state' => ['ok' => true] + $this->state($db, $uid, $who),
             'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
             // The feed's promotions: paid, live sites, never the viewer's own.
-            'showcase' => ['ok' => true, 'sites' => (new \Ginto\Sites\Showcase($db))->featured($uid)],
+            'showcase' => ['ok' => true, 'sites' => $this->showcase($db, $uid, !empty($in['preview']))],
             default => ['ok' => false, 'error' => 'Unknown action.'],
         };
         echo json_encode($out);
@@ -81,6 +81,25 @@ class SitesCardController
     }
 
     /** Keep the plan they picked with their name, so every page shows the same one. */
+    /**
+     * The feed's promotions. A simulator asking for a preview, while no paid site
+     * exists, gets their own site so the single cards can be seen; never counted.
+     */
+    private function showcase($db, int $uid, bool $preview): array
+    {
+        $sc = new \Ginto\Sites\Showcase($db);
+        $out = $sc->featured($uid);
+        if ($out === [] && $preview && in_array(Members::identity($uid), \Ginto\Sites\Config::SIMULATORS, true)) {
+            $n = (new Names($db))->of($uid);
+            $own = $n ? $sc->of($n) : null;
+            if ($own && $own['products'] !== []) {
+                $out[] = $own + ['founding' => false, 'preview' => true];
+            }
+        }
+
+        return $out;
+    }
+
     private function choose($db, int $uid, string $plan): array
     {
         if (\Ginto\Sites\Config::plan($plan) === null) {

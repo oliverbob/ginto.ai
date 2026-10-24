@@ -71,28 +71,56 @@ final class Showcase
     }
 
     /**
-     * Paid, live sites for the feed's promotions, never the viewer's own.
+     * Paid, live sites for the feed's promotions, never the viewer's own, in
+     * fair turns: the least shown first, then the longest unseen, ties at random.
+     * Each one handed out counts as shown.
+     *
      * @return list<array<string,mixed>>
      */
-    public function featured(int $exceptUserId, int $limit = 6): array
+    public function featured(int $exceptUserId, int $limit = 3): array
     {
         $subs = $this->db->select('sites_subscriptions', ['user_id', 'founding'], ['status' => 'active',
-            'period_end[>]' => date('Y-m-d H:i:s'), 'user_id[!]' => $exceptUserId, 'ORDER' => ['id' => 'DESC'], 'LIMIT' => 40]) ?: [];
-        $out = [];
-        $seen = [];
+            'period_end[>]' => date('Y-m-d H:i:s'), 'user_id[!]' => $exceptUserId, 'ORDER' => ['id' => 'DESC']]) ?: [];
+        $founding = [];
         foreach ($subs as $s) {
-            if (isset($seen[$s['user_id']])) {
+            $founding[(int) $s['user_id']] = ($founding[(int) $s['user_id']] ?? false) || (bool) $s['founding'];
+        }
+        if ($founding === []) {
+            return [];
+        }
+        $names = $this->db->select('sites_names', '*', ['user_id' => array_keys($founding), 'status' => 'active']) ?: [];
+        $turns = [];
+        foreach ($this->db->select('sites_showcase', '*', ['name' => array_column($names, 'name')]) ?: [] as $t) {
+            $turns[$t['name']] = $t;
+        }
+        // Shuffled, then a stable sort by turns: ties stay in random order.
+        shuffle($names);
+        usort($names, static function ($a, $b) use ($turns) {
+            $ta = $turns[$a['name']] ?? ['shown' => 0, 'last_shown' => ''];
+            $tb = $turns[$b['name']] ?? ['shown' => 0, 'last_shown' => ''];
+
+            return [(int) $ta['shown'], (string) $ta['last_shown']] <=> [(int) $tb['shown'], (string) $tb['last_shown']];
+        });
+
+        $out = [];
+        foreach ($names as $n) {
+            if (count($out) === $limit) {
+                break;
+            }
+            $card = Publisher::isLive((string) $n['name']) ? $this->of($n) : null;
+            if (!$card || $card['products'] === []) {
                 continue;
             }
-            $seen[$s['user_id']] = true;
-            $n = $this->db->get('sites_names', '*', ['user_id' => (int) $s['user_id'], 'status' => 'active']);
-            $card = $n ? $this->of($n) : null;
-            if ($card && $card['products'] !== [] && Publisher::isLive((string) $n['name'])) {
-                $out[] = $card + ['founding' => (bool) $s['founding']];
-            }
+            $out[] = $card + ['founding' => $founding[(int) $n['user_id']]];
+            $this->counted((string) $n['name']);
         }
-        shuffle($out);
 
-        return array_slice($out, 0, $limit);
+        return $out;
+    }
+
+    private function counted(string $name): void
+    {
+        $this->db->query('INSERT INTO sites_showcase (name, shown, last_shown) VALUES (:n, 1, NOW())
+            ON DUPLICATE KEY UPDATE shown = shown + 1, last_shown = NOW()', [':n' => $name]);
     }
 }

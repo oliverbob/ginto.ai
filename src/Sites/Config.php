@@ -137,6 +137,12 @@ final class Config
 
     // ---- names -----------------------------------------------------------------
 
+    /**
+     * Members (comchain identities) who may simulate a payment and preview the
+     * feed's promotions with their own site: the owner and Eleanor Rojas (owner, 2026-10-24).
+     */
+    public const SIMULATORS = [10, 20];
+
     public const NAME_RE = '/^[a-z0-9]([a-z0-9-]{1,30}[a-z0-9])$/';
 
     public const RESERVED = [
