@@ -1401,6 +1401,7 @@ $router->get('/sites/enter', 'SitesController@enter');
 $router->get('/sites/me', 'SitesController@me');
 $router->post('/sites/me/review', 'SitesController@review');
 $router->post('/sites/me/checkout', 'SitesController@checkout');
+$router->post('/sites/me/plan', 'SitesController@planChoice');
 $router->post('/sites/surprise', 'SitesController@surprise');
 $router->post('/sites/describe', 'SitesController@describe');
 $router->post('/sites/me/template', 'SitesController@template');

@@ -221,6 +221,8 @@ if (($phase ?? '') === 'trial'): ?>
       }
     }, 3000);
   }
+  // A change of plan is kept at once, so the app and every page show the same choice.
+  document.querySelectorAll('input[name=plan]').forEach((r) => r.addEventListener('change', () => { post('/sites/me/plan', { plan: r.value }); }));
   const go = $('payGo');
   if (go) go.addEventListener('click', () => { const c = document.querySelector('input[name=plan]:checked'); if (c) pay(c.value); });
   document.querySelectorAll('[data-renew]').forEach((b) => b.addEventListener('click', () => pay(b.dataset.renew)));

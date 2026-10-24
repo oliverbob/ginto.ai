@@ -52,6 +52,7 @@ class SitesCardController
             'check' => (new Names($db))->check((string) ($in['n'] ?? ''), $uid),
             'hold'  => $this->hold($db, $uid, (string) ($in['n'] ?? ''), $who),
             'state' => ['ok' => true] + $this->state($db, $uid, $who),
+            'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
             default => ['ok' => false, 'error' => 'Unknown action.'],
         };
         echo json_encode($out);
@@ -71,9 +72,21 @@ class SitesCardController
             return $r + ['ok' => false];
         }
         (new Trial($db))->start($uid, $who);
+        $this->choose($db, $uid, (string) ($in['plan'] ?? ''));
         Subscriptions::log("HELD {$r['name']} by member " . Members::identity($uid) . ' from the feed card');
 
         return ['ok' => true, 'held' => true, 'name' => $r['name']] + $this->state($db, $uid, $who);
+    }
+
+    /** Keep the plan they picked with their name, so every page shows the same one. */
+    private function choose($db, int $uid, string $plan): array
+    {
+        if (\Ginto\Sites\Config::plan($plan) === null) {
+            return ['ok' => false];
+        }
+        $db->update('sites_names', ['plan_choice' => $plan], ['user_id' => $uid]);
+
+        return ['ok' => true, 'plan_choice' => $plan];
     }
 
     private function state($db, int $uid, string $who): array
@@ -86,6 +99,7 @@ class SitesCardController
 
         return [
             'mine'        => $n && $phase !== 'none' ? (string) $n['name'] : null,
+            'plan_choice' => $n['plan_choice'] ?? null,
             'phase'       => $phase,
             'trial_left'  => $n && !empty($n['trial_until']) ? max(0, strtotime((string) $n['trial_until']) - time()) : 0,
             'release_left'=> $n && !empty($n['release_at']) ? max(0, strtotime((string) $n['release_at']) - time()) : 0,

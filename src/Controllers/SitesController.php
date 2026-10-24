@@ -84,6 +84,9 @@ class SitesController extends \Core\Controller
         $p = (string) ($_GET['plan'] ?? '');
         if (Config::plan($p) !== null) {
             $_SESSION['sites_plan'] = $p;
+            if ($this->userId()) {
+                $this->db->update('sites_names', ['plan_choice' => $p], ['user_id' => $this->userId()]);
+            }
         }
     }
 
@@ -215,7 +218,7 @@ class SitesController extends \Core\Controller
         $sub   = (new Subscriptions($this->db))->current($uid);
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'phase' => Trial::phase($name, $sub),
-            'plan_pick' => (string) ($_SESSION['sites_plan'] ?? ''),
+            'plan_pick' => (string) (($name['plan_choice'] ?? null) ?: ($_SESSION['sites_plan'] ?? '')),
             'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
             'live' => $name && Publisher::isLive((string) $name['name']), 'csrf_token' => generateCsrfToken()] + $this->founding());
     }
@@ -259,6 +262,21 @@ class SitesController extends \Core\Controller
         }
 
         return $this->json(['ok' => true, 'republished' => $republished]);
+    }
+
+    /** POST /sites/me/plan {plan} -- the plan they picked, kept with their name (the same one everywhere). */
+    public function planChoice()
+    {
+        $uid = $this->userId();
+        $in = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        $plan = (string) ($in['plan'] ?? '');
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '') || Config::plan($plan) === null) {
+            return $this->json(['ok' => false], 422);
+        }
+        $_SESSION['sites_plan'] = $plan;
+        $this->db->update('sites_names', ['plan_choice' => $plan], ['user_id' => $uid]);
+
+        return $this->json(['ok' => true]);
     }
 
     /** POST /sites/me/checkout {plan} -- a QR Ph code for this month. */
@@ -453,9 +471,9 @@ class SitesController extends \Core\Controller
             return $this->page('sites/gone', ['title' => 'That link has expired']);
         }
         session_regenerate_id(true);
-        $this->rememberPlan();
         $_SESSION['sites_uid'] = $m['uid'];
         $_SESSION['sites_member_name'] = $m['name'];
+        $this->rememberPlan();
         header('Location: ' . $m['to']);
     }
 
