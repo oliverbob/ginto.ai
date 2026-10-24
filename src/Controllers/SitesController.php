@@ -67,6 +67,15 @@ class SitesController extends \Core\Controller
             'csrf_token' => generateCsrfToken(true)] + $this->founding());
     }
 
+    /** A member the owner lets build previews without the one-a-day limit (SITES_EXEMPT_IDENTITIES, e.g. "10" for himself). */
+    private function exemptMember(): bool
+    {
+        $identity = Members::identity($this->userId());
+        $list = array_filter(array_map('intval', explode(',', (string) (\Ginto\Support\Env::get('SITES_EXEMPT_IDENTITIES', '') ?? ''))));
+
+        return $identity !== null && in_array($identity, $list, true);
+    }
+
     /** The plan someone picked on the card or the Plans page, kept until checkout so they never pick twice. */
     private function rememberPlan(): void
     {
@@ -101,7 +110,7 @@ class SitesController extends \Core\Controller
             $photos = new Photos($this->db);
             $shas = array_merge(array_map(static fn ($u) => $photos->ingestUrl($u), $picked), array_map(static fn ($f) => $photos->ingest($f), $files));
             $p = (new Previews($this->db))->create((string) ($_POST['description'] ?? ''), $shas, $this->deviceId(), $this->clientIp(),
-                $this->userId() ?: null, $this->isAdmin());
+                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember());
         } catch (LimitReached | \InvalidArgumentException $e) {
             return $this->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
