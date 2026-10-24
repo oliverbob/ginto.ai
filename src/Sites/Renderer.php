@@ -441,7 +441,10 @@ final class Renderer
             . '.post .pa{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-top:1px solid var(--line)}'
             . '.g-thread{max-width:620px;margin:0 auto;border-top:1px solid var(--line)}.tw{display:flex;gap:12px;padding:16px 4px;border-bottom:1px solid var(--line)}.tw small{color:var(--mu)}.tw p{color:var(--fg);margin:4px 0 10px}'
             . '.tm{border-radius:16px;overflow:hidden;border:1px solid var(--line);margin-bottom:10px}.tm img{width:100%;max-height:420px;object-fit:cover}'
-            . '.g-vertical{display:grid;grid-auto-flow:column;grid-auto-columns:min(360px,82vw);gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:8px}'
+            . '.g-vertical{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,42vw),1fr));gap:12px}'
+            // Every product on the page, wrapped (owner, 2026-10-24: twelve photos picked, "only three" seen --
+            // a sideways strip hid the rest past the edge). Two across on a phone, more on a wider screen.
+            . '.g-vertical .vc .vt{padding:12px}.g-vertical .vc h3{font-size:15px}.g-vertical .vc .vt p{font-size:12.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}'
             . '.vc{scroll-snap-align:center;aspect-ratio:9/16;border-radius:16px;overflow:hidden;background:var(--card)}.vc img{width:100%;height:100%;object-fit:cover}'
             . '.vc .vt{position:absolute;inset:auto 0 0 0;padding:18px;background:linear-gradient(transparent,rgba(0,0,0,.85));color:#fff}.vc .vt p{color:#ddd;font-size:14px}.vc .ask{color:#fff}'
             . '.g-rows{display:grid;gap:clamp(28px,6vw,72px)}.row{display:grid;grid-template-columns:1fr 1fr;gap:clamp(20px,5vw,64px);align-items:center}.row:nth-child(even) .rm{order:2}'
