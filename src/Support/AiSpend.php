@@ -85,9 +85,9 @@ final class AiSpend
     /** This month's paid cap in USD. */
     public static function capUsd(): float
     {
-        $share = (float) (Env::get('AI_PAID_REVENUE_SHARE', '0.10') ?: '0.10');
-        $floor = (float) (Env::get('AI_PAID_FLOOR_USD', '3') ?: '3');
-        $max   = (float) (Env::get('AI_PAID_HARD_MAX_USD', '25') ?: '25');
+        $share = self::number('AI_PAID_REVENUE_SHARE', 0.10);
+        $floor = self::number('AI_PAID_FLOOR_USD', 3.0);
+        $max   = self::number('AI_PAID_HARD_MAX_USD', 25.0);
 
         return round(min($max, max($floor, $share * self::revenueUsdThisMonth())), 2);
     }
@@ -170,13 +170,21 @@ final class AiSpend
             'paid_usd'  => round(self::paidThisMonthUsd(), 4),
             'cap_usd'   => self::capUsd(),
             'revenue_usd' => round(self::revenueUsdThisMonth(), 2),
-            'share'     => (float) (Env::get('AI_PAID_REVENUE_SHARE', '0.10') ?: '0.10'),
+            'share'     => self::number('AI_PAID_REVENUE_SHARE', 0.10),
             'tiers'     => ['groq' => self::tier('groq'), 'cerebras' => self::tier('cerebras')],
             'by_provider' => array_map(static fn ($r) => [
                 'provider' => $r['provider'], 'paid' => (bool) $r['paid'], 'calls' => (int) $r['calls'],
                 'tokens' => (int) $r['tin'] + (int) $r['tout'], 'usd' => round((float) $r['usd'], 4),
             ], $rows),
         ];
+    }
+
+    /** A number from .env; "0" means zero (a cap of nothing), only a missing or non-numeric value takes the default. */
+    private static function number(string $key, float $default): float
+    {
+        $v = Env::get($key, null);
+
+        return is_numeric($v) ? max(0.0, (float) $v) : $default;
     }
 
     private static function alert(string $level, float $spent, float $cap): void
