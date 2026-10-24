@@ -200,7 +200,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
       } catch (e) { r = { ok: false, reason: 'Not claimed. Try again.' }; }
       if (r.login) { location.assign('/login?next=' + encodeURIComponent(location.pathname + location.search + '#claim')); return; }
       csay.className = 'say ' + (r.ok ? 'ok' : 'bad');
-      csay.textContent = r.ok ? r.name + '.silverqueen.pro is yours. Next: choose your plan.' : (r.reason || 'Not claimed.');
+      csay.textContent = r.ok ? r.name + '.silverqueen.pro is yours. Next: review your site and choose your plan.' : (r.reason || 'Not claimed.');
       if (r.ok && r.next) setTimeout(() => location.assign(r.next), 1200); else cgo.disabled = false;
     });
   }

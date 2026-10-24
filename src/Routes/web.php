@@ -1395,6 +1395,10 @@ $router->post('/sites/claim', 'SitesController@claim');
 $router->get('/sites/photo/{sha}', 'SitesController@photo');
 $router->get('/sites/p/{token}/status', 'SitesController@status');
 $router->get('/sites/p/{token}', 'SitesController@preview');
+$router->get('/sites/me', 'SitesController@me');
+$router->post('/sites/me/review', 'SitesController@review');
+$router->post('/sites/me/checkout', 'SitesController@checkout');
+$router->get('/sites/me/checkout', 'SitesController@checkoutStatus');
 
 $router->req('/mall', 'MallController@marketplace');
 $router->get('/mall/buyer-register', 'MallCheckoutController@buyerRegisterPage');

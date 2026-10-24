@@ -56,6 +56,7 @@ svg.i{width:18px;height:18px;flex:none}
     <a href="/sites" <?= ($nav ?? '') === 'dir' ? 'aria-current="page"' : '' ?>>Directory</a>
     <a href="/sites/plans" <?= ($nav ?? '') === 'plans' ? 'aria-current="page"' : '' ?>>Plans</a>
     <a href="/sites/start" <?= ($nav ?? '') === 'start' ? 'aria-current="page"' : '' ?>>Start it now</a>
+    <a href="/sites/me" <?= ($nav ?? '') === 'me' ? 'aria-current="page"' : '' ?>>My Site</a>
   </nav>
 </header>
 <?php else: ?>

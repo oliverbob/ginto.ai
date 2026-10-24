@@ -62,6 +62,10 @@ final class Names
             $this->db->pdo->beginTransaction();
             $this->db->delete('sites_names', ['user_id' => $userId, 'status' => 'held']);
             $this->db->insert('sites_names', ['name' => $v['name'], 'user_id' => $userId, 'status' => 'held', 'preview_id' => $previewId]);
+            // The preview becomes this account's draft: kept 30 days instead of 72 hours.
+            if ($previewId) {
+                $this->db->update('sites_previews', ['user_id' => $userId, 'expires_at' => date('Y-m-d H:i:s', time() + 30 * 86400)], ['id' => $previewId]);
+            }
             $this->db->pdo->commit();
         } catch (\Throwable $e) {
             if ($this->db->pdo->inTransaction()) {

@@ -5,6 +5,9 @@ namespace Ginto\Controllers;
 use Ginto\Core\Database;
 use Ginto\Sites\Config;
 use Ginto\Sites\LimitReached;
+use Ginto\Sites\Meter;
+use Ginto\Sites\Publisher;
+use Ginto\Sites\Subscriptions;
 use Ginto\Sites\Names;
 use Ginto\Sites\Photos;
 use Ginto\Sites\Previews;
@@ -140,7 +143,114 @@ class SitesController extends \Core\Controller
         $prev = !empty($in['token']) ? (new Previews($this->db))->byToken((string) $in['token']) : null;
         $r = (new Names($this->db))->claim((string) ($in['name'] ?? ''), $this->userId(), $prev ? (int) $prev['id'] : null);
 
-        return $this->json($r + ['next' => $r['ok'] ? '/sites/plans?name=' . rawurlencode($r['name']) : null], $r['ok'] ? 200 : 422);
+        return $this->json($r + ['next' => $r['ok'] ? '/sites/me' : null], $r['ok'] ? 200 : 422);
+    }
+
+    /** GET /sites/me -- the seller's own: review, plan and pay, renewal, credits. */
+    public function me()
+    {
+        $uid = $this->userId();
+        if (!$uid) {
+            header('Location: /login?next=' . rawurlencode('/sites/me'));
+
+            return;
+        }
+        $name  = (new Names($this->db))->of($uid);
+        $draft = $this->draft($uid);
+        $sub   = (new Subscriptions($this->db))->current($uid);
+        $this->page('sites/me', ['title' => 'My Site · SilverQueen Sites', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
+            'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
+            'live' => $name && Publisher::isLive((string) $name['name']), 'csrf_token' => generateCsrfToken()] + $this->founding());
+    }
+
+    /** POST /sites/me/review -- the seller's own words over the AI's, required before anything goes live. */
+    public function review()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        $draft = $this->draft($uid);
+        if (!$draft) {
+            return $this->json(['ok' => false, 'error' => 'Build a preview and claim your name first.'], 422);
+        }
+        $site = $draft['site'];
+        $t = static fn ($v, int $max): string => mb_substr(trim(preg_replace('/\s+/u', ' ', (string) $v)), 0, $max);
+        $site['plan']['brand']['name']    = $t($in['brand'] ?? $site['plan']['brand']['name'], 60) ?: $site['plan']['brand']['name'];
+        $site['plan']['brand']['tagline'] = $t($in['tagline'] ?? '', 120);
+        $site['plan']['hero']['headline'] = $t($in['headline'] ?? $site['plan']['hero']['headline'], 90);
+        $site['plan']['about']['body']    = mb_substr(trim((string) ($in['about'] ?? $site['plan']['about']['body'])), 0, 900);
+        foreach ((array) ($in['products'] ?? []) as $i => $p) {
+            if (isset($site['plan']['products'][$i]) && is_array($p)) {
+                $site['plan']['products'][$i]['name'] = $t($p['name'] ?? '', 80);
+                $site['plan']['products'][$i]['description'] = $t($p['description'] ?? '', 320);
+            }
+        }
+        $contact = trim((string) ($in['contact'] ?? ''));
+        if ($contact !== '' && preg_match('#^(https://\S+|tel:\+?[0-9 ]{6,20}|mailto:\S+@\S+)$#i', $contact) !== 1) {
+            return $this->json(['ok' => false, 'error' => 'The contact must start with https://, tel: or mailto:'], 422);
+        }
+        $site['contact'] = $contact;
+        $site['reviewed_at'] = date('c');
+        $this->db->update('sites_previews', ['site' => json_encode($site)], ['id' => $draft['id']]);
+
+        $live = (new Subscriptions($this->db))->current($uid);
+        $republished = null;
+        if ($live && $live['status'] === 'active') {
+            $republished = (new Publisher($this->db))->publish($uid)['ok'];
+        }
+
+        return $this->json(['ok' => true, 'republished' => $republished]);
+    }
+
+    /** POST /sites/me/checkout {plan} -- a QR Ph code for this month. */
+    public function checkout()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        if (!Config::isPublic() && !$this->isAdmin()) {
+            return $this->json(['ok' => false, 'error' => 'SilverQueen Sites opens soon.'], 403);
+        }
+        $draft = $this->draft($uid);
+        if (!$draft || empty($draft['site']['reviewed_at'])) {
+            return $this->json(['ok' => false, 'error' => 'Review your site first: nothing goes live until you have.'], 422);
+        }
+        $u = $this->db->get('users', ['email', 'firstname', 'lastname', 'username'], ['id' => $uid]) ?: [];
+        $r = (new Subscriptions($this->db))->checkout($uid, (string) ($in['plan'] ?? ''), (string) ($u['email'] ?? ''),
+            trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) ?: (string) ($u['username'] ?? ''));
+
+        return $this->json($r, $r['ok'] ? 200 : 422);
+    }
+
+    /** GET /sites/me/checkout -- paid yet? (polled by the QR screen) */
+    public function checkoutStatus()
+    {
+        $uid = $this->userId();
+        if (!$uid) {
+            return $this->json(['status' => 'none'], 401);
+        }
+
+        return $this->json((new Subscriptions($this->db))->confirm($uid));
+    }
+
+    /** The account's claimed preview, as its draft site. */
+    private function draft(int $uid): ?array
+    {
+        $n = (new Names($this->db))->of($uid);
+        if (!$n || !$n['preview_id']) {
+            return null;
+        }
+        $p = $this->db->get('sites_previews', ['id', 'site', 'photos', 'status'], ['id' => (int) $n['preview_id'], 'user_id' => $uid]);
+        if (!$p || $p['status'] !== 'ready') {
+            return null;
+        }
+        $site = json_decode((string) $p['site'], true);
+
+        return is_array($site) ? ['id' => (int) $p['id'], 'site' => $site, 'photos' => json_decode((string) $p['photos'], true) ?: []] : null;
     }
 
     // ---------------------------------------------------------------------

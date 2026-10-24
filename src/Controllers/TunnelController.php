@@ -895,6 +895,14 @@ TOML;
             return;
         }
 
+        // SilverQueen Sites (owner, 2026-10-24): the Directory, and every published site.
+        if ($domain === 'sites.silverqueen.pro'
+            || (str_ends_with($domain, '.silverqueen.pro') && \Ginto\Sites\Publisher::isLive($subdomain))) {
+            http_response_code(200);
+            echo "OK - site";
+            return;
+        }
+
         // Check reserved subdomains - deny certificate
         $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
         if (in_array($subdomain, $reserved)) {

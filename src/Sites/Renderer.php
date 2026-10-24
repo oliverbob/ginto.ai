@@ -108,6 +108,11 @@ final class Renderer
         $preview = isset($opts['preview_hours']);
         $brand = $plan['brand']['name'];
         $heroImg = $photoUrls[$plan['products'][0]['photo'] ?? 0] ?? '';
+        // Only a link a visitor can safely follow: the web, a phone number or an e-mail address.
+        $contact = (string) ($opts['contact_url'] ?? '#shop');
+        if (preg_match('#^(https://|tel:\+?[0-9 ]{6,20}$|mailto:[^\s<>"]+@[^\s<>"]+$|\#)#i', $contact) !== 1) {
+            $contact = '#shop';
+        }
 
         $cards = '';
         foreach ($plan['products'] as $p) {
@@ -168,8 +173,9 @@ final class Renderer
             . ($plan['about']['body'] !== '' ? '<section class="about" id="about"><h2>' . $e($plan['about']['title'] ?: 'About us') . '</h2><p>' . $e($plan['about']['body']) . '</p></section>' : '')
             . ($highs !== '' ? '<section><div class="hls">' . $highs . '</div></section>' : '')
             . '<section class="close" id="contact"><h2>' . $e($plan['closing']['headline'] ?: 'Thank you for visiting') . '</h2>'
-            . '<a class="btn" href="' . $e($opts['contact_url'] ?? '#') . '">' . $e($plan['closing']['cta']) . '</a></section>'
-            . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Sites</footer>'
+            . '<a class="btn" href="' . $e($contact) . '"' . (str_starts_with($contact, 'https://') ? ' target="_blank" rel="noopener"' : '') . '>' . $e($plan['closing']['cta']) . '</a></section>'
+            . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Sites'
+            . (!empty($opts['founding']) ? ' &middot; <span style="color:var(--p);font-weight:600">&#127941; Founding Member</span>' : '') . '</footer>'
             . '</body></html>';
     }
 
