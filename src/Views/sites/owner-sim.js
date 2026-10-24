@@ -42,22 +42,9 @@
   row.appendChild(button());
   qr.appendChild(row);
 
-  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  async function play() {
+  // The page's own success moment, the very one a real payment plays.
+  function play() {
     qr.querySelectorAll('[data-sim]').forEach((b) => { b.disabled = true; });
-    $('qrCode').hidden = true; $('qrGone').hidden = true; $('qrCheck').hidden = false; $('ckMore').hidden = true;
-    const steps = $('qrCheck').querySelectorAll('.steps li');
-    const set = (i, cls) => { if (steps[i]) steps[i].className = cls; };
-    set(0, 'done'); set(1, 'now'); set(2, '');
-    $('ckSay').textContent = 'Confirming your payment…';
-    $('ckTime').textContent = 'Simulation · nothing is paid';
-    await wait(1600);
-    set(1, 'done'); set(2, 'now');
-    $('ckSay').textContent = 'Payment received.';
-    await wait(1600);
-    set(2, 'done');
-    $('ckSay').textContent = 'Paid. Your site is going live…';
-    await wait(1000);
-    location.assign('/sites/me?paid=1&sim=1');
+    if (typeof qr.sqpSuccess === 'function') qr.sqpSuccess('/sites/me?paid=1&sim=1', 'Simulation · nothing is paid');
   }
 })();

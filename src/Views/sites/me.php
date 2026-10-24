@@ -277,7 +277,7 @@ if (($phase ?? '') === 'trial'): ?>
     if (m === 'gone' && Q.expires) $('goneAt').textContent = ' at ' + new Date(Q.expires).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   }
   function tick() {
-    if (!qr || !qr.classList.contains('on')) return;
+    if (!qr || !qr.classList.contains('on') || Q.done) return;
     const left = Q.expires - Date.now();
     if (Q.mode === 'code' && Q.expires) {
       if (left <= 0 || Q.expired) { mode('gone'); return; }
@@ -303,14 +303,37 @@ if (($phase ?? '') === 'trial'): ?>
   async function checkPaid() {
     let st = {};
     try { st = await (await fetch('/sites/me/checkout', { credentials: 'same-origin' })).json(); } catch (e) { return; }
-    if (st.status === 'active') {
-      store(claimKey(), null);
-      if (Q.mode === 'check') { $('qrCheck').querySelectorAll('.steps li').forEach((li) => { li.className = 'done'; }); $('ckSay').textContent = 'Paid. Your site is going live…'; }
-      setTimeout(() => location.assign('/sites/me?paid=1'), Q.mode === 'check' ? 900 : 0);
-      return;
-    }
+    if (st.status === 'active') { store(claimKey(), null); success('/sites/me?paid=1'); return; }
     if (st.status === 'waiting') { learn(st); tick(); }
   }
+  /*
+   * Paid: the steps fill in one by one, then the live page. The same moment for
+   * a real payment and for the owner's simulation (owner-sim.js calls it), so
+   * what he sees is what a member will see.
+   */
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function success(next, note) {
+    if (Q.done) return;
+    Q.done = true;
+    clearInterval(polling);
+    mode('check');
+    const steps = $('qrCheck').querySelectorAll('.steps li');
+    const set = (i, cls) => { if (steps[i]) steps[i].className = cls; };
+    $('ckMore').hidden = true;
+    $('ckTime').textContent = note || '';
+    set(0, 'done'); set(1, 'now'); set(2, '');
+    $('ckSay').textContent = 'Confirming your payment…';
+    await wait(1200);
+    set(1, 'done'); set(2, 'now');
+    $('ckSay').textContent = 'Payment received.';
+    await wait(1400);
+    set(2, 'done');
+    $('ckSay').textContent = 'Paid. Your site is going live…';
+    await wait(1000);
+    location.assign(next);
+  }
+  if (qr) qr.sqpSuccess = success;
+
   let polling = 0;
   let ticking = 0;
   const poll = () => { clearInterval(polling); polling = setInterval(checkPaid, 4000); if (!ticking) ticking = setInterval(tick, 1000); };
