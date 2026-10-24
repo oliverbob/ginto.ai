@@ -28,9 +28,9 @@ final class Names
         if (in_array($name, Config::RESERVED, true)) {
             return ['name' => $name, 'ok' => false, 'reason' => 'That name is kept for SilverQueen.'];
         }
-        $folded = strtr(str_replace('-', '', $name), ['0' => 'o', '1' => 'l', '3' => 'e', '4' => 'a', '5' => 's', '7' => 't', '8' => 'b']);
+        $folded = self::fold($name);
         foreach (Config::LOOKALIKE_ROOTS as $root) {
-            if (str_contains($folded, $root)) {
+            if (str_contains($folded, self::fold($root))) {
                 return ['name' => $name, 'ok' => false, 'reason' => 'That name is too close to one of ours.'];
             }
         }
@@ -77,6 +77,14 @@ final class Names
     public function of(int $userId): ?array
     {
         return $this->db->get('sites_names', ['name', 'status', 'preview_id'], ['user_id' => $userId]) ?: null;
+    }
+
+    /** Letters that read alike become one: s1lverqueen, silverqu33n and 5ilverqueen all read as silverqueen. */
+    private static function fold(string $s): string
+    {
+        $s = strtr(str_replace('-', '', $s), ['0' => 'o', '1' => 'i', 'l' => 'i', '3' => 'e', '4' => 'a', '5' => 's', '7' => 't', '8' => 'b', '9' => 'g']);
+
+        return preg_replace('/(.)\\1+/', '$1', $s); // and doubled letters (silverqueeen) count once
     }
 
     private function isTunnel(string $name): bool
