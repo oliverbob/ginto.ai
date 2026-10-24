@@ -71,6 +71,10 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
   <?php if ($live): ?><a class="btn gold" href="https://<?= $e($name['name']) ?>.silverqueen.pro" target="_blank" rel="noopener"><?= $icon('<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>') ?> Open my site</a><?php endif; ?>
 </section>
 
+<?php if (!empty($simulated)): ?>
+<section class="card sec" style="border-style:dashed"><b>Simulation, for you only.</b>
+  <p class="muted" style="margin:6px 0 0">This is My Site as it will look once the code is paid. Nothing was paid, saved or published. <a href="/sites/me#pay">Back to the real page</a></p></section>
+<?php endif; ?>
 <?php if (!empty($just_paid) && ($phase ?? '') === 'live'): ?>
 <section class="card sec" style="border-color:var(--ok)"><b>🎉 Paid. <?= $e($name['name']) ?>.silverqueen.pro is live.</b>
   <p class="muted" style="margin:6px 0 0">Thank you<?= !empty($sub['founding']) ? ', Founding Member' : '' ?>. Your price is locked for as long as you stay.</p></section>
@@ -368,4 +372,5 @@ if (($phase ?? '') === 'trial'): ?>
   document.querySelectorAll('[data-renew]').forEach((b) => b.addEventListener('click', () => pay(b.dataset.renew)));
 })();
 </script>
+<?php if (!empty($owner)): ?><script src="/sites/me/sim.js" defer></script><?php endif; ?>
 <?php $frame = 'close'; include __DIR__ . '/_frame.php'; ?>

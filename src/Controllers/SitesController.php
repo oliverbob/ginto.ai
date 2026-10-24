@@ -78,6 +78,34 @@ class SitesController extends \Core\Controller
         return $identity !== null && in_array($identity, $list, true);
     }
 
+    /**
+     * Datu Gyud himself: the member who is comchain identity 10, or his own
+     * silverqueen.pro accounts (1 admin, 2 oliverbob) when no member link is in use.
+     * Only he gets the payment simulation (owner, 2026-10-24).
+     */
+    private function isOwner(): bool
+    {
+        $uid = $this->userId();
+        if (Members::isMember($uid)) {
+            return Members::identity($uid) === 10;
+        }
+
+        return in_array($uid, [1, 2], true);
+    }
+
+    /** GET /sites/me/sim.js -- the owner's payment simulation; nobody else is ever sent it. */
+    public function simScript()
+    {
+        if (!$this->isOwner()) {
+            http_response_code(404);
+
+            return;
+        }
+        header('Content-Type: application/javascript; charset=utf-8');
+        header('Cache-Control: private, no-store');
+        readfile(ROOT_PATH . '/src/Views/sites/owner-sim.js');
+    }
+
     /** The plan someone picked on the card or the Plans page, kept until checkout so they never pick twice. */
     private function rememberPlan(): void
     {
@@ -216,7 +244,15 @@ class SitesController extends \Core\Controller
         $name  = (new Names($this->db))->of($uid);
         $draft = $this->draft($uid);
         $sub   = (new Subscriptions($this->db))->current($uid);
+        // The owner's simulation of a paid checkout: the page as it will be, drawn
+        // from the open checkout in memory only. Nothing is saved, nothing is published.
+        $sim = $this->isOwner() && isset($_GET['sim']) && $sub && $sub['status'] === 'pending';
+        if ($sim) {
+            $sub  = ['status' => 'active', 'period_start' => date('Y-m-d H:i:s'), 'period_end' => date('Y-m-d H:i:s', strtotime('+1 month'))] + $sub;
+            $name = ['status' => 'active'] + (array) $name;
+        }
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
+            'owner' => $this->isOwner(), 'simulated' => $sim,
             'phase' => Trial::phase($name, $sub),
             'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,
             'just_paid' => isset($_GET['paid']),
