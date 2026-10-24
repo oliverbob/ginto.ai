@@ -22,6 +22,8 @@ if (($frame ?? 'open') === 'open'): ?>
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--shine:#f6dc8c;--bg:#0b0e14;--panel:#11151f;--panel2:#161b28;--line:#232a3a;--fg:#ecebe6;--muted:#9097a8;--gold-fg:#f0c75a;--ok:#4ade80;--bad:#f87171;color-scheme:dark}}
 :root[data-theme=dark]{--shine:#f6dc8c;--bg:#0b0e14;--panel:#11151f;--panel2:#161b28;--line:#232a3a;--fg:#ecebe6;--muted:#9097a8;--gold-fg:#f0c75a;--ok:#4ade80;--bad:#f87171;color-scheme:dark}
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+/* Hidden means hidden, whatever display a class gives it (the QR's spinner stayed over the loaded code). */
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.55 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 a{color:inherit}
 .wrap{max-width:1080px;margin:0 auto;padding:0 16px}

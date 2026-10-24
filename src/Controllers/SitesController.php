@@ -218,6 +218,8 @@ class SitesController extends \Core\Controller
         $sub   = (new Subscriptions($this->db))->current($uid);
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'phase' => Trial::phase($name, $sub),
+            'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,
+            'just_paid' => isset($_GET['paid']),
             'plan_pick' => (string) (($name['plan_choice'] ?? null) ?: ($_SESSION['sites_plan'] ?? '')),
             'sub' => $sub, 'credits' => $sub && $sub['status'] === 'active' ? (new Meter($this->db))->status($uid, (string) $sub['plan']) : null,
             'live' => $name && Publisher::isLive((string) $name['name']), 'csrf_token' => generateCsrfToken()] + $this->founding());
@@ -262,6 +264,53 @@ class SitesController extends \Core\Controller
         }
 
         return $this->json(['ok' => true, 'republished' => $republished]);
+    }
+
+    /**
+     * GET /sites/me/qr.png -- the QR they are paying with, served from here so it
+     * shows and downloads on any phone (owner, 2026-10-24: "always, at all times
+     * show a download qr button"). ?download=1 saves it as a file. 410 once paid.
+     */
+    public function qr()
+    {
+        $uid = $this->userId();
+        $sub = $uid ? $this->db->get('sites_subscriptions', '*', ['user_id' => $uid, 'status' => 'pending', 'ORDER' => ['id' => 'DESC']]) : null;
+        if (!$sub) {
+            http_response_code(404);
+
+            return;
+        }
+        $st = (new \Ginto\Handlers\PayMongoHandler())->getPaymentIntentStatus((string) $sub['payment_ref']);
+        if (($st['status'] ?? '') === 'succeeded') {
+            http_response_code(410);
+
+            return;
+        }
+        $img = (string) ($st['qr_image'] ?? '');
+        $bytes = null;
+        if (preg_match('#^data:image/(png|jpeg);base64,(.+)$#s', $img, $m) === 1) {
+            $bytes = base64_decode($m[2], true);
+        } elseif (str_starts_with($img, 'https://')) {
+            $ch = curl_init($img);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_FOLLOWLOCATION => false]);
+            $bytes = curl_exec($ch);
+            $ok = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE) === 200;
+            curl_close($ch);
+            $bytes = $ok ? $bytes : null;
+        }
+        if (!is_string($bytes) || $bytes === '' || @getimagesizefromstring($bytes) === false) {
+            http_response_code(502);
+
+            return;
+        }
+        $info = getimagesizefromstring($bytes);
+        header('Content-Type: ' . $info['mime']);
+        header('Cache-Control: private, no-store');
+        if (isset($_GET['download'])) {
+            header('Content-Disposition: attachment; filename="SilverQueen-Premium-' . preg_replace('/[^a-z0-9-]/', '', (string) $sub['name'])
+                . '-QR-PHP' . (int) $sub['price_php'] . '.' . ($info['mime'] === 'image/png' ? 'png' : 'jpg') . '"');
+        }
+        echo $bytes;
     }
 
     /** POST /sites/me/plan {plan} -- the plan they picked, kept with their name (the same one everywhere). */

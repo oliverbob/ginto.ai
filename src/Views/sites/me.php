@@ -59,6 +59,10 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
   <?php if ($live): ?><a class="btn gold" href="https://<?= $e($name['name']) ?>.silverqueen.pro" target="_blank" rel="noopener"><?= $icon('<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>') ?> Open my site</a><?php endif; ?>
 </section>
 
+<?php if (!empty($just_paid) && ($phase ?? '') === 'live'): ?>
+<section class="card sec" style="border-color:var(--ok)"><b>🎉 Paid. <?= $e($name['name']) ?>.silverqueen.pro is live.</b>
+  <p class="muted" style="margin:6px 0 0">Thank you<?= !empty($sub['founding']) ? ', Founding Member' : '' ?>. Your price is locked for as long as you stay.</p></section>
+<?php endif; ?>
 <?php
 $clock = static function ($until): string {
     $s = max(0, strtotime((string) $until) - time());
@@ -161,11 +165,13 @@ if (($phase ?? '') === 'trial'): ?>
       <span class="say" id="paySay" aria-live="polite"><?= $reviewed ? '' : 'Review your site first.' ?></span>
     </div>
   <?php endif; ?>
-  <div class="qr" id="qr">
+  <div class="qr<?= !empty($pending) ? ' on' : '' ?>" id="qr" data-waiting="<?= !empty($pending) ? '1' : '' ?>">
     <p style="margin:0 0 10px;font-weight:700">Scan with GCash, Maya or your bank app</p>
-    <div class="qrwait" id="qrWait"><span class="spin" aria-hidden="true"></span><span id="qrWaitWord">Making your QR code…</span></div>
+    <div class="qrwait" id="qrWait"><span class="spin" aria-hidden="true"></span><span id="qrWaitWord"><?= !empty($pending) ? 'Loading your QR code…' : 'Making your QR code…' ?></span></div>
     <img id="qrImg" alt="QR Ph code" hidden>
-    <p style="margin:10px 0 0;font-size:22px;font-weight:800" id="qrAmt"></p>
+    <div style="margin-top:12px"><a class="btn ghost" id="qrDown" href="/sites/me/qr.png?download=1" download<?= empty($pending) ? ' hidden' : '' ?>><?= $icon('<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>') ?> Download QR</a></div>
+    <p style="margin:10px 0 0;font-size:22px;font-weight:800" id="qrAmt"><?= !empty($pending) ? '₱' . number_format((int) $pending['price_php']) . ($pending['founding'] ? ' · 🏅 Founding Member' : '') : '' ?></p>
+    <p class="muted" style="margin:6px 0 0;font-size:13px">Pay it any time: we notice by ourselves and bring you to your live site.</p>
     <p class="say" id="qrSay" aria-live="polite">Waiting for your payment…</p>
   </div>
 </section>
@@ -231,7 +237,7 @@ if (($phase ?? '') === 'trial'): ?>
     $('qrWaitWord').textContent = 'Loading the code…';
     $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; tell($('qrSay'), '', 'Waiting for your payment…'); };
     $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'The code did not load. Press Pay again.'; };
-    if (!r.paid) $('qrImg').src = r.qr_image;
+    if (!r.paid) { $('qrImg').src = '/sites/me/qr.png?t=' + Date.now(); $('qrDown').hidden = false; }
     $('qrAmt').textContent = '₱' + Number(r.amount).toLocaleString('en-PH') + (r.founding ? ' · 🏅 Founding Member' : '');
     clearInterval(polling);
     polling = setInterval(async () => {
@@ -240,10 +246,26 @@ if (($phase ?? '') === 'trial'): ?>
       if (s.status === 'active') {
         clearInterval(polling);
         tell($('qrSay'), 'ok', s.published ? 'Paid. Your site is live!' : 'Paid. Publishing your site…');
-        setTimeout(() => location.reload(), 1500);
+        setTimeout(() => location.assign('/sites/me?paid=1'), 1200);
       }
     }, 3000);
   }
+  // Paid while away? Check now, and every time they come back to this page (from GCash, another tab).
+  async function checkPaid() {
+    let st = {};
+    try { st = await (await fetch('/sites/me/checkout', { credentials: 'same-origin' })).json(); } catch (e) { return; }
+    if (st.status === 'active') location.assign('/sites/me?paid=1');
+  }
+  const waitingQr = $('qr') && $('qr').dataset.waiting === '1';
+  if (waitingQr) {
+    $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; tell($('qrSay'), '', 'Waiting for your payment…'); };
+    $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'Paid already? Checking…'; checkPaid(); };
+    $('qrImg').src = '/sites/me/qr.png?t=' + Date.now();
+    checkPaid();
+    polling = setInterval(checkPaid, 4000);
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && ($('qr') || {}).classList && $('qr').classList.contains('on')) checkPaid(); });
+
   // A change of plan is kept at once, so the app and every page show the same choice.
   document.querySelectorAll('input[name=plan]').forEach((r) => r.addEventListener('change', () => { post('/sites/me/plan', { plan: r.value }); }));
   const go = $('payGo');
