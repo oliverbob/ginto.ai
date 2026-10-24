@@ -67,6 +67,8 @@ final class Showcase
             'theme'    => $theme,
             'look'     => Templates::get($p['template'] ?? null)['name'],
             'products' => $products,
+            // Whose it is in the app, so its Page shows their own profile cover and photo.
+            'member'   => Members::identity((int) $name['user_id']),
         ];
     }
 
