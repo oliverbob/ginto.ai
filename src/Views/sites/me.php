@@ -72,7 +72,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 </section>
 
 <?php if (!empty($simulated)): ?>
-<section class="card sec" style="border-style:dashed"><b>Simulation, for you only.</b>
+<section class="card sec" style="border-style:dashed"><b>Simulation. Only you see this.</b>
   <p class="muted" style="margin:6px 0 0">This is My Site as it will look once the code is paid. Nothing was paid, saved or published. <a href="/sites/me#pay">Back to the real page</a></p></section>
 <?php endif; ?>
 <?php if (!empty($just_paid) && ($phase ?? '') === 'live'): ?>

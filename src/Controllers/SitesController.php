@@ -93,10 +93,24 @@ class SitesController extends \Core\Controller
         return in_array($uid, [1, 2], true);
     }
 
-    /** GET /sites/me/sim.js -- the owner's payment simulation; nobody else is ever sent it. */
+    /**
+     * Who may press "Simulate payment success": the owner, and the members he
+     * named (identity 20, Eleanor Rojas, owner 2026-10-24). They see the real
+     * QR like anyone; the button only plays the paid moment, nothing is saved.
+     */
+    private const SIMULATORS = [10, 20];
+
+    private function canSimulate(): bool
+    {
+        $uid = $this->userId();
+
+        return $this->isOwner() || (Members::isMember($uid) && in_array(Members::identity($uid), self::SIMULATORS, true));
+    }
+
+    /** GET /sites/me/sim.js -- the payment simulation; only those who may simulate are ever sent it. */
     public function simScript()
     {
-        if (!$this->isOwner()) {
+        if (!$this->canSimulate()) {
             http_response_code(404);
 
             return;
@@ -246,13 +260,13 @@ class SitesController extends \Core\Controller
         $sub   = (new Subscriptions($this->db))->current($uid);
         // The owner's simulation of a paid checkout: the page as it will be, drawn
         // from the open checkout in memory only. Nothing is saved, nothing is published.
-        $sim = $this->isOwner() && isset($_GET['sim']) && $sub && $sub['status'] === 'pending';
+        $sim = $this->canSimulate() && isset($_GET['sim']) && $sub && $sub['status'] === 'pending';
         if ($sim) {
             $sub  = ['status' => 'active', 'period_start' => date('Y-m-d H:i:s'), 'period_end' => date('Y-m-d H:i:s', strtotime('+1 month'))] + $sub;
             $name = ['status' => 'active'] + (array) $name;
         }
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
-            'owner' => $this->isOwner(), 'simulated' => $sim,
+            'owner' => $this->canSimulate(), 'simulated' => $sim,
             'phase' => Trial::phase($name, $sub),
             'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,
             'just_paid' => isset($_GET['paid']),
