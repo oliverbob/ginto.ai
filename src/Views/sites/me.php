@@ -126,7 +126,7 @@ if (($phase ?? '') === 'trial'): ?>
   <p class="say" id="lookSay" aria-live="polite"></p>
 </section>
 
-<section class="sec" id="pay">
+<section class="sec" id="pay" style="scroll-margin-top:12px">
   <?php if ($active): $pl = Config::plan((string) $sub['plan']); ?>
     <h2 class="serif">2 · Your plan: <?= $e($pl['name'] ?? '') ?></h2>
     <p class="muted" style="margin:0">₱<?= number_format((int) $sub['price_php']) ?> a month<?= $sub['founding'] ? ' · <b style="color:var(--gold-fg)">🏅 Founding Member</b>, price locked while you stay' : '' ?>.
@@ -192,14 +192,21 @@ if (($phase ?? '') === 'trial'): ?>
     save.disabled = false;
     if (!r.ok) { tell($('rvSay'), 'bad', r.error || 'Not saved.'); return; }
     tell($('rvSay'), 'ok', r.republished ? 'Saved, and your live site is updated.' : 'Saved. You can choose your plan now.');
-    document.querySelectorAll('input[name=look]').forEach((r) => r.addEventListener('change', async () => {
+    const payBtn = $('payGo');
+    if (payBtn) {
+      payBtn.disabled = false; payBtn.removeAttribute('title'); tell($('paySay'), '', '');
+      // Reviewed: the next step is the plan, so go there (owner, 2026-10-24).
+      const pay = $('pay');
+      if (pay) setTimeout(() => pay.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
+    }
+  });
+
+  // Your look: the same site in another of the twelve, switched at once.
+  document.querySelectorAll('input[name=look]').forEach((r) => r.addEventListener('change', async () => {
     tell($('lookSay'), '', 'Switching…');
     const res = await post('/sites/me/template', { id: r.value });
     tell($('lookSay'), res.ok ? 'ok' : 'bad', res.ok ? ('Now ' + res.name + (res.republished ? '. Your site is updated.' : '.')) : (res.error || 'Not switched.'));
   }));
-  const go = $('payGo');
-    if (go) { go.disabled = false; go.removeAttribute('title'); tell($('paySay'), '', ''); }
-  });
 
   let polling = 0;
   async function pay(plan) {
