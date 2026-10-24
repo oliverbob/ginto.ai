@@ -95,7 +95,7 @@ final class Renderer
     /**
      * @param list<string> $photoUrls in plan photo order
      * @param array{preview_hours?:int, trial_hours?:int, trial_until?:int, claim_url?:string, contact_url?:string, founding?:bool,
-     *              template?:string, videos?:array<int,string>, page?:array, chat?:bool, name?:string} $opts
+     *              template?:string, videos?:array<int,string>, page?:array, chat?:bool, name?:string, index?:bool, seo?:?array} $opts
      */
     public static function html(array $plan, array $photoUrls, array $opts = []): string
     {
@@ -217,11 +217,29 @@ final class Renderer
             $banner = '<div class="pv"><span><b>Free preview</b> &middot; disappears in ' . (int) $opts['preview_hours'] . ' hours</span>'
                 . '<a href="' . $e($opts['claim_url'] ?? '/sites/start') . '">Claim your name &rarr;</a></div>';
         }
-        $noindex = isset($opts['trial_hours']) || isset($opts['preview_hours']);
+        // Search engines only for a checked, allowed site (Indexing); a trial or preview never.
+        $noindex = empty($opts['index']) || isset($opts['trial_hours']) || isset($opts['preview_hours']);
+        $seo = is_array($opts['seo'] ?? null) ? $opts['seo'] : [];
+        $title = ($seo['title'] ?? '') ?: ($brand . ($tag !== '' ? ' — ' . $tag : ''));
+        $desc = ($seo['description'] ?? '') ?: ($sub ?: ($tag ?: $headline));
+        $home = !empty($opts['name']) ? 'https://' . $opts['name'] . '.silverqueen.pro/' : '';
+        $ogImg = $home !== '' && $heroImg !== '' && str_starts_with($heroImg, '/') ? rtrim($home, '/') . $heroImg : '';
+        $meta = '<title>' . $e(mb_substr($title, 0, 70)) . '</title><meta name="description" content="' . $e(mb_substr($desc, 0, 170)) . '">'
+            . '<meta property="og:type" content="website"><meta property="og:title" content="' . $e(mb_substr($title, 0, 70)) . '">'
+            . '<meta property="og:description" content="' . $e(mb_substr($desc, 0, 170)) . '">'
+            . ($ogImg !== '' ? '<meta property="og:image" content="' . $e($ogImg) . '"><meta name="twitter:card" content="summary_large_image">' : '')
+            . ($home !== '' ? '<link rel="canonical" href="' . $e($home) . '"><meta property="og:url" content="' . $e($home) . '">' : '');
+        if ($home !== '' && !$noindex) {
+            $ld = ['@context' => 'https://schema.org', '@type' => 'Store', 'name' => $brand, 'url' => $home, 'description' => mb_substr($desc, 0, 170)];
+            if ($ogImg !== '') {
+                $ld['image'] = $ogImg;
+            }
+            $meta .= '<script type="application/ld+json">' . json_encode($ld, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) . '</script>';
+        }
 
         return '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-            . ($noindex ? '<meta name="robots" content="noindex,nofollow">' : '')
-            . '<title>' . $e($brand) . '</title><meta name="description" content="' . $e($tag ?: $sub) . '">'
+            . ($noindex ? '<meta name="robots" content="noindex,nofollow">' : '<meta name="robots" content="index,follow">')
+            . $meta
             . '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
             . '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=' . $fontCss . '&family=Inter:wght@400;500;600&display=swap">'
             . '<style>:root{--bg:' . $bg . ';--fg:' . $fg . ';--p:' . $primary . ';--a:' . $accent . ';--on:' . $onPrimary . ';--mu:' . $muted . ';--card:' . $card . ';--line:' . $line . '}'

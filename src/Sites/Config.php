@@ -86,6 +86,7 @@ final class Config
     public const CREDITS = [
         'caption' => 1, 'description' => 1, 'chat_reply' => 1, 'live_script' => 1,
         'vision' => 1, 'assistant_edit' => 2, 'insights' => 5, 'site_generation' => 10,
+        'index_check' => 1, 'seo' => 3,
     ];
 
     /** feature => [model role, max input tokens, max output tokens] */
@@ -99,12 +100,14 @@ final class Config
         'chat_reply'      => ['fast', 3000, 300],
         'live_script'     => ['fast', 2000, 800],
         'insights'        => ['builder', 16000, 2000],
+        'index_check'     => ['builder', 6000, 500],
+        'seo'             => ['fast', 2500, 400],
     ];
 
     /** Lower number = served first when the shared AI queue is busy. */
     public const PRIORITY = [
         'chat_reply' => 1, 'assistant_edit' => 2, 'site_generation' => 3, 'vision' => 4,
-        'description' => 5, 'caption' => 5, 'live_script' => 5, 'insights' => 6,
+        'description' => 5, 'caption' => 5, 'live_script' => 5, 'insights' => 6, 'seo' => 5, 'index_check' => 6,
     ];
 
     /** Paused first when the monthly budget runs hot (80%); at 95% everything but chat. */

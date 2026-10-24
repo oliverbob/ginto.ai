@@ -41,7 +41,9 @@ final class Publisher
         $plan = Config::plan((string) $sub['plan']) ?? Config::PLANS['silver'];
 
         // Gold and Crown sites carry the customer chat.
-        return $this->push($n, (int) $plan['storage_gb'] * 1024, ['founding' => (bool) $sub['founding'], 'chat' => !empty($plan['chat']), 'name' => (string) $n['name']]);
+        return $this->push($n, (int) $plan['storage_gb'] * 1024, ['founding' => (bool) $sub['founding'], 'chat' => !empty($plan['chat']), 'name' => (string) $n['name'],
+            // Open to search engines only when checked, allowed and past its three days (Indexing).
+            'index' => (new Indexing($this->db))->indexable($n)]);
     }
 
     /**
@@ -83,12 +85,12 @@ final class Publisher
         }
         $contact = (string) ($site['contact'] ?? '');
         $html = Renderer::html($site['plan'], array_values(array_replace(array_fill(0, count($shas), ''), $urls)),
-            $opts + ['contact_url' => $contact !== '' ? $contact : '#shop', 'template' => $prev['template'] ?? null,
+            $opts + ['contact_url' => $contact !== '' ? $contact : '#shop', 'template' => $prev['template'] ?? null, 'seo' => $site['seo'] ?? null, 'name' => (string) $n['name'],
                      'videos' => json_decode((string) ($prev['media'] ?? ''), true) ?: [],
                      // Their Page and their Store, carried by the site (owner, 2026-10-24).
                      'page' => Members::page((int) $n['user_id'])]);
         $files['index.html'] = base64_encode($html);
-        $files['robots.txt'] = base64_encode(isset($opts['trial_hours']) ? "User-agent: *\nDisallow: /\n" : "User-agent: *\nAllow: /\n");
+        $files['robots.txt'] = base64_encode(!empty($opts['index']) ? "User-agent: *\nAllow: /\n" : "User-agent: *\nDisallow: /\n");
 
         $r = $this->call('publish', ['name' => $n['name'], 'files' => $files, 'quota_mb' => $quotaMb]);
         if (empty($r['ok'])) {

@@ -286,6 +286,31 @@ class SitesController extends \Core\Controller
         return $this->json($r, $r['ok'] ? 200 : 429);
     }
 
+    /** POST /sites/me/index {on} -- "Show on Google" on or off. */
+    public function indexing()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+
+        return $this->json((new \Ginto\Sites\Indexing($this->db))->setOn($uid, !empty($in['on'])));
+    }
+
+    /** POST /sites/me/seo -- SilverQueen AI writes the search title and description (3 credits). */
+    public function seo()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        $r = (new \Ginto\Sites\Indexing($this->db))->seo($uid);
+
+        return $this->json($r, $r['ok'] ? 200 : 422);
+    }
+
     /** POST /sites/me/ask {text} -- SilverQueen AI changes the site as asked, checked like every build. */
     public function ask()
     {
@@ -335,6 +360,7 @@ class SitesController extends \Core\Controller
         }
         $this->page('sites/me', ['title' => 'My Site · SilverQueen Premium', 'nav' => 'me', 'name' => $name, 'draft' => $draft,
             'owner' => $this->canSimulate(), 'simulated' => $sim,
+            'google' => $name ? (new \Ginto\Sites\Indexing($this->db))->describe($name) : null,
             'test_php' => Config::testPrice(Members::identity($uid)),
             'phase' => Trial::phase($name, $sub),
             'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,

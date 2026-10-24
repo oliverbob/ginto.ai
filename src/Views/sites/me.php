@@ -141,6 +141,23 @@ if (($phase ?? '') === 'trial'): ?>
   </form>
 </section>
 
+<?php if (!empty($google) && $draft): $seoNow = $draft['site']['seo'] ?? null;
+  $gTitle = $seoNow['title'] ?? ($plan['brand']['name'] . (($plan['brand']['tagline'] ?? '') !== '' ? ' — ' . $plan['brand']['tagline'] : ''));
+  $gDesc = $seoNow['description'] ?? (($plan['hero']['subheadline'] ?? '') ?: ($plan['brand']['tagline'] ?? '')); ?>
+<section class="sec" id="google">
+  <h2 class="serif">On Google</h2>
+  <label style="display:flex;align-items:center;gap:10px;margin-top:4px;font-weight:600"><input type="checkbox" id="gOn" <?= $google['on'] ? 'checked' : '' ?> style="width:20px;height:20px;accent-color:var(--gold)"> Show my site on Google</label>
+  <p class="say <?= $google['state'] === 'bad' ? 'bad' : ($google['state'] === 'ok' ? 'ok' : '') ?>" id="gSay" style="margin:8px 0 0"><?= $e($google['text']) ?></p>
+  <div style="margin-top:14px;padding:12px 14px;border-radius:12px;background:var(--panel2);max-width:600px">
+    <div style="font-size:12px;color:var(--muted)"><?= $e($name['name']) ?>.silverqueen.pro</div>
+    <div id="gTitle" style="font-size:18px;color:#8ab4f8;margin:2px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><?= $e(mb_substr($gTitle, 0, 70)) ?></div>
+    <div id="gDesc" style="font-size:14px;color:var(--muted)"><?= $e(mb_substr($gDesc, 0, 170)) ?></div>
+  </div>
+  <p class="muted" style="margin:8px 0 0;font-size:13px">How your site may look in search. SilverQueen AI checks every change before Google can see it (1 AI credit).</p>
+  <div class="act"><button class="btn ghost" id="seoGo" type="button"><?= $icon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>') ?> Improve my Google listing with AI</button><span class="say" id="seoSay" aria-live="polite">3 AI credits</span></div>
+</section>
+<?php endif; ?>
+
 <section class="sec" id="ai">
   <h2 class="serif">Ask SilverQueen AI</h2>
   <p class="muted" style="margin:0">Say what to change: &ldquo;make the headline warmer&rdquo;, &ldquo;blue and white colours&rdquo;, &ldquo;shorter product descriptions&rdquo;. Your photos stay where they are. Each change uses AI credits.</p>
@@ -276,6 +293,23 @@ if (($phase ?? '') === 'trial'): ?>
       const pay = $('pay');
       if (pay) setTimeout(() => pay.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
     }
+  });
+
+  // On Google: the switch, and the AI-written listing.
+  const gOn = $('gOn');
+  if (gOn) gOn.addEventListener('change', async () => {
+    const r = await post('/sites/me/index', { on: gOn.checked });
+    if (r.ok) tell($('gSay'), r.state === 'bad' ? 'bad' : (r.state === 'ok' ? 'ok' : ''), r.text);
+    else { gOn.checked = !gOn.checked; tell($('gSay'), 'bad', r.error || 'Not changed.'); }
+  });
+  const seoGo = $('seoGo');
+  if (seoGo) seoGo.addEventListener('click', async () => {
+    seoGo.disabled = true; tell($('seoSay'), '', 'Writing…');
+    const r = await post('/sites/me/seo', {});
+    seoGo.disabled = false;
+    if (!r.ok) { tell($('seoSay'), 'bad', r.error || 'Not written.'); return; }
+    $('gTitle').textContent = r.seo.title; $('gDesc').textContent = r.seo.description;
+    tell($('seoSay'), 'ok', 'Done. SilverQueen AI checks it before Google sees it.');
   });
 
   // Ask SilverQueen AI: the site changed as asked, checked like every build.

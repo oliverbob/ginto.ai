@@ -27,6 +27,10 @@ foreach ((new Ginto\Sites\Subscriptions($db))->remindRenewals() as $n) {
 foreach ((new Ginto\Sites\Insights($db))->creditVisits() as $n => $views) {
     echo date('c'), " visits credited: {$n} +{$views}", PHP_EOL;
 }
+// Search engines: changed sites checked by SilverQueen AI, then opened or closed.
+foreach ((new Ginto\Sites\Indexing($db))->tick() as $line) {
+    echo date('c'), " indexing: {$line}", PHP_EOL;
+}
 $r = (new Ginto\Sites\Trial($db))->tick();
 if ($r['ended'] !== [] || $r['released'] !== []) {
     echo date('c'), ' trial ended: ', implode(', ', $r['ended']) ?: '-', '; released: ', implode(', ', $r['released']) ?: '-', PHP_EOL;
