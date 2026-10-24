@@ -13,8 +13,8 @@ use Ginto\Support\Env;
  *
  * There is no page here and no session: the wallet's superadmin controller has
  * already checked the owner and his 2FA code, and signs each request with a key
- * derived from the relay secret both hosts hold (RELAY_JWT_SECRET here,
- * GINTO_RELAY_SECRET there). Checked: signature, a 5-minute clock window, and a
+ * derived from SQ_RELAY_SECRET, which both hosts hold (the general relay secret,
+ * narrowed by the 'sq-api-keys:' label to this one use). Checked: signature, a 5-minute clock window, and a
  * nonce that is never accepted twice.
  */
 class ApiKeysRelayController
@@ -51,9 +51,6 @@ class ApiKeysRelayController
         } catch (\InvalidArgumentException $e) {
             $out = ['ok' => false, 'error' => $e->getMessage()];
         }
-        if (isset($out['external']) && $out['external'] === []) {
-            $out['external'] = [];
-        }
         echo json_encode($out + ['ok' => $out['ok'] ?? true]);
     }
 
@@ -79,7 +76,7 @@ class ApiKeysRelayController
             return false;
         }
         $ok = false;
-        foreach (['RELAY_JWT_SECRET', 'RELAY_JWT_SECRET_PREVIOUS'] as $name) {
+        foreach (['SQ_RELAY_SECRET', 'SQ_RELAY_SECRET_PREVIOUS'] as $name) {
             $secret = (string) (Env::get($name, '') ?? '');
             if ($secret !== '' && hash_equals(hash_hmac('sha256', $ts . '.' . $nonce . '.' . $body, hash('sha256', 'sq-api-keys:' . $secret, true)), $sig)) {
                 $ok = true;
