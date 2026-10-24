@@ -28,7 +28,7 @@ final class Templates
             'palette' => ['#0f0f0f', '#f1f1f1', '#ff4e45', '#aaaaaa', '#1c1c1c'], 'font' => 'sans'],
         'timeline'  => ['name' => 'Timeline', 'line' => 'A profile with your products as posts', 'hero' => 'profile', 'shop' => 'posts',
             'palette' => ['#f0f2f5', '#1c1e21', '#1b74e4', '#65676b', '#ffffff'], 'font' => 'sans'],
-        'reel'      => ['name' => 'Reel', 'line' => 'Full-screen vertical cards you scroll through', 'hero' => 'vertical', 'shop' => 'vertical',
+        'reel'      => ['name' => 'Reel', 'line' => 'Tall vertical cards, every product on one page', 'hero' => 'vertical', 'shop' => 'vertical',
             'palette' => ['#000000', '#ffffff', '#fe2c55', '#a1a1a1', '#121212'], 'font' => 'display'],
         'thread'    => ['name' => 'Thread', 'line' => 'Text-first, black and white, short and sharp', 'hero' => 'centered', 'shop' => 'thread',
             'palette' => ['#ffffff', '#0f1419', '#0f1419', '#536471', '#ffffff'], 'font' => 'sans'],
