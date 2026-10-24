@@ -57,6 +57,7 @@ $activeClass = function($path) use ($currentPath) {
                 '/admin/menus' => 'text-emerald-500 dark:text-emerald-400',
                 '/admin/themes' => 'text-cyan-500 dark:text-cyan-400',
                 '/admin/plugins' => 'text-fuchsia-500 dark:text-fuchsia-400',
+                '/admin/api-keys' => 'text-amber-500 dark:text-amber-400',
                 '/admin/settings' => 'text-teal-500 dark:text-teal-400',
                 '/logout' => 'text-red-500 dark:text-red-400',
             ];
@@ -96,6 +97,7 @@ $activeClass = function($path) use ($currentPath) {
                 '/admin/menus' => '#10b981',
                 '/admin/themes' => '#06b6d4',
                 '/admin/plugins' => '#d946ef',
+                '/admin/api-keys' => '#f59e0b',
                 '/admin/settings' => '#14b8a6',
                 '/logout' => '#ef4444',
             ];
@@ -333,6 +335,14 @@ $activeClass = function($path) use ($currentPath) {
             <span class="font-medium">Server Hosting</span>
         </a>
         
+        <!-- API Keys -->
+        <a href="/admin/api-keys" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/api-keys') ?> <?= activeIconClass('/admin/api-keys') ?>">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 <?= iconClassForAdmin('/admin/api-keys') ?>" <?= iconStyleForAdmin('/admin/api-keys') ?>>
+                <circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/>
+            </svg>
+            <span class="font-medium">API Keys</span>
+        </a>
+
         <!-- Settings -->
         <a href="/admin/settings" class="w-full flex items-center space-x-3 px-4 py-1 transition-all text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 <?= $activeClass('/admin/settings') ?> <?= activeIconClass('/admin/settings') ?>">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 <?= iconClassForAdmin('/admin/settings') ?>" <?= iconStyleForAdmin('/admin/settings') ?>>

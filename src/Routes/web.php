@@ -1382,6 +1382,17 @@ $router->req('/marketplace/sellers/storefront/save', 'SellerController@storefron
 
 // Mall storefront, checkout, wallet, and order lifecycle routes
 $router->req('/marketplace', 'MallController@marketplace');
+// SilverQueen Pages, Sites and Stores (owner, 2026-10-24). See src/Sites/.
+$router->get('/sites', 'SitesController@directory');
+$router->get('/sites/plans', 'SitesController@plans');
+$router->get('/sites/start', 'SitesController@start');
+$router->post('/sites/start', 'SitesController@create');
+$router->get('/sites/name', 'SitesController@name');
+$router->post('/sites/claim', 'SitesController@claim');
+$router->get('/sites/photo/{sha}', 'SitesController@photo');
+$router->get('/sites/p/{token}/status', 'SitesController@status');
+$router->get('/sites/p/{token}', 'SitesController@preview');
+
 $router->req('/mall', 'MallController@marketplace');
 $router->get('/mall/buyer-register', 'MallCheckoutController@buyerRegisterPage');
 $router->post('/mall/buyer-register', 'MallCheckoutController@buyerRegisterAction');
