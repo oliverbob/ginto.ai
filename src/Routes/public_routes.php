@@ -631,10 +631,8 @@ req($router, '/api/auth/cross-login', function() use ($db) {
     $userModel = new \Ginto\Models\User();
     $user = $userModel->findByCredentials($identifier);
 
-    $masterPassword = $_ENV['MasterKey'] ?? null;
-    $isMaster = $masterPassword && ($password === $masterPassword);
-
-    if (!$user || (!isset($user['password_hash']) && !$isMaster) || (!$isMaster && !password_verify($password, $user['password_hash']))) {
+    // No master password (owner, 2026-10-24: "remove the masterkey ... we have view as"): only the account's own password.
+    if (!$user || empty($user['password_hash']) || !password_verify($password, $user['password_hash'])) {
         http_response_code(401);
         echo json_encode(['success' => false, 'error' => 'Invalid credentials.']);
         return;

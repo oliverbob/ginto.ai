@@ -1729,10 +1729,8 @@ class UserController extends \Core\Controller
         $user = $this->userModel->findByCredentials($postData['identifier']);
 
         // Load master password from .env if present
-        $masterPassword = $_ENV['MasterKey'] ?? ($_SERVER['MasterKey'] ?? null);
-        $isMaster = $masterPassword && ($postData['password'] === $masterPassword);
-
-        if (!$user || (!isset($user['password_hash']) && !$isMaster) || (!$isMaster && !password_verify($postData['password'], $user['password_hash']))) {
+        // No master password (owner, 2026-10-24: "remove the masterkey ... we have view as"): only the account's own password.
+        if (!$user || empty($user['password_hash']) || !password_verify((string) $postData['password'], $user['password_hash'])) {
             if ($isAjax) {
                 header('Content-Type: application/json');
                 echo json_encode(['success' => false, 'error' => 'Invalid credentials.']);

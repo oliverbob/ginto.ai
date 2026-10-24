@@ -4,7 +4,7 @@ namespace Ginto\Services;
 /**
  * RFC 6238 TOTP enrollment and verification for authenticator applications.
  * Secrets are encrypted at rest; set TOTP_ENCRYPTION_KEY to a long random
- * deployment secret (APP_KEY or MasterKey is accepted for older deployments).
+ * deployment secret (APP_KEY when TOTP_ENCRYPTION_KEY is not set).
  */
 class TotpService
 {
@@ -129,7 +129,7 @@ class TotpService
     private function encryptionKey(): string
     {
         $raw = $_ENV['TOTP_ENCRYPTION_KEY'] ?? getenv('TOTP_ENCRYPTION_KEY')
-            ?: ($_ENV['APP_KEY'] ?? getenv('APP_KEY') ?: ($_ENV['MasterKey'] ?? getenv('MasterKey')));
+            ?: ($_ENV['APP_KEY'] ?? getenv('APP_KEY'));
         if (!is_string($raw) || $raw === '') throw new \RuntimeException('TOTP_ENCRYPTION_KEY must be configured before enabling two-factor authentication.');
         return hash('sha256', $raw, true);
     }
