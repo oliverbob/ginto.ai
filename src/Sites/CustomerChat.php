@@ -80,7 +80,8 @@ final class CustomerChat
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => 'The assistant could not answer just now. Please try again.'];
         }
-        $answer = mb_substr(trim((string) $r['content']), 0, 700);
+        // Plain text: the chat panel shows text, so markdown marks would show as stray characters.
+        $answer = mb_substr(trim(preg_replace(['~\*\*|__|`~', '~^\s*#+\s*~m', '~[ \t]+\n~'], ['', '', "\n"], (string) $r['content'])), 0, 700);
         if ($answer === '') {
             return ['ok' => false, 'error' => 'The assistant could not answer just now. Please try again.'];
         }
