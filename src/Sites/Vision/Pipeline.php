@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Ginto\Sites\Vision;
 
 use Ginto\Sites\Config;
-use Ginto\Sites\Groq;
+use Ginto\Sites\Ai;
 use Ginto\Sites\LimitReached;
 use Ginto\Sites\Photos;
 
@@ -20,7 +20,7 @@ use Ginto\Sites\Photos;
  */
 final class Pipeline
 {
-    public function __construct(private $db, private Groq $groq)
+    public function __construct(private $db, private Ai $groq)
     {
     }
 

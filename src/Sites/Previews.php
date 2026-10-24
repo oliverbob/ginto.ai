@@ -82,7 +82,7 @@ final class Previews
 
         try {
             $meter = new Meter($this->db);
-            $groq  = new Groq($meter);
+            $groq  = new Ai($meter);
             $shas  = json_decode((string) $row['photos'], true) ?: [];
             $facts = (new Pipeline($this->db, $groq))->run($shas, $ctx);
             $photos = array_map(static fn ($sha) => $facts[$sha] ?? ['status' => 'manual', 'vision' => null, 'palette' => []], $shas);
@@ -90,9 +90,13 @@ final class Previews
             try {
                 $plan = (new Builder($groq))->build((string) $row['description'], $photos, $ctx);
             } catch (LimitReached $e) {
-                throw $e;
+                // The free minute is spent (a preview never uses paid AI): the site is built without AI instead.
+                if (!in_array($e->reason, ['busy', 'preview_budget'], true)) {
+                    throw $e;
+                }
+                $plan = Renderer::fallback((string) $row['description'], $photos);
             } catch (\Throwable $e) {
-                // Groq down or refusing: the seller still sees a site, from their own words and the photos' colours.
+                // AI down or refusing: the seller still sees a site, from their own words and the photos' colours.
                 $plan = Renderer::fallback((string) $row['description'], $photos);
             }
 

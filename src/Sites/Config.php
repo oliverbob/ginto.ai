@@ -55,7 +55,7 @@ final class Config
         return $prices[$model] ?? [0.80, 4.00];
     }
 
-    /** Groq counts every image as this many input tokens. */
+    /** Every image counts as this many input tokens. */
     public const IMAGE_TOKENS = 2048;
 
     public static function usdPhp(): float
@@ -91,16 +91,17 @@ final class Config
     /** feature => [model role, max input tokens, max output tokens] */
     public const LIMITS = [
         'vision'          => ['vision', 3 * 2048 + 800, 400],
-        'site_generation' => ['builder', 12000, 16000],
-        'assistant_edit'  => ['builder', 8000, 4000],
+        // Sized to Groq's free minute (8K tokens, prompt and answer together); bigger work overflows to Cerebras.
+        'site_generation' => ['builder', 4500, 3500],
+        'assistant_edit'  => ['builder', 4000, 2000],
         'description'     => ['fast', 1500, 300],
         'caption'         => ['fast', 1500, 300],
-        'chat_reply'      => ['fast', 4000, 300],
+        'chat_reply'      => ['fast', 3000, 300],
         'live_script'     => ['fast', 2000, 800],
         'insights'        => ['builder', 16000, 2000],
     ];
 
-    /** Lower number = served first when the shared Groq queue is busy. */
+    /** Lower number = served first when the shared AI queue is busy. */
     public const PRIORITY = [
         'chat_reply' => 1, 'assistant_edit' => 2, 'site_generation' => 3, 'vision' => 4,
         'description' => 5, 'caption' => 5, 'live_script' => 5, 'insights' => 6,
@@ -121,12 +122,6 @@ final class Config
     public static function previewBudgetPhp(): float
     {
         return (float) self::env('SITES_PREVIEW_BUDGET_PHP', '1000');
-    }
-
-    /** The whole month's Groq budget (USD) the circuit breaker measures against. */
-    public static function monthlyBudgetUsd(): float
-    {
-        return (float) self::env('SITES_GROQ_MONTHLY_USD', '50');
     }
 
     public static function foundingCap(): int

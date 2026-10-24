@@ -515,7 +515,104 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }
     }
 
+    /**
+     * Groq and Cerebras on OUR keys are one service (owner, 2026-10-24: "Cerebras
+     * (paid tier), groq (free tier). You can now consolidate them. And make sure
+     * that we earn more than we pay many times"). The free one answers first; the
+     * paid one only when the free one refuses for capacity, and only while
+     * AiSpend has room this month. Every call is written to the ledger. A member's
+     * own key, and every other provider, goes straight through as before.
+     */
     public function chat(array $messages, array $tools = [], array $options = []): LLMResponse
+    {
+        return $this->routed($options, $messages, null, fn (array $o): LLMResponse => $this->chatOnce($messages, $tools, $o));
+    }
+
+    public function chatStream(array $messages, array $tools = [], array $options = [], callable $onChunk = null): LLMResponse
+    {
+        $emitted = false;
+        $relay = $onChunk === null ? null : function (...$args) use (&$emitted, $onChunk) {
+            $emitted = true;
+
+            return $onChunk(...$args);
+        };
+
+        return $this->routed($options, $messages, static function () use (&$emitted): bool { return $emitted; },
+            fn (array $o): LLMResponse => $this->chatStreamOnce($messages, $tools, $o, $relay));
+    }
+
+    private function routed(array $options, array $messages, ?callable $emitted, callable $call): LLMResponse
+    {
+        $ours = in_array($this->providerName, ['groq', 'cerebras'], true)
+            && \Ginto\Support\AiSpend::ours($this->providerName, $this->apiKey);
+        if (!$ours) {
+            return $call($options);
+        }
+
+        $model  = (string) ($options['model'] ?? $this->model);
+        $family = \Ginto\Support\ProviderRouter::family($model);
+        $plan   = $family !== null ? \Ginto\Support\ProviderRouter::order() : [$this->providerName];
+        $last   = null;
+
+        foreach ($plan as $p) {
+            $m = $family !== null ? \Ginto\Support\ProviderRouter::modelFor($p, $family) : $model;
+            if ($m === null) {
+                continue;
+            }
+            if (\Ginto\Support\AiSpend::isPaid($p) && !\Ginto\Support\AiSpend::paidRoom()) {
+                $last = $last ?? LLMResponse::error('SilverQueen AI is busy right now. Please try again in a little while.');
+                continue;
+            }
+            if ($p !== $this->providerName || $m !== $this->model) {
+                $this->useProvider($p, $m);
+            }
+            $o = $options;
+            $o['model'] = $m;
+            $r = $call($o);
+
+            [$in, $out, $est] = $this->usageOf($r, $messages);
+            \Ginto\Support\AiSpend::record($p, $m, $in, $out, 'chat', isset($_SESSION['user_id']) ? (int) $_SESSION['user_id'] : null, $est);
+
+            $again = $r->isError() && \Ginto\Support\ProviderRouter::isOverflow($r->getContent())
+                && !($emitted !== null && $emitted());
+            if (!$again) {
+                return $r;
+            }
+            $last = $r;
+        }
+
+        return $last ?? $call($options);
+    }
+
+    /** Switch this instance to another of our providers (its own key and address). */
+    private function useProvider(string $provider, string $model): void
+    {
+        $this->providerName = $provider;
+        $this->configure([
+            'api_key' => \Ginto\Support\ProviderRouter::key($provider),
+            'model'   => $model,
+            'timeout' => $this->timeout,
+        ]);
+    }
+
+    /** @return array{0:int,1:int,2:bool} input tokens, output tokens, and whether they were estimated */
+    private function usageOf(LLMResponse $r, array $messages): array
+    {
+        $u = $r->getUsage();
+        if (!empty($u['prompt_tokens']) || !empty($u['completion_tokens'])) {
+            return [(int) ($u['prompt_tokens'] ?? 0), (int) ($u['completion_tokens'] ?? 0), false];
+        }
+        // Streams rarely report usage: about four characters a token, rounded up a fifth to stay on the safe side.
+        $chars = 0;
+        foreach ($messages as $msg) {
+            $c = $msg['content'] ?? '';
+            $chars += is_string($c) ? mb_strlen($c) : mb_strlen((string) json_encode($c));
+        }
+
+        return [(int) ceil($chars / 4 * 1.2), $r->isError() ? 0 : (int) ceil(mb_strlen($r->getContent()) / 4 * 1.2), true];
+    }
+
+    private function chatOnce(array $messages, array $tools = [], array $options = []): LLMResponse
     {
         $payload = [
             'model' => $options['model'] ?? $this->model,
@@ -560,7 +657,7 @@ class OpenAICompatibleProvider extends AbstractLLMProvider
         }
     }
 
-    public function chatStream(array $messages, array $tools = [], array $options = [], callable $onChunk = null): LLMResponse
+    private function chatStreamOnce(array $messages, array $tools = [], array $options = [], callable $onChunk = null): LLMResponse
     {
         $payload = [
             'model' => $options['model'] ?? $this->model,

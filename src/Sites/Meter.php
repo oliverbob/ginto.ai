@@ -7,7 +7,7 @@ namespace Ginto\Sites;
 /**
  * Who may spend AI, and what they spent.
  *
- * Read before every Groq call (allow) and written after it (record), from the
+ * Read before every AI call (allow) and written after it (record), from the
  * one table sites_ai_usage. Order of the checks is the order of the owner's
  * sheet: the global budget breaker first (it protects everyone), then the
  * shared rate (customer chat keeps its 30%), then the free-preview budget or
@@ -26,18 +26,6 @@ final class Meter
     public function allow(string $feature, array $ctx, int $estimate): void
     {
         $model = Config::model(Config::LIMITS[$feature][0]);
-
-        // 1. The month's whole Groq budget: 80% pauses the nice-to-haves, 95% all but customer chat.
-        $spent = $this->sum('cost_usd', 'created_at >= ?', [$this->monthStart()]);
-        $ratio = $spent / max(0.01, Config::monthlyBudgetUsd());
-        if ($ratio >= 0.95 && $feature !== 'chat_reply') {
-            $this->alert('95', $spent);
-            throw new LimitReached('budget', 'SilverQueen AI is resting for a little while. Your site keeps working; please try again later.');
-        }
-        if ($ratio >= 0.80 && in_array($feature, Config::NON_ESSENTIAL, true)) {
-            $this->alert('80', $spent);
-            throw new LimitReached('budget', 'This AI helper is paused for now. Your site keeps working; please try again later.');
-        }
 
         // 2. The shared per-model rate. Customer chat may use all of it; everything else stops at 70% on
         //    the fast model (its 30% is chat's), and the low-priority work steps aside at 80% anywhere.
@@ -84,17 +72,16 @@ final class Meter
         }
     }
 
-    public function record(string $feature, string $model, array $usage, array $ctx, bool $ok): float
+    public function record(string $feature, string $provider, string $model, array $usage, array $ctx, bool $ok): float
     {
-        [$pin, $pout] = Config::price($model);
-        $fresh = max(0, $usage['in'] - $usage['cached']);
-        // Cached prompt tokens are billed at half.
-        $usd = ($fresh * $pin + $usage['cached'] * $pin * 0.5 + $usage['out'] * $pout) / 1_000_000;
+        // What the provider that answered charges: nothing on a free tier.
+        $usd = \Ginto\Support\AiSpend::costUsd($provider, $model, max(0, $usage['in'] - intdiv($usage['cached'], 2)), $usage['out']);
 
         $this->db->insert('sites_ai_usage', [
             'user_id'       => isset($ctx['user_id']) ? (int) $ctx['user_id'] : null,
             'preview_id'    => isset($ctx['preview_id']) ? (int) $ctx['preview_id'] : null,
             'feature'       => $feature,
+            'provider'      => $provider,
             'model'         => $model,
             'in_tokens'     => $usage['in'],
             'out_tokens'    => $usage['out'],
@@ -142,17 +129,5 @@ final class Meter
         $q->execute($args);
 
         return (int) $q->fetchColumn();
-    }
-
-    /** One line per threshold per day in the Sites log, for the admin. */
-    private function alert(string $level, float $spent): void
-    {
-        $flag = STORAGE_PATH . '/logs/sites-budget-' . $level . '-' . date('Ymd');
-        if (is_file($flag)) {
-            return;
-        }
-        @touch($flag);
-        @file_put_contents(STORAGE_PATH . '/logs/sites.log',
-            date('c') . " BUDGET {$level}% reached: \$" . number_format($spent, 2) . ' of $' . Config::monthlyBudgetUsd() . "\n", FILE_APPEND | LOCK_EX);
     }
 }

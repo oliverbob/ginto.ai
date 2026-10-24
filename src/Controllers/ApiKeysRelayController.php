@@ -41,6 +41,7 @@ class ApiKeysRelayController
         try {
             $out = match ((string) ($in['action'] ?? '')) {
                 'status' => ['ok' => true, 'external' => $keys->external(), 'internal' => $keys->internal(),
+                    'spend' => \Ginto\Support\AiSpend::summary(),
                     'models' => class_exists(\Ginto\Sites\Config::class) ? \Ginto\Sites\Config::models() : []],
                 'test'   => $keys->test((string) ($in['provider'] ?? ''), trim((string) ($in['key'] ?? ''))),
                 'save'   => $this->save($keys, $in, $by),

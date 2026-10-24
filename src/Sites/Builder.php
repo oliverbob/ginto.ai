@@ -14,7 +14,7 @@ namespace Ginto\Sites;
  */
 final class Builder
 {
-    /** Kept byte-identical between calls: Groq bills a repeated prefix at half. */
+    /** Kept byte-identical between calls: a repeated prefix is billed at half. */
     private const SYSTEM = 'You design one-page online shops for Filipino sellers on SilverQueen. You get the seller\'s own '
         . 'description of the shop and, for each product photo, what was seen in it. Answer ONLY with JSON in this shape: '
         . '{"brand":{"name":string,"tagline":string},"theme":{"primary":"#hex","accent":"#hex","background":"#hex","text":"#hex",'
@@ -26,7 +26,7 @@ final class Builder
         . 'awards or reviews; keep the seller\'s own facts; write in the language the seller wrote in; headline at most 8 '
         . 'words; product descriptions at most 35 words; 3 highlights at most; warm, simple, honest.';
 
-    public function __construct(private Groq $groq)
+    public function __construct(private Ai $groq)
     {
     }
 

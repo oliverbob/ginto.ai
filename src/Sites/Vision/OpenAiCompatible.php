@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Ginto\Sites\Vision;
 
 use Ginto\Sites\Config;
-use Ginto\Sites\Groq;
+use Ginto\Sites\Ai;
 use Ginto\Sites\Photos;
 use Ginto\Support\Env;
 
 /**
  * A vision provider on an OpenAI-style chat API.
  *
- * Two of them are wired: Groq (through Ginto\Sites\Groq, so it is metered like
+ * Two of them are wired: Groq (through Ginto\Sites\Ai, so it is metered like
  * everything else) and the alternate slot, which is empty until SITES_VISION_ALT_URL,
  * SITES_VISION_ALT_KEY and SITES_VISION_ALT_MODEL are set. The alternate is not
  * metered by Groq's prices; it records its tokens at the vision price as an
@@ -20,7 +20,7 @@ use Ginto\Support\Env;
  */
 final class OpenAiCompatible implements Provider
 {
-    public function __construct(private string $slot, private ?Groq $groq = null)
+    public function __construct(private string $slot, private ?Ai $groq = null)
     {
     }
 
@@ -32,7 +32,7 @@ final class OpenAiCompatible implements Provider
     public function ready(): bool
     {
         return $this->slot === 'groq'
-            ? Groq::configured()
+            ? \Ginto\Support\ProviderRouter::key('groq') !== ''
             : (string) Env::get('SITES_VISION_ALT_URL', '') !== '' && (string) Env::get('SITES_VISION_ALT_MODEL', '') !== '';
     }
 

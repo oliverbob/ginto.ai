@@ -67,6 +67,7 @@ final class ApiKeys
             }
             $out[] = $p + [
                 'id'   => $id,
+                'tier' => \Ginto\Support\AiSpend::tier($id),
                 'env_set'  => $env !== '',
                 'env_mask' => self::mask($env),
                 'rows' => array_map(static fn (array $r): array => [
@@ -116,7 +117,8 @@ final class ApiKeys
         }
         $tier = $tier === 'production' ? 'production' : 'basic';
 
-        EnvFile::set([$p['env'] => $key]);
+        // The key and its tier together: the tier decides whether its calls cost money (AiSpend).
+        EnvFile::set([$p['env'] => $key, strtoupper($provider) . '_TIER' => $tier === 'production' ? 'paid' : 'free']);
 
         $this->db->update('provider_keys', ['is_default' => 0], ['provider' => $provider, 'user_id' => null]);
         $have = $this->db->get('provider_keys', ['id'], ['provider' => $provider, 'user_id' => null, 'api_key' => $key]);
