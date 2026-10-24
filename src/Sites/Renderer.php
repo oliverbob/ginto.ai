@@ -320,38 +320,53 @@ final class Renderer
             . '#sqc .q,#sqc .a{max-width:84%;padding:9px 13px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere}'
             . '#sqc .q{align-self:flex-end;background:var(--qc);color:#fff;border-bottom-right-radius:6px}'
             . '#sqc .a{align-self:flex-start;background:#fff;color:#141414;border-bottom-left-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.08)}'
-            . '#sqc .a.wait{color:#888;letter-spacing:2px}'
+            . '#sqc .a.wait{display:inline-flex;align-items:center;gap:8px;padding:10px 14px}'
+            . '#sqc .wait svg{width:16px;height:16px;color:var(--qc);animation:sqcPen 1s ease-in-out infinite;transform-origin:20% 90%}'
+            . '#sqc .dots{display:inline-flex;gap:4px}#sqc .dots i{width:7px;height:7px;border-radius:50%;background:#9a9a9a;animation:sqcDot 1.2s infinite ease-in-out}'
+            . '#sqc .dots i:nth-child(2){animation-delay:.15s}#sqc .dots i:nth-child(3){animation-delay:.3s}'
+            . '@keyframes sqcDot{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}'
+            . '@keyframes sqcPen{0%,100%{transform:rotate(-8deg) translateX(0)}50%{transform:rotate(6deg) translateX(3px)}}'
             . '#sqc .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}'
             . '#sqc .chips button{border:1px solid var(--qc);background:#fff;color:var(--qc);border-radius:999px;padding:6px 12px;font:600 13px Inter,sans-serif;cursor:pointer}'
-            . '#sqc form{display:flex;align-items:center;gap:8px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #eee}'
-            . '#sqc input{flex:1;min-width:0;height:44px;padding:0 16px;border-radius:999px;border:1.5px solid #e2e2e0;background:#f5f5f4;color:#141414;font:16px Inter,sans-serif;outline:0}'
-            . '#sqc input:focus{border-color:var(--qc);background:#fff}'
-            . '#sqc form button{width:44px;height:44px;border:0;border-radius:50%;background:var(--qc);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none}'
-            . '#sqc form button svg{width:20px;height:20px}'
+            // The composer, as in SilverQueen's own chats: one rounded field that grows, the send inside it.
+            . '#sqc form{padding:8px 10px calc(8px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #eee}'
+            . '#sqc .fld{display:flex;align-items:flex-end;gap:4px;border:1px solid #e2e2e0;background:#f5f5f4;border-radius:1.25rem;padding:0 4px 0 0;transition:border-color .15s}'
+            . '#sqc .fld:focus-within{border-color:var(--qc);background:#fff}'
+            . '#sqc textarea{flex:1;min-width:0;resize:none;border:0;background:transparent;color:#141414;font:16px/1.4 Inter,sans-serif;padding:.6rem 0 .6rem .95rem;min-height:2.6rem;max-height:8.5rem;outline:0;overflow-y:auto}'
+            . '#sqc form button{flex:none;width:2.4rem;height:2.4rem;margin-bottom:.1rem;border:0;border-radius:50%;background:none;color:var(--qc);display:grid;place-items:center;cursor:pointer;transition:transform .12s,opacity .15s}'
+            . '#sqc form button:disabled{opacity:.35;cursor:default}#sqc form button:active:not(:disabled){transform:scale(.9)}'
+            . '#sqc form button svg{width:1.5rem;height:1.5rem}'
             . '#sqc .note{padding:6px 14px 0;color:#888;font-size:11px;background:#fff}';
-        $send = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+        $send = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 3 10.5 13.5M21 3l-6.6 18-3.9-7.5L3 9.6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>';
         $bubble = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5z"/></svg>';
-        $js = '(function(){var N=' . json_encode($name) . ',B=document.getElementById("sqc-b"),P=document.getElementById("sqc"),M=P.querySelector(".m"),F=P.querySelector("form"),I=F.querySelector("input"),H=[];'
+        $js = '(function(){var N=' . json_encode($name) . ',B=document.getElementById("sqc-b"),P=document.getElementById("sqc"),M=P.querySelector(".m"),F=P.querySelector("form"),I=F.querySelector("textarea"),H=[];'
             // On phones the panel fills exactly what the keyboard leaves.
             . 'function fit(){var v=window.visualViewport;P.style.setProperty("--vh",(v?v.height:innerHeight)+"px");if(v&&P.classList.contains("on")&&innerWidth<=600)P.style.top=v.offsetTop+"px"}'
             . 'if(window.visualViewport){visualViewport.addEventListener("resize",fit);visualViewport.addEventListener("scroll",fit)}fit();'
             . 'function add(c,t){var d=document.createElement("div");d.className=c;d.textContent=t;M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
-            . 'function ask(t){t=t.trim();if(!t)return;var ch=M.querySelector(".chips");if(ch)ch.remove();add("q",t);H.push({role:"visitor",text:t});var w=add("a wait","•••");'
+            . 'var PEN=' . json_encode('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16v4z"/></svg>') . ';'
+            . 'function wait(){var d=document.createElement("div");d.className="a wait";d.setAttribute("aria-label","Writing");d.innerHTML=PEN+"<span class=dots><i></i><i></i><i></i></span>";M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
+            . 'function ask(t){t=t.trim();if(!t)return;var ch=M.querySelector(".chips");if(ch)ch.remove();add("q",t);H.push({role:"visitor",text:t});var w=wait();'
             . 'fetch("https://silverqueen.pro/sites/chat",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({name:N,messages:H.slice(-6)})})'
             . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.className="a";w.textContent=x;M.scrollTop=M.scrollHeight;if(d&&d.ok)H.push({role:"shop",text:x})})'
             . '.catch(function(){w.className="a";w.textContent="No connection. Please try again."})}'
             . 'B.onclick=function(){P.classList.add("on");B.style.display="none";fit();if(!M.children.length){add("a","Hi! What would you like to know about our shop?");'
             . 'var c=document.createElement("div");c.className="chips";["What do you sell?","How do I order?","How can I contact you?"].forEach(function(t){var b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=function(){ask(t)};c.appendChild(b)});M.appendChild(c)}};'
             . 'P.querySelector("header button").onclick=function(){P.classList.remove("on");B.style.display="";I.blur()};'
-            . 'F.onsubmit=function(ev){ev.preventDefault();var t=I.value;I.value="";ask(t)}})();';
+            // The field grows with the message (up to six lines); Enter sends on a computer, Shift+Enter is a new line;
+            // on a phone the return key is a new line and the arrow sends, as in the app's own chats.
+            . 'var S=F.querySelector("button");function grow(){I.style.height="auto";I.style.height=Math.min(I.scrollHeight,136)+"px";S.disabled=!I.value.trim()}'
+            . 'I.addEventListener("input",grow);grow();'
+            . 'I.addEventListener("keydown",function(ev){if(ev.key==="Enter"&&!ev.shiftKey&&matchMedia("(pointer:fine)").matches){ev.preventDefault();F.requestSubmit?F.requestSubmit():F.onsubmit(ev)}});'
+            . 'F.onsubmit=function(ev){ev.preventDefault();var t=I.value;I.value="";grow();ask(t);I.focus()}})();';
 
         return '<style>' . $css . '</style>'
             . '<button id="sqc-b" type="button" aria-label="Ask ' . $e($brand) . '">' . $bubble . ' Ask ' . $e($brand) . '</button>'
             . '<div id="sqc" role="dialog" aria-label="Chat with ' . $e($brand) . '"><header><i>' . $e(mb_strtoupper(mb_substr($brand, 0, 1))) . '</i>'
             . '<div><b>' . $e($brand) . '</b><small>Replies instantly</small></div><button type="button" aria-label="Close">&times;</button></header>'
             . '<div class="m" aria-live="polite"></div><div class="note">Answers by SilverQueen AI from this shop\'s own information.</div>'
-            . '<form><input type="text" maxlength="500" placeholder="Ask about a product…" aria-label="Your question" enterkeyhint="send">'
-            . '<button type="submit" aria-label="Send">' . $send . '</button></form></div>'
+            . '<form><div class="fld"><textarea rows="1" maxlength="500" placeholder="Ask about a product…" aria-label="Your question"></textarea>'
+            . '<button type="submit" aria-label="Send" disabled>' . $send . '</button></div></form></div>'
             . '<script>' . $js . '</script>';
     }
 
