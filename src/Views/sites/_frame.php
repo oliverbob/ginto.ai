@@ -31,7 +31,7 @@ a{color:inherit}
 .top nav a{text-decoration:none;font-size:14px;font-weight:600;color:var(--muted);padding:7px 10px;border-radius:8px}
 .top nav a[aria-current]{color:var(--fg);background:var(--panel2)}
 .logo{white-space:nowrap}
-@media (max-width:520px){.top{flex-wrap:wrap;padding:14px 0 6px}.top nav{margin-left:0;width:100%;justify-content:space-between}.top nav a{flex:1;text-align:center}}
+@media (max-width:520px){.top{flex-wrap:wrap;padding:14px 0 6px}.top nav{margin-left:0;width:100%;justify-content:space-between;flex-wrap:nowrap}.top nav a{flex:1 1 auto;text-align:center;white-space:nowrap;font-size:13px;padding:7px 6px}}
 h1,h2,.serif{font-family:"Playfair Display",Georgia,serif;letter-spacing:-.5px;line-height:1.1;margin:0}
 .gold-text{background:linear-gradient(90deg,var(--gold-fg),var(--shine) 45%,var(--gold-fg) 70%);-webkit-background-clip:text;background-clip:text;color:transparent}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:5px;padding:13px 20px;font:700 15px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}
