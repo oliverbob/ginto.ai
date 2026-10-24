@@ -198,7 +198,7 @@ final class Renderer
 
         // The member's Page and Store, which the site carries too (owner, 2026-10-24:
         // "the sites should contain details about the page and the store").
-        [$storeHtml, $pageHtml] = self::pageAndStore(is_array($opts['page'] ?? null) ? $opts['page'] : [], $e);
+        [$storeHtml, $pageHtml] = self::pageAndStore(is_array($opts['page'] ?? null) ? $opts['page'] : [], $e, $brand);
 
         $banner = '';
         if (isset($opts['trial_hours'])) {
@@ -244,12 +244,14 @@ final class Renderer
 
     /**
      * The Store (their real Mall listings, each to its public page) and the Page
-     * (their SilverQueen profile, opened in the app). Only https addresses; a
+     * (their SilverQueen profile, opened in the app), under the site's own brand:
+     * a member's profile name is never printed on a public site (an owner's name
+     * stays private; a member's nickname is theirs to show in the app). Only https addresses; a
      * member with no shop gets no Store section at all.
      *
      * @return array{0:string,1:string}
      */
-    private static function pageAndStore(array $d, callable $e): array
+    private static function pageAndStore(array $d, callable $e, string $brand): array
     {
         $https = static fn ($u): string => is_string($u) && preg_match('#^https://[^\s"<>]+$#', $u) === 1 ? $u : '';
         $store = '';
@@ -280,7 +282,7 @@ final class Renderer
             $page = '<section class="sq-page" id="page"><div class="pc">' . ($cover !== '' ? '<img src="' . $e($cover) . '" alt="" loading="lazy" style="object-position:'
                 . (int) ($pr['cx'] ?? 50) . '% ' . (int) ($pr['cy'] ?? 50) . '%">' : '') . '</div>'
                 . '<div class="pw"><span class="pa">' . ($av !== '' ? '<img src="' . $e($av) . '" alt="">' : '') . '</span>'
-                . '<div><span class="k">Find us on SilverQueen</span><h2>' . $e($pr['name'] ?? '') . '</h2><p>Our lives, our news and our store, all in one place.</p></div>'
+                . '<div><span class="k">Find us on SilverQueen</span><h2>' . $e($brand) . '</h2><p>Our lives, our news and our store, all in one place.</p></div>'
                 . '<a class="btn" href="' . $e($link) . '" target="_blank" rel="noopener">Follow on SilverQueen</a></div></section>';
         }
 
