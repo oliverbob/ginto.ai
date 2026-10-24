@@ -80,7 +80,8 @@ final class Names
 
     public function of(int $userId): ?array
     {
-        return $this->db->get('sites_names', ['name', 'status', 'preview_id'], ['user_id' => $userId]) ?: null;
+        // The whole row: the trial clock (held_at, trial_until, release_at) decides its phase.
+        return $this->db->get('sites_names', '*', ['user_id' => $userId]) ?: null;
     }
 
     /** Letters that read alike become one: s1lverqueen, silverqu33n and 5ilverqueen all read as silverqueen. */
