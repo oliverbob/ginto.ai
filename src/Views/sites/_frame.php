@@ -61,8 +61,8 @@ svg.i{width:18px;height:18px;flex:none}
 </header>
 <?php else: ?>
 <footer class="terms">
-  <p>SilverQueen is managed by Ginto Services Corporation (SEC Reg. No. 2026040246055-25). SilverQueen Premium are
-     monthly hosting and builder services. Plans are services, not investments. They grant no ownership of any server or company
+  <p>SilverQueen is managed by Ginto Services Corporation (SEC Reg. No. 2026040246055-25). SilverQueen Premium (Pages, Sites and Stores) is a monthly hosting and
+     builder service. Plans are services, not investments. They grant no ownership of any server or company
      asset and no right to profits or returns. Plans are non-transferable. Cancel anytime; the Founding price ends if the
      subscription lapses. <a href="https://silverqueen.pro/terms">Terms</a></p>
 </footer>
