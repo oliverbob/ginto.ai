@@ -302,10 +302,16 @@ class SitesController extends \Core\Controller
         return Config::isPublic() || $this->isAdmin() || Members::isMember($this->userId());
     }
 
-    /** A silverqueen.pro account, or a SilverQueen member who came in from the feed card (Sites only). */
+    /**
+     * Who this is for Sites. A SilverQueen member who came in by the feed card's
+     * link comes FIRST: the link is the most recent and most explicit "this is
+     * me", and the same phone's browser is often still signed in to a
+     * silverqueen.pro account, which would otherwise take over (owner's phone,
+     * 2026-10-24: the held name vanished and the page said "Opening soon").
+     */
     private function userId(): int
     {
-        return (int) ($_SESSION['user_id'] ?? 0) ?: (int) ($_SESSION['sites_uid'] ?? 0);
+        return (int) ($_SESSION['sites_uid'] ?? 0) ?: (int) ($_SESSION['user_id'] ?? 0);
     }
 
     /** GET /sites/enter?t= -- the feed card's one-time way in, for the Sites dashboard only. */
