@@ -239,7 +239,7 @@ final class Renderer
             . '<a class="btn" href="' . $e($contact) . '"' . $ext . '>' . $e($plan['closing']['cta']) . '</a></section>'
             . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Premium'
             . (!empty($opts['founding']) ? ' &middot; <span class="fb">&#127941; Founding Member</span>' : '') . '</footer>'
-            . (!empty($opts['chat']) && !empty($opts['name']) ? self::chatWidget((string) $opts['name'], $brand, $e) : '')
+            . (!empty($opts['chat']) && !empty($opts['name']) ? self::chatWidget((string) $opts['name'], $brand, $e, $accent) : '')
             . '</body></html>';
     }
 
@@ -294,34 +294,59 @@ final class Renderer
      * Customer chat (Gold and Crown): a button, a small panel, answers from
      * silverqueen.pro/sites/chat. Answers are set as text, never as HTML.
      */
-    private static function chatWidget(string $name, string $brand, callable $e): string
+    private static function chatWidget(string $name, string $brand, callable $e, string $accent = '#e0b23c'): string
     {
-        $css = '#sqc-b{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:8px;padding:12px 16px;border:0;border-radius:999px;'
-            . 'background:var(--p);color:var(--on);font:600 15px Inter,system-ui,sans-serif;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);cursor:pointer}'
-            . '#sqc{position:fixed;right:16px;bottom:16px;z-index:51;width:min(360px,calc(100vw - 32px));height:min(520px,calc(100vh - 32px));display:none;flex-direction:column;'
-            . 'background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px -15px rgba(0,0,0,.5);overflow:hidden;font:15px/1.45 Inter,system-ui,sans-serif}'
-            . '#sqc.on{display:flex}#sqc header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--p);color:var(--on);font-weight:700}'
-            . '#sqc header button{border:0;background:transparent;color:inherit;font-size:22px;cursor:pointer;line-height:1}'
-            . '#sqc .m{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}'
-            . '#sqc .q,#sqc .a{max-width:85%;padding:8px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}'
-            . '#sqc .q{align-self:flex-end;background:var(--p);color:var(--on)}#sqc .a{align-self:flex-start;background:var(--card);border:1px solid var(--line)}'
-            . '#sqc form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}#sqc input{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit}'
-            . '#sqc form button{border:0;border-radius:10px;padding:0 14px;background:var(--p);color:var(--on);font-weight:700;cursor:pointer}'
-            . '#sqc small{display:block;padding:0 12px 8px;color:var(--mu);font-size:11px}';
+        // The chat's one colour: the site's accent when white text reads on it, else near-black.
+        $c = self::contrast('#ffffff', $accent) >= 3 ? $accent : '#1f1f1f';
+        $css = ':root{--qc:' . $c . '}'
+            . '#sqc-b{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;display:flex;align-items:center;gap:8px;padding:12px 18px 12px 14px;border:0;border-radius:999px;'
+            . 'background:var(--qc);color:#fff;font:600 15px Inter,system-ui,sans-serif;box-shadow:0 12px 30px -10px rgba(0,0,0,.55);cursor:pointer}'
+            . '#sqc-b svg{width:20px;height:20px}'
+            . '#sqc{position:fixed;right:16px;bottom:16px;z-index:51;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 32px));display:none;flex-direction:column;'
+            . 'background:#fff;color:#141414;border-radius:18px;box-shadow:0 24px 60px -18px rgba(0,0,0,.55);overflow:hidden;font:15px/1.45 Inter,system-ui,sans-serif}'
+            . '#sqc.on{display:flex}'
+            . '@media (max-width:600px){#sqc{left:0;right:0;bottom:auto;top:0;width:100%;border-radius:0;height:var(--vh,100vh)}}'
+            . '#sqc header{display:flex;align-items:center;gap:10px;padding:12px 12px 12px 14px;background:var(--qc);color:#fff}'
+            . '#sqc header i{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.22);display:grid;place-items:center;font:700 16px/1 Inter,sans-serif;font-style:normal;flex:none}'
+            . '#sqc header div{flex:1;min-width:0}#sqc header b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+            . '#sqc header small{display:flex;align-items:center;gap:6px;font-size:12px;opacity:.9}#sqc header small:before{content:"";width:7px;height:7px;border-radius:50%;background:#4ade80}'
+            . '#sqc header button{border:0;background:rgba(255,255,255,.18);color:#fff;width:34px;height:34px;border-radius:50%;font-size:20px;line-height:1;cursor:pointer;flex:none}'
+            . '#sqc .m{flex:1;overflow-y:auto;padding:14px 12px;display:flex;flex-direction:column;gap:8px;background:#f5f5f4}'
+            . '#sqc .q,#sqc .a{max-width:84%;padding:9px 13px;border-radius:18px;white-space:pre-wrap;overflow-wrap:anywhere}'
+            . '#sqc .q{align-self:flex-end;background:var(--qc);color:#fff;border-bottom-right-radius:6px}'
+            . '#sqc .a{align-self:flex-start;background:#fff;color:#141414;border-bottom-left-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,.08)}'
+            . '#sqc .a.wait{color:#888;letter-spacing:2px}'
+            . '#sqc .chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}'
+            . '#sqc .chips button{border:1px solid var(--qc);background:#fff;color:var(--qc);border-radius:999px;padding:6px 12px;font:600 13px Inter,sans-serif;cursor:pointer}'
+            . '#sqc form{display:flex;align-items:center;gap:8px;padding:10px 10px calc(10px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #eee}'
+            . '#sqc input{flex:1;min-width:0;height:44px;padding:0 16px;border-radius:999px;border:1.5px solid #e2e2e0;background:#f5f5f4;color:#141414;font:16px Inter,sans-serif;outline:0}'
+            . '#sqc input:focus{border-color:var(--qc);background:#fff}'
+            . '#sqc form button{width:44px;height:44px;border:0;border-radius:50%;background:var(--qc);color:#fff;display:grid;place-items:center;cursor:pointer;flex:none}'
+            . '#sqc form button svg{width:20px;height:20px}'
+            . '#sqc .note{padding:6px 14px 0;color:#888;font-size:11px;background:#fff}';
+        $send = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>';
+        $bubble = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v11H8l-4 4V5z"/></svg>';
         $js = '(function(){var N=' . json_encode($name) . ',B=document.getElementById("sqc-b"),P=document.getElementById("sqc"),M=P.querySelector(".m"),F=P.querySelector("form"),I=F.querySelector("input"),H=[];'
+            // On phones the panel fills exactly what the keyboard leaves.
+            . 'function fit(){var v=window.visualViewport;P.style.setProperty("--vh",(v?v.height:innerHeight)+"px");if(v&&P.classList.contains("on")&&innerWidth<=600)P.style.top=v.offsetTop+"px"}'
+            . 'if(window.visualViewport){visualViewport.addEventListener("resize",fit);visualViewport.addEventListener("scroll",fit)}fit();'
             . 'function add(c,t){var d=document.createElement("div");d.className=c;d.textContent=t;M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
-            . 'B.onclick=function(){P.classList.add("on");B.style.display="none";if(!M.children.length)add("a","Hi! Ask me about our products.");I.focus()};'
-            . 'P.querySelector("header button").onclick=function(){P.classList.remove("on");B.style.display=""};'
-            . 'F.onsubmit=function(ev){ev.preventDefault();var t=I.value.trim();if(!t)return;I.value="";add("q",t);H.push({role:"visitor",text:t});var w=add("a","…");'
+            . 'function ask(t){t=t.trim();if(!t)return;var ch=M.querySelector(".chips");if(ch)ch.remove();add("q",t);H.push({role:"visitor",text:t});var w=add("a wait","•••");'
             . 'fetch("https://silverqueen.pro/sites/chat",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({name:N,messages:H.slice(-6)})})'
-            . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.textContent=x;if(d&&d.ok)H.push({role:"shop",text:x})})'
-            . '.catch(function(){w.textContent="No connection. Please try again."})}})();';
+            . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.className="a";w.textContent=x;M.scrollTop=M.scrollHeight;if(d&&d.ok)H.push({role:"shop",text:x})})'
+            . '.catch(function(){w.className="a";w.textContent="No connection. Please try again."})}'
+            . 'B.onclick=function(){P.classList.add("on");B.style.display="none";fit();if(!M.children.length){add("a","Hi! What would you like to know about our shop?");'
+            . 'var c=document.createElement("div");c.className="chips";["What do you sell?","How do I order?","How can I contact you?"].forEach(function(t){var b=document.createElement("button");b.type="button";b.textContent=t;b.onclick=function(){ask(t)};c.appendChild(b)});M.appendChild(c)}};'
+            . 'P.querySelector("header button").onclick=function(){P.classList.remove("on");B.style.display="";I.blur()};'
+            . 'F.onsubmit=function(ev){ev.preventDefault();var t=I.value;I.value="";ask(t)}})();';
 
         return '<style>' . $css . '</style>'
-            . '<button id="sqc-b" type="button" aria-label="Ask ' . $e($brand) . '">&#128172; Ask ' . $e($brand) . '</button>'
-            . '<div id="sqc" role="dialog" aria-label="Chat with ' . $e($brand) . '"><header><span>' . $e($brand) . '</span><button type="button" aria-label="Close">&times;</button></header>'
-            . '<div class="m" aria-live="polite"></div><small>Answers by SilverQueen AI from this shop\'s own information.</small>'
-            . '<form><input type="text" maxlength="500" placeholder="Ask about a product…" aria-label="Your question"><button type="submit">Send</button></form></div>'
+            . '<button id="sqc-b" type="button" aria-label="Ask ' . $e($brand) . '">' . $bubble . ' Ask ' . $e($brand) . '</button>'
+            . '<div id="sqc" role="dialog" aria-label="Chat with ' . $e($brand) . '"><header><i>' . $e(mb_strtoupper(mb_substr($brand, 0, 1))) . '</i>'
+            . '<div><b>' . $e($brand) . '</b><small>Replies instantly</small></div><button type="button" aria-label="Close">&times;</button></header>'
+            . '<div class="m" aria-live="polite"></div><div class="note">Answers by SilverQueen AI from this shop\'s own information.</div>'
+            . '<form><input type="text" maxlength="500" placeholder="Ask about a product…" aria-label="Your question" enterkeyhint="send">'
+            . '<button type="submit" aria-label="Send">' . $send . '</button></form></div>'
             . '<script>' . $js . '</script>';
     }
 
