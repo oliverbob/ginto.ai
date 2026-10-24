@@ -37,6 +37,7 @@ class CsrfMiddleware
         '/api/v1/relay/trade/buy',        // Relay callers carry a signed, single-use token; there is no session to hold a CSRF token
         '/api/v1/relay/trade/sell',
         '/api/v1/relay/analyze',
+        '/api/internal/api-keys',         // SilverQueen /superadmin API Keys: HMAC-signed, nonce once (ApiKeysRelayController)
         // The payments relay for sq.silverqueen.pro. There is no session and
         // no browser here — sq authenticates with an HMAC over the timestamp
         // and the exact body, which SqRelayController checks before it does
