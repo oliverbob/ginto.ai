@@ -53,6 +53,8 @@ class SitesCardController
             'hold'  => $this->hold($db, $uid, (string) ($in['n'] ?? ''), $who),
             'state' => ['ok' => true] + $this->state($db, $uid, $who),
             'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
+            // The feed's promotions: paid, live sites, never the viewer's own.
+            'showcase' => ['ok' => true, 'sites' => (new \Ginto\Sites\Showcase($db))->featured($uid)],
             default => ['ok' => false, 'error' => 'Unknown action.'],
         };
         echo json_encode($out);
@@ -107,6 +109,9 @@ class SitesCardController
             'enter'       => Members::enterLink($uid, $who, $to),
             'filled'      => (new Subscriptions($db))->foundingTaken(),
             'cap'         => \Ginto\Sites\Config::foundingCap(),
+            // Their own site, as the feed card shows it once they have one.
+            'site'        => $n && $hasDraft && $phase !== 'none' ? (new \Ginto\Sites\Showcase($db))->of($n) : null,
+            'founding'    => $sub && $sub['status'] === 'active' && !empty($sub['founding']),
         ];
     }
 
