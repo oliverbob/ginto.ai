@@ -51,7 +51,8 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .qleft{margin:4px 0 0;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}.qleft b{color:var(--gold-fg)}
 .qnote{margin:12px auto 0;max-width:420px;font-size:13px;color:var(--muted)}
 .steps{list-style:none;display:flex;margin:6px 0 16px;padding:0;font-size:12.5px;color:var(--muted)}
-.steps li{flex:1;display:grid;justify-items:center;gap:8px;position:relative}
+.steps li{flex:1;display:grid;justify-items:center;align-content:start;gap:8px;position:relative;text-align:center;line-height:1.3}
+#qrSay:empty{display:none}
 .steps li::before{content:'';position:relative;z-index:1;width:22px;height:22px;box-sizing:border-box;border-radius:50%;border:2px solid var(--line);background:var(--bg);display:grid;place-items:center;font-size:12px;font-weight:800}
 .steps li+li::after{content:'';position:absolute;top:10px;right:50%;width:100%;height:2px;background:var(--line)}
 .steps li.done{color:var(--fg)}.steps li.done::before{content:'✓';border-color:var(--gold);background:var(--gold);color:var(--gold-ink)}
