@@ -213,6 +213,7 @@ if (($phase ?? '') === 'trial'): ?>
     </div>
     <?php endif; ?>
     <?php if (!empty($test_php)): ?><div class="act"><button class="btn gold" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3z"/>') ?> Test a real payment: ₱<?= (int) $test_php ?> by QR Ph</button><span class="say">Only you see this. The real road at a small amount.</span></div><?php endif; ?>
+    <?php if ($comp && !empty($owner)): ?><div class="act"><button class="btn gold" id="payWalk" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM20 14v.01M14 20h.01M17 20h3v-3"/>') ?> Pay with QR Ph</button><span class="say">The real code at the real price, and the paid moment by simulation. Your plan stays complimentary.</span></div><?php endif; ?>
     <?php if (!$comp): ?><div class="act"><button class="btn ghost" type="button" data-renew="<?= $e($sub['plan']) ?>"><?= $icon('<path d="M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5"/>') ?> Pay next month now</button></div><?php endif; ?>
   <?php else: ?>
     <h2 class="serif">2 · Choose your plan and go live</h2>
@@ -292,6 +293,8 @@ if (($phase ?? '') === 'trial'): ?>
       contact: f.contact.value, about: f.about.value, products });
     save.disabled = false;
     if (!r.ok) { tell($('rvSay'), 'bad', r.error || 'Not saved.'); return; }
+    const walk = $('payWalk');
+    if (walk) { tell($('rvSay'), 'ok', 'Saved. Next: pay with QR Ph below.'); setTimeout(() => $('pay').scrollIntoView({ behavior: 'smooth', block: 'start' }), 350); return; }
     const payBtn = $('payGo');
     if (!payBtn && r.republished === false) { tell($('rvSay'), 'bad', 'Saved, but your site could not be updated just now. Press Save again in a minute.'); return; }
     tell($('rvSay'), 'ok', r.republished ? 'Saved, and your live site is updated.' : 'Saved. You can choose your plan now.');

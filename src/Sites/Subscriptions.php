@@ -39,9 +39,16 @@ final class Subscriptions
         if ($plan === null || Config::testPrice($identity) !== null) {
             return null;
         }
-        $cur = $this->current($userId);
-        if ($cur && $cur['status'] === 'active' && $cur['plan'] === $plan && (int) $cur['price_php'] === 0) {
-            return $cur;
+        // Found directly, not through current(): a simulator's walk-through QR is a
+        // pending row above it, and must not make the plan look missing and be rebuilt.
+        $comp = $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => 'active', 'plan' => $plan,
+            'payment_ref' => 'complimentary', 'ORDER' => ['id' => 'DESC']]);
+        if ($comp) {
+            // A walk-through code lives 30 minutes; after that it is gone, and so is its row.
+            $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending',
+                'created_at[<]' => date('Y-m-d H:i:s', time() - 1800)]);
+
+            return $this->current($userId);
         }
         $name = (new Names($this->db))->of($userId);
         if (!$name || !in_array($name['status'], ['held', 'active'], true)) {
@@ -76,14 +83,17 @@ final class Subscriptions
      * Start paying for a plan: a QR Ph code for this month.
      * @return array{ok:bool, sub_id?:int, qr_image?:string, qr_string?:string, amount?:int, founding?:bool, error?:string}
      */
-    public function checkout(int $userId, string $planId, string $email, string $displayName): array
+    public function checkout(int $userId, string $planId, string $email, string $displayName, bool $walkthrough = false): array
     {
         $plan = Config::plan($planId);
         if ($plan === null) {
             return ['ok' => false, 'error' => 'Choose Silver, Gold or Crown.'];
         }
         $test = Config::testPrice(Members::identity($userId));
-        if ($test === null && $this->complimentary($userId)) {
+        // A complimentary plan pays nothing -- except for those who may simulate
+        // (owner, 2026-10-24, of Eleanor: "she should see the animation or the
+        // simulation IS THE WHOLE POINT"): they get the real QR, and sim.js plays the paid moment.
+        if ($test === null && !$walkthrough && $this->complimentary($userId)) {
             return ['ok' => true, 'paid' => true, 'qr_image' => '', 'amount' => 0, 'founding' => false];
         }
         $name = (new Names($this->db))->of($userId);

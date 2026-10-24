@@ -493,7 +493,7 @@ class SitesController extends \Core\Controller
             ? ['email' => 'member' . Members::identity($uid) . '@silverqueen.pro', 'firstname' => (string) ($_SESSION['sites_member_name'] ?? 'SilverQueen member')]
             : ($this->db->get('users', ['email', 'firstname', 'lastname', 'username'], ['id' => $uid]) ?: []);
         $r = (new Subscriptions($this->db))->checkout($uid, (string) ($in['plan'] ?? ''), (string) ($u['email'] ?? ''),
-            trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) ?: (string) ($u['username'] ?? ''));
+            trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? '')) ?: (string) ($u['username'] ?? ''), $this->canSimulate());
 
         return $this->json($r, $r['ok'] ? 200 : 422);
     }
