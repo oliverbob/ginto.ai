@@ -138,11 +138,13 @@ final class Previews
             // A held name with no site yet takes this one, and its free trial goes up.
             if ($row['user_id'] !== null) {
                 $uid  = (int) $row['user_id'];
-                $held = $this->db->get('sites_names', '*', ['user_id' => $uid, 'status' => 'held']);
+                $held = $this->db->get('sites_names', '*', ['user_id' => $uid, 'status' => ['held', 'active']]);
                 if ($held && empty($held['preview_id'])) {
                     $this->db->update('sites_names', ['preview_id' => $id], ['name' => $held['name']]);
                     $this->db->update('sites_previews', ['expires_at' => date('Y-m-d H:i:s', time() + 30 * 86400)], ['id' => $id]);
-                    (new Publisher($this->db))->publishTrial($uid);
+                    // An active name (paid, or complimentary like Eleanor's) goes live at
+                    // once; a held one goes up on its free trial.
+                    $held['status'] === 'active' ? (new Publisher($this->db))->publish($uid) : (new Publisher($this->db))->publishTrial($uid);
                 }
             }
         } catch (\Throwable $e) {

@@ -70,6 +70,22 @@ class SitesController extends \Core\Controller
     }
 
     /** A member the owner lets build previews without the one-a-day limit (SITES_EXEMPT_IDENTITIES, e.g. "10" for himself). */
+    /**
+     * Signed in and nothing published yet: no daily limit (owner, 2026-10-24: "You
+     * should only do that when they have actually published something"). Only a
+     * visitor who is not signed in is held to one free preview a day.
+     */
+    private function stillBuilding(): bool
+    {
+        $uid = $this->userId();
+        if (!$uid) {
+            return false;
+        }
+        $n = (new Names($this->db))->of($uid);
+
+        return !$n || !Publisher::isLive((string) $n['name']);
+    }
+
     private function exemptMember(): bool
     {
         $identity = Members::identity($this->userId());
@@ -163,7 +179,7 @@ class SitesController extends \Core\Controller
             $photos = new Photos($this->db);
             $shas = array_merge(array_map(static fn ($u) => $photos->ingestUrl($u), $picked), array_map(static fn ($f) => $photos->ingest($f), $files));
             $p = (new Previews($this->db))->create((string) ($_POST['description'] ?? ''), $shas, $this->deviceId(), $this->clientIp(),
-                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember(), $media, (string) ($_POST['template'] ?? ''));
+                $this->userId() ?: null, $this->isAdmin() || $this->exemptMember() || $this->stillBuilding(), $media, (string) ($_POST['template'] ?? ''));
         } catch (LimitReached | \InvalidArgumentException $e) {
             return $this->json(['ok' => false, 'error' => $e->getMessage()], 422);
         }
