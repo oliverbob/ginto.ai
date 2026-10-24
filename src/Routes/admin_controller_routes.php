@@ -65,13 +65,6 @@ $req('/promocodes/{id}/update', 'PromoCodesAdminController@update', ['POST']);
 $req('/promocodes/{id}/toggle', 'PromoCodesAdminController@toggle', ['POST']);
 $req('/promocodes/{id}/delete', 'PromoCodesAdminController@delete', ['POST']);
 
-// API Keys: external (Groq, Cerebras) and our own issued tokens
-$req('/api-keys', 'ApiKeysAdminController@index');
-$req('/api-keys/test', 'ApiKeysAdminController@test', ['POST']);
-$req('/api-keys/save', 'ApiKeysAdminController@save', ['POST']);
-$req('/api-keys/remove', 'ApiKeysAdminController@remove', ['POST']);
-$req('/api-keys/revoke', 'ApiKeysAdminController@revoke', ['POST']);
-
 // Membership Tiers (admin management)
 $req('/tier', 'TierController@index');
 $req('/tier/create', 'TierController@store', ['POST']);

@@ -1382,6 +1382,9 @@ $router->req('/marketplace/sellers/storefront/save', 'SellerController@storefron
 
 // Mall storefront, checkout, wallet, and order lifecycle routes
 $router->req('/marketplace', 'MallController@marketplace');
+// The SilverQueen /superadmin API Keys page reaches this host's keys here (signed; no session).
+$router->post('/api/internal/api-keys', 'ApiKeysRelayController@handle');
+
 // SilverQueen Pages, Sites and Stores (owner, 2026-10-24). See src/Sites/.
 $router->get('/sites', 'SitesController@directory');
 $router->get('/sites/plans', 'SitesController@plans');
