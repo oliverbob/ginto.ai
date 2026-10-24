@@ -263,6 +263,32 @@ class SitesController extends \Core\Controller
         return $this->json($r + ['next' => $r['ok'] ? '/sites/me' : null], $r['ok'] ? 200 : 422);
     }
 
+    /** POST /sites/me/ask {text} -- SilverQueen AI changes the site as asked, checked like every build. */
+    public function ask()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        $r = (new \Ginto\Sites\Assistant($this->db))->edit($uid, (string) ($in['text'] ?? ''));
+
+        return $this->json($r, $r['ok'] ? 200 : 422);
+    }
+
+    /** POST /sites/me/live-script -- a 30-second live script and three reel ideas (Gold and Crown). */
+    public function liveScript()
+    {
+        $uid = $this->userId();
+        $in  = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
+            return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
+        }
+        $r = (new \Ginto\Sites\Assistant($this->db))->liveScript($uid);
+
+        return $this->json($r, $r['ok'] ? 200 : 422);
+    }
+
     /** GET /sites/me -- the seller's own: review, plan and pay, renewal, credits. */
     public function me()
     {

@@ -1403,6 +1403,8 @@ $router->post('/sites/me/review', 'SitesController@review');
 $router->post('/sites/me/checkout', 'SitesController@checkout');
 $router->post('/sites/me/plan', 'SitesController@planChoice');
 $router->get('/sites/me/qr.png', 'SitesController@qr');
+$router->post('/sites/me/ask', 'SitesController@ask');
+$router->post('/sites/me/live-script', 'SitesController@liveScript');
 $router->get('/sites/me/sim.js', 'SitesController@simScript');
 $router->post('/sites/surprise', 'SitesController@surprise');
 $router->post('/sites/describe', 'SitesController@describe');

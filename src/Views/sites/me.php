@@ -141,6 +141,24 @@ if (($phase ?? '') === 'trial'): ?>
   </form>
 </section>
 
+<section class="sec" id="ai">
+  <h2 class="serif">Ask SilverQueen AI</h2>
+  <p class="muted" style="margin:0">Say what to change: &ldquo;make the headline warmer&rdquo;, &ldquo;blue and white colours&rdquo;, &ldquo;shorter product descriptions&rdquo;. Your photos stay where they are. Each change uses AI credits.</p>
+  <label class="f" style="margin-top:12px"><span class="sr-only" style="position:absolute;left:-9999px">What to change</span><textarea id="askText" maxlength="600" placeholder="What should change?"></textarea></label>
+  <div class="act"><button class="btn gold" id="askGo" type="button"><?= $icon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>') ?> Change it</button><span class="say" id="askSay" aria-live="polite"></span></div>
+</section>
+
+<section class="sec" id="live">
+  <h2 class="serif">Your live script</h2>
+  <p class="muted" style="margin:0">A 30-second script for your next live, and three reel ideas, written from your own products. With Gold and Crown.</p>
+  <div class="act"><button class="btn ghost" id="liveGo" type="button"><?= $icon('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>') ?> Write my live script</button><span class="say" id="liveSay" aria-live="polite"></span></div>
+  <div id="liveOut" hidden style="margin-top:12px">
+    <p id="liveScript" style="margin:0;white-space:pre-line;font-size:16px;line-height:1.6"></p>
+    <p class="muted" style="margin:14px 0 6px;font-weight:700">Reel ideas</p><ol id="liveReels" style="margin:0;padding-left:20px;display:grid;gap:6px"></ol>
+    <div class="act"><button class="btn ghost" id="liveCopy" type="button"><?= $icon('<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/>') ?> Copy the script</button></div>
+  </div>
+</section>
+
 <section class="sec" id="look">
   <h2 class="serif">Your look</h2>
   <p class="muted" style="margin:0">Twelve designs for the same site. Switching is free and instant<?= in_array($phase ?? '', ['trial', 'live'], true) ? ', and your site at ' . $e($name['name']) . '.silverqueen.pro changes with it' : '' ?>.</p>
@@ -258,6 +276,38 @@ if (($phase ?? '') === 'trial'): ?>
       const pay = $('pay');
       if (pay) setTimeout(() => pay.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
     }
+  });
+
+  // Ask SilverQueen AI: the site changed as asked, checked like every build.
+  const askGo = $('askGo');
+  if (askGo) askGo.addEventListener('click', async () => {
+    const text = $('askText').value.trim();
+    if (text.length < 4) { tell($('askSay'), 'bad', 'Say what to change, in a sentence.'); return; }
+    askGo.disabled = true; tell($('askSay'), '', 'SilverQueen AI is working on it…');
+    const r = await post('/sites/me/ask', { text });
+    askGo.disabled = false;
+    if (!r.ok) { tell($('askSay'), 'bad', r.error || 'Not changed.'); return; }
+    if (!r.changed || !r.changed.length) { tell($('askSay'), '', 'Nothing needed changing for that. Try saying it another way.'); return; }
+    tell($('askSay'), 'ok', 'Changed: ' + r.changed.join(', ') + (r.republished ? '. Your live site is updated.' : '.') + ' Reloading…');
+    setTimeout(() => location.reload(), 1600);
+  });
+  // The live script.
+  const liveGo = $('liveGo');
+  if (liveGo) liveGo.addEventListener('click', async () => {
+    liveGo.disabled = true; tell($('liveSay'), '', 'Writing…');
+    const r = await post('/sites/me/live-script', {});
+    liveGo.disabled = false;
+    if (!r.ok) { tell($('liveSay'), 'bad', r.error || 'Not written.'); return; }
+    tell($('liveSay'), '', '');
+    $('liveScript').textContent = r.script;
+    const ol = $('liveReels'); ol.textContent = '';
+    (r.reels || []).forEach((x) => { const li = document.createElement('li'); li.textContent = x; ol.appendChild(li); });
+    $('liveOut').hidden = false;
+    liveGo.lastChild.textContent = ' Write another';
+  });
+  const liveCopy = $('liveCopy');
+  if (liveCopy) liveCopy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText($('liveScript').textContent); tell($('liveSay'), 'ok', 'Copied.'); } catch (e) { tell($('liveSay'), 'bad', 'Copy did not work here; select the text instead.'); }
   });
 
   // Your look: the same site in another of the twelve, switched at once.
