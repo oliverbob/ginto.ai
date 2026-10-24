@@ -296,12 +296,17 @@ final class Renderer
      */
     private static function chatWidget(string $name, string $brand, callable $e, string $accent = '#e0b23c'): string
     {
-        // The chat's one colour: the site's accent when white text reads on it, else near-black.
-        $c = self::contrast('#ffffff', $accent) >= 3 ? $accent : '#1f1f1f';
+        // The chat's one colour: the site's accent, deepened just enough for white text to read on it.
+        $c = preg_match('/^#[0-9a-fA-F]{6}$/', $accent) === 1 ? strtolower($accent) : '#1f1f1f';
+        for ($k = 0; $k < 12 && self::contrast('#ffffff', $c) < 3.6; $k++) {
+            $c = sprintf('#%02x%02x%02x', ...array_map(static fn ($h) => (int) round(hexdec($h) * 0.9), str_split(substr($c, 1), 2)));
+        }
         $css = ':root{--qc:' . $c . '}'
             . '#sqc-b{position:fixed;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:50;display:flex;align-items:center;gap:8px;padding:12px 18px 12px 14px;border:0;border-radius:999px;'
             . 'background:var(--qc);color:#fff;font:600 15px Inter,system-ui,sans-serif;box-shadow:0 12px 30px -10px rgba(0,0,0,.55);cursor:pointer}'
             . '#sqc-b svg{width:20px;height:20px}'
+            . '#sqc-b:after{content:"";position:absolute;top:6px;right:8px;width:9px;height:9px;border-radius:50%;background:#4ade80;box-shadow:0 0 0 2px var(--qc)}'
+            . '@media (prefers-reduced-motion:no-preference){#sqc-b{animation:sqcIn .5s ease 1s both}@keyframes sqcIn{from{transform:translateY(20px);opacity:0}}}'
             . '#sqc{position:fixed;right:16px;bottom:16px;z-index:51;width:min(380px,calc(100vw - 32px));height:min(560px,calc(100vh - 32px));display:none;flex-direction:column;'
             . 'background:#fff;color:#141414;border-radius:18px;box-shadow:0 24px 60px -18px rgba(0,0,0,.55);overflow:hidden;font:15px/1.45 Inter,system-ui,sans-serif}'
             . '#sqc.on{display:flex}'
