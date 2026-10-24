@@ -287,7 +287,8 @@ class SitesController extends \Core\Controller
         if (!$uid || !validateCsrfToken($in['csrf_token'] ?? '')) {
             return $this->json(['ok' => false, 'error' => 'Sign in again and retry.'], 403);
         }
-        if (!Config::isPublic() && !$this->isAdmin()) {
+        // The same door as building: open to the public, an admin, or a member who came in from the app's card.
+        if (!$this->canBuild()) {
             return $this->json(['ok' => false, 'error' => 'SilverQueen Premium opens soon.'], 403);
         }
         $draft = $this->draft($uid);
