@@ -18,7 +18,8 @@ $icon = static fn (string $p): string => '<svg class="i" viewBox="0 0 24 24" fil
 .mh h1{font-size:clamp(28px,5vw,40px)}
 .pill{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:5px 12px;border-radius:999px}
 .pill.ok{color:var(--ok);background:rgba(15,122,61,.12)}.pill.gold{color:var(--gold-fg);background:rgba(224,178,60,.16)}.pill.bad{color:var(--bad);background:rgba(180,35,24,.1)}
-.sec{margin-top:18px;padding:20px}
+/* Open sections, a line between them: the only frames on this page are notices and the things you pick. */
+.sec{margin-top:8px;padding:26px 0;border-top:1px solid var(--line)}.card.sec{margin-top:18px;padding:18px 20px;border-top:1px solid var(--line)}
 .sec h2{font-size:24px;margin-bottom:6px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)}
@@ -34,7 +35,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .act{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
 .say{font-size:14px;min-height:20px}.say.ok{color:var(--ok)}.say.bad{color:var(--bad)}
 .plans3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
-.pc{position:relative;display:block;cursor:pointer;padding:16px;border:2px solid var(--line);border-radius:14px;background:var(--bg)}
+.pc{position:relative;display:block;cursor:pointer;padding:16px;border:1.5px solid var(--line);border-radius:14px;background:var(--panel)}
 .pc input{position:absolute;opacity:0;pointer-events:none}
 .pc:has(input:checked){border-color:var(--gold);background:linear-gradient(170deg,rgba(224,178,60,.12),var(--bg) 60%)}
 .pc b{display:block;font-size:17px}.pc .pr{font-size:26px;font-weight:800;margin:6px 0 2px}.pc .pr small{font-size:13px;color:var(--muted);font-weight:600}
@@ -72,14 +73,14 @@ if (($phase ?? '') === 'trial'): ?>
 <?php endif; ?>
 
 <?php if (!$name || !$draft): ?>
-<section class="card sec">
+<section class="sec">
   <h2 class="serif">Start with a free preview</h2>
   <p class="muted">Upload your product photos and tell SilverQueen AI about your shop. When you like it, claim your name and come back here.</p>
   <a class="btn gold" href="/sites/start"><?= $icon('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z"/>') ?> Start it now</a>
 </section>
 <?php else: ?>
 
-<section class="card sec" id="review">
+<section class="sec" id="review">
   <h2 class="serif">1 · Review your site</h2>
   <p class="muted" style="margin:0">SilverQueen AI wrote these from your photos. Check every word: nothing goes live until you have.
     <?= $reviewed ? '<b style="color:var(--ok)">Reviewed.</b>' : '' ?></p>
@@ -111,7 +112,7 @@ if (($phase ?? '') === 'trial'): ?>
   </form>
 </section>
 
-<section class="card sec" id="look">
+<section class="sec" id="look">
   <h2 class="serif">Your look</h2>
   <p class="muted" style="margin:0">Twelve designs for the same site. Switching is free and instant<?= in_array($phase ?? '', ['trial', 'live'], true) ? ', and your site at ' . $e($name['name']) . '.silverqueen.pro changes with it' : '' ?>.</p>
   <div class="tpls" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-top:14px">
@@ -125,7 +126,7 @@ if (($phase ?? '') === 'trial'): ?>
   <p class="say" id="lookSay" aria-live="polite"></p>
 </section>
 
-<section class="card sec" id="pay">
+<section class="sec" id="pay">
   <?php if ($active): $pl = Config::plan((string) $sub['plan']); ?>
     <h2 class="serif">2 · Your plan: <?= $e($pl['name'] ?? '') ?></h2>
     <p class="muted" style="margin:0">₱<?= number_format((int) $sub['price_php']) ?> a month<?= $sub['founding'] ? ' · <b style="color:var(--gold-fg)">🏅 Founding Member</b>, price locked while you stay' : '' ?>.

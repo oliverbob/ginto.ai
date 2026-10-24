@@ -12,7 +12,9 @@ include __DIR__ . '/_frame.php';
 .steps{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:22px 0 0}
 .steps span{display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;padding:7px 12px;border-radius:999px;background:var(--panel2)}
 .steps b{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--gold);color:var(--gold-ink);font-size:11px}
-.builder{margin:28px auto 0;max-width:760px;padding:22px}
+/* Open sections: no box around a whole step; only notices and the tiles you pick are framed. */
+.flat{border-top:1px solid var(--line)}
+.builder{margin:28px auto 0;max-width:760px;padding:26px 0}
 .drop{display:block;box-sizing:border-box;width:100%;border:2px dashed var(--line);border-radius:14px;padding:26px 16px;text-align:center;cursor:pointer;transition:border-color .2s,background .2s}
 .drop:hover,.drop.over{border-color:var(--gold);background:var(--panel2)}
 .drop svg{display:block;margin:0 auto;width:34px;height:34px;color:var(--gold-fg)}
@@ -30,7 +32,7 @@ include __DIR__ . '/_frame.php';
 .aitag{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--gold-fg);background:rgba(224,178,60,.14);padding:4px 10px;border-radius:999px}
 .btn.sm{padding:9px 14px;font-size:13.5px}
 .tpls{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:6px}
-.tpl{position:relative;display:block;cursor:pointer;border:2px solid var(--line);border-radius:12px;overflow:hidden;background:var(--bg)}
+.tpl{position:relative;display:block;cursor:pointer;border:1.5px solid transparent;border-radius:12px;overflow:hidden;background:var(--panel)}
 .tpl input{position:absolute;opacity:0;pointer-events:none}.tpl:has(input:checked){border-color:var(--gold)}
 .tpl .sw{height:54px;display:flex;align-items:flex-end;gap:4px;padding:8px}.tpl .sw i{flex:1;height:60%;border-radius:4px}
 .tpl b{display:block;padding:8px 10px 0;font-size:14px}.tpl small{display:block;padding:0 10px 10px;font-size:12px;color:var(--muted);line-height:1.35}
@@ -51,11 +53,12 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 @keyframes spin{to{transform:rotate(360deg)}}
 .soon{text-align:center;padding:30px 16px}
 .claim{margin:28px auto 0;max-width:760px;padding:22px}
+.flat.claim{padding:26px 0}
 .claim .box{display:flex;align-items:center;border:1.5px solid var(--line);border-radius:12px;background:var(--bg)}
 .claim .box.ok{border-color:var(--ok)}.claim .box.bad{border-color:var(--bad)}
 .claim input{flex:1;min-width:0;border:0;background:transparent;color:var(--fg);font:600 17px Inter,system-ui,sans-serif;padding:13px 0 13px 14px}
 .claim .sfx{color:var(--muted);padding-right:14px;white-space:nowrap}
-.fbar{max-width:760px;margin:28px auto 0;padding:18px 22px}
+.fbar{max-width:760px;margin:28px auto 0;padding:24px 0}
 .fbar .head{display:flex;justify-content:space-between;font-weight:700;margin-bottom:10px}
 .fbar .head b{color:var(--gold-fg)}
 @media (prefers-reduced-motion:reduce){.progress li.on i{animation:none}}
@@ -77,7 +80,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 <?php endif; ?>
 
 <?php if ($claimToken !== ''): ?>
-<section class="card claim" id="claim">
+<section class="flat claim" id="claim">
   <p class="lab">Claim your name</p>
   <div class="box"><input id="cname" maxlength="32" placeholder="yourname" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Your name"><span class="sfx">.silverqueen.pro</span></div>
   <div class="say" id="csay">Your Page: silverqueen.pro/<b id="cpg">yourname</b> · your Site and Store: <b id="cst">yourname</b>.silverqueen.pro</div>
@@ -87,7 +90,7 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
 <?php endif; ?>
 
 <?php if (!empty($open)): ?>
-<form class="card builder" id="builder" onsubmit="return false" enctype="multipart/form-data">
+<form class="flat builder" id="builder" onsubmit="return false" enctype="multipart/form-data">
   <?php if (!empty($suggest)): ?>
   <p class="lab">From your SilverQueen photos</p>
   <p class="muted" style="margin:-4px 0 10px;font-size:13px">Your most-loved photos first. Tap the ones that show what you sell.</p>
@@ -138,14 +141,14 @@ textarea:focus,.claim input:focus{outline:none;border-color:var(--gold)}
   </ol>
 </form>
 <?php else: ?>
-<section class="card builder soon">
+<section class="flat builder soon">
   <h2 class="serif" style="font-size:28px">Opening soon</h2>
   <p class="muted">SilverQueen Premium is getting ready for its Founding Members. See the plans while you wait.</p>
   <a class="btn gold" href="/sites/plans">See the plans</a>
 </section>
 <?php endif; ?>
 
-<section class="card fbar">
+<section class="flat fbar">
   <div class="head"><span>Founding slots filled</span><b><?= (int) $founding_filled ?> of <?= (int) $founding_cap ?></b></div>
   <div class="meter"><i style="width:<?= max(3, min(100, (int) round($founding_filled / max(1, $founding_cap) * 100))) ?>%"></i></div>
   <p class="muted" style="margin:10px 0 0;font-size:14px">Founding Members keep their price for as long as they stay, wear a permanent Founding badge, and are on the Founders Wall.</p>
