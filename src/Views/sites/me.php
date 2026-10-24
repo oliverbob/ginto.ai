@@ -138,6 +138,13 @@ if (($phase ?? '') === 'trial'): ?>
       <button class="btn gold" id="rvSave" type="button"><?= $icon('<path d="M5 12.5l4.2 4.2L19 7"/>') ?> <?= $reviewed ? 'Save changes' : 'I have reviewed it' ?></button>
       <span class="say" id="rvSay" aria-live="polite"></span>
     </div>
+    <?php /* A plan already active (paid or complimentary) has nothing to pay: the
+             next step after saving is the live site itself (owner, 2026-10-24). */ ?>
+    <div class="act" id="rvNext" hidden>
+      <a class="btn gold" href="https://<?= $e($name['name'] ?? '') ?>.silverqueen.pro" target="_blank" rel="noopener"><?= $icon('<path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/>') ?> Open my site</a>
+      <button class="btn ghost" type="button" id="rvShare"><?= $icon('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>') ?> Share</button>
+      <span class="say ok">Your site is live at <b><?= $e($name['name'] ?? '') ?>.silverqueen.pro</b>.</span>
+    </div>
   </form>
 </section>
 
@@ -285,14 +292,27 @@ if (($phase ?? '') === 'trial'): ?>
       contact: f.contact.value, about: f.about.value, products });
     save.disabled = false;
     if (!r.ok) { tell($('rvSay'), 'bad', r.error || 'Not saved.'); return; }
-    tell($('rvSay'), 'ok', r.republished ? 'Saved, and your live site is updated.' : 'Saved. You can choose your plan now.');
     const payBtn = $('payGo');
+    if (!payBtn && r.republished === false) { tell($('rvSay'), 'bad', 'Saved, but your site could not be updated just now. Press Save again in a minute.'); return; }
+    tell($('rvSay'), 'ok', r.republished ? 'Saved, and your live site is updated.' : 'Saved. You can choose your plan now.');
+    const next = $('rvNext');
+    if (r.republished && next) {
+      next.hidden = false;
+      setTimeout(() => next.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
+    }
     if (payBtn) {
       payBtn.disabled = false; payBtn.removeAttribute('title'); tell($('paySay'), '', '');
       // Reviewed: the next step is the plan, so go there (owner, 2026-10-24).
       const pay = $('pay');
       if (pay) setTimeout(() => pay.scrollIntoView({ behavior: 'smooth', block: 'start' }), 350);
     }
+  });
+
+  const rvShare = $('rvShare');
+  if (rvShare) rvShare.addEventListener('click', async () => {
+    const url = rvShare.previousElementSibling.href;
+    try { if (navigator.share) { await navigator.share({ url }); return; } } catch (e) { return; }
+    try { await navigator.clipboard.writeText(url); tell($('rvSay'), 'ok', 'Link copied.'); } catch (e) { /* nothing to do */ }
   });
 
   // On Google: the switch, and the AI-written listing.
