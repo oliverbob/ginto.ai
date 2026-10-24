@@ -108,6 +108,24 @@ final class Subscriptions
         return ['status' => 'active', 'published' => $pub['ok'], 'url' => $pub['url'] ?? null, 'error' => $pub['error'] ?? null];
     }
 
+    /**
+     * Every few minutes: QR codes paid while nobody was watching the page are
+     * confirmed here too, so a member who paid and closed the page still goes live.
+     * @return list<string> names that went live
+     */
+    public function confirmPending(): array
+    {
+        $out = [];
+        foreach ($this->db->select('sites_subscriptions', ['user_id', 'name'], ['status' => 'pending', 'created_at[>]' => date('Y-m-d H:i:s', time() - 86400)]) ?: [] as $p) {
+            $r = $this->confirm((int) $p['user_id']);
+            if (($r['status'] ?? '') === 'active') {
+                $out[] = (string) $p['name'];
+            }
+        }
+
+        return $out;
+    }
+
     /** Daily: a month unpaid past its end plus the grace days lapses, and the site is taken down. */
     public function lapseDue(): array
     {
