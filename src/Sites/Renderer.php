@@ -95,7 +95,7 @@ final class Renderer
     /**
      * @param list<string> $photoUrls in plan photo order
      * @param array{preview_hours?:int, trial_hours?:int, trial_until?:int, claim_url?:string, contact_url?:string, founding?:bool,
-     *              template?:string, videos?:array<int,string>} $opts
+     *              template?:string, videos?:array<int,string>, page?:array} $opts
      */
     public static function html(array $plan, array $photoUrls, array $opts = []): string
     {
@@ -196,6 +196,10 @@ final class Renderer
         $aboutHtml = ($plan['about']['body'] !== '' && $tpl['hero'] !== 'story')
             ? '<section class="about" id="about"><h2>' . $e($plan['about']['title'] ?: 'About us') . '</h2><p>' . $e($plan['about']['body']) . '</p></section>' : '';
 
+        // The member's Page and Store, which the site carries too (owner, 2026-10-24:
+        // "the sites should contain details about the page and the store").
+        [$storeHtml, $pageHtml] = self::pageAndStore(is_array($opts['page'] ?? null) ? $opts['page'] : [], $e);
+
         $banner = '';
         if (isset($opts['trial_hours'])) {
             // The end time, not the hours left: the page is written once and read for hours,
@@ -223,16 +227,64 @@ final class Renderer
             . '<style>:root{--bg:' . $bg . ';--fg:' . $fg . ';--p:' . $primary . ';--a:' . $accent . ';--on:' . $onPrimary . ';--mu:' . $muted . ';--card:' . $card . ';--line:' . $line . '}'
             . self::css($fontStack) . '</style></head><body class="t-' . $e($tpl['id']) . '">'
             . $banner
-            . '<header class="top"><div class="brand">' . $e($brand) . '</div><nav><a href="#shop">Shop</a><a href="#about">About</a><a href="#contact">Contact</a></nav></header>'
+            . '<header class="top"><div class="brand">' . $e($brand) . '</div><nav><a href="#shop">Shop</a>' . ($storeHtml !== '' ? '<a href="#store">Store</a>' : '')
+            . ($pageHtml !== '' ? '<a href="#page">Page</a>' : '') . '<a href="#about">About</a><a href="#contact">Contact</a></nav></header>'
             . $hero
             . '<section id="shop" class="shop"><h2>' . ($tpl['id'] === 'court' ? 'The Court' : ($tpl['id'] === 'channel' ? 'Videos &amp; products' : 'Shop')) . '</h2><div class="' . $shopClass . '">' . $shop . '</div></section>'
+            . $storeHtml
             . $aboutHtml
             . ($highs !== '' ? '<section class="hls-wrap"><div class="hls">' . $highs . '</div></section>' : '')
+            . $pageHtml
             . '<section class="close" id="contact"><h2>' . $e($plan['closing']['headline'] ?: 'Thank you for visiting') . '</h2>'
             . '<a class="btn" href="' . $e($contact) . '"' . $ext . '>' . $e($plan['closing']['cta']) . '</a></section>'
             . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Premium'
             . (!empty($opts['founding']) ? ' &middot; <span class="fb">&#127941; Founding Member</span>' : '') . '</footer>'
             . '</body></html>';
+    }
+
+    /**
+     * The Store (their real Mall listings, each to its public page) and the Page
+     * (their SilverQueen profile, opened in the app). Only https addresses; a
+     * member with no shop gets no Store section at all.
+     *
+     * @return array{0:string,1:string}
+     */
+    private static function pageAndStore(array $d, callable $e): array
+    {
+        $https = static fn ($u): string => is_string($u) && preg_match('#^https://[^\s"<>]+$#', $u) === 1 ? $u : '';
+        $store = '';
+        $shop = is_array($d['shop'] ?? null) ? $d['shop'] : null;
+        if ($shop && !empty($shop['items'])) {
+            $cards = '';
+            foreach (array_slice($shop['items'], 0, 8) as $it) {
+                $url = $https($it['url'] ?? '');
+                $ph = $https($it['photo'] ?? '');
+                if ($url === '') {
+                    continue;
+                }
+                $cards .= '<a class="si" href="' . $e($url) . '" target="_blank" rel="noopener">'
+                    . '<span class="sp">' . ($ph !== '' ? '<img src="' . $e($ph) . '" alt="" loading="lazy">' : '') . '</span>'
+                    . '<b>' . $e($it['name'] ?? '') . '</b><span class="pr">' . $e($it['price'] ?? '') . '</span><span class="buy">Buy</span></a>';
+            }
+            if ($cards !== '') {
+                $store = '<section class="sq-store" id="store"><h2>Our store</h2><p class="sub">On the SilverQueen Mall &middot; ' . $e($shop['name'] ?? '') . '</p>'
+                    . '<div class="sg">' . $cards . '</div></section>';
+            }
+        }
+        $page = '';
+        $pr = is_array($d['profile'] ?? null) ? $d['profile'] : null;
+        if ($pr) {
+            $cover = $https($pr['cover'] ?? '');
+            $av = $https($pr['avatar'] ?? '');
+            $link = $https($pr['url'] ?? '') ?: 'https://sq.silverqueen.pro/';
+            $page = '<section class="sq-page" id="page"><div class="pc">' . ($cover !== '' ? '<img src="' . $e($cover) . '" alt="" loading="lazy" style="object-position:'
+                . (int) ($pr['cx'] ?? 50) . '% ' . (int) ($pr['cy'] ?? 50) . '%">' : '') . '</div>'
+                . '<div class="pw"><span class="pa">' . ($av !== '' ? '<img src="' . $e($av) . '" alt="">' : '') . '</span>'
+                . '<div><span class="k">Find us on SilverQueen</span><h2>' . $e($pr['name'] ?? '') . '</h2><p>Our lives, our news and our store, all in one place.</p></div>'
+                . '<a class="btn" href="' . $e($link) . '" target="_blank" rel="noopener">Follow on SilverQueen</a></div></section>';
+        }
+
+        return [$store, $page];
     }
 
     /** One stylesheet for all twelve: shared bones, then each template's own look (body.t-<id>). */
@@ -295,6 +347,17 @@ final class Renderer
             . '.chip{display:grid;grid-template-columns:96px 1fr;gap:14px;align-items:center;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:16px}.chip img{width:96px;height:96px;object-fit:cover;border-radius:12px}.chip h3{font-size:16px;font-family:Inter,sans-serif}.chip p{margin:4px 0 6px;font-size:14px}'
             // the rest
             . '.about{display:grid;grid-template-columns:1fr 1.4fr;gap:40px;background:var(--card)}.about p{margin:0;font-size:17px;white-space:pre-line}'
+            . '.sq-store .sub{margin:-8px 0 20px;color:var(--mu)}.sq-store .sg{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px}'
+            . '.sq-store .si{display:flex;flex-direction:column;gap:6px;text-decoration:none;color:var(--fg);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px}'
+            . '.sq-store .sp{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--line)}.sq-store .sp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}'
+            . '.sq-store .si b{font-size:15px;line-height:1.3}.sq-store .pr{font-weight:800;color:var(--p)}'
+            . '.sq-store .buy{margin-top:auto;align-self:flex-start;padding:6px 14px;border-radius:5px;background:var(--p);color:var(--on);font-weight:700;font-size:13px}'
+            . '.sq-page{padding:0;overflow:hidden}.sq-page .pc{position:relative;height:220px;background:linear-gradient(135deg,var(--p),var(--a))}'
+            . '.sq-page .pc img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}'
+            . '.sq-page .pw{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px 20px;padding:0 6vw 40px;margin-top:-48px;position:relative}'
+            . '.sq-page .pa{width:104px;height:104px;border-radius:50%;overflow:hidden;border:5px solid var(--bg);background:var(--card);flex:none}.sq-page .pa img{width:100%;height:100%;object-fit:cover}'
+            . '.sq-page .pw>div{flex:1;min-width:220px}.sq-page .k{font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--p)}'
+            . '.sq-page h2{margin:4px 0 4px}.sq-page p{margin:0;color:var(--mu)}'
             . '.hls{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:22px}.hl{border-top:3px solid var(--a);padding-top:14px}.hl h3{font-size:19px;margin-bottom:6px}.hl p{margin:0}'
             . '.ms{display:block;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--p);margin-bottom:6px}'
             . '.close{text-align:center}.close h2{margin-bottom:22px}footer{padding:28px 16px;text-align:center;font-size:13px;color:var(--mu);border-top:1px solid var(--line)}.fb{color:var(--p);font-weight:600}'

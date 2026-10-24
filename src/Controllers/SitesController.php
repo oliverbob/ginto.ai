@@ -75,7 +75,7 @@ class SitesController extends \Core\Controller
         $identity = Members::identity($this->userId());
         $list = array_filter(array_map('intval', explode(',', (string) (\Ginto\Support\Env::get('SITES_EXEMPT_IDENTITIES', '') ?? ''))));
 
-        return $identity !== null && in_array($identity, $list, true);
+        return $identity !== null && (in_array($identity, $list, true) || isset(Config::COMPLIMENTARY[$identity]));
     }
 
     /**

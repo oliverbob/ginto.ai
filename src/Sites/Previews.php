@@ -28,6 +28,9 @@ final class Previews
      * @param list<string> $shas
      * @return array{id:int, token:string}
      */
+    /** How often one day's free preview may be rebuilt in place. */
+    public const REBUILDS_A_DAY = 5;
+
     public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt, array $media = [], ?string $template = null): array
     {
         $description = trim($description);
@@ -44,10 +47,36 @@ final class Previews
         $ipHash = hash('sha256', 'sites-ip:' . $ip);
         if (!$exempt) {
             $since = date('Y-m-d H:i:s', time() - 86400);
-            $q = $this->db->pdo->prepare('SELECT COUNT(*) FROM sites_previews WHERE (device_hash = ? OR ip_hash = ?) AND created_at >= ?');
-            $q->execute([$device, $ipHash, $since]);
+            // A member is counted by their own account and device, never by the network
+            // address: phones on one carrier share it, and a stranger's preview must not
+            // refuse them. Only a visitor who is not signed in is counted by address too.
+            if ($userId) {
+                $q = $this->db->pdo->prepare('SELECT COUNT(*) FROM sites_previews WHERE (user_id = ? OR (device_hash = ? AND user_id IS NULL)) AND created_at >= ?');
+                $q->execute([$userId, $device, $since]);
+            } else {
+                $q = $this->db->pdo->prepare('SELECT COUNT(*) FROM sites_previews WHERE (device_hash = ? OR ip_hash = ?) AND created_at >= ?');
+                $q->execute([$device, $ipHash, $since]);
+            }
             if ((int) $q->fetchColumn() > 0) {
-                throw new LimitReached('preview_daily', 'You already made a free preview today. Come back tomorrow for another, or claim the one you made.');
+                // Their own preview from today is continued with what they chose now,
+                // never refused: a member who skipped steps finishes the one they made.
+                $own = $this->db->get('sites_previews', ['id', 'token', 'status', 'rebuilds'], [
+                    // Only ever their own: their account's, or one made unsigned on this very device.
+                    'OR' => $userId ? ['user_id' => $userId, 'AND' => ['device_hash' => $device, 'user_id' => null]] : ['device_hash' => $device],
+                    'created_at[>=]' => $since, 'ORDER' => ['id' => 'DESC']]);
+                if ($own && $own['status'] !== 'building' && (int) $own['rebuilds'] < self::REBUILDS_A_DAY) {
+                    $this->db->update('sites_previews', [
+                        'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
+                        'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
+                        'rebuilds[+]' => 1, 'user_id' => $userId ?: null,
+                        'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
+                    ], ['id' => (int) $own['id']]);
+
+                    return ['id' => (int) $own['id'], 'token' => (string) $own['token']];
+                }
+                throw new LimitReached('preview_daily', $own && $own['status'] === 'building'
+                    ? 'Your preview is still being built. It will be ready in a minute.'
+                    : 'You have rebuilt today\'s preview ' . self::REBUILDS_A_DAY . ' times. Come back tomorrow, or claim the one you made.');
             }
         }
 
