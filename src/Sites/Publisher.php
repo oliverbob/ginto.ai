@@ -40,7 +40,8 @@ final class Publisher
         }
         $plan = Config::plan((string) $sub['plan']) ?? Config::PLANS['silver'];
 
-        return $this->push($n, (int) $plan['storage_gb'] * 1024, ['founding' => (bool) $sub['founding']]);
+        // Gold and Crown sites carry the customer chat.
+        return $this->push($n, (int) $plan['storage_gb'] * 1024, ['founding' => (bool) $sub['founding'], 'chat' => !empty($plan['chat']), 'name' => (string) $n['name']]);
     }
 
     /**

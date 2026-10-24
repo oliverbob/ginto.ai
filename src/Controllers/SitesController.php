@@ -263,6 +263,29 @@ class SitesController extends \Core\Controller
         return $this->json($r + ['next' => $r['ok'] ? '/sites/me' : null], $r['ok'] ? 200 : 422);
     }
 
+    /**
+     * POST /sites/chat {name, messages} -- a visitor's question on a member's
+     * live site (Gold and Crown). Sent as text/plain from the site so the browser
+     * needs no preflight; answered only to that site's own address.
+     */
+    public function chat()
+    {
+        $origin = (string) ($_SERVER['HTTP_ORIGIN'] ?? '');
+        $in = json_decode((string) file_get_contents('php://input'), true) ?: [];
+        $name = (string) ($in['name'] ?? '');
+        if (preg_match(Config::NAME_RE, $name) === 1 && $origin === 'https://' . $name . '.silverqueen.pro') {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+        }
+        if (preg_match(Config::NAME_RE, $name) !== 1) {
+            return $this->json(['ok' => false, 'error' => 'Unknown site.'], 404);
+        }
+        $r = (new \Ginto\Sites\CustomerChat($this->db))->reply($name, is_array($in['messages'] ?? null) ? $in['messages'] : [],
+            $this->clientIp() . '|' . (string) ($_SERVER['HTTP_USER_AGENT'] ?? ''));
+
+        return $this->json($r, $r['ok'] ? 200 : 429);
+    }
+
     /** POST /sites/me/ask {text} -- SilverQueen AI changes the site as asked, checked like every build. */
     public function ask()
     {

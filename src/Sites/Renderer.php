@@ -95,7 +95,7 @@ final class Renderer
     /**
      * @param list<string> $photoUrls in plan photo order
      * @param array{preview_hours?:int, trial_hours?:int, trial_until?:int, claim_url?:string, contact_url?:string, founding?:bool,
-     *              template?:string, videos?:array<int,string>, page?:array} $opts
+     *              template?:string, videos?:array<int,string>, page?:array, chat?:bool, name?:string} $opts
      */
     public static function html(array $plan, array $photoUrls, array $opts = []): string
     {
@@ -239,6 +239,7 @@ final class Renderer
             . '<a class="btn" href="' . $e($contact) . '"' . $ext . '>' . $e($plan['closing']['cta']) . '</a></section>'
             . '<footer>&copy; ' . date('Y') . ' ' . $e($brand) . ' &middot; Made with SilverQueen Premium'
             . (!empty($opts['founding']) ? ' &middot; <span class="fb">&#127941; Founding Member</span>' : '') . '</footer>'
+            . (!empty($opts['chat']) && !empty($opts['name']) ? self::chatWidget((string) $opts['name'], $brand, $e) : '')
             . '</body></html>';
     }
 
@@ -287,6 +288,41 @@ final class Renderer
         }
 
         return [$store, $page];
+    }
+
+    /**
+     * Customer chat (Gold and Crown): a button, a small panel, answers from
+     * silverqueen.pro/sites/chat. Answers are set as text, never as HTML.
+     */
+    private static function chatWidget(string $name, string $brand, callable $e): string
+    {
+        $css = '#sqc-b{position:fixed;right:16px;bottom:16px;z-index:50;display:flex;align-items:center;gap:8px;padding:12px 16px;border:0;border-radius:999px;'
+            . 'background:var(--p);color:var(--on);font:600 15px Inter,system-ui,sans-serif;box-shadow:0 10px 30px -10px rgba(0,0,0,.5);cursor:pointer}'
+            . '#sqc{position:fixed;right:16px;bottom:16px;z-index:51;width:min(360px,calc(100vw - 32px));height:min(520px,calc(100vh - 32px));display:none;flex-direction:column;'
+            . 'background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:16px;box-shadow:0 20px 50px -15px rgba(0,0,0,.5);overflow:hidden;font:15px/1.45 Inter,system-ui,sans-serif}'
+            . '#sqc.on{display:flex}#sqc header{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;background:var(--p);color:var(--on);font-weight:700}'
+            . '#sqc header button{border:0;background:transparent;color:inherit;font-size:22px;cursor:pointer;line-height:1}'
+            . '#sqc .m{flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}'
+            . '#sqc .q,#sqc .a{max-width:85%;padding:8px 12px;border-radius:14px;white-space:pre-wrap;overflow-wrap:anywhere}'
+            . '#sqc .q{align-self:flex-end;background:var(--p);color:var(--on)}#sqc .a{align-self:flex-start;background:var(--card);border:1px solid var(--line)}'
+            . '#sqc form{display:flex;gap:8px;padding:10px;border-top:1px solid var(--line)}#sqc input{flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--fg);font:inherit}'
+            . '#sqc form button{border:0;border-radius:10px;padding:0 14px;background:var(--p);color:var(--on);font-weight:700;cursor:pointer}'
+            . '#sqc small{display:block;padding:0 12px 8px;color:var(--mu);font-size:11px}';
+        $js = '(function(){var N=' . json_encode($name) . ',B=document.getElementById("sqc-b"),P=document.getElementById("sqc"),M=P.querySelector(".m"),F=P.querySelector("form"),I=F.querySelector("input"),H=[];'
+            . 'function add(c,t){var d=document.createElement("div");d.className=c;d.textContent=t;M.appendChild(d);M.scrollTop=M.scrollHeight;return d}'
+            . 'B.onclick=function(){P.classList.add("on");B.style.display="none";if(!M.children.length)add("a","Hi! Ask me about our products.");I.focus()};'
+            . 'P.querySelector("header button").onclick=function(){P.classList.remove("on");B.style.display=""};'
+            . 'F.onsubmit=function(ev){ev.preventDefault();var t=I.value.trim();if(!t)return;I.value="";add("q",t);H.push({role:"visitor",text:t});var w=add("a","…");'
+            . 'fetch("https://silverqueen.pro/sites/chat",{method:"POST",headers:{"Content-Type":"text/plain"},body:JSON.stringify({name:N,messages:H.slice(-6)})})'
+            . '.then(function(r){return r.json()}).then(function(r){var d=r&&(r.data||r);var x=d&&d.ok?d.reply:(d&&d.error)||"Please try again.";w.textContent=x;if(d&&d.ok)H.push({role:"shop",text:x})})'
+            . '.catch(function(){w.textContent="No connection. Please try again."})}})();';
+
+        return '<style>' . $css . '</style>'
+            . '<button id="sqc-b" type="button" aria-label="Ask ' . $e($brand) . '">&#128172; Ask ' . $e($brand) . '</button>'
+            . '<div id="sqc" role="dialog" aria-label="Chat with ' . $e($brand) . '"><header><span>' . $e($brand) . '</span><button type="button" aria-label="Close">&times;</button></header>'
+            . '<div class="m" aria-live="polite"></div><small>Answers by SilverQueen AI from this shop\'s own information.</small>'
+            . '<form><input type="text" maxlength="500" placeholder="Ask about a product…" aria-label="Your question"><button type="submit">Send</button></form></div>'
+            . '<script>' . $js . '</script>';
     }
 
     /** One stylesheet for all twelve: shared bones, then each template's own look (body.t-<id>). */
