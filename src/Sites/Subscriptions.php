@@ -56,10 +56,25 @@ final class Subscriptions
         $founding = $renewing ? (bool) $last['founding'] : $this->foundingTaken() < Config::foundingCap();
         $price = $renewing && $last['plan'] === $planId && $last['founding'] ? (int) $last['price_php'] : (int) $plan['php'];
 
-        // One pending checkout at a time: an older one is replaced.
-        $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending']);
-
         $handler = new \Ginto\Handlers\PayMongoHandler();
+
+        // Pressed again for the same plan: the same code, never a second one. A member
+        // may be scanning the first; a new code would leave that payment unclaimed.
+        $open = $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => 'pending', 'plan' => $planId,
+            'price_php' => $price, 'created_at[>]' => date('Y-m-d H:i:s', time() - 1800), 'ORDER' => ['id' => 'DESC']]);
+        if ($open) {
+            $st = $handler->getPaymentIntentStatus((string) $open['payment_ref']);
+            if (!empty($st['success']) && ($st['status'] ?? '') === 'succeeded') {
+                return ['ok' => true, 'sub_id' => (int) $open['id'], 'paid' => true, 'qr_image' => '', 'amount' => $price, 'founding' => (bool) $open['founding']];
+            }
+            if (!empty($st['success']) && !empty($st['qr_image'])) {
+                return ['ok' => true, 'sub_id' => (int) $open['id'], 'qr_image' => (string) $st['qr_image'],
+                    'qr_string' => (string) ($st['qr_string'] ?? ''), 'amount' => $price, 'founding' => (bool) $open['founding']];
+            }
+        }
+
+        // One pending checkout at a time: an older one is replaced (and still honoured if it gets paid; see confirm()).
+        $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending']);
         $r = $handler->initQrph($price, $email, $displayName ?: 'SilverQueen member', '', 'SilverQueen Premium ' . $plan['name'] . ' — ' . $name['name']);
         if (empty($r['success'])) {
             return ['ok' => false, 'error' => (string) ($r['message'] ?? 'The QR code could not be made. Try again.')];
@@ -80,16 +95,31 @@ final class Subscriptions
      */
     public function confirm(int $userId): array
     {
-        $sub = $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => 'pending', 'ORDER' => ['id' => 'DESC']]);
+        // The open checkout, and any replaced in the last day: whichever was actually paid counts,
+        // so a member who scanned an older code is never left without what they paid for.
+        $candidates = $this->db->select('sites_subscriptions', '*', ['user_id' => $userId, 'status' => ['pending', 'cancelled'],
+            'period_start' => null, 'created_at[>]' => date('Y-m-d H:i:s', time() - 86400), 'ORDER' => ['id' => 'DESC']]) ?: [];
+        $handler = new \Ginto\Handlers\PayMongoHandler();
+        $sub = null;
+        $waiting = false;
+        foreach ($candidates as $c) {
+            if (empty($c['payment_ref'])) {
+                continue;
+            }
+            $st = $handler->getPaymentIntentStatus((string) $c['payment_ref']);
+            if (!empty($st['success']) && ($st['status'] ?? '') === 'succeeded') {
+                $sub = $c;
+                break;
+            }
+            $waiting = $waiting || $c['status'] === 'pending';
+        }
         if (!$sub) {
             $active = $this->current($userId);
 
-            return ['status' => $active && $active['status'] === 'active' ? 'active' : 'none'];
+            return ['status' => $active && $active['status'] === 'active' ? 'active' : ($waiting ? 'waiting' : 'none')];
         }
-        $st = (new \Ginto\Handlers\PayMongoHandler())->getPaymentIntentStatus((string) $sub['payment_ref']);
-        if (empty($st['success']) || ($st['status'] ?? '') !== 'succeeded') {
-            return ['status' => 'waiting'];
-        }
+        // A paid code that was replaced: the replacement is moot.
+        $this->db->update('sites_subscriptions', ['status' => 'cancelled'], ['user_id' => $userId, 'status' => 'pending', 'id[!]' => (int) $sub['id']]);
 
         // Paid. A renewal extends from the end of the paid month; a new one starts now.
         $prev  = $this->db->get('sites_subscriptions', '*', ['user_id' => $userId, 'status' => 'active', 'ORDER' => ['id' => 'DESC']]);
@@ -116,7 +146,13 @@ final class Subscriptions
     public function confirmPending(): array
     {
         $out = [];
-        foreach ($this->db->select('sites_subscriptions', ['user_id', 'name'], ['status' => 'pending', 'created_at[>]' => date('Y-m-d H:i:s', time() - 86400)]) ?: [] as $p) {
+        $seen = [];
+        foreach ($this->db->select('sites_subscriptions', ['user_id', 'name'], ['status' => ['pending', 'cancelled'], 'period_start' => null,
+            'created_at[>]' => date('Y-m-d H:i:s', time() - 86400)]) ?: [] as $p) {
+            if (isset($seen[$p['user_id']]) || $this->current((int) $p['user_id']) && $this->current((int) $p['user_id'])['status'] === 'active') {
+                continue;
+            }
+            $seen[$p['user_id']] = true;
             $r = $this->confirm((int) $p['user_id']);
             if (($r['status'] ?? '') === 'active') {
                 $out[] = (string) $p['name'];

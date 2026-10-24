@@ -42,6 +42,10 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .pc ul{list-style:none;margin:8px 0 0;padding:0;font-size:13px;color:var(--muted);display:grid;gap:4px}
 .qr{display:none;margin-top:16px;padding:16px;border:1px dashed var(--gold);border-radius:14px;text-align:center}
 .qr.on{display:block}
+.qrwait{display:grid;place-items:center;gap:10px;width:240px;max-width:100%;aspect-ratio:1;margin:0 auto;border-radius:12px;background:var(--panel2);color:var(--muted);font-size:13px}
+.spin{width:34px;height:34px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--gold);animation:spn .8s linear infinite}
+.btn .spin{width:16px;height:16px;border-width:2px}@keyframes spn{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
 .qr img{width:240px;max-width:100%;aspect-ratio:1;background:#fff;border-radius:12px;padding:8px}
 .cr{display:flex;justify-content:space-between;font-weight:700;margin-bottom:8px}
 @media (max-width:760px){.row2,.plans3{grid-template-columns:1fr}.plans3{gap:8px}.pc{padding:12px 14px}.pc b{display:inline;font-size:16px}.pc .pr{display:inline;font-size:18px;margin:0 0 0 8px}.pc .pr small{font-size:12px}.pc ul{display:flex;flex-wrap:wrap;gap:2px 12px;margin:6px 0 0;font-size:12.5px}.prod{grid-template-columns:1fr;gap:12px}.prod img{aspect-ratio:16/10}}
@@ -159,7 +163,8 @@ if (($phase ?? '') === 'trial'): ?>
   <?php endif; ?>
   <div class="qr" id="qr">
     <p style="margin:0 0 10px;font-weight:700">Scan with GCash, Maya or your bank app</p>
-    <img id="qrImg" alt="QR Ph code">
+    <div class="qrwait" id="qrWait"><span class="spin" aria-hidden="true"></span><span id="qrWaitWord">Making your QR code…</span></div>
+    <img id="qrImg" alt="QR Ph code" hidden>
     <p style="margin:10px 0 0;font-size:22px;font-weight:800" id="qrAmt"></p>
     <p class="say" id="qrSay" aria-live="polite">Waiting for your payment…</p>
   </div>
@@ -211,12 +216,23 @@ if (($phase ?? '') === 'trial'): ?>
   let polling = 0;
   async function pay(plan) {
     const say = $('paySay') || $('qrSay');
-    const r = await post('/sites/me/checkout', { plan });
-    if (!r.ok) { tell(say, 'bad', r.error || 'The QR code could not be made.'); return; }
-    $('qrImg').src = r.qr_image;
-    $('qrAmt').textContent = '₱' + Number(r.amount).toLocaleString('en-PH') + (r.founding ? ' · 🏅 Founding Member' : '');
+    const btn = $('payGo');
+    const label = btn ? btn.innerHTML : '';
+    // Making the code takes PayMongo a few seconds, and the image a few more: say so at once.
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin" aria-hidden="true"></span> Making your QR code…'; }
+    $('qrImg').hidden = true; $('qrWait').hidden = false; $('qrWaitWord').textContent = 'Making your QR code…';
+    $('qrAmt').textContent = ''; tell($('qrSay'), '', '');
     $('qr').classList.add('on');
     $('qr').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const r = await post('/sites/me/checkout', { plan });
+    if (btn) { btn.disabled = false; btn.innerHTML = label; }
+    if (!r.ok) { $('qr').classList.remove('on'); tell(say, 'bad', r.error || 'The QR code could not be made.'); return; }
+    if (r.paid) { $('qrWaitWord').textContent = 'Already paid. Publishing your site…'; }
+    $('qrWaitWord').textContent = 'Loading the code…';
+    $('qrImg').onload = () => { $('qrWait').hidden = true; $('qrImg').hidden = false; tell($('qrSay'), '', 'Waiting for your payment…'); };
+    $('qrImg').onerror = () => { $('qrWaitWord').textContent = 'The code did not load. Press Pay again.'; };
+    if (!r.paid) $('qrImg').src = r.qr_image;
+    $('qrAmt').textContent = '₱' + Number(r.amount).toLocaleString('en-PH') + (r.founding ? ' · 🏅 Founding Member' : '');
     clearInterval(polling);
     polling = setInterval(async () => {
       let s = {};
