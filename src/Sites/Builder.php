@@ -24,7 +24,10 @@ final class Builder
         . 'from the photos\' colours so the site matches the products, with readable contrast between text and background; '
         . 'one product per photo, "photo" is its 0-based index; never invent prices, stock, sizes, discounts, delivery times, '
         . 'awards or reviews; keep the seller\'s own facts; write in the language the seller wrote in; headline at most 8 '
-        . 'words; product descriptions at most 35 words; 3 highlights at most; warm, simple, honest.';
+        . 'words; product descriptions at most 35 words; 3 highlights at most; warm, simple, honest. Never copy a caption '
+        . 'word for word into the tagline, headline or names, and never use hashtags or @mentions: write fresh, short words. '
+        . 'A photo whose main subject is a person, a crowd or an event is not a product: name it for the service or work it '
+        . 'shows (or "Our team", "Our events"), never "laptop on table" or what is merely visible.';
 
     public function __construct(private Ai $groq)
     {

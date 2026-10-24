@@ -25,10 +25,12 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .f input,.f textarea{box-sizing:border-box;width:100%;height:2.6rem;margin:0;padding:0 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--bg);color:var(--fg);font:500 15px Inter,system-ui,sans-serif}
 .f textarea{height:auto;min-height:84px;padding:10px 12px;resize:vertical;line-height:1.45}
 .f input:focus,.f textarea:focus{outline:none;border-color:var(--gold)}
-.prods{display:grid;gap:12px;margin-top:14px}
-.prod{display:grid;grid-template-columns:84px 1fr;gap:12px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--bg)}
-.prod img{width:84px;height:84px;border-radius:10px;object-fit:cover;background:var(--panel2)}
-.prod .ai{font-size:11px;font-weight:700;color:var(--gold-fg);text-transform:uppercase;letter-spacing:.5px}
+.prods{display:grid;margin-top:18px;border-top:1px solid var(--line)}
+/* One flat section per product, divided by a line: never a box inside the review box. */
+.prod{display:grid;grid-template-columns:150px 1fr;gap:18px;align-items:start;padding:18px 0;border-bottom:1px solid var(--line)}
+.prod .ph{position:relative}
+.prod img{display:block;width:100%;aspect-ratio:1;border-radius:12px;object-fit:cover;background:var(--panel2)}
+.prod .ai{position:absolute;left:8px;top:8px;font-size:10.5px;font-weight:700;color:#2a1d05;background:#e0b23c;text-transform:uppercase;letter-spacing:.4px;padding:3px 8px;border-radius:999px}
 .act{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:16px}
 .say{font-size:14px;min-height:20px}.say.ok{color:var(--ok)}.say.bad{color:var(--bad)}
 .plans3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
@@ -41,7 +43,7 @@ label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:60
 .qr.on{display:block}
 .qr img{width:240px;max-width:100%;aspect-ratio:1;background:#fff;border-radius:12px;padding:8px}
 .cr{display:flex;justify-content:space-between;font-weight:700;margin-bottom:8px}
-@media (max-width:760px){.row2,.plans3{grid-template-columns:1fr}}
+@media (max-width:760px){.row2,.plans3{grid-template-columns:1fr}.prod{grid-template-columns:1fr;gap:12px}.prod img{aspect-ratio:16/10}}
 </style>
 
 <section class="mh">
@@ -94,9 +96,8 @@ if (($phase ?? '') === 'trial'): ?>
     <div class="prods">
       <?php foreach ($plan['products'] as $i => $p): $sha = $draft['photos'][$p['photo']] ?? ''; ?>
       <div class="prod" data-i="<?= (int) $i ?>">
-        <img src="/sites/photo/<?= $e($sha) ?>" alt="" loading="lazy">
-        <div style="display:grid;gap:8px">
-          <span class="ai">Written by AI · check it</span>
+        <div class="ph"><img src="/sites/photo/<?= $e($sha) ?>" alt="" loading="lazy"><span class="ai">Written by AI · check it</span></div>
+        <div style="display:grid;gap:10px">
           <label class="f">Product name<input data-k="name" maxlength="80" value="<?= $e($p['name']) ?>"></label>
           <label class="f">Description<textarea data-k="description" maxlength="320"><?= $e($p['description']) ?></textarea></label>
         </div>
