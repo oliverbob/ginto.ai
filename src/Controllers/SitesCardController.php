@@ -55,6 +55,8 @@ class SitesCardController
             'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
             // The feed's promotions: paid, live sites, never the viewer's own.
             'showcase' => ['ok' => true, 'sites' => $this->showcase($db, $uid, !empty($in['preview']))],
+            // The Page's own words, edited in the app (Pages > Edit Page).
+            'edit' => $this->editPage($db, $uid, $in),
             // Several live, paid sites by name: for the feed's site posts.
             'cards' => ['ok' => true, 'sites' => $this->cards($db, (array) ($in['names'] ?? []))],
             default => ['ok' => false, 'error' => 'Unknown action.'],
@@ -100,6 +102,40 @@ class SitesCardController
         }
 
         return $out;
+    }
+
+    /**
+     * Edit the Page in the app (owner, 2026-10-24: "Editing the page is not
+     * possible"): its name, tagline and about, the same words the site shows.
+     * The live site follows at once; a held name's trial site too.
+     */
+    private function editPage($db, int $uid, array $in): array
+    {
+        $n = (new Names($db))->of($uid);
+        if (!$n || empty($n['preview_id'])) {
+            return ['ok' => false, 'error' => 'Build your site first.'];
+        }
+        $p = $db->get('sites_previews', ['id', 'site'], ['id' => (int) $n['preview_id']]);
+        $site = $p ? json_decode((string) $p['site'], true) : null;
+        if (!is_array($site) || !is_array($site['plan'] ?? null)) {
+            return ['ok' => false, 'error' => 'Build your site first.'];
+        }
+        $t = static fn ($v, int $max): string => mb_substr(trim(preg_replace('/\s+/u', ' ', strip_tags((string) $v))), 0, $max);
+        if (isset($in['brand']) && $t($in['brand'], 60) !== '') {
+            $site['plan']['brand']['name'] = $t($in['brand'], 60);
+        }
+        if (isset($in['tagline'])) {
+            $site['plan']['brand']['tagline'] = $t($in['tagline'], 120);
+        }
+        if (isset($in['about'])) {
+            $site['plan']['about']['body'] = mb_substr(trim(strip_tags((string) $in['about'])), 0, 900);
+        }
+        $db->update('sites_previews', ['site' => json_encode($site)], ['id' => (int) $p['id']]);
+        $phase = \Ginto\Sites\Trial::phase($n, (new Subscriptions($db))->current($uid));
+        $pub = $phase === 'live' ? (new \Ginto\Sites\Publisher($db))->publish($uid)
+            : ($phase === 'trial' ? (new \Ginto\Sites\Publisher($db))->publishTrial($uid) : ['ok' => null]);
+
+        return ['ok' => true, 'republished' => $pub['ok'] ?? null, 'site' => (new \Ginto\Sites\Showcase($db))->of($db->get('sites_names', '*', ['name' => $n['name']]))];
     }
 
     /** @return array<string,array> name => card, for live paid sites only (never a trial or a preview) */
