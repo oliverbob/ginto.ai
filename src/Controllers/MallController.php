@@ -139,6 +139,8 @@ class MallController extends \Core\Controller
 
         // Pass data to the view
         $this->view('mall/marketplace', [
+            // Every SilverQueen shop's listings (owner, 2026-10-25: "Sync everything.").
+            'sq_items'    => \Ginto\Services\SilverQueenShelf::all(),
             'categories'  => $categories,
             'products'    => $products,
             'csrf_token'  => generateCsrfToken(),

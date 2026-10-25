@@ -41,41 +41,69 @@ class SilverQueenShelf
 
         $out = [];
 
-        foreach (self::read($sellerId) as $it) {
-            $url = (string) ($it['url'] ?? '');
-
-            if (!preg_match('#^https://sq\.silverqueen\.pro/i/\d+\.\d+$#', $url)) {
-                continue;
+        foreach (self::read('sq-shelf-' . $sellerId, '/api/v1/ginto-mall/sellers/' . $sellerId . '/items') as $it) {
+            if (($card = self::card($it, $sellerId)) !== null) {
+                $out[] = $card;
             }
-
-            $out[] = [
-                'id'       => -abs((int) ($it['id'] ?? 0)),
-                'title'    => (string) ($it['title'] ?? ''),
-                'price'    => round((float) ($it['price'] ?? 0), 2),
-                'currency' => (string) ($it['currency'] ?? 'PHP'),
-                'cat'      => null,
-                'rating'   => 0,
-                'img'      => $it['img'] ?? null,
-                'imgs'     => array_values(array_filter((array) ($it['imgs'] ?? []))),
-                'desc'     => (string) ($it['desc'] ?? ''),
-                'slug'     => '',
-                'badge'    => null,
-                'seller_slug' => null,
-                'seller_name' => null,
-                'seller_id'   => $sellerId,
-                'ext_url'  => $url,
-                // Not yet cleared to sell on SilverQueen: shown, Buy waits.
-                'buyable'  => ($it['buyable'] ?? true) !== false,
-            ];
         }
 
         return $out;
     }
 
-    /** @return array<int,array<string,mixed>> */
-    private static function read(int $sellerId): array
+    /**
+     * Every SilverQueen shop's listings, for this mall's front page (owner,
+     * 2026-10-25: "Sync everything."). Each says whose it is; the same card
+     * and the same Buy as on a storefront.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    public static function all(): array
     {
-        $file = self::cacheFile('sq-shelf-' . $sellerId . '.json');
+        $out = [];
+
+        foreach (self::read('sq-shelf-all', '/api/v1/ginto-mall/items') as $it) {
+            if (($card = self::card($it, (int) ($it['seller_id'] ?? 0))) !== null) {
+                $out[] = $card;
+            }
+        }
+
+        return $out;
+    }
+
+    /** One SilverQueen listing as a PRODUCTS entry, or null when it is not one of theirs. */
+    private static function card(array $it, int $sellerId): ?array
+    {
+        $url = (string) ($it['url'] ?? '');
+
+        if (!preg_match('#^https://sq\.silverqueen\.pro/i/\d+\.\d+$#', $url)) {
+            return null;
+        }
+
+        return [
+            'id'       => -abs((int) ($it['id'] ?? 0)),
+            'title'    => (string) ($it['title'] ?? ''),
+            'price'    => round((float) ($it['price'] ?? 0), 2),
+            'currency' => (string) ($it['currency'] ?? 'PHP'),
+            'cat'      => null,
+            'rating'   => 0,
+            'img'      => $it['img'] ?? null,
+            'imgs'     => array_values(array_filter((array) ($it['imgs'] ?? []))),
+            'desc'     => (string) ($it['desc'] ?? ''),
+            'slug'     => '',
+            'badge'    => null,
+            'seller_slug' => null,
+            'seller_name' => null,
+            'seller_id'   => $sellerId,
+            'ext_url'  => $url,
+            // Not yet cleared to sell on SilverQueen: shown, Buy waits.
+            'buyable'  => ($it['buyable'] ?? true) !== false,
+        ];
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    private static function read(string $key, string $path): array
+    {
+        $file = self::cacheFile($key . '.json');
         $kept = null;
 
         if ($file !== null && is_file($file)) {
@@ -94,7 +122,7 @@ class SilverQueenShelf
         }
 
         try {
-            $fresh = self::fetch($sellerId);
+            $fresh = self::fetch($path);
 
             if ($fresh === null) {
                 return $stale;
@@ -110,13 +138,13 @@ class SilverQueenShelf
     }
 
     /** @return array<int,array<string,mixed>>|null null when SilverQueen could not be read */
-    private static function fetch(int $sellerId): ?array
+    private static function fetch(string $path): ?array
     {
         if (!function_exists('curl_init')) {
             return null;
         }
 
-        $curl = curl_init(self::ORIGIN . '/api/v1/ginto-mall/sellers/' . $sellerId . '/items');
+        $curl = curl_init(self::ORIGIN . $path);
 
         curl_setopt_array($curl, [
             CURLOPT_RETURNTRANSFER => true,

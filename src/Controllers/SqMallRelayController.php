@@ -67,6 +67,50 @@ class SqMallRelayController
         exit();
     }
 
+    /**
+     * Every seller here with something on sale, for SilverQueen to give a shop
+     * of its own (owner, 2026-10-25: "Sync everything."). The other direction
+     * of provision(): SilverQueen matches the account by email, opens or finds
+     * the member's shop there and pairs it, and from then on its mall shows
+     * these listings and takes their orders. Signed, because emails are in it.
+     */
+    public function sellers()
+    {
+        header('Content-Type: application/json');
+
+        $raw = file_get_contents('php://input') ?: '';
+
+        if (!(new SqRelayController())->authentic($raw)) {
+            http_response_code(401);
+            echo json_encode(['error' => 'unauthorised']);
+            exit();
+        }
+
+        $rows = Database::getInstance()->query(
+            "SELECT u.id AS user_id, LOWER(u.email) AS email, u.fullname,
+                    s.slug, s.display_name, s.description, s.logo_image, s.banner_image,
+                    COUNT(p.id) AS listings
+               FROM products p
+               JOIN users u ON u.id = p.seller_id
+          LEFT JOIN seller_storefronts s ON s.user_id = u.id
+              WHERE p.status = 'published' AND p.is_visible = 1
+           GROUP BY u.id, u.email, u.fullname, s.slug, s.display_name, s.description, s.logo_image, s.banner_image
+           ORDER BY u.id"
+        )->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        echo json_encode(['sellers' => array_map(static fn (array $r): array => [
+            'user_id'  => (int) $r['user_id'],
+            'email'    => (string) $r['email'],
+            'name'     => (string) ($r['display_name'] ?: $r['fullname']),
+            'slug'     => (string) ($r['slug'] ?? ''),
+            'about'    => (string) ($r['description'] ?? ''),
+            'logo'     => $r['logo_image'],
+            'banner'   => $r['banner_image'],
+            'listings' => (int) $r['listings'],
+        ], $rows)]);
+        exit();
+    }
+
     private function provisionShop(array $in): array
     {
         $db       = Database::getInstance();

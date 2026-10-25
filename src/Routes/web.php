@@ -1611,6 +1611,9 @@ $router->req('/relay/paymongo/status', 'SqRelayController@intentStatus', ['POST'
 // A SilverQueen shop, given its storefront here (and an account if it has
 // none). Same signature as the PayMongo relay -- see SqMallRelayController.
 $router->req('/relay/mall/provision', 'SqMallRelayController@provision', ['POST']);
+// And the other way: every seller here with listings, for SilverQueen to give a
+// shop of its own and pair (owner, 2026-10-25: "Sync everything.").
+$router->req('/relay/mall/sellers', 'SqMallRelayController@sellers', ['POST']);
 $router->req('/webhook/status', 'WebhookController@saiCodeCheck');
 
 // Editor routes
