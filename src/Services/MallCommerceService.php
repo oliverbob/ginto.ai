@@ -1047,6 +1047,7 @@ class MallCommerceService
                 ];
             }
             $grouped[$sellerId]['items'][] = array_merge($pricing, [
+                'physical' => self::isPhysical($product),
                 'product_id' => (int)$product['id'],
                 'title' => (string)($product['title'] ?? ''),
                 'image_url' => $this->firstProductImage($product),
@@ -1094,8 +1095,12 @@ class MallCommerceService
 
         // Compute per-seller shipping estimate (each seller = 1 parcel group)
         foreach ($grouped as $sellerId => $group) {
-            $shippingResult = $shippingCalc->estimate(
-                $group['items'],
+            /* Only what travels is shipped or delivered (owner, 2026-10-25: an
+               "Internship Admission" -- virtual -- was charged P80 shipping
+               and a P600 delivery fee). */
+            $travels = array_values(array_filter($group['items'], static fn ($i) => !empty($i['physical'])));
+            $shippingResult = $travels === [] ? ['estimated_fee' => 0.00, 'zone' => null, 'chargeable_weight_kg' => null] : $shippingCalc->estimate(
+                $travels,
                 $buyerZone,
                 ShippingCalculator::DIVISOR_SAFE, // conservative — safe default
                 false                              // no logistics partner yet
@@ -1113,11 +1118,11 @@ class MallCommerceService
                     $physicalItemCount += (int)($gi['quantity'] ?? 1);
                 }
             }
-            $deliveryFee = $this->calculateDeliveryFee(
+            $deliveryFee = $travels === [] ? 0.00 : $this->calculateDeliveryFee(
                 $sellerId,
                 $buyerBarangayId,
-                $group['items'],
-                $group['subtotal']
+                $travels,
+                array_sum(array_column($travels, 'line_subtotal'))
             );
             $grouped[$sellerId]['delivery_fee'] = $deliveryFee;
 
@@ -1316,7 +1321,7 @@ class MallCommerceService
                 ];
             }
 
-            $grouped[$sellerId]['items'][] = $pricing;
+            $grouped[$sellerId]['items'][] = $pricing + ['physical' => self::isPhysical($product)];
             $grouped[$sellerId]['subtotal'] += $pricing['line_subtotal'];
             $grouped[$sellerId]['platform_fee'] += $pricing['platform_fee_amount'];
             $grouped[$sellerId]['seller_net'] += $pricing['seller_net_amount'];
@@ -1341,14 +1346,10 @@ class MallCommerceService
         $totalShipping = 0.00;
         $totalDelivery = 0.00;
         foreach ($grouped as $sellerId => &$group) {
-            $shippingResult = $shippingCalc->estimate(
-                $group['items'],
-                $buyerZone,
-                ShippingCalculator::DIVISOR_SAFE,
-                false
-            );
-            $group['shipping_fee'] = $shippingResult['estimated_fee'];
-            $group['delivery_fee'] = $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $group['items'], $group['subtotal']);
+            // Only what travels is shipped or delivered (as checkout()).
+            $travels = array_values(array_filter($group['items'], static fn ($i) => !empty($i['physical'])));
+            $group['shipping_fee'] = $travels === [] ? 0.00 : $shippingCalc->estimate($travels, $buyerZone, ShippingCalculator::DIVISOR_SAFE, false)['estimated_fee'];
+            $group['delivery_fee'] = $travels === [] ? 0.00 : $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $travels, array_sum(array_column($travels, 'line_subtotal')));
             $group['buyer_total'] += $group['shipping_fee'] + $group['delivery_fee'];
             $group['seller_net'] = round($group['seller_net'] - self::SELLER_PROCESSING_COST_PHP, 2);
             $group['platform_fee'] = round($group['platform_fee'] + self::SELLER_PROCESSING_COST_PHP, 2);
@@ -1369,10 +1370,19 @@ class MallCommerceService
             'shipping_fee' => round($totalShipping,2),
             'delivery_fee' => round($totalDelivery,2),
             'platform_fee' => round($platformFee,2),
+            // The two parts of platform_fee, for the summary's two lines.
+            'platform_commission' => round($platformFee - self::SELLER_PROCESSING_COST_PHP * count($grouped), 2),
+            'fixed_fee' => round(self::SELLER_PROCESSING_COST_PHP * count($grouped), 2),
             'processing_fee' => round($processingFee,2),
             'total' => round($total,2),
             'currency' => $currency ?: 'PHP',
         ];
+    }
+
+    /** Whether a product travels (and so is shipped and delivered). */
+    private static function isPhysical(array $product): bool
+    {
+        return in_array($product['product_type'] ?? null, ['physical', 'liquid', null, ''], true);
     }
 
     private function calculatePricing(array $product, int $quantity): array

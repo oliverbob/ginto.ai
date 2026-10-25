@@ -1079,6 +1079,10 @@ body.light .co-qr-spinner {
                 <span id="checkoutShippingFee" style="font-size:0.85rem;">calculated at checkout</span>
             </div>
             <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
+                <span>Delivery fee</span>
+                <span id="checkoutDeliveryFee" style="font-size:0.85rem;">₱0.00</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.95rem;color:var(--muted);margin-bottom:8px;">
                 <span>Platform fee (8%)</span>
                 <span id="checkoutPlatformFee" style="font-size:0.85rem;">₱0.00</span>
             </div>
@@ -1577,7 +1581,16 @@ body.light .co-qr-spinner {
                 shipping: shippingPayload(),
             });
             if (checkoutShippingFee) checkoutShippingFee.textContent = formatPrice(response.shipping_fee, response.currency);
-            if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(response.platform_fee, response.currency);
+            /* Every line from the server, so they add up to the total: the
+               items as charged, the delivery fee (it was in the total with no
+               line), and the 8% without the fixed fee shown under it. */
+            const sub = document.getElementById('checkoutSubtotal');
+            if (sub && response.subtotal !== undefined) sub.textContent = formatPrice(response.subtotal, response.currency);
+            const del = document.getElementById('checkoutDeliveryFee');
+            if (del) del.textContent = formatPrice(response.delivery_fee || 0, response.currency);
+            const fixed = document.getElementById('checkoutFixedFee');
+            if (fixed && response.fixed_fee !== undefined) fixed.textContent = formatPrice(response.fixed_fee, response.currency);
+            if (checkoutPlatformFee) checkoutPlatformFee.textContent = formatPrice(response.platform_commission ?? response.platform_fee, response.currency);
             if (checkoutProcessingFee) checkoutProcessingFee.textContent = formatPrice(response.processing_fee, response.currency);
             if (checkoutTotal) checkoutTotal.textContent = formatPrice(response.total, response.currency);
         } catch (err) {
