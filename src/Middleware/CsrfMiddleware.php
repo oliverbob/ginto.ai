@@ -54,6 +54,7 @@ class CsrfMiddleware
         // A SilverQueen shop's storefront, provisioned here. The same HMAC,
         // checked by SqMallRelayController before anything else.
         '/relay/mall/provision',
+        '/relay/mall/sellers',
         // PayMongo's own deliveries. Signed by PayMongo and verified against
         // PAYMONGO_WEBHOOK_SECRET in the handler; a rejection here would show
         // up as a disabled endpoint on their dashboard rather than as an error
