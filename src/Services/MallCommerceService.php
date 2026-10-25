@@ -1099,7 +1099,12 @@ class MallCommerceService
                "Internship Admission" -- virtual -- was charged P80 shipping
                and a P600 delivery fee). */
             $travels = array_values(array_filter($group['items'], static fn ($i) => !empty($i['physical'])));
-            $shippingResult = $travels === [] ? ['estimated_fee' => 0.00, 'zone' => null, 'chargeable_weight_kg' => null] : $shippingCalc->estimate(
+            /* One way there per parcel (owner, 2026-10-25: "Whatever is logical
+               about shipping, do it" -- physical goods paid BOTH the courier's
+               zone fee and the rider's distance fee). Near the seller: the
+               rider, distance fee only. Otherwise: the courier, zone fee only. */
+            $local = $travels !== [] && $this->isLocalDelivery($sellerId, $buyerBarangayId);
+            $shippingResult = ($travels === [] || $local) ? ['estimated_fee' => 0.00, 'zone' => $local ? 'local' : null, 'chargeable_weight_kg' => null] : $shippingCalc->estimate(
                 $travels,
                 $buyerZone,
                 ShippingCalculator::DIVISOR_SAFE, // conservative — safe default
@@ -1118,7 +1123,7 @@ class MallCommerceService
                     $physicalItemCount += (int)($gi['quantity'] ?? 1);
                 }
             }
-            $deliveryFee = $travels === [] ? 0.00 : $this->calculateDeliveryFee(
+            $deliveryFee = !$local ? 0.00 : $this->calculateDeliveryFee(
                 $sellerId,
                 $buyerBarangayId,
                 $travels,
@@ -1348,8 +1353,10 @@ class MallCommerceService
         foreach ($grouped as $sellerId => &$group) {
             // Only what travels is shipped or delivered (as checkout()).
             $travels = array_values(array_filter($group['items'], static fn ($i) => !empty($i['physical'])));
-            $group['shipping_fee'] = $travels === [] ? 0.00 : $shippingCalc->estimate($travels, $buyerZone, ShippingCalculator::DIVISOR_SAFE, false)['estimated_fee'];
-            $group['delivery_fee'] = $travels === [] ? 0.00 : $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $travels, array_sum(array_column($travels, 'line_subtotal')));
+            // One way there per parcel: rider when near, courier otherwise (as checkout()).
+            $local = $travels !== [] && $this->isLocalDelivery($sellerId, $buyerBarangayId);
+            $group['shipping_fee'] = ($travels === [] || $local) ? 0.00 : $shippingCalc->estimate($travels, $buyerZone, ShippingCalculator::DIVISOR_SAFE, false)['estimated_fee'];
+            $group['delivery_fee'] = !$local ? 0.00 : $this->calculateDeliveryFee($sellerId, $buyerBarangayId, $travels, array_sum(array_column($travels, 'line_subtotal')));
             $group['buyer_total'] += $group['shipping_fee'] + $group['delivery_fee'];
             $group['seller_net'] = round($group['seller_net'] - self::SELLER_PROCESSING_COST_PHP, 2);
             $group['platform_fee'] = round($group['platform_fee'] + self::SELLER_PROCESSING_COST_PHP, 2);
@@ -2004,6 +2011,47 @@ class MallCommerceService
      *
      * Returns 0 if distance cannot be determined (e.g. no GPS data).
      */
+    /** Farthest a rider takes a parcel; past it, or when either end is unknown, the courier does. */
+    private const LOCAL_DELIVERY_MAX_KM = 20.0;
+
+    /**
+     * Whether the seller's home barangay and the buyer's are near enough for a
+     * rider. Unknown on either side means no: the courier's zone fee is the
+     * one that does not need a map.
+     */
+    private function isLocalDelivery(int $sellerId, ?int $buyerBarangayId): bool
+    {
+        if (!$buyerBarangayId) {
+            return false;
+        }
+
+        $home = $this->db->get('seller_delivery_zones', 'barangay_id', ['seller_id' => $sellerId, 'is_home' => 1]);
+
+        if (!$home) {
+            return false;
+        }
+
+        if ((int) $home === $buyerBarangayId) {
+            return true;
+        }
+
+        $at = [];
+
+        foreach ($this->db->select('barangays', ['id', 'lat', 'lng'], ['id' => [(int) $home, $buyerBarangayId]]) ?: [] as $r) {
+            if ((float) $r['lat'] != 0.0 || (float) $r['lng'] != 0.0) {
+                $at[(int) $r['id']] = [(float) $r['lat'], (float) $r['lng']];
+            }
+        }
+
+        if (!isset($at[(int) $home], $at[$buyerBarangayId])) {
+            return false;
+        }
+
+        [$a, $b] = [$at[(int) $home], $at[$buyerBarangayId]];
+
+        return $this->haversineKm($a[0], $a[1], $b[0], $b[1]) <= self::LOCAL_DELIVERY_MAX_KM;
+    }
+
     private function calculateDeliveryFee(int $sellerId, ?int $buyerBarangayId, array $items, float $groupSubtotal = 0.00): float
     {
         $itemCount = count($items);
