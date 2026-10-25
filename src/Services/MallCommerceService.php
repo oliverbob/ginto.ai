@@ -1064,7 +1064,17 @@ class MallCommerceService
         }
 
         $sanitizedShipping = $this->sanitizeShipping($shipping);
-        if (empty($sanitizedShipping['full_name']) || empty($sanitizedShipping['phone']) || empty($sanitizedShipping['address_line1']) || empty($sanitizedShipping['city'])) {
+        // An address only when something travels; a service or ticket needs who, not where.
+        $anyPhysical = false;
+        foreach ($grouped as $g) {
+            foreach ($g['items'] as $i) {
+                $anyPhysical = $anyPhysical || !empty($i['physical']);
+            }
+        }
+        if (empty($sanitizedShipping['full_name']) || empty($sanitizedShipping['phone'])) {
+            throw new \RuntimeException('Your full name and phone are required.');
+        }
+        if ($anyPhysical && (empty($sanitizedShipping['address_line1']) || empty($sanitizedShipping['city']))) {
             throw new \RuntimeException('Shipping full name, phone, address, and city are required.');
         }
 
@@ -1376,6 +1386,8 @@ class MallCommerceService
             'subtotal' => round($subtotal,2),
             'shipping_fee' => round($totalShipping,2),
             'delivery_fee' => round($totalDelivery,2),
+            // Whether anything travels, so checkout asks for an address only then.
+            'needs_address' => (bool) array_filter(array_merge(...array_map(static fn ($g) => array_column($g['items'], 'physical'), array_values($grouped)))),
             'platform_fee' => round($platformFee,2),
             // The two parts of platform_fee, for the summary's two lines.
             'platform_commission' => round($platformFee - self::SELLER_PROCESSING_COST_PHP * count($grouped), 2),
@@ -1386,10 +1398,14 @@ class MallCommerceService
         ];
     }
 
-    /** Whether a product travels (and so is shipped and delivered). */
+    /**
+     * Whether a product is goods, and so is shipped and delivered. Owner,
+     * 2026-10-25: "Anything that isn't goods shouldn't be charged shipping" --
+     * a service, ticket, subscription or anything untyped is not.
+     */
     private static function isPhysical(array $product): bool
     {
-        return in_array($product['product_type'] ?? null, ['physical', 'liquid', null, ''], true);
+        return in_array($product['product_type'] ?? null, ['physical', 'liquid'], true);
     }
 
     private function calculatePricing(array $product, int $quantity): array

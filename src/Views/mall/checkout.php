@@ -946,7 +946,7 @@ body.light .co-qr-spinner {
 
         <!-- Shipping Details -->
         <div class="co-section">
-            <div class="co-section-title">Shipping Details</div>
+            <div class="co-section-title" id="coShipTitle">Shipping Details</div>
                 <form id="checkoutShippingForm" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;">
                 <label style="display:flex;flex-direction:column;">
                     <span class="pf-label">Full Name</span>
@@ -956,35 +956,35 @@ body.light .co-qr-spinner {
                     <span class="pf-label">Phone</span>
                     <input id="shipPhone" type="text" class="pf-input" placeholder="09xx xxx xxxx" autocomplete="tel">
                 </label>
-                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                <label class="co-addr" style="display:flex;flex-direction:column;grid-column:1 / -1;">
                     <span class="pf-label">Address Line 1</span>
                     <input id="shipAddress1" type="text" class="pf-input" placeholder="House number, street, barangay" autocomplete="address-line1">
                 </label>
-                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                <label class="co-addr" style="display:flex;flex-direction:column;grid-column:1 / -1;">
                     <span class="pf-label">Address Line 2 <span style="font-weight:500;opacity:0.6;">(optional)</span></span>
                     <input id="shipAddress2" type="text" class="pf-input" placeholder="Apartment, building, landmark" autocomplete="address-line2">
                 </label>
-                <label style="display:flex;flex-direction:column;">
+                <label class="co-addr" style="display:flex;flex-direction:column;">
                     <span class="pf-label">City / Municipality</span>
                     <input id="shipCity" type="text" class="pf-input" placeholder="Quezon City" autocomplete="address-level2">
                 </label>
-                <label style="display:flex;flex-direction:column;">
+                <label class="co-addr" style="display:flex;flex-direction:column;">
                     <span class="pf-label">Province</span>
                     <input id="shipProvince" type="text" class="pf-input" placeholder="Metro Manila" autocomplete="address-level1">
                 </label>
-                <label style="display:flex;flex-direction:column;">
+                <label class="co-addr" style="display:flex;flex-direction:column;">
                     <span class="pf-label">Postal Code</span>
                     <input id="shipPostalCode" type="text" class="pf-input" placeholder="1100" autocomplete="postal-code">
                 </label>
-                <label style="display:flex;flex-direction:column;">
+                <label class="co-addr" style="display:flex;flex-direction:column;">
                     <span class="pf-label">Country</span>
                     <input id="shipCountry" type="text" class="pf-input" value="PH" autocomplete="country-name">
                 </label>
-                <label style="display:flex;flex-direction:column;grid-column:1 / -1;">
+                <label class="co-addr" style="display:flex;flex-direction:column;grid-column:1 / -1;">
                     <span class="pf-label">Delivery Notes <span style="font-weight:500;opacity:0.6;">(optional)</span></span>
                     <textarea id="shipBuyerNotes" class="pf-input" rows="3" placeholder="Special instructions or landmark notes for the delivery crew"></textarea>
                 </label>
-                <label style="display:flex;align-items:center;gap:10px;grid-column:1 / -1;cursor:pointer;padding:4px 0;">
+                <label class="co-addr" style="display:flex;align-items:center;gap:10px;grid-column:1 / -1;cursor:pointer;padding:4px 0;">
                     <input type="checkbox" id="coRememberAddress" checked style="width:18px;height:18px;accent-color:var(--accent);">
                     <span style="font-size:0.88rem;">Remember my shipping address for next time</span>
                 </label>
@@ -1584,6 +1584,7 @@ body.light .co-qr-spinner {
             /* Every line from the server, so they add up to the total: the
                items as charged, the delivery fee (it was in the total with no
                line), and the 8% without the fixed fee shown under it. */
+            if (response.needs_address !== undefined) paintAddressNeed(response.needs_address);
             const sub = document.getElementById('checkoutSubtotal');
             if (sub && response.subtotal !== undefined) sub.textContent = formatPrice(response.subtotal, response.currency);
             const del = document.getElementById('checkoutDeliveryFee');
@@ -1910,13 +1911,30 @@ body.light .co-qr-spinner {
     const coClose = document.getElementById('coClose');
     const coCardName = document.getElementById('coCardName');
 
+    /* A cart with nothing that travels -- a service, a ticket, an internship --
+       asks only who the buyer is (owner, 2026-10-25). Set from the estimate. */
+    let needsAddress = true;
+
+    function paintAddressNeed(need) {
+        needsAddress = need !== false;
+        document.querySelectorAll('#checkoutShippingForm .co-addr').forEach(function (el) {
+            el.style.display = needsAddress ? '' : 'none';
+        });
+        const t = document.getElementById('coShipTitle');
+        if (t) t.textContent = needsAddress ? 'Shipping Details' : 'Your details';
+        const shipRow = document.getElementById('checkoutShippingFee');
+        if (shipRow && shipRow.parentElement) shipRow.parentElement.style.display = needsAddress ? '' : 'none';
+        const delRow = document.getElementById('checkoutDeliveryFee');
+        if (delRow && delRow.parentElement) delRow.parentElement.style.display = needsAddress ? '' : 'none';
+    }
+
     function validateShipping() {
         const required = [
             { id: 'shipFullName', label: 'Full Name' },
             { id: 'shipPhone',    label: 'Phone' },
             { id: 'shipAddress1', label: 'Address Line 1' },
             { id: 'shipCity',     label: 'City' },
-        ];
+        ].filter(function (f) { return needsAddress || (f.id !== 'shipAddress1' && f.id !== 'shipCity'); });
         document.querySelectorAll('#checkoutShippingForm .pf-input').forEach(function (el) {
             el.classList.remove('field-error');
         });
