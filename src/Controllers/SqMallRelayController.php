@@ -101,7 +101,9 @@ class SqMallRelayController
         echo json_encode(['sellers' => array_map(static fn (array $r): array => [
             'user_id'  => (int) $r['user_id'],
             'email'    => (string) $r['email'],
-            'name'     => (string) ($r['display_name'] ?: $r['fullname']),
+            // The shop's name only -- never the account's full name, which is a
+            // legal name and has no place on a shop a member trades from.
+            'name'     => (string) ($r['display_name'] ?? ''),
             'slug'     => (string) ($r['slug'] ?? ''),
             'about'    => (string) ($r['description'] ?? ''),
             'logo'     => $r['logo_image'],
