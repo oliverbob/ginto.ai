@@ -444,6 +444,8 @@ class MallController extends \Core\Controller
                     'id'          => (int)$p['id'],
                     'title'       => $p['title'] ?? '',
                     'price'       => round((float)($p['price'] ?? 0) * 1.15, 2),
+                    // What checkout charges for the item; SilverQueen sells at this.
+                    'base_price'  => round((float)($p['price'] ?? 0), 2),
                     'currency'    => $p['currency'] ?? 'PHP',
                     'cat'         => isset($p['category_id']) ? (int)$p['category_id'] : null,
                     'rating'      => (float)($p['rating'] ?? 0),
