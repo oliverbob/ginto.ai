@@ -332,7 +332,7 @@ class MallController extends \Core\Controller
             $available = ($p['status'] ?? '') === 'published' && ((int)($p['is_visible'] ?? 0) === 1);
             if (!$available) continue;
 
-            $unitPrice = round((float)($p['price'] ?? 0) * 1.15, 2);
+            $unitPrice = round((float)($p['price'] ?? 0), 2);
             $lineTotal = $unitPrice * $qty;
             $total += $lineTotal;
 
@@ -443,7 +443,7 @@ class MallController extends \Core\Controller
                 $out[] = [
                     'id'          => (int)$p['id'],
                     'title'       => $p['title'] ?? '',
-                    'price'       => round((float)($p['price'] ?? 0) * 1.15, 2),
+                    'price'       => round((float)($p['price'] ?? 0), 2),
                     // What checkout charges for the item; SilverQueen sells at this.
                     'base_price'  => round((float)($p['price'] ?? 0), 2),
                     'currency'    => $p['currency'] ?? 'PHP',
