@@ -1383,6 +1383,8 @@ $router->req('/marketplace/sellers/storefront/save', 'SellerController@storefron
 $router->req('/marketplace', 'MallController@marketplace');
 // The Sites ad on the SilverQueen feed holds names here (signed by the chat server; no session).
 $router->post('/api/internal/sites-card', 'SitesCardController@handle');
+// The owner's grant picker reads the site's template ways here (signed; no session).
+$router->get('/api/internal/sites-templates', 'SitesCardController@templates');
 // The SilverQueen /superadmin API Keys page reaches this host's keys here (signed; no session).
 $router->post('/api/internal/api-keys', 'ApiKeysRelayController@handle');
 

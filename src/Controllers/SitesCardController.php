@@ -50,7 +50,7 @@ class SitesCardController
 
         $out = match ((string) ($in['action'] ?? '')) {
             'check' => (new Names($db))->check((string) ($in['n'] ?? ''), $uid),
-            'hold'  => $this->hold($db, $uid, (string) ($in['n'] ?? ''), $who),
+            'hold'  => $this->hold($db, $uid, (string) ($in['n'] ?? ''), $who, (string) ($in['template'] ?? '')),
             'state' => ['ok' => true] + $this->state($db, $uid, $who),
             'plan'  => $this->choose($db, $uid, (string) ($in['plan'] ?? '')) + $this->state($db, $uid, $who),
             // The feed's promotions: paid, live sites, never the viewer's own.
@@ -64,7 +64,16 @@ class SitesCardController
         echo json_encode($out);
     }
 
-    private function hold($db, int $uid, string $name, string $who): array
+    /** GET /api/internal/sites-templates -- the twelve ways a site can be drawn. */
+    public function templates()
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+
+        echo json_encode(['ok' => true, 'templates' => \Ginto\Sites\Templates::list()]);
+    }
+
+    private function hold($db, int $uid, string $name, string $who, string $template = ''): array
     {
         $names = new Names($db);
         $mine = $names->of($uid);
@@ -76,6 +85,15 @@ class SitesCardController
         $r = $names->claim($name, $uid, $draft ? (int) $draft['id'] : null);
         if (empty($r['ok'])) {
             return $r + ['ok' => false];
+        }
+        /* The owner's drawing for a granted site (admin, 2026-10-29: "I have to
+           chose the template for them"): the held name's site is built in it when
+           the trial publishes from the draft it claimed. */
+        if ($template !== '') {
+            $heldNow = $names->of($uid);
+            if (!empty($heldNow['preview_id'])) {
+                $db->update('sites_previews', ['template' => \Ginto\Sites\Templates::get($template)['id']], ['id' => (int) $heldNow['preview_id']]);
+            }
         }
         (new Trial($db))->start($uid, $who);
         $this->choose($db, $uid, (string) ($in['plan'] ?? ''));
