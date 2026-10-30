@@ -115,6 +115,12 @@ class SitesCardController
         // (payment / months) -- never the free trial a self-hold starts.
         if (empty($in['owner'])) {
             (new Trial($db))->start($uid, $who);
+        } else {
+            // The granted terms own the clock now: no free trial.
+            $db->update('sites_names', [
+                'trial_until' => date('Y-m-d H:i:s', time() - 1),
+                'release_at'  => date('Y-m-d H:i:s', time() - 1),
+            ], ['user_id' => $uid, 'status' => 'held']);
         }
         $this->choose($db, $uid, (string) ($in['plan'] ?? ''));
         Subscriptions::log("HELD {$r['name']} by member " . Members::identity($uid) . ' from the feed card');
