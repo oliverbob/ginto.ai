@@ -207,7 +207,15 @@ class SitesCardController
     /** The superadmin's one-time edit link into a member's Premium site (system override). */
     private function editLink($db, int $uid, string $who): string
     {
-        return Members::enterLink($uid, $who, '/sites/me');
+        // The superadmin's edit opens on the granted plan's terms, not the
+        // free-trial clock a self-hold starts -- the owner grants the terms.
+        $n = (new Names($db))->of($uid);
+        $to = '/sites/me';
+        if ((string) ($n['plan_choice'] ?? '') !== '') {
+            $to .= '?plan=' . rawurlencode((string) $n['plan_choice']);
+        }
+
+        return Members::enterLink($uid, $who, $to);
     }
 
     private function state($db, int $uid, string $who): array
