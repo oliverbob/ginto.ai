@@ -57,6 +57,9 @@ class SitesCardController
             'showcase' => ['ok' => true, 'sites' => $this->showcase($db, $uid, !empty($in['preview']))],
             // The Page's own words, edited in the app (Pages > Edit Page).
             'edit' => $this->editPage($db, $uid, $in),
+            // The superadmin's edit link for a granted member's Premium site
+            // (system override: the owner opens their edit mode from the console).
+            'editlink' => ['ok' => true, 'enter' => $this->editLink($db, $uid, $who)],
             // Several live, paid sites by name: for the feed's site posts.
             'cards' => ['ok' => true, 'sites' => $this->cards($db, (array) ($in['names'] ?? []))],
             default => ['ok' => false, 'error' => 'Unknown action.'],
@@ -199,6 +202,12 @@ class SitesCardController
         $db->update('sites_names', ['plan_choice' => $plan], ['user_id' => $uid]);
 
         return ['ok' => true, 'plan_choice' => $plan];
+    }
+
+    /** The superadmin's one-time edit link into a member's Premium site (system override). */
+    private function editLink($db, int $uid, string $who): string
+    {
+        return Members::enterLink($uid, $who, '/sites/me');
     }
 
     private function state($db, int $uid, string $who): array
