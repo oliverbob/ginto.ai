@@ -78,6 +78,19 @@ class SitesCardController
         $names = new Names($db);
         $mine = $names->of($uid);
         if ($mine && Trial::phase($mine, (new Subscriptions($db))->current($uid)) !== 'none') {
+            // A system override may still redraw an existing hold in the owner's template.
+            if ($template !== '') {
+                $draftId = (int) ($mine['preview_id'] ?? 0);
+                if ($draftId) {
+                    $db->update('sites_previews', ['template' => \Ginto\Sites\Templates::get($template)['id']], ['id' => $draftId]);
+                    $phase = Trial::phase($mine, (new Subscriptions($db))->current($uid));
+                    $pub = $phase === 'live' ? (new Publisher($db))->publish($uid)
+                        : ($phase === 'trial' ? (new Publisher($db))->publishTrial($uid) : ['ok' => false]);
+
+                    return ['ok' => true, 'republished' => !empty($pub['ok']), 'already' => true] + $this->state($db, $uid, $who);
+                }
+            }
+
             return ['ok' => false, 'reason' => 'You already hold ' . $mine['name'] . '.silverqueen.pro.'] + $this->state($db, $uid, $who);
         }
         // Their newest finished draft, if they have one, becomes this name's site.
