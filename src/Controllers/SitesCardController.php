@@ -111,7 +111,11 @@ class SitesCardController
                 $db->update('sites_previews', ['template' => \Ginto\Sites\Templates::get($template)['id']], ['id' => (int) $heldNow['preview_id']]);
             }
         }
-        (new Trial($db))->start($uid, $who);
+        // A superadmin grant is the owner's own hand, and he defined the terms
+        // (payment / months) -- never the free trial a self-hold starts.
+        if (empty($in['owner'])) {
+            (new Trial($db))->start($uid, $who);
+        }
         $this->choose($db, $uid, (string) ($in['plan'] ?? ''));
         Subscriptions::log("HELD {$r['name']} by member " . Members::identity($uid) . ' from the feed card');
 
