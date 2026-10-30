@@ -362,7 +362,10 @@ class SitesController extends \Core\Controller
             'owner' => $this->canSimulate(), 'simulated' => $sim,
             'google' => $name ? (new \Ginto\Sites\Indexing($this->db))->describe($name) : null,
             'test_php' => Config::testPrice(Members::identity($uid)),
-            'phase' => Trial::phase($name, $sub),
+            'phase' => (string) ($_GET['plan'] ?? '') !== '' && \Ginto\Sites\Config::plan((string) ($_GET['plan'] ?? '')) !== null
+                // An admin-granted Premium runs on the granted plan's terms, not the self-hold trial.
+                ? ((is_array($sub) && ($sub['status'] ?? '') === 'active') ? 'live' : 'held')
+                : Trial::phase($name, $sub),
             'pending' => $sub && $sub['status'] === 'pending' ? $sub : null,
             'just_paid' => isset($_GET['paid']),
             'plan_pick' => (string) (($name['plan_choice'] ?? null) ?: ($_SESSION['sites_plan'] ?? '')),
