@@ -371,7 +371,7 @@
         }
       }
       if (toggleBtn) toggleBtn.classList.remove('hidden');
-      if (overlay) overlay.classList.remove('hidden');
+      // Do not auto-show admin console on debug updates; user must toggle via button
     } catch (e) { console.debug('updateAdminConsole failed', e); }
   }
 
