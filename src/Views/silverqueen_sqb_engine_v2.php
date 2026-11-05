@@ -643,6 +643,12 @@ body{background:#050A10!important;color:#f5f8fb!important}.v2-wrap{background:#0
 @media(max-width:760px){.sqb-header-tagline{display:none}.sqb-package-grid,.sqb-sample-grid,.sqb-steps{grid-template-columns:1fr}.sqb-package-featured{transform:none}.stx-brief-intro{padding:75px 22px!important}.sqb-join-cta{margin:12px 0 0}.st-chpin__stick{position:relative!important;top:auto!important}.st-chpin{height:auto!important}.st-chart{width:100%!important;min-width:0!important;margin:0!important}.st-ch-svg{width:100%!important}}
 @media(prefers-reduced-motion:reduce){.st-hero--scroll{height:100svh!important}.st-hero__sticky{position:absolute!important}.st-scbg-l,.st-el{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
 </style>
+<style>
+/* Keep the downloaded template's full-screen scrub hero; the older draft constrained it on phones. */
+.st-hero--scroll.v2-hero{margin-top:-69px!important}
+.v2-hero .st-hero__sticky,.v2-hero .st-hero__overlay{height:100vh!important;height:100svh!important}
+@media(max-width:760px){.v2-hero .st-hero__sticky,.v2-hero .st-hero__overlay{height:100vh!important;height:100svh!important}}
+</style>
 </head><body><div class="v2-wrap">
   <script>try{history.scrollRestoration='manual'}catch(e){}(function(){var t=false;function m(){t=true;}['wheel','touchstart','keydown','pointerdown'].forEach(function(n){addEventListener(n,m,{passive:true});});addEventListener('load',function(){if(!t&&!location.hash)window.scrollTo(0,0);});})();</script>
   <header class="st-header" style="background:#0a0a0a;--hdr-sub-bg:#0a0a0a;color:#f5f5f5;font-family:'Bebas Neue',system-ui,sans-serif"><a class="st-header__logo" href="#cover" style="color:#f5f5f5">SilverQueen.</a><span class="sqb-header-tagline">A BARANGAY-FIRST MOVEMENT</span><nav class="st-header__nav"><a href="#sec-1" style="color:#f5f5f5">Network</a><a href="#auth" style="color:#f5f5f5">Log in</a><a href="#sec-3" style="color:#f5f5f5">Engines</a><a href="#sec-4" style="color:#f5f5f5">How it works</a><a class="st-header__cta" href="#auth" style="background:#ff3366;color:#FFFFFF">Join the Movement</a></nav><button class="st-header__burger" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button></header>
