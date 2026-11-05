@@ -128,6 +128,7 @@ if (strpos($path, '/install') === 0) {
             'js' => 'application/javascript',
             'json' => 'application/json',
             'png' => 'image/png',
+            'avif' => 'image/avif',
             'jpg' => 'image/jpeg',
             'gif' => 'image/gif',
             'svg' => 'image/svg+xml',
@@ -831,6 +832,7 @@ $router = new Router($db);
         'svg' => 'image/svg+xml',
         'ico' => 'image/x-icon',
         'webp' => 'image/webp',
+        'avif' => 'image/avif',
         'woff' => 'font/woff',
         'woff2' => 'font/woff2',
         'ttf' => 'font/ttf',
@@ -844,7 +846,7 @@ $router = new Router($db);
     header('Content-Length: ' . filesize($fullPath));
     
     // Cache static assets
-    if (in_array($ext, ['css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'woff', 'woff2', 'ttf', 'eot'])) {
+    if (in_array($ext, ['css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'webp', 'avif', 'woff', 'woff2', 'ttf', 'eot'])) {
         header('Cache-Control: public, max-age=3600');
     }
     

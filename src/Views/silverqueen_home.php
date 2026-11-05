@@ -11,6 +11,8 @@
   <meta name="keywords" content="SilverQueen, barangay, Philippines, barangay e-commerce, community marketplace, social commerce, last-mile delivery, local riders, Ginto AI, digital barangay, Luzon, Visayas, Mindanao">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <link rel="canonical" href="https://silverqueen.pro/login">
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon/favicon.svg">
+  <link rel="apple-touch-icon" href="/assets/favicon/apple-touch-icon.png">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="SilverQueen">
   <meta property="og:title" content="SilverQueen — Social Trade for Every Barangay">

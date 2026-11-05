@@ -675,7 +675,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
       <div class="flex justify-between items-center min-h-0" style="min-height:unset;">
         <a href="/" class="flex items-center space-x-2">
           <span class="header-logo-glow" style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#fff;box-shadow:0 2px 8px rgba(31,162,255,0.10);overflow:hidden;border:2px solid var(--primary-500);">
-            <img src="/assets/images/ginto.png" alt="Ginto Logo" style="width:24px;height:24px;object-fit:cover;display:block;border-radius:50%;" />
+            <picture><source type="image/avif" srcset="/assets/images/register/ginto-144.avif"><source type="image/webp" srcset="/assets/images/register/ginto-144.webp"><img src="/assets/images/ginto.png" alt="Ginto Logo" width="24" height="24" decoding="async" style="width:24px;height:24px;object-fit:cover;display:block;border-radius:50%;" /></picture>
           </span>
           <span class="text-lg font-bold header-title-vibrant" style="line-height:1.1;">Ginto Rewards</span>
           <i class="fas fa-crown text-xl header-crown-animate" style="color: var(--accent-500); margin-left: 6px;"></i>
@@ -727,7 +727,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
        style="display:block;text-decoration:none;background:linear-gradient(90deg,#6366f1,#7c3aed);transition:opacity 0.15s;"
        onmouseover="this.style.opacity='0.92';" onmouseout="this.style.opacity='1';">
       <div style="max-width:960px;margin:0 auto;display:flex;align-items:center;justify-content:center;gap:12px;padding:11px 20px;">
-        <img src="/assets/images/mall.png" alt="Ginto Mall" style="height:42px;width:auto;border-radius:7px;object-fit:cover;flex-shrink:0;">
+        <picture><source type="image/avif" srcset="/assets/images/register/mall-144.avif"><source type="image/webp" srcset="/assets/images/register/mall-144.webp"><img src="/assets/images/mall.png" alt="Ginto Mall" width="44" height="42" loading="lazy" decoding="async" style="height:42px;width:auto;border-radius:7px;object-fit:cover;flex-shrink:0;"></picture>
         <span style="font-size:1.1rem;">🛍️</span>
         <span style="color:#fff;font-weight:700;font-size:0.95rem;letter-spacing:0.01em;">Shop and sell now at Ginto Mall</span>
         <span style="color:rgba(255,255,255,0.75);font-size:0.9rem;">→</span>
@@ -848,7 +848,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
             <div class="tier-card p-6 relative" data-tier-id="1" data-tier-name="Starter" 
                  data-tier-first-php="250" data-tier-first-usd="5" 
                  data-tier-recurring-php="250" data-tier-recurring-usd="5">
-              <img src="/assets/images/atome.png" alt="Atome Toothpaste" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
+              <picture><source type="image/avif" srcset="/assets/images/register/atome-480.avif 480w, /assets/images/register/atome-800.avif 800w" sizes="(max-width: 640px) 100vw, 33vw"><source type="image/webp" srcset="/assets/images/register/atome-480.webp 480w, /assets/images/register/atome-800.webp 800w" sizes="(max-width: 640px) 100vw, 33vw"><img src="/assets/images/atome.png" alt="Atome Toothpaste" width="1360" height="1360" loading="lazy" decoding="async" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;"></picture>
               <div class="tier-badge" style="background: linear-gradient(135deg, #ff6a00, #ffe53b);">🔥 PROMO</div>
               <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Starter</h4>
               <p class="mb-4" style="color: var(--text-secondary);">Perfect for beginners with basic training.</p>
@@ -948,7 +948,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               <div class="tier-card p-6 relative" data-tier-id="4" data-tier-name="Gold" 
                    data-tier-first-php="10000" data-tier-first-usd="199" 
                    data-tier-recurring-php="10000" data-tier-recurring-usd="199">
-                <img src="/assets/images/gold-solar.png" alt="Gold Solar Package" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
+                <picture><source type="image/avif" srcset="/assets/images/register/gold-solar-480.avif 480w, /assets/images/register/gold-solar-800.avif 800w" sizes="(max-width: 640px) 100vw, 50vw"><source type="image/webp" srcset="/assets/images/register/gold-solar-480.webp 480w, /assets/images/register/gold-solar-800.webp 800w" sizes="(max-width: 640px) 100vw, 50vw"><img src="/assets/images/gold-solar.png" alt="Gold Solar Package" width="2048" height="1536" loading="lazy" decoding="async" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;"></picture>
                 <div class="tier-badge" style="background: linear-gradient(135deg, var(--accent-500), var(--accent-600));">Gold</div>
                 <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Gold</h4>
                 <p class="mb-4" style="color: var(--text-secondary);">Advanced package for serious earners.</p>
@@ -978,7 +978,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
               <div class="tier-card p-6 relative" data-tier-id="5" data-tier-name="Platinum" 
                    data-tier-first-php="50000" data-tier-first-usd="999" 
                    data-tier-recurring-php="50000" data-tier-recurring-usd="999">
-                <img src="/assets/images/server.png" alt="Server Deployment" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;">
+                <picture><source type="image/avif" srcset="/assets/images/register/server-480.avif 480w, /assets/images/register/server-800.avif 800w" sizes="(max-width: 640px) 100vw, 50vw"><source type="image/webp" srcset="/assets/images/register/server-480.webp 480w, /assets/images/register/server-800.webp 800w" sizes="(max-width: 640px) 100vw, 50vw"><img src="/assets/images/server.png" alt="Server Deployment" width="1266" height="832" loading="lazy" decoding="async" class="w-full rounded-lg mb-4 object-cover" style="max-height: 160px;"></picture>
                 <div class="tier-badge" style="background: linear-gradient(135deg, #E5E4E2, #B0C4DE);">Platinum</div>
                 <h4 class="text-xl font-bold mb-2" style="color: var(--text-primary);">Platinum</h4>
                 <p class="mb-4" style="color: var(--text-secondary);">Top-tier package with VIP treatment.</p>

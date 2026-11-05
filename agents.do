@@ -1,4 +1,15 @@
-# AGENT INSTRUCTIONS FOR TESTING
+# AGENT INSTRUCTIONS FOR TESTING AND DEPLOYMENT
+
+## Production repository sync (silverqueen.pro)
+
+The production box is `162.35.101.26`. The app checkout is `/home/oliverbob/ginto.ai`.
+After commits have been pushed to the repository, sync the production checkout with:
+
+  ssh root@162.35.101.26 'su - oliverbob -c "cd ~/ginto.ai && git pull"'
+
+This is the production checkout. Keep it separate from the LXC testing workflow below.
+
+## LXC testing
 
 You must test this repo in the LXC container:
 
@@ -54,3 +65,7 @@ Example:
     If its chat endpoints test some prompts.
     For credentials read .env in the lxc.
     Read this instruction everytime as part of your last task.
+
+## Local registration image assets
+
+When optimizing registration page imagery, generate AVIF/WebP responsive derivatives locally from the repository originals. Keep originals as fallbacks, use `<picture>` sources, and lazy-load below-the-fold images. Do not outsource or upload these assets for processing.

@@ -40,15 +40,15 @@ $loginOld = isset($loginOld) && is_array($loginOld) ? $loginOld : [];
     <p class="sq-login-intro">SilverQueen is selected. Ginto is available on the second tab.</p>
     <?php if (!empty($loginError)): ?><div class="sq-login-error" role="alert"><?= htmlspecialchars($loginError, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>
     <div class="sq-tabs" role="tablist" aria-label="Choose a sign-in platform">
-      <button type="button" role="tab" aria-selected="<?= $gintoLoginActive ? 'false' : 'true' ?>" class="sq-tab <?= $gintoLoginActive ? '' : 'active-sqs' ?>" id="tab-sqs" onclick="switchTab('sqs')"><i class="fas fa-gem" aria-hidden="true" style="margin-right:.35rem"></i>SilverQueen</button>
-      <button type="button" role="tab" aria-selected="<?= $gintoLoginActive ? 'true' : 'false' ?>" class="sq-tab <?= $gintoLoginActive ? 'active-ginto' : '' ?>" id="tab-ginto" onclick="switchTab('ginto')"><i class="fas fa-robot" aria-hidden="true" style="margin-right:.35rem"></i>Ginto</button>
+      <button type="button" role="tab" aria-selected="<?= $gintoLoginActive ? 'false' : 'true' ?>" class="sq-tab <?= $gintoLoginActive ? '' : 'active-sqs' ?>" id="tab-sqs" onclick="switchTab('sqs')"><svg aria-hidden="true" viewBox="0 0 24 24" style="width:15px;height:15px;vertical-align:-2px;margin-right:.35rem;fill:currentColor"><path d="M12 2 2 9l10 13L22 9 12 2Zm0 3.1L16.1 8H7.9L12 5.1ZM5.2 10h3.5l2.1 7.1L5.2 10Zm7.9 7.1 2.1-7.1h3.5l-5.6 7.1ZM18.3 8h-2.9l-1.8-2.1L18.3 8ZM10.4 5.9 8.6 8H5.7l4.7-2.1Z"/></svg>SilverQueen</button>
+      <button type="button" role="tab" aria-selected="<?= $gintoLoginActive ? 'true' : 'false' ?>" class="sq-tab <?= $gintoLoginActive ? 'active-ginto' : '' ?>" id="tab-ginto" onclick="switchTab('ginto')"><svg aria-hidden="true" viewBox="0 0 24 24" style="width:15px;height:15px;vertical-align:-2px;margin-right:.35rem;fill:currentColor"><path d="M12 2a2 2 0 0 0-1 3.73V7H7a3 3 0 0 0-3 3v7a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-7a3 3 0 0 0-3-3h-4V5.73A2 2 0 0 0 12 2ZM7 9h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Zm1.5 3a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3ZM9 17h6v1H9z"/></svg>Ginto</button>
     </div>
     <div class="sq-tab-indicator <?= $gintoLoginActive ? 'ginto' : 'sqs' ?>" id="tab-indicator"></div>
     <div class="sq-panels">
         <!-- SilverQueen login panel -->
         <div class="sq-panel <?= $gintoLoginActive ? '' : 'active' ?>" id="panel-sqs">
             <div class="sq-logo-area sqs">
-                <div class="sq-logo-crown"><i class="fas fa-crown"></i></div>
+                <div class="sq-logo-crown"><svg aria-hidden="true" viewBox="0 0 24 24" style="width:25px;height:25px;fill:currentColor"><path d="M3 18h18l-1.5-9-4.2 3.5L12 5l-3.3 7.5L4.5 9 3 18Zm1.1 2h15.8v1H4.1z"/></svg></div>
                 <h2>SilverQueen</h2>
                 <p>sq.silverqueen.pro</p>
             </div>
@@ -162,7 +162,7 @@ function sqLogin(e) {
         btn.textContent = 'Verifying…';
         btn.disabled = true;
 
-        fetch('https://sq.silverqueen.pro/api/auth/cross-login/verify', {
+        fetch('/api/auth/cross-login/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -172,12 +172,12 @@ function sqLogin(e) {
         .then(function(data) {
             var user = data.data || data;
             var tokens = user.tokens || data.tokens || {};
-            var accessToken = tokens.access_token || user.access_token || data.access_token;
+            var accessToken = tokens.access_token || user.access_token || data.access_token || user.token || data.token;
             if (accessToken) {
                 localStorage.setItem('sq_token', accessToken);
                 localStorage.setItem('sq_refresh', tokens.refresh_token || '');
                 localStorage.setItem('sq_user', JSON.stringify(user.user || user));
-                window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
+                window.location.href = '/login-jwt?token=' + encodeURIComponent(accessToken);
             } else {
                 var errMsg = (user.error && typeof user.error === 'string') ? user.error
                     : (data.error && typeof data.error === 'string') ? data.error
@@ -201,7 +201,7 @@ function sqLogin(e) {
     btn.textContent = 'Signing in…';
     btn.disabled = true;
 
-    fetch('https://sq.silverqueen.pro/api/auth/cross-login', {
+    fetch('/api/auth/cross-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -214,7 +214,7 @@ function sqLogin(e) {
     .then(function(data) {
         var user = data.data || data;
         var tokens = user.tokens || data.tokens || {};
-        var accessToken = tokens.access_token || user.access_token || data.access_token;
+        var accessToken = tokens.access_token || user.access_token || data.access_token || user.token || data.token;
         var refreshToken = tokens.refresh_token || user.refresh_token || '';
 
         if (user.requires_2fa) {
@@ -226,11 +226,19 @@ function sqLogin(e) {
             return;
         }
 
+        if (user.two_factor_required || data.two_factor_required) {
+            errEl.textContent = user.error || data.error || 'Two-factor authentication is enabled. Sign in through the account security login flow.';
+            errEl.style.display = 'block';
+            btn.textContent = 'Login to SilverQueen';
+            btn.disabled = false;
+            return;
+        }
+
         if (accessToken) {
             localStorage.setItem('sq_token', accessToken);
             localStorage.setItem('sq_refresh', refreshToken);
             localStorage.setItem('sq_user', JSON.stringify(user.user || user));
-            window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
+            window.location.href = '/login-jwt?token=' + encodeURIComponent(accessToken);
         } else {
             var errMsg = (user.error && typeof user.error === 'string') ? user.error
                 : (data.error && typeof data.error === 'string') ? data.error
