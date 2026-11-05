@@ -145,4 +145,4 @@ h3{margin:0 0 .65rem;font-size:clamp(1.7rem,2.8vw,2.4rem);font-weight:780}
 @media(max-width:760px){.sq-disclosure-footer{padding:1.5rem 1rem;font-size:.75rem}}
 
 /* Let the archipelago animation remain visible behind the story copy. */
-.panel{background:linear-gradient(145deg,rgba(7,14,23,.58),rgba(7,14,23,.40));box-shadow:0 18px 70px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.025);backdrop-filter:blur(8px)}
+.panel{background:linear-gradient(145deg,rgba(7,14,23,.70),rgba(7,14,23,.70));box-shadow:0 18px 70px rgba(0,0,0,.2),inset 0 1px 0 rgba(255,255,255,.025);backdrop-filter:blur(8px)}
