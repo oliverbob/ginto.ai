@@ -132,11 +132,8 @@ $gintoLoginActive = !empty($gintoLoginActive) || !empty($loginError);
             <p class="cta-note">Social connection. Community commerce. Last-mile delivery.</p>
           </div>
         </section>
-        <section class="chapter chapter-auth" id="auth" data-chapter="auth" aria-labelledby="auth-heading">
-          <div class="panel auth-content">
-            <p class="eyebrow"><span class="eyebrow-rule"></span> YOUR COMMUNITY STARTS HERE</p>
-            <h2 id="auth-heading">Welcome to <span class="title-cyan">SilverQueen</span></h2>
-            <p class="body-copy">Sign in to connect with your barangay, discover local sellers, and take part in a more connected community.</p>
+        <section class="chapter chapter-auth" id="auth" data-chapter="auth" aria-label="SilverQueen and Ginto sign-in">
+          <div class="auth-content">
             <?php require __DIR__ . '/user/login_form_partial.php'; ?>
           </div>
         </section>
