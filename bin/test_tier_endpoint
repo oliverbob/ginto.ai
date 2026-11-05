@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+set -euo pipefail
+IFS=$'\n\t'
+
+PROJECT_ROOT="$(pwd)"
+STORAGE="$(dirname \"$PROJECT_ROOT\")/storage"
+BASE_URL="${1:-http://127.0.0.1}"
+SESSID="${SESSID:-testsess_ci}"
+
+mkdir -p "$STORAGE/sessions" "$STORAGE/logs"
+
+echo "Using PROJECT_ROOT=$PROJECT_ROOT"
+echo "Using STORAGE=$STORAGE"
+echo "Using BASE_URL=$BASE_URL"
+echo "Using PHPSESSID=$SESSID"
+
+# Generate token
+TOKEN="$(php -r 'echo bin2hex(random_bytes(32));')"
+echo "Generated TOKEN (first 8 chars): ${TOKEN:0:8}..."
+
+# Write PHP session file (serialized)
+SESSION_FILE="$STORAGE/sessions/sess_$SESSID"
+printf 'user_id|i:1;csrf_token|s:%d:"%s";' ${#TOKEN} "$TOKEN" > "$SESSION_FILE"
+echo "Wrote session file: $SESSION_FILE"
+ls -l "$SESSION_FILE" || true
+echo
+echo "Session file contents:"
+cat "$SESSION_FILE" || true
+echo
+
+# Run GET
+echo "=== GET $BASE_URL/admin/tier ==="
+curl -v -b "PHPSESSID=$SESSID" "$BASE_URL/admin/tier" || echo "GET request finished with non-zero exit"
+
+echo
+# Run POST create
+echo "=== POST $BASE_URL/admin/tier (create) ==="
+curl -v -b "PHPSESSID=$SESSID" -X POST "$BASE_URL/admin/tier" \
+  -d "csrf_token=$TOKEN" \
+  -d "name=Test Tier LXC" \
+  -d "cost_amount=100" \
+  -d "cost_currency=PHP" \
+  -d "setup_fee=0" \
+  -d "recurring_amount=100" \
+  -d "billing_interval=MONTH" || echo "POST request finished with non-zero exit"
+
+echo
+echo "=== Logs in $STORAGE/logs ==="
+ls -l "$STORAGE/logs" || true
+
+if [ -f "$STORAGE/logs/debug-tier.log" ]; then
+  echo "=== Tail debug-tier.log ==="
+  tail -n 200 "$STORAGE/logs/debug-tier.log"
+else
+  echo "No debug-tier.log in $STORAGE/logs"
+fi
+
+echo
+echo "=== /tmp debug-tier files ==="
+ls -l /tmp/debug-tier* 2>/dev/null || echo "No /tmp/debug-tier* files"
+
+for f in /tmp/debug-tier-before-insert.log /tmp/debug-tier-after-insert.log /tmp/debug-tier-exception.log; do
+  if [ -f "$f" ]; then
+    echo "------ $f ------"
+    tail -n 200 "$f"
+  fi
+done
+
+echo
+echo "To remove the session file run:"
+echo "  rm -f \"$SESSION_FILE\""

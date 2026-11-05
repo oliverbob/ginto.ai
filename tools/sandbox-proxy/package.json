@@ -1,0 +1,17 @@
+{
+  "name": "ginto-sandbox-proxy",
+  "version": "1.0.0",
+  "description": "Dynamic reverse proxy for Ginto LXD sandboxes",
+  "main": "sandbox-proxy.js",
+  "scripts": {
+    "start": "node sandbox-proxy.js",
+    "dev": "node sandbox-proxy.js"
+  },
+  "dependencies": {
+    "http-proxy": "^1.18.1",
+    "redis": "^4.6.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,0 +1,10 @@
+-- Seed Levels for SQLite
+-- This seed ensures that core membership levels exist before any users are created.
+INSERT OR IGNORE INTO levels (id, name, cost_amount, cost_currency, commission_rate_json, created_at) VALUES
+(1, 'Starter', 150.00, 'PHP', '{"L1":0.01}', datetime('now')),
+(2, 'Basic',   1000.00, 'PHP', '{"L1":0.02}', datetime('now')),
+(3, 'Silver',  5000.00, 'PHP', '{"L1":0.05, "L2":0.02}', datetime('now')),
+(4, 'Gold',   10000.00, 'PHP', '{"L1":0.07, "L2":0.03, "L3":0.02}', datetime('now')),
+(5, 'Platinum',50000.00, 'PHP', '{"L1":0.10, "L2":0.05, "L3":0.03, "L4":0.02, "L5":0.01}', datetime('now'));
+
+-- End seed

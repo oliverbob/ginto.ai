@@ -1,0 +1,119 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * Enrol an authenticator app for the phpMyAdmin gate.
+ *
+ *   bin/pma-2fa-setup
+ *
+ * Generates a TOTP secret, shows it as a QR code and as characters you can
+ * type, and writes PMA_TOTP_SECRET into .env.
+ *
+ * WHO RUNS THIS: a person, at a terminal, on the server. Not an agent, not a
+ * deploy, not a cron. It prints the shared secret, and anything that can read
+ * the output can pass the gate forever after. Run it yourself, scan the code,
+ * and clear the scrollback when you are done.
+ *
+ * The secret goes only into .env, which is gitignored. It must never be
+ * committed: this repository is public.
+ */
+
+declare(strict_types=1);
+
+if (PHP_SAPI !== 'cli') {
+    http_response_code(404);
+    exit(1);
+}
+
+$root    = dirname(__DIR__);
+$envPath = $root . '/.env';
+$issuer  = 'silverqueen.pro';
+$label   = 'phpMyAdmin';
+
+/** Base32 per RFC 4648, which is what authenticator apps expect. */
+function base32_encode_bytes(string $data): string
+{
+    $alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+    $bits     = '';
+
+    foreach (str_split($data) as $char) {
+        $bits .= str_pad(decbin(ord($char)), 8, '0', STR_PAD_LEFT);
+    }
+
+    $out = '';
+
+    foreach (str_split($bits, 5) as $chunk) {
+        $out .= $alphabet[bindec(str_pad($chunk, 5, '0'))];
+    }
+
+    return $out;
+}
+
+if (!is_writable($root) || (file_exists($envPath) && !is_writable($envPath))) {
+    fwrite(STDERR, "Cannot write to {$envPath}. Run this as the user that owns the checkout.\n");
+    exit(1);
+}
+
+$existing = file_exists($envPath) ? (string) file_get_contents($envPath) : '';
+
+if (preg_match('/^PMA_TOTP_SECRET=(.*)$/m', $existing, $m) === 1 && trim($m[1], " \t\"'") !== '') {
+    fwrite(STDOUT, "PMA_TOTP_SECRET is already set in .env.\n");
+    fwrite(STDOUT, "Replacing it will lock out the authenticator you enrolled before.\n");
+    fwrite(STDOUT, "Type REPLACE to continue, anything else to stop: ");
+
+    if (trim((string) fgets(STDIN)) !== 'REPLACE') {
+        fwrite(STDOUT, "Stopped. Nothing changed.\n");
+        exit(0);
+    }
+}
+
+// 20 bytes is the SHA-1 block size TOTP uses, and what every authenticator
+// handles without complaint.
+$secret = base32_encode_bytes(random_bytes(20));
+
+$uri = 'otpauth://totp/' . rawurlencode($issuer . ':' . $label)
+     . '?secret=' . $secret
+     . '&issuer=' . rawurlencode($issuer)
+     . '&algorithm=SHA1&digits=6&period=30';
+
+echo "\n";
+echo "Scan this with Google Authenticator\n";
+echo "===================================\n\n";
+
+$qrencode = trim((string) shell_exec('command -v qrencode 2>/dev/null'));
+
+if ($qrencode !== '') {
+    passthru($qrencode . ' -t ANSIUTF8 -m 1 ' . escapeshellarg($uri));
+} else {
+    echo "  (qrencode is not installed, so there is no QR code to scan.\n";
+    echo "   Install it with: apt-get install -y qrencode\n";
+    echo "   Or add the account by hand using the key below.)\n";
+}
+
+echo "\n";
+echo "Or choose \"Enter a setup key\" and type:\n\n";
+echo "  Account : {$issuer}:{$label}\n";
+echo "  Key     : {$secret}\n";
+echo "  Type    : Time based\n";
+echo "\n";
+
+// Write it only after the operator has had the chance to record it.
+echo "Press Enter once the account shows a rotating code. ";
+fgets(STDIN);
+
+$line    = 'PMA_TOTP_SECRET=' . $secret;
+$updated = preg_match('/^PMA_TOTP_SECRET=.*$/m', $existing) === 1
+    ? (string) preg_replace('/^PMA_TOTP_SECRET=.*$/m', $line, $existing)
+    : rtrim($existing, "\n") . "\n\n# phpMyAdmin two-factor gate (src/Security/PmaGate.php)\n" . $line . "\n";
+
+if (file_put_contents($envPath, $updated, LOCK_EX) === false) {
+    fwrite(STDERR, "Failed to write {$envPath}. The secret above was NOT saved.\n");
+    exit(1);
+}
+
+@chmod($envPath, 0600);
+
+echo "\nWritten to .env, which is gitignored. The gate is live on the next request.\n";
+echo "Check it now at https://{$issuer}/pma/ before you close this session —\n";
+echo "if something is wrong you want to find out while you still have a shell.\n\n";
+echo "Then clear the scrollback so the key is not left on screen:  clear && history -c\n\n";

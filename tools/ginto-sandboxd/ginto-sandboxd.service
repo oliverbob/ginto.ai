@@ -1,0 +1,14 @@
+[Unit]
+Description=Ginto Sandbox Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /usr/local/bin/ginto_sandboxd.py
+Restart=on-failure
+RuntimeDirectory=ginto-sandboxd
+RuntimeDirectoryMode=0750
+PermissionsStartOnly=true
+
+[Install]
+WantedBy=multi-user.target

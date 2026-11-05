@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+set -euo pipefail
+# Simple CLI to manage web and auxiliary services for development.
+# Usage:
+#   bin/ginto start [--services]
+#   bin/ginto stop [--services]
+#   bin/ginto restart [--services]
+
+cmd="${1:-}" || true
+shift || true
+START_SERVICES=0
+STOP_SERVICES=0
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --services|-s)
+      START_SERVICES=1
+      shift
+      ;;
+        --restart-services)
+          # shorthand to stop and then start services during a restart
+          START_SERVICES=1
+          STOP_SERVICES=1
+          shift
+          ;;
+    --no-services)
+      START_SERVICES=0
+      shift
+      ;;
+    --stop-services)
+      STOP_SERVICES=1
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      # passthrough or unknown
+      shift
+      ;;
+  esac
+done
+
+case "$cmd" in
+  start)
+    bash bin/start_web.sh
+    if [ "$START_SERVICES" -eq 1 ]; then
+      bash bin/start_services.sh
+    fi
+    ;;
+  stop)
+    bash bin/stop_web.sh
+    if [ "$STOP_SERVICES" -eq 1 ]; then
+      bash bin/stop_services.sh
+    fi
+    ;;
+  restart)
+    # If asked to stop services as part of restart, do that first
+    if [ "$STOP_SERVICES" -eq 1 ]; then
+      bash bin/stop_services.sh || true
+    fi
+    bash bin/stop_web.sh || true
+    bash bin/start_web.sh
+    if [ "$START_SERVICES" -eq 1 ]; then
+      bash bin/start_services.sh
+    fi
+    ;;
+  services)
+    bash bin/start_services.sh
+    ;;
+  services:stop)
+    bash bin/stop_services.sh
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|services|services:stop} [--services] [--stop-services]" >&2
+    exit 2
+    ;;
+esac

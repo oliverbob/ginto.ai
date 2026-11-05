@@ -1,0 +1,2503 @@
+<?php
+/**
+ * Ginto Tunnel HTTP Handler
+ * 
+ * This handles incoming HTTP requests to tunnel subdomains
+ * and forwards them through the WebSocket tunnel to the client.
+ */
+
+declare(strict_types=1);
+
+namespace Ginto\Controllers;
+
+class TunnelController
+{
+    protected ?\Medoo\Medoo $db;
+    private string $lastRelayApprovalDetail = '';
+    private const VISION_RELAY_SUBDOMAIN = 'vision';
+    private const TUNNEL_REGISTRY_FILE = '/var/lib/ginto/tunnel-registry.json';
+    private const TUNNEL_BLOCKLIST_FILE = '/var/lib/ginto/tunnel-blocklist.json';
+    private const TUNNEL_REGISTRY_FALLBACK_FILE = '/tmp/ginto-tunnel-registry.json';
+    private const TUNNEL_BLOCKLIST_FALLBACK_FILE = '/tmp/ginto-tunnel-blocklist.json';
+    private const TUNNEL_RELAY_CHECKS_FILE = '/var/lib/ginto/tunnel-relay-checks.json';
+    private const APPROVAL_SERVER = 'https://silverqueen.pro';
+    private const FRP_ONLINE_CACHE_FILE = '/tmp/ginto-frp-online-subdomains.json';
+    private const FRP_ONLINE_CACHE_LOCK = '/tmp/ginto-frp-online-subdomains.lock';
+
+    public function __construct(?\Medoo\Medoo $db = null)
+    {
+        $this->db = $db;
+    }
+
+    public function relayVision(): void
+    {
+        $this->proxyVisionRequest('/');
+    }
+
+    public function relayVisionPath(string $path = ''): void
+    {
+        $this->proxyVisionRequest('/' . ltrim($path, '/'));
+    }
+
+    public function relayApproval(): void
+    {
+        header('Content-Type: application/json');
+        $subdomain = strtolower((string)($_GET['subdomain'] ?? self::VISION_RELAY_SUBDOMAIN));
+
+        $approved = $this->isSubdomainApprovedLocally($subdomain);
+        $registry = $this->readRegistry();
+        $entry = is_array($registry) ? ($registry[$subdomain] ?? null) : null;
+        $expiresAt = (int)($entry['expires_at'] ?? 0);
+        $blocked = $this->isSubdomainBlockedLocally($subdomain);
+
+        $this->recordRelayApprovalCheck($subdomain, [
+            'checked_at' => time(),
+            'checked_at_iso' => date('c'),
+            'client_ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+            'host' => $_SERVER['HTTP_HOST'] ?? '',
+            'user_agent' => substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 220),
+            'approved' => $approved,
+            'blocked' => $blocked,
+            'expires_at' => $expiresAt,
+        ]);
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'approved' => $approved,
+            'blocked' => $blocked,
+            'expires_at' => $expiresAt,
+            'remaining' => $expiresAt > 0 ? max(0, $expiresAt - time()) : 0,
+        ]);
+    }
+
+    private function proxyVisionRequest(string $path): void
+    {
+        $localRelayPort = (int)(getenv('TUNNEL_RELAY_LOCAL_PORT') ?: ($_ENV['TUNNEL_RELAY_LOCAL_PORT'] ?? 18080));
+        if ($localRelayPort < 1024 || $localRelayPort > 65535) {
+            $localRelayPort = 18080;
+        }
+
+        $requestHost = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+        $requestHost = preg_replace('/:\\d+$/', '', $requestHost);
+        $isLocalRequest = in_array($requestHost, ['localhost', '127.0.0.1', '::1'], true);
+
+        if ($isLocalRequest) {
+            $this->proxyToTargetHost('127.0.0.1:' . $localRelayPort, $path, '/tunnel', true);
+            return;
+        }
+
+        if (!$this->isVisionRelayApprovedRemote()) {
+            http_response_code(403);
+            header('Content-Type: text/html; charset=utf-8');
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Tunnel Not Approved</title></head><body style="font-family:sans-serif;padding:24px;"><h2>vision.silverqueen.pro relay is not approved</h2><p>Approve or re-enable it in /admin/hosting/tunnels first.</p><p>Approval check: <code>' . htmlspecialchars($this->lastRelayApprovalDetail, ENT_QUOTES, 'UTF-8') . '</code></p><p>Local relay port reserved: <code>http://127.0.0.1:' . $localRelayPort . '</code></p></body></html>';
+            return;
+        }
+
+        $this->proxyToTargetHost(self::VISION_RELAY_SUBDOMAIN . '.silverqueen.pro', $path, '/tunnel', false);
+    }
+
+    private function proxyToTargetHost(string $targetHost, string $path, string $locationPrefix, bool $isHttpTarget): void
+    {
+        $normalizedPath = '/' . ltrim($path, '/');
+        $queryString = $_SERVER['QUERY_STRING'] ?? '';
+        $targetScheme = $isHttpTarget ? 'http' : 'https';
+        $targetUrl = $targetScheme . '://' . $targetHost . $normalizedPath . ($queryString !== '' ? ('?' . $queryString) : '');
+        $timeoutSeconds = $this->resolveRelayTimeoutSeconds($normalizedPath);
+
+        $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
+        $relayBody = null;
+        if (!in_array($method, ['GET', 'HEAD'], true)) {
+            $relayBody = file_get_contents('php://input');
+        }
+
+        $ch = curl_init($targetUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, false);
+        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($ch, CURLOPT_TIMEOUT, $timeoutSeconds);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
+        if ($relayBody !== null) {
+            curl_setopt($ch, CURLOPT_POSTFIELDS, $relayBody);
+        }
+
+        $headers = [];
+        foreach ($this->getIncomingHeaders() as $name => $value) {
+            $lower = strtolower((string)$name);
+            if (in_array($lower, ['host', 'connection', 'content-length', 'transfer-encoding', 'keep-alive', 'upgrade', 'proxy-authorization', 'proxy-authenticate', 'te', 'trailer'], true)) {
+                continue;
+            }
+            $headers[] = $name . ': ' . $value;
+        }
+        $headers[] = 'Host: ' . $targetHost;
+        $headers[] = 'X-Forwarded-For: ' . ($_SERVER['REMOTE_ADDR'] ?? '');
+        $headers[] = 'X-Forwarded-Host: ' . ($_SERVER['HTTP_HOST'] ?? '');
+        $headers[] = 'X-Forwarded-Proto: ' . ($isHttpTarget ? 'http' : 'https');
+        $headers[] = 'X-Ginto-Tunnel-Relay: ' . self::VISION_RELAY_SUBDOMAIN . '.silverqueen.pro';
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+
+        $response = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $status = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = (int)curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        curl_close($ch);
+
+        if ($response === false) {
+            http_response_code(502);
+            header('Content-Type: text/html; charset=utf-8');
+            $title = $isHttpTarget ? 'Failed to reach local relay target' : 'Failed to reach vision relay endpoint';
+            $displayTarget = ($isHttpTarget ? 'http://' : 'https://') . $targetHost;
+            echo '<!doctype html><html><head><meta charset="utf-8"><title>Relay Error</title></head><body style="font-family:sans-serif;padding:24px;"><h2>' . htmlspecialchars($title, ENT_QUOTES, 'UTF-8') . '</h2><p>' . htmlspecialchars($curlError ?: 'Unknown upstream error', ENT_QUOTES, 'UTF-8') . '</p><p>Relay target: <code>' . htmlspecialchars($displayTarget, ENT_QUOTES, 'UTF-8') . '</code></p></body></html>';
+            return;
+        }
+
+        $rawHeaders = substr($response, 0, $headerSize);
+        $body = substr($response, $headerSize);
+
+        http_response_code($status > 0 ? $status : 200);
+        header('X-Ginto-Tunnel-Relay: ' . $targetHost);
+
+        $headerLines = preg_split('/\r\n|\n|\r/', $rawHeaders) ?: [];
+        foreach ($headerLines as $line) {
+            if ($line === '' || stripos($line, 'HTTP/') === 0) {
+                continue;
+            }
+            $pos = strpos($line, ':');
+            if ($pos === false) {
+                continue;
+            }
+            $name = trim(substr($line, 0, $pos));
+            $value = trim(substr($line, $pos + 1));
+            $lower = strtolower($name);
+            if (in_array($lower, ['content-length', 'transfer-encoding', 'connection', 'strict-transport-security'], true)) {
+                continue;
+            }
+            if ($lower === 'location') {
+                $value = str_replace('http://' . $targetHost, $locationPrefix, $value);
+                $value = str_replace('https://' . $targetHost, $locationPrefix, $value);
+                if (str_starts_with($value, '/') && !str_starts_with($value, $locationPrefix . '/') && $value !== $locationPrefix) {
+                    $value = $locationPrefix . $value;
+                }
+            }
+            header($name . ': ' . $value, false);
+        }
+
+        echo $body;
+    }
+
+    private function resolveRelayTimeoutSeconds(string $normalizedPath): int
+    {
+        // Image generation can take much longer than standard API calls,
+        // especially through local CPU relay and model warm-up.
+        if (str_starts_with($normalizedPath, '/api/generate-stream')) {
+            return 600;
+        }
+        if (str_starts_with($normalizedPath, '/api/generate')) {
+            return 300;
+        }
+
+        return 60;
+    }
+
+    private function isVisionRelayApprovedRemote(): bool
+    {
+        $server = rtrim((string)(getenv('TUNNEL_APPROVAL_SERVER') ?: ($_ENV['TUNNEL_APPROVAL_SERVER'] ?? self::APPROVAL_SERVER)), '/');
+        $subdomain = self::VISION_RELAY_SUBDOMAIN;
+        $approvalUrl = $server . '/api/tunnel/relay/approval?subdomain=' . rawurlencode($subdomain);
+        $this->lastRelayApprovalDetail = 'request=' . $approvalUrl;
+
+        $ch = curl_init($approvalUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 8);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 3);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['X-Ginto-Relay-Check: 1']);
+        $response = curl_exec($ch);
+        $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($response === false || $httpCode < 200 || $httpCode >= 300) {
+            $localApproved = $this->isSubdomainApprovedLocally($subdomain);
+            $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' error=' . ($curlError !== '' ? $curlError : 'none') . ' fallback_local=' . ($localApproved ? 'true' : 'false');
+            return $localApproved;
+        }
+
+        $decoded = json_decode((string)$response, true);
+        $approved = is_array($decoded) && !empty($decoded['approved']);
+        $this->lastRelayApprovalDetail = 'request=' . $approvalUrl . ' http=' . $httpCode . ' approved=' . ($approved ? 'true' : 'false');
+        return $approved;
+    }
+
+    private function isSubdomainApprovedLocally(string $subdomain): bool
+    {
+        if ($this->isSubdomainBlockedLocally($subdomain)) {
+            return false;
+        }
+
+        $registry = $this->readRegistry();
+        if (!is_array($registry) || !isset($registry[$subdomain])) {
+            return false;
+        }
+
+        $expiresAt = (int)($registry[$subdomain]['expires_at'] ?? 0);
+        if ($expiresAt <= time()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function isSubdomainBlockedLocally(string $subdomain): bool
+    {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_BLOCKLIST_FILE, self::TUNNEL_BLOCKLIST_FALLBACK_FILE);
+        if ($path === null) {
+            return false;
+        }
+        $blocklist = json_decode((string)file_get_contents($path), true);
+        return is_array($blocklist) && in_array($subdomain, $blocklist, true);
+    }
+
+    private function readRegistry(): array
+    {
+        $path = $this->resolveTunnelDataReadPath(self::TUNNEL_REGISTRY_FILE, self::TUNNEL_REGISTRY_FALLBACK_FILE);
+        if ($path === null) {
+            return [];
+        }
+        $registry = json_decode((string)file_get_contents($path), true);
+        return is_array($registry) ? $registry : [];
+    }
+
+    private function resolveTunnelDataReadPath(string $primary, string $fallback): ?string
+    {
+        if (file_exists($primary)) {
+            return $primary;
+        }
+        if (file_exists($fallback)) {
+            return $fallback;
+        }
+        return null;
+    }
+
+    private function recordRelayApprovalCheck(string $subdomain, array $check): void
+    {
+        try {
+            $dir = dirname(self::TUNNEL_RELAY_CHECKS_FILE);
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+
+            $data = [];
+            if (file_exists(self::TUNNEL_RELAY_CHECKS_FILE)) {
+                $decoded = json_decode((string)file_get_contents(self::TUNNEL_RELAY_CHECKS_FILE), true);
+                if (is_array($decoded)) {
+                    $data = $decoded;
+                }
+            }
+
+            $count = (int)($data[$subdomain]['check_count'] ?? 0) + 1;
+            $check['check_count'] = $count;
+            $data[$subdomain] = $check;
+            @file_put_contents(self::TUNNEL_RELAY_CHECKS_FILE, json_encode($data, JSON_PRETTY_PRINT));
+        } catch (\Throwable $_) {
+        }
+    }
+
+    private function getIncomingHeaders(): array
+    {
+        if (function_exists('getallheaders')) {
+            $headers = getallheaders();
+            return is_array($headers) ? $headers : [];
+        }
+
+        $headers = [];
+        foreach ($_SERVER as $key => $value) {
+            if (!str_starts_with($key, 'HTTP_')) {
+                continue;
+            }
+            $header = str_replace('_', '-', ucwords(strtolower(substr($key, 5)), '_'));
+            $headers[$header] = $value;
+        }
+        return $headers;
+    }
+    
+    /**
+     * Handle incoming HTTP request to a tunnel subdomain
+     * This is called by Caddy via reverse proxy
+     */
+    public function handleRequest(): void
+    {
+        $subdomain = $_SERVER['HTTP_X_TUNNEL_SUBDOMAIN'] ?? null;
+        
+        if (!$subdomain) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Missing tunnel subdomain header']);
+            return;
+        }
+        
+        // Connect to tunnel server and forward request
+        $tunnelWsPort = $_ENV['TUNNEL_WS_PORT'] ?? 9012;
+        
+        // For now, return a simple response - full implementation would
+        // communicate with the tunnel server to forward the request
+        http_response_code(502);
+        echo json_encode([
+            'error' => 'Tunnel not connected',
+            'subdomain' => $subdomain,
+            'message' => 'The tunnel client has disconnected. Please reconnect.'
+        ]);
+    }
+    
+    /**
+     * API: Request a new tunnel
+     * POST /api/tunnel/request
+     * 
+     * Uses FRP for high-performance tunneling with server-side expiry
+     */
+    public function requestTunnel(): void
+    {
+        header('Content-Type: application/json');
+        
+        // Clean up any expired tunnels first
+        $this->cleanupExpiredTunnels();
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $subdomain = $input['subdomain'] ?? null;
+            $localPort = $input['port'] ?? 8088;
+            
+            // Determine tunnel duration based on user status
+            // Default: 15 minutes for guests
+            // Registered users: 1 hour
+            $expiresIn = 900; // 15 minutes default for guests
+            $creditUsed = false;
+            
+            if (!empty($_SESSION['user_id']) && $this->db) {
+                // Registered user gets 1 hour
+                $expiresIn = 3600;
+            }
+            
+            // Validate subdomain (7+ hex chars like git commits, or alphanumeric with hyphens)
+            if (!$subdomain || !preg_match('/^[a-z0-9][a-z0-9-]{0,30}[a-z0-9]$|^[a-f0-9]{7,}$/', $subdomain)) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'Invalid subdomain format. Use lowercase alphanumeric characters and hyphens.'
+                ]);
+                return;
+            }
+            
+            // Check reserved
+            $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'staging', 'ginto'];
+            if (in_array($subdomain, $reserved)) {
+                echo json_encode([
+                    'success' => false,
+                    'error' => 'This subdomain is reserved.'
+                ]);
+                return;
+            }
+            
+            // Use FRP (Fast Reverse Proxy) for high-performance tunneling
+            $result = $this->startTunnelClient($subdomain, $localPort);
+            
+            if (!$result['success']) {
+                echo json_encode($result);
+                return;
+            }
+            
+            // Store tunnel expiry info
+            $expiryTime = time() + $expiresIn;
+            $this->storeTunnelExpiry($subdomain, $result['pid'] ?? 0, $expiryTime);
+            
+            // Register tunnel with server for unified tracking
+            $this->registerTunnelWithServer($subdomain, $expiresIn);
+            
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $subdomain,
+                'url' => "https://{$subdomain}.silverqueen.pro/",
+                'expires_in' => $expiresIn,
+                'expires_at' => $expiryTime,
+                'mode' => 'frp',
+                'pid' => $result['pid'] ?? null,
+                'credit_used' => $creditUsed
+            ]);
+            
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+    
+    /**
+     * Register tunnel with the central server for unified tracking
+     */
+    protected function registerTunnelWithServer(string $subdomain, int $expiresIn): void
+    {
+        try {
+            $ownerUserId = $this->getAuthenticatedUserId();
+            $data = json_encode([
+                'subdomain' => $subdomain,
+                'expires_in' => $expiresIn,
+                'client_ip' => $_SERVER['REMOTE_ADDR'] ?? '',
+                // Optional: allow the central registry to attribute ownership.
+                'owner_user_id' => $ownerUserId ?: null,
+            ]);
+            
+            $ch = curl_init('https://silverqueen.pro/admin/hosting/tunnels/register');
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $data,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 5,
+                CURLOPT_SSL_VERIFYPEER => false // Local/dev environments
+            ]);
+            curl_exec($ch);
+            curl_close($ch);
+        } catch (\Exception $e) {
+            // Non-critical, log and continue
+            error_log("Failed to register tunnel with server: " . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Start SSH tunnel using gtunnel.py (SirTunnel pattern)
+     * This auto-generates SSH keys if they don't exist
+     */
+    protected function startSshTunnel(string $subdomain, int $localPort): array
+    {
+        $projectRoot = dirname(dirname(__DIR__));
+        $gtunnelScript = "{$projectRoot}/bin/gtunnel.py";
+        
+        if (!file_exists($gtunnelScript)) {
+            return ['success' => false, 'error' => 'gtunnel.py not found'];
+        }
+        
+        // Get user home directory
+        $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: posix_getpwuid(posix_getuid())['dir'];
+        $sshDir = "{$homeDir}/.ssh";
+        $privateKey = "{$sshDir}/id_ed25519";
+        $publicKey = "{$sshDir}/id_ed25519.pub";
+        $knownHosts = "{$sshDir}/known_hosts";
+        $tunnelServer = 'silverqueen.pro';
+        $tunnelUser = 'oliverbob';
+        
+        // Ensure .ssh directory exists
+        if (!is_dir($sshDir)) {
+            mkdir($sshDir, 0700, true);
+        }
+        
+        // Generate SSH keys if they don't exist
+        if (!file_exists($privateKey)) {
+            $keygenCmd = "ssh-keygen -t ed25519 -N '' -f {$privateKey} -C 'ginto-tunnel' 2>&1";
+            exec($keygenCmd, $keygenOutput, $keygenCode);
+            
+            if ($keygenCode !== 0 || !file_exists($privateKey)) {
+                return [
+                    'success' => false, 
+                    'error' => 'Failed to generate SSH key: ' . implode("\n", $keygenOutput)
+                ];
+            }
+            
+            // Read the public key to show user (they need to add it to server)
+            $pubKeyContent = trim(file_get_contents($publicKey));
+            
+            // For now, we'll assume the key needs to be added manually
+            // In a production setup, you'd have an API to register keys
+            return [
+                'success' => false,
+                'error' => 'SSH key generated. Please add this key to the server and try again.',
+                'public_key' => $pubKeyContent,
+                'needs_key_setup' => true
+            ];
+        }
+        
+        // Add server to known_hosts if not present
+        if (!file_exists($knownHosts) || strpos(file_get_contents($knownHosts), $tunnelServer) === false) {
+            exec("ssh-keyscan -H {$tunnelServer} >> {$knownHosts} 2>/dev/null");
+        }
+        
+        // Test SSH connectivity first
+        $testCmd = "ssh -o BatchMode=yes -o ConnectTimeout=5 -o StrictHostKeyChecking=accept-new {$tunnelUser}@{$tunnelServer} 'echo OK' 2>&1";
+        exec($testCmd, $testOutput, $testCode);
+        
+        if ($testCode !== 0) {
+            $pubKeyContent = file_exists($publicKey) ? trim(file_get_contents($publicKey)) : null;
+            return [
+                'success' => false,
+                'error' => 'SSH connection failed. Your key may not be authorized.',
+                'public_key' => $pubKeyContent,
+                'needs_key_setup' => true,
+                'ssh_output' => implode("\n", $testOutput)
+            ];
+        }
+        
+        // Kill any existing tunnel for this subdomain
+        exec("pkill -f 'gtunnel.py.*{$subdomain}' 2>/dev/null");
+        
+        $logFile = "/tmp/gtunnel-{$subdomain}.log";
+        $pidFile = "/tmp/gtunnel-{$subdomain}.pid";
+        
+        // Clear old log
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+        
+        // Start gtunnel in client mode (creates SSH tunnel)
+        $host = "{$subdomain}.silverqueen.pro";
+        $cmd = "nohup python3 {$gtunnelScript} --expose {$host} {$localPort} --server {$tunnelServer} --user {$tunnelUser} > {$logFile} 2>&1 & echo \$!";
+        
+        $pid = trim(shell_exec($cmd));
+        
+        if (empty($pid) || !is_numeric($pid)) {
+            return ['success' => false, 'error' => 'Failed to start SSH tunnel process'];
+        }
+        
+        file_put_contents($pidFile, $pid);
+        
+        // Wait for connection
+        $maxWait = 5;
+        $connected = false;
+        for ($i = 0; $i < $maxWait; $i++) {
+            usleep(500000); // 0.5 seconds
+            
+            // Check if process is still running
+            exec("ps -p {$pid}", $psOutput, $psCode);
+            if ($psCode !== 0) {
+                $log = file_exists($logFile) ? trim(file_get_contents($logFile)) : 'No log available';
+                return ['success' => false, 'error' => 'SSH tunnel failed: ' . $log];
+            }
+            
+            // Check log for success
+            if (file_exists($logFile)) {
+                $log = file_get_contents($logFile);
+                if (strpos($log, 'Tunnel Active') !== false) {
+                    $connected = true;
+                    break;
+                }
+            }
+        }
+        
+        return ['success' => true, 'pid' => (int)$pid, 'connected' => $connected];
+    }
+    
+    /**
+     * Start FRP tunnel client process to connect to silverqueen.pro
+     * Uses frpc (Fast Reverse Proxy) for high-performance tunneling
+     */
+    protected function startTunnelClient(string $subdomain, int $localPort): array
+    {
+        $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+        $frpDir = "{$homeDir}/.ginto-frp";
+        $frpcBinary = "{$frpDir}/frpc";
+        $configFile = "{$frpDir}/frpc-{$subdomain}.toml";
+        $logFile = "/tmp/frpc-{$subdomain}.log";
+        $pidFile = "/tmp/frpc-{$subdomain}.pid";
+        
+        // FRP server details
+        $frpServer = 'silverqueen.pro';
+        $frpPort = 7000;
+        $frpToken = '0868d7a0943085871e506e79c8589bd1d80fbd9852b441165237deea6e16955a';
+        
+        // Kill existing tunnel for this subdomain
+        if (file_exists($pidFile)) {
+            $oldPid = trim(file_get_contents($pidFile));
+            if ($oldPid && is_numeric($oldPid)) {
+                exec("kill {$oldPid} 2>/dev/null");
+            }
+            unlink($pidFile);
+        }
+        exec("pkill -f 'frpc.*{$subdomain}' 2>/dev/null");
+        usleep(100000); // 100ms
+        
+        // Ensure frpc binary exists
+        if (!file_exists($frpcBinary)) {
+            // Download frpc if not exists
+            if (!is_dir($frpDir)) {
+                mkdir($frpDir, 0755, true);
+            }
+            
+            $arch = php_uname('m');
+            $frpArch = match($arch) {
+                'x86_64', 'amd64' => 'amd64',
+                'aarch64', 'arm64' => 'arm64',
+                default => 'amd64'
+            };
+            
+            $version = '0.66.0';
+            $tarball = "frp_{$version}_linux_{$frpArch}.tar.gz";
+            $downloadUrl = "https://github.com/fatedier/frp/releases/download/v{$version}/{$tarball}";
+            
+            // Download and extract
+            $tmpFile = "/tmp/{$tarball}";
+            exec("curl -sL '{$downloadUrl}' -o '{$tmpFile}' 2>&1", $dlOutput, $dlCode);
+            
+            if ($dlCode !== 0 || !file_exists($tmpFile)) {
+                return ['success' => false, 'error' => 'Failed to download FRP client'];
+            }
+            
+            exec("tar -xzf '{$tmpFile}' -C /tmp && cp /tmp/frp_{$version}_linux_{$frpArch}/frpc '{$frpcBinary}' && chmod +x '{$frpcBinary}' 2>&1", $extractOutput, $extractCode);
+            exec("rm -rf '{$tmpFile}' /tmp/frp_{$version}_linux_{$frpArch}");
+            
+            if (!file_exists($frpcBinary)) {
+                return ['success' => false, 'error' => 'Failed to extract FRP client'];
+            }
+        }
+        
+        // Create config file for this subdomain
+        $config = <<<TOML
+serverAddr = "{$frpServer}"
+serverPort = {$frpPort}
+auth.method = "token"
+auth.token = "{$frpToken}"
+log.to = "{$logFile}"
+log.level = "info"
+
+[[proxies]]
+name = "{$subdomain}"
+type = "http"
+localPort = {$localPort}
+subdomain = "{$subdomain}"
+TOML;
+        
+        file_put_contents($configFile, $config);
+        
+        // Clear old log
+        if (file_exists($logFile)) {
+            unlink($logFile);
+        }
+        
+        // Start frpc in background
+        $cmd = "nohup {$frpcBinary} -c {$configFile} > {$logFile} 2>&1 & echo \$!";
+        $pid = trim(shell_exec($cmd));
+        
+        if (empty($pid) || !is_numeric($pid)) {
+            return ['success' => false, 'error' => 'Failed to start FRP tunnel process'];
+        }
+        
+        file_put_contents($pidFile, $pid);
+        
+        // Wait for connection
+        $maxWait = 5;
+        $connected = false;
+        for ($i = 0; $i < $maxWait; $i++) {
+            usleep(500000); // 0.5 seconds
+            
+            // Check if process is still running
+            exec("ps -p {$pid}", $psOutput, $psCode);
+            $psOutput = []; // Reset for next iteration
+            
+            if ($psCode !== 0) {
+                $log = file_exists($logFile) ? trim(file_get_contents($logFile)) : 'No log available';
+                
+                if (strpos($log, 'already exists') !== false || strpos($log, 'proxy name') !== false) {
+                    return ['success' => false, 'error' => 'This subdomain is already in use. Please choose another.'];
+                }
+                if (strpos($log, 'auth failed') !== false) {
+                    return ['success' => false, 'error' => 'Authentication failed'];
+                }
+                
+                return ['success' => false, 'error' => 'FRP tunnel failed: ' . ($log ?: 'Unknown error')];
+            }
+            
+            // Check log for successful connection
+            if (file_exists($logFile)) {
+                $log = file_get_contents($logFile);
+                if (strpos($log, 'start proxy success') !== false || strpos($log, 'login to server success') !== false) {
+                    $connected = true;
+                    break;
+                }
+            }
+        }
+        
+        return ['success' => true, 'pid' => (int)$pid, 'connected' => $connected, 'mode' => 'frp'];
+    }
+    
+    /**
+     * API: Get tunnel status
+     * GET /api/tunnel/status
+     */
+    public function tunnelStatus(): void
+    {
+        header('Content-Type: application/json');
+        
+        $subdomain = $_GET['subdomain'] ?? null;
+        
+        if (!$subdomain) {
+            echo json_encode(['success' => false, 'error' => 'Missing subdomain parameter']);
+            return;
+        }
+        
+        // Check if Caddy config exists for this subdomain
+        $domain = "{$subdomain}.silverqueen.pro";
+        $configFile = "/etc/caddy/sites-enabled/{$domain}.caddy";
+        
+        $active = file_exists($configFile);
+        
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'active' => $active,
+            'url' => $active ? "https://{$domain}/" : null
+        ]);
+    }
+    
+    /**
+     * Get or create tunnel auth token for user
+     */
+    protected function getOrCreateTunnelToken(int $userId): ?string
+    {
+        if (!$this->db) {
+            return null;
+        }
+        
+        try {
+            // Check for existing tunnel token
+            $existing = $this->db->get('api_tokens', ['token', 'expires_at'], [
+                'user_id' => $userId,
+                'name' => 'tunnel_auth',
+                'revoked' => 0
+            ]);
+            
+            if ($existing && (!$existing['expires_at'] || strtotime($existing['expires_at']) > time())) {
+                // Return existing valid token (the actual token, not hash)
+                // Note: In production, store the plain token somewhere retrievable
+                return null; // Can't retrieve hashed token
+            }
+            
+            // Generate new token
+            $plainToken = bin2hex(random_bytes(32));
+            $hashedToken = hash('sha256', $plainToken);
+            
+            $this->db->insert('api_tokens', [
+                'user_id' => $userId,
+                'name' => 'tunnel_auth',
+                'token' => $hashedToken,
+                'expires_at' => null, // Never expires for registered users
+                'revoked' => 0,
+                'created_at' => date('Y-m-d H:i:s')
+            ]);
+            
+            return $plainToken;
+            
+        } catch (\Exception $e) {
+            error_log("Failed to create tunnel token: " . $e->getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * API: Disconnect a tunnel
+     * POST /api/tunnel/disconnect
+     */
+    public function disconnectTunnel(): void
+    {
+        header('Content-Type: application/json');
+        
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+            $subdomain = $input['subdomain'] ?? null;
+            
+            if (!$subdomain) {
+                echo json_encode(['success' => false, 'error' => 'Missing subdomain parameter']);
+                return;
+            }
+            
+            // Kill the FRP tunnel client process
+            $pidFile = "/tmp/frpc-{$subdomain}.pid";
+            if (file_exists($pidFile)) {
+                $pid = trim(file_get_contents($pidFile));
+                if ($pid && is_numeric($pid)) {
+                    exec("kill {$pid} 2>/dev/null");
+                }
+                unlink($pidFile);
+            }
+            
+            // Also try to kill by pattern
+            exec("pkill -f 'frpc.*{$subdomain}' 2>/dev/null");
+            
+            // Clean up config, log, and expiry files
+            $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+            $configFile = "{$homeDir}/.ginto-frp/frpc-{$subdomain}.toml";
+            $logFile = "/tmp/frpc-{$subdomain}.log";
+            $expiryFile = "/tmp/frpc-{$subdomain}.expiry";
+            
+            @unlink($configFile);
+            @unlink($logFile);
+            @unlink($expiryFile);
+            
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $subdomain,
+                'message' => 'Tunnel disconnected'
+            ]);
+            
+        } catch (\Exception $e) {
+            echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+        }
+    }
+    
+    /**
+     * API: Verify if a tunnel domain should be allowed for on-demand TLS
+     * GET /api/tunnel/verify?domain=subdomain.silverqueen.pro
+     * 
+     * Called by Caddy's on_demand_tls to verify certificate requests
+     * Return 200 to allow, 4xx to deny
+     * 
+     * IMPORTANT: Only approve subdomains that are actually in use to prevent
+     * Let's Encrypt rate limiting and ACME challenge delays on random requests.
+     */
+    public function verifyTunnel(): void
+    {
+        $domain = $_GET['domain'] ?? '';
+        
+        // Must be a valid *.silverqueen.pro or *.ginto.ai subdomain (2-32 chars)
+        $allowedDomains = ['silverqueen.pro', 'ginto.ai'];
+        $matched = false;
+        $subdomain = '';
+        foreach ($allowedDomains as $baseDomain) {
+            if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.' . preg_quote($baseDomain, '/') . '$/', $domain, $matches)) {
+                $subdomain = $matches[1];
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
+            http_response_code(400);
+            echo "Invalid domain format";
+            return;
+        }
+
+        // If an operator key is enabled for this subdomain, only approve if the currently-online
+        // FRP proxy presents the matching key via proxy metas.
+        $requiredOperatorKeyHash = '';
+        $registryFile = '/var/lib/ginto/tunnel-registry.json';
+        $registryFallback = '/tmp/ginto-tunnel-registry.json';
+        $registryPath = file_exists($registryFile) ? $registryFile : (file_exists($registryFallback) ? $registryFallback : null);
+        if ($registryPath !== null) {
+            $registry = json_decode((string)@file_get_contents($registryPath), true) ?: [];
+            if (is_array($registry) && isset($registry[$subdomain]) && is_array($registry[$subdomain])) {
+                $entry = $registry[$subdomain];
+                $enabled = !empty($entry['access_key_enabled']);
+                $hash = (string)($entry['access_key_hash'] ?? '');
+                if ($enabled && $hash !== '') {
+                    $requiredOperatorKeyHash = $hash;
+                }
+            }
+        }
+        
+        // Our own www, which Caddy serves as a redirect to the apex (owner,
+        // 2026-10-23: "Fix that certificate problem"). The wildcard site makes
+        // Caddy fetch it on demand, so it must be allowed here; no tunnel can
+        // take it, because the www site block answers before the wildcard.
+        if ($domain === 'www.silverqueen.pro') {
+            http_response_code(200);
+            echo "OK - site alias";
+            return;
+        }
+
+        // SilverQueen Premium (owner, 2026-10-24): the Directory, and every published site.
+        if ($domain === 'sites.silverqueen.pro'
+            || (str_ends_with($domain, '.silverqueen.pro') && \Ginto\Sites\Publisher::isLive($subdomain))) {
+            http_response_code(200);
+            echo "OK - site";
+            return;
+        }
+
+        // Check reserved subdomains - deny certificate
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        if (in_array($subdomain, $reserved)) {
+            http_response_code(403);
+            echo "Reserved subdomain";
+            return;
+        }
+        
+        // 1. Check if there's an active tunnel PID file
+        $pidFile = "/tmp/tunnel-{$subdomain}.pid";
+        if (file_exists($pidFile)) {
+            http_response_code(200);
+            echo "OK - active tunnel";
+            return;
+        }
+        
+        // 2. Check for static Caddy config in sites-enabled
+        $staticConfig = "/etc/caddy/sites-enabled/{$domain}.caddy";
+        if (file_exists($staticConfig)) {
+            http_response_code(200);
+            echo "OK - static config";
+            return;
+        }
+        
+        // 3. Check OpenWebUI pattern (owui-xxxxxx)
+        if (preg_match('/^owui-[a-z0-9]{6}$/', $subdomain)) {
+            http_response_code(200);
+            echo "OK - OpenWebUI subdomain";
+            return;
+        }
+        
+        // 4. Check virtual_hosts database table for registered cloud domains
+        try {
+            if ($this->db && $this->db->has('virtual_hosts', [
+                'domain' => $domain,
+                'is_enabled' => 1
+            ])) {
+                http_response_code(200);
+                echo "OK - registered domain";
+                return;
+            }
+        } catch (\Exception $e) {
+            // Database check failed, log but continue with denial
+            error_log("TunnelController::verifyTunnel DB check failed: " . $e->getMessage());
+        }
+        
+        // 5. Check for FRP client PID file (legacy pattern)
+        $frpcPidFile = "/tmp/frpc-{$subdomain}.pid";
+        if (file_exists($frpcPidFile)) {
+            http_response_code(200);
+            echo "OK - FRP tunnel";
+            return;
+        }
+
+        // 6. Check FRP dashboard API for an active proxy for this subdomain.
+        // This supports real FRP clients that run off-server (no local PID file).
+        // Uses a small on-disk cache to avoid hammering frps during bot/scanner traffic.
+        if ($requiredOperatorKeyHash !== '') {
+            if ($this->isFrpSubdomainOnlineWithOperatorKey($subdomain, $requiredOperatorKeyHash)) {
+                http_response_code(200);
+                echo "OK - FRP dashboard + operator key";
+                return;
+            }
+        } else {
+            // Being online is not authorisation. The frps token is shared by
+            // every client, so "a proxy is connected" only proves someone has
+            // that token - not that they own the subdomain. Require a valid
+            // account key, which is what revoke and expiry act on.
+            [$allowed, $reason] = $this->subdomainAuthorized($subdomain);
+            if ($allowed) {
+                http_response_code(200);
+                echo "OK - " . $reason;
+                return;
+            }
+        }
+        
+        // A registry entry alone is deliberately not enough any more: entries
+        // outlive the keys that created them (deleting a key used to leave one
+        // behind with a decade-long expiry), which kept revoked subdomains
+        // resolvable. Authorisation now comes from the key check above.
+
+
+        // Subdomain not in use - deny certificate request
+        // This prevents ACME challenges for random/arbitrary subdomains
+        http_response_code(404);
+        echo "Subdomain not registered or in use";
+    }
+
+    private function isFrpSubdomainOnline(string $subdomain): bool
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return false;
+        }
+
+        // Fast path: very short cache window.
+        $cached = $this->readFrpOnlineCache(2);
+        if ($cached !== null) {
+            return in_array($subdomain, $cached, true);
+        }
+
+        // Update path guarded by a lock to prevent thundering herd.
+        $lockHandle = @fopen(self::FRP_ONLINE_CACHE_LOCK, 'c');
+        if ($lockHandle === false) {
+            // If we can't lock, do a best-effort single fetch without caching.
+            $online = $this->fetchFrpOnlineSubdomains();
+            return in_array($subdomain, $online, true);
+        }
+
+        $gotLock = @flock($lockHandle, LOCK_EX);
+        if (!$gotLock) {
+            @fclose($lockHandle);
+            $online = $this->fetchFrpOnlineSubdomains();
+            return in_array($subdomain, $online, true);
+        }
+
+        // Re-check cache after acquiring lock.
+        $cached = $this->readFrpOnlineCache(2);
+        if ($cached !== null) {
+            @flock($lockHandle, LOCK_UN);
+            @fclose($lockHandle);
+            return in_array($subdomain, $cached, true);
+        }
+
+        $online = $this->fetchFrpOnlineSubdomains();
+        $this->writeFrpOnlineCache($online);
+
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+
+        return in_array($subdomain, $online, true);
+    }
+
+    private function readFrpOnlineCache(int $maxAgeSeconds): ?array
+    {
+        if (!file_exists(self::FRP_ONLINE_CACHE_FILE)) {
+            return null;
+        }
+        $mtime = @filemtime(self::FRP_ONLINE_CACHE_FILE);
+        if (!is_int($mtime) || (time() - $mtime) > $maxAgeSeconds) {
+            return null;
+        }
+        $decoded = json_decode((string)@file_get_contents(self::FRP_ONLINE_CACHE_FILE), true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $subdomains = $decoded['subdomains'] ?? null;
+        if (!is_array($subdomains)) {
+            return null;
+        }
+        $out = [];
+        foreach ($subdomains as $sd) {
+            $sd = strtolower(trim((string)$sd));
+            if ($sd !== '') {
+                $out[] = $sd;
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    private function writeFrpOnlineCache(array $subdomains): void
+    {
+        $payload = [
+            'updated_at' => time(),
+            'subdomains' => array_values(array_unique(array_map('strval', $subdomains))),
+        ];
+        @file_put_contents(self::FRP_ONLINE_CACHE_FILE, json_encode($payload));
+    }
+
+    private function fetchFrpOnlineSubdomains(): array
+    {
+        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
+        if ($dashPwd === '') {
+            $envFile = '/etc/frp/frps.env';
+            if (file_exists($envFile) && is_readable($envFile)) {
+                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (is_array($lines)) {
+                    foreach ($lines as $line) {
+                        $line = trim((string)$line);
+                        if ($line === '' || str_starts_with($line, '#')) {
+                            continue;
+                        }
+                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
+                            continue;
+                        }
+                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($dashPwd === '') {
+            return [];
+        }
+
+        $online = [];
+        foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
+            $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
+            $resp = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($resp === false || $code < 200 || $code >= 300) {
+                continue;
+            }
+
+            $decoded = json_decode((string)$resp, true);
+            $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+            if (!is_array($proxies)) {
+                continue;
+            }
+
+            foreach ($proxies as $proxy) {
+                if (!is_array($proxy)) {
+                    continue;
+                }
+                if ((string)($proxy['status'] ?? '') !== 'online') {
+                    continue;
+                }
+                $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+                $sd = strtolower(trim((string)($conf['subdomain'] ?? '')));
+                if ($sd !== '') {
+                    $online[] = $sd;
+                }
+            }
+        }
+
+        return array_values(array_unique($online));
+    }
+
+    private function isFrpSubdomainOnlineWithOperatorKey(string $subdomain, string $requiredHash): bool
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '' || $requiredHash === '') {
+            return false;
+        }
+
+        $cached = $this->readFrpOnlineKeyCache(2);
+        if ($cached !== null) {
+            $seen = (string)($cached[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $lockHandle = @fopen('/tmp/ginto-frp-online-keys.lock', 'c');
+        if ($lockHandle === false) {
+            $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($map[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $gotLock = @flock($lockHandle, LOCK_EX);
+        if (!$gotLock) {
+            @fclose($lockHandle);
+            $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($map[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $cached = $this->readFrpOnlineKeyCache(2);
+        if ($cached !== null) {
+            @flock($lockHandle, LOCK_UN);
+            @fclose($lockHandle);
+            $seen = (string)($cached[$subdomain] ?? '');
+            return $seen !== '' && hash_equals($requiredHash, $seen);
+        }
+
+        $map = $this->fetchFrpOnlineSubdomainKeyHashes();
+        $this->writeFrpOnlineKeyCache($map);
+
+        @flock($lockHandle, LOCK_UN);
+        @fclose($lockHandle);
+
+        $seen = (string)($map[$subdomain] ?? '');
+        return $seen !== '' && hash_equals($requiredHash, $seen);
+    }
+
+    private function readFrpOnlineKeyCache(int $maxAgeSeconds): ?array
+    {
+        $file = '/tmp/ginto-frp-online-keys.json';
+        if (!file_exists($file)) {
+            return null;
+        }
+        $mtime = @filemtime($file);
+        if (!is_int($mtime) || (time() - $mtime) > $maxAgeSeconds) {
+            return null;
+        }
+        $decoded = json_decode((string)@file_get_contents($file), true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $map = $decoded['keys'] ?? null;
+        return is_array($map) ? $map : null;
+    }
+
+    private function writeFrpOnlineKeyCache(array $keysBySubdomain): void
+    {
+        $payload = [
+            'updated_at' => time(),
+            'keys' => $keysBySubdomain,
+        ];
+        @file_put_contents('/tmp/ginto-frp-online-keys.json', json_encode($payload));
+    }
+
+    private function fetchFrpOnlineSubdomainKeyHashes(): array
+    {
+        $dashPwd = trim((string)(getenv('FRP_DASHBOARD_PWD') ?: ($_ENV['FRP_DASHBOARD_PWD'] ?? '')));
+        if ($dashPwd === '') {
+            $envFile = '/etc/frp/frps.env';
+            if (file_exists($envFile) && is_readable($envFile)) {
+                $lines = @file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+                if (is_array($lines)) {
+                    foreach ($lines as $line) {
+                        $line = trim((string)$line);
+                        if ($line === '' || str_starts_with($line, '#')) {
+                            continue;
+                        }
+                        if (!str_starts_with($line, 'FRP_DASHBOARD_PWD=')) {
+                            continue;
+                        }
+                        $dashPwd = trim(substr($line, strlen('FRP_DASHBOARD_PWD=')));
+                        break;
+                    }
+                }
+            }
+        }
+
+        if ($dashPwd === '') {
+            return [];
+        }
+
+        $out = [];
+        foreach (['/api/proxy/http', '/api/proxy/https'] as $endpoint) {
+            $ch = curl_init('http://127.0.0.1:7500' . $endpoint);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+            curl_setopt($ch, CURLOPT_USERPWD, 'admin:' . $dashPwd);
+            $resp = curl_exec($ch);
+            $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($resp === false || $code < 200 || $code >= 300) {
+                continue;
+            }
+
+            $decoded = json_decode((string)$resp, true);
+            $proxies = is_array($decoded) ? ($decoded['proxies'] ?? null) : null;
+            if (!is_array($proxies)) {
+                continue;
+            }
+
+            foreach ($proxies as $proxy) {
+                if (!is_array($proxy) || (string)($proxy['status'] ?? '') !== 'online') {
+                    continue;
+                }
+                $conf = is_array($proxy['conf'] ?? null) ? $proxy['conf'] : [];
+                $sd = strtolower(trim((string)($conf['subdomain'] ?? '')));
+                if ($sd === '') {
+                    continue;
+                }
+                // frp v1 configs call this "metadatas"; older builds reported
+                // "metas". Accept both so the check works across frps versions.
+                $metas = $conf['metadatas'] ?? ($conf['metas'] ?? null);
+                $rawKey = '';
+                if (is_array($metas)) {
+                    $rawKey = trim((string)($metas['ginto_key'] ?? $metas['ginto-key'] ?? ''));
+                }
+                if ($rawKey === '' && isset($conf['meta_ginto_key'])) {
+                    $rawKey = trim((string)$conf['meta_ginto_key']);
+                }
+
+                if ($rawKey !== '') {
+                    $out[$sd] = hash('sha256', $rawKey);
+                }
+            }
+        }
+
+        return $out;
+    }
+    
+    /**
+     * Store tunnel expiry information
+     */
+    protected function storeTunnelExpiry(string $subdomain, int $pid, int $expiryTime): void
+    {
+        $expiryFile = "/tmp/frpc-{$subdomain}.expiry";
+        file_put_contents($expiryFile, json_encode([
+            'subdomain' => $subdomain,
+            'pid' => $pid,
+            'created_at' => time(),
+            'expires_at' => $expiryTime
+        ]));
+    }
+    
+    /**
+     * Clean up expired tunnels (called on each tunnel request)
+     */
+    protected function cleanupExpiredTunnels(): void
+    {
+        $expiryFiles = glob('/tmp/frpc-*.expiry');
+        $now = time();
+        
+        foreach ($expiryFiles as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if (!$data) {
+                @unlink($file);
+                continue;
+            }
+            
+            $expiresAt = $data['expires_at'] ?? 0;
+            $subdomain = $data['subdomain'] ?? '';
+            $pid = $data['pid'] ?? 0;
+            
+            // If expired, kill the tunnel
+            if ($expiresAt > 0 && $now >= $expiresAt) {
+                error_log("Tunnel {$subdomain} expired, cleaning up...");
+                
+                // Kill the process
+                if ($pid > 0) {
+                    exec("kill {$pid} 2>/dev/null");
+                }
+                exec("pkill -f 'frpc.*{$subdomain}' 2>/dev/null");
+                
+                // Clean up files
+                $homeDir = $_SERVER['HOME'] ?? getenv('HOME') ?: '/tmp';
+                @unlink("{$homeDir}/.ginto-frp/frpc-{$subdomain}.toml");
+                @unlink("/tmp/frpc-{$subdomain}.pid");
+                @unlink("/tmp/frpc-{$subdomain}.log");
+                @unlink($file);
+            }
+        }
+    }
+    
+    /**
+     * API: Get tunnel status and remaining time
+     * GET /api/tunnel/time?subdomain=xxx
+     */
+    public function tunnelTime(): void
+    {
+        header('Content-Type: application/json');
+        
+        $subdomain = $_GET['subdomain'] ?? null;
+        
+        if (!$subdomain) {
+            echo json_encode(['success' => false, 'error' => 'Missing subdomain']);
+            return;
+        }
+        
+        // Clean up expired tunnels
+        $this->cleanupExpiredTunnels();
+        
+        $expiryFile = "/tmp/frpc-{$subdomain}.expiry";
+        
+        if (!file_exists($expiryFile)) {
+            echo json_encode([
+                'success' => false,
+                'active' => false,
+                'error' => 'Tunnel not found or expired'
+            ]);
+            return;
+        }
+        
+        $data = json_decode(file_get_contents($expiryFile), true);
+        $now = time();
+        $expiresAt = $data['expires_at'] ?? 0;
+        $remaining = max(0, $expiresAt - $now);
+        
+        echo json_encode([
+            'success' => true,
+            'active' => $remaining > 0,
+            'subdomain' => $subdomain,
+            'expires_at' => $expiresAt,
+            'remaining' => $remaining,
+            'created_at' => $data['created_at'] ?? 0
+        ]);
+    }
+
+    /**
+     * API: Generate a tunnel access key (JWT) for a subdomain.
+     * POST /api/tunnel/access-key/generate
+    * Body JSON: {"subdomain":"test","ttl_seconds":2592000}
+     *
+     * Returns the token once. The server stores only sha256(token) for verification.
+     */
+    public function generateAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $subdomain = strtolower(trim((string)($input['subdomain'] ?? '')));
+        $subdomain = preg_replace('/[^a-z0-9\-]/', '', $subdomain);
+
+        if ($subdomain === '' || !preg_match('/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/', $subdomain)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Invalid subdomain']);
+            return;
+        }
+
+        // Reserved words still blocked.
+        $reserved = ['www', 'api', 'admin', 'mail', 'ftp', 'ssh', 'oi', 'tunnel', 'app', 'dev', 'staging', 'ginto', 'ns1', 'ns2', 'mx'];
+        if (in_array($subdomain, $reserved, true)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Reserved subdomain']);
+            return;
+        }
+
+        // Default TTL should be long enough that subdomains don't randomly flip back
+        // to unauthorized during normal usage. Revocation remains the primary control.
+        $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
+
+        // Prevent users from generating keys for subdomains owned by someone else.
+        // Ownership is sticky: once claimed by a user, other users cannot take it.
+        if ($this->db) {
+            try {
+                $claimed = $this->db->get('tunnel_access_keys', ['user_id'], [
+                    'subdomain' => $subdomain,
+                    'ORDER' => ['id' => 'ASC'],
+                    'LIMIT' => 1,
+                ]);
+                $claimedBy = (int)($claimed['user_id'] ?? 0);
+                if ($claimedBy > 0 && $claimedBy !== (int)$userId) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'DOMAIN_NOT_AVAILABLE',
+                        'error' => 'Domain is owned by another user.',
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // ignore DB read failures for ownership lookup
+            }
+        }
+
+        // Secondary owner lock from registry (if present).
+        try {
+            $registry = $this->readRegistry();
+            $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain])) ? $registry[$subdomain] : [];
+            $owner = (int)($entry['owner_user_id'] ?? 0);
+            $expiresAt = (int)($entry['expires_at'] ?? 0);
+
+            if ($owner !== 0 && $owner !== (int)$userId) {
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'DOMAIN_NOT_AVAILABLE',
+                    'error' => 'Domain is owned by another user.',
+                ]);
+                return;
+            }
+
+            // If the subdomain is currently registered/active but the owner is unknown, treat it as taken.
+            if ($owner === 0 && $expiresAt > time()) {
+                http_response_code(409);
+                echo json_encode([
+                    'success' => false,
+                    'code' => 'DOMAIN_NOT_AVAILABLE',
+                    'error' => 'Domain is not available.',
+                ]);
+                return;
+            }
+        } catch (\Throwable $_) {
+            // If registry cannot be read, do not block here.
+        }
+
+        // Additional safety: if another user already has an active key for this subdomain,
+        // treat it as unavailable.
+        if ($this->db) {
+            try {
+                $nowSql = date('Y-m-d H:i:s');
+                $other = $this->db->get('tunnel_access_keys', ['id'], [
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'user_id[!]' => (int)$userId,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => $nowSql,
+                    ],
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                if ($other) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'DOMAIN_NOT_AVAILABLE',
+                        'error' => 'Domain is not available.',
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // ignore
+            }
+        }
+
+        // Enforce user key limits (admins unlimited).
+        // Rule: non-admins can have 1 active (unrevoked, unexpired) key for free.
+        // Additional keys require paid slots ($10/month equivalent per additional key).
+        $isAdmin = false;
+        try {
+            $isAdmin = UserController::isAdmin();
+        } catch (\Throwable $_) {
+            $isAdmin = false;
+        }
+
+        if (!$isAdmin && $this->db) {
+            try {
+                // Limit is based on active keys (unrevoked and unexpired).
+                $activeKeys = (int)$this->db->count('tunnel_access_keys', [
+                    'user_id' => (int)$userId,
+                    'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => date('Y-m-d H:i:s'),
+                    ],
+                ]);
+
+                $extraSlots = 0;
+                try {
+                    $nowSql = date('Y-m-d H:i:s');
+                    $subscriptionSlots = (int)$this->db->count('user_addons', [
+                        'user_id' => (int)$userId,
+                        'addon_type' => ['serverless_key_1m', 'serverless_key_1y'],
+                        'status' => 'active',
+                        'OR' => [
+                            'subscription_next_billing' => null,
+                            'subscription_next_billing[>]' => $nowSql,
+                        ],
+                    ]);
+
+                    $termSlots = (int)$this->db->count('user_addons', [
+                        'user_id' => (int)$userId,
+                        'addon_type[~]' => 'serverless_key_term%',
+                        'status' => 'active',
+                        'subscription_next_billing[>]' => $nowSql,
+                    ]);
+
+                    $extraSlots = max(0, $subscriptionSlots) + max(0, $termSlots);
+                } catch (\Throwable $_) {
+                    $extraSlots = 0;
+                }
+
+                $limit = 1 + max(0, $extraSlots);
+                if ($activeKeys >= $limit) {
+                    http_response_code(402);
+                    echo json_encode([
+                        'success' => false,
+                        'code' => 'KEY_LIMIT_REACHED',
+                        'error' => 'Key limit reached. Upgrade to add more keys.',
+                        'active_keys' => $activeKeys,
+                        'limit' => $limit,
+                        'addon_type' => 'serverless_key_1m',
+                        'addon_price_usd' => 10,
+                    ]);
+                    return;
+                }
+            } catch (\Throwable $_) {
+                // If counting fails, do not block key generation.
+            }
+        }
+
+        try {
+            // Enforce one active key per user+subdomain.
+            // Re-use latest existing record for this subdomain to avoid duplicate history rows.
+            if ($this->db) {
+                $nowSql = date('Y-m-d H:i:s');
+                $existingActive = $this->db->get('tunnel_access_keys', ['id', 'expires_at'], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => $nowSql,
+                    ],
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                if ($existingActive) {
+                    http_response_code(409);
+                    echo json_encode([
+                        'success' => false,
+                        'error' => 'An active key already exists for this subdomain. Revoke, delete, or keep using it.',
+                    ]);
+                    return;
+                }
+
+                $latestRow = $this->db->get('tunnel_access_keys', ['id'], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'ORDER' => ['id' => 'DESC'],
+                ]);
+                $rotateId = (int)($latestRow['id'] ?? 0);
+
+                // Revoke any active duplicates for this subdomain except the row we rotate.
+                $this->db->update('tunnel_access_keys', [
+                    'revoked' => 1,
+                    'revoked_at' => date('Y-m-d H:i:s'),
+                ], [
+                    'user_id' => (int)$userId,
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'id[!]' => $rotateId > 0 ? $rotateId : -1,
+                ]);
+            }
+
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl, isset($rotateId) ? (int)$rotateId : 0);
+
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $created['subdomain'],
+                'expires_at' => $created['expires_at'],
+                'token' => $created['token'],
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to generate access key']);
+        }
+    }
+
+    /**
+     * API: List user's tunnel access keys.
+     * GET /api/tunnel/access-keys
+     */
+    public function listAccessKeys(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        try {
+            $rows = $this->db->select('tunnel_access_keys', [
+                'id',
+                'subdomain',
+                'created_at',
+                'expires_at',
+                'last_used_at',
+                'revoked',
+                'revoked_at',
+            ], [
+                'user_id' => (int)$userId,
+                'ORDER' => ['id' => 'DESC'],
+                'LIMIT' => 200,
+            ]);
+
+            echo json_encode(['success' => true, 'keys' => is_array($rows) ? $rows : []]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to load keys']);
+        }
+    }
+
+    /**
+     * API: Revoke a user's tunnel access key.
+     * POST /api/tunnel/access-key/revoke
+     * Body: {"id":123,"csrf_token":"..."}
+     */
+    public function revokeAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'revoked', 'subdomain'], ['id' => $id]);
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+            if ((int)($row['revoked'] ?? 0) === 1) {
+                $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
+                echo json_encode(['success' => true]);
+                return;
+            }
+            $this->db->update('tunnel_access_keys', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'id' => $id,
+                'user_id' => (int)$userId,
+            ]);
+            $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to revoke key']);
+        }
+    }
+
+    /**
+     * API: Reactivate an expired or revoked key by issuing a new token for the same subdomain.
+     * POST /api/tunnel/access-key/reactivate
+     * Body: {"id":123,"ttl_seconds":31536000,"csrf_token":"..."}
+     */
+    public function reactivateAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        $ttl = $this->normalizeTunnelTtlSeconds($input['ttl_seconds'] ?? (86400 * 30));
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', [
+                'id',
+                'user_id',
+                'subdomain',
+                'revoked',
+                'expires_at',
+            ], [
+                'id' => $id,
+            ]);
+
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+
+            $subdomain = strtolower(trim((string)($row['subdomain'] ?? '')));
+            if ($subdomain === '') {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Invalid key subdomain']);
+                return;
+            }
+
+            $rowRevoked = (int)($row['revoked'] ?? 0) === 1;
+            $rowExpiresAt = isset($row['expires_at']) ? strtotime((string)$row['expires_at']) : false;
+            $rowExpired = is_int($rowExpiresAt) && $rowExpiresAt > 0 ? ($rowExpiresAt <= time()) : false;
+            if (!$rowRevoked && !$rowExpired) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'Key is already active.']);
+                return;
+            }
+
+            $nowSql = date('Y-m-d H:i:s');
+            $existingActive = $this->db->get('tunnel_access_keys', ['id'], [
+                'user_id' => (int)$userId,
+                'subdomain' => $subdomain,
+                'revoked' => 0,
+                'OR' => [
+                    'expires_at' => null,
+                    'expires_at[>]' => $nowSql,
+                ],
+                'ORDER' => ['id' => 'DESC'],
+            ]);
+            if ($existingActive && (int)($existingActive['id'] ?? 0) !== $id) {
+                http_response_code(409);
+                echo json_encode(['success' => false, 'error' => 'An active key already exists for this subdomain.']);
+                return;
+            }
+
+            // Revoke other active rows so only one row remains active after rotation.
+            $this->db->update('tunnel_access_keys', [
+                'revoked' => 1,
+                'revoked_at' => date('Y-m-d H:i:s'),
+            ], [
+                'user_id' => (int)$userId,
+                'subdomain' => $subdomain,
+                'revoked' => 0,
+                'id[!]' => $id,
+            ]);
+
+            $created = $this->createTunnelAccessKey((int)$userId, $subdomain, $ttl, $id);
+
+            echo json_encode([
+                'success' => true,
+                'subdomain' => $created['subdomain'],
+                'expires_at' => $created['expires_at'],
+                'token' => $created['token'],
+            ]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to reactivate key']);
+        }
+    }
+
+    /**
+     * API: Delete a tunnel access key record.
+     * POST /api/tunnel/access-key/delete
+     * Body: {"id":123,"csrf_token":"..."}
+     */
+    public function deleteAccessKey(): void
+    {
+        header('Content-Type: application/json');
+
+        $userId = $this->getAuthenticatedUserId();
+        if (!$userId) {
+            http_response_code(401);
+            echo json_encode(['success' => false, 'error' => 'Authentication required']);
+            return;
+        }
+        if (!$this->db) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Database not available']);
+            return;
+        }
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+        $this->validateCsrfFromInput($input);
+
+        $id = (int)($input['id'] ?? 0);
+        if ($id <= 0) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Missing id']);
+            return;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'user_id', 'subdomain'], ['id' => $id]);
+            if (!$row || (int)($row['user_id'] ?? 0) !== (int)$userId) {
+                http_response_code(404);
+                echo json_encode(['success' => false, 'error' => 'Key not found']);
+                return;
+            }
+
+            $this->db->delete('tunnel_access_keys', [
+                'id' => $id,
+                'user_id' => (int)$userId,
+            ]);
+
+            // Deleting the last key for a subdomain releases it: the registry
+            // entry must go too, or the subdomain keeps resolving and stays
+            // claimed against anyone else generating a key for it.
+            $this->purgeSubdomainAuthorization((string)($row['subdomain'] ?? ''));
+
+            echo json_encode(['success' => true]);
+        } catch (\Exception $e) {
+            http_response_code(500);
+            echo json_encode(['success' => false, 'error' => 'Failed to delete key']);
+        }
+    }
+
+    private function normalizeTunnelTtlSeconds($ttlInput): int
+    {
+        $ttl = (int)$ttlInput;
+        if ($ttl < 60) {
+            $ttl = 60;
+        }
+        $max = 86400 * 365 * 5;
+        if ($ttl > $max) {
+            $ttl = $max;
+        }
+        return $ttl;
+    }
+
+    /**
+     * @return array{subdomain:string,expires_at:int,token:string,id:int}
+     */
+    private function createTunnelAccessKey(int $userId, string $subdomain, int $ttl, int $rotateId = 0): array
+    {
+        if (!$this->db) {
+            throw new \RuntimeException('Database not available');
+        }
+
+        $jti = bin2hex(random_bytes(16));
+        $now = time();
+        $payload = [
+            'iss' => 'silverqueen.pro',
+            'sub' => $userId,
+            'sd' => $subdomain,
+            'jti' => $jti,
+            'iat' => $now,
+            'exp' => $now + $ttl,
+        ];
+
+        $secret = $this->getTunnelKeySigningSecret();
+        if ($secret === '') {
+            throw new \RuntimeException('Signing secret not configured');
+        }
+
+        $jwt = $this->jwtEncodeHs256($payload, $secret);
+        $token = 'gtnl-' . $jwt;
+
+        if ($rotateId > 0) {
+            $this->db->update('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'created_at' => date('Y-m-d H:i:s', $now),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'last_used_at' => null,
+                'revoked' => 0,
+                'revoked_at' => null,
+            ], [
+                'id' => $rotateId,
+                'user_id' => $userId,
+            ]);
+            $keyId = $rotateId;
+        } else {
+            $this->db->insert('tunnel_access_keys', [
+                'user_id' => $userId,
+                'subdomain' => $subdomain,
+                'jti' => $jti,
+                'token_hash' => hash('sha256', $token),
+                'expires_at' => date('Y-m-d H:i:s', $now + $ttl),
+                'revoked' => 0,
+            ]);
+            $keyId = (int)$this->db->id();
+        }
+
+        return [
+            'id' => $keyId,
+            'subdomain' => $subdomain,
+            'expires_at' => $now + $ttl,
+            'token' => $token,
+        ];
+    }
+
+    private function getAuthenticatedUserId(): ?int
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            @session_start();
+        }
+
+        if (!empty($_SESSION['user']['id'])) {
+            return (int)$_SESSION['user']['id'];
+        }
+
+        // Most of the web app uses a flat session key.
+        if (!empty($_SESSION['user_id'])) {
+            return (int)$_SESSION['user_id'];
+        }
+
+        $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+        if (preg_match('/^Bearer\s+(.+)$/i', $authHeader, $m)) {
+            $bearer = trim($m[1]);
+            if ($bearer !== '' && $this->db) {
+                $tokenRecord = $this->db->get('api_tokens', ['user_id'], [
+                    'token' => hash('sha256', $bearer),
+                    'revoked' => 0,
+                ]);
+                if ($tokenRecord) {
+                    return (int)$tokenRecord['user_id'];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function validateCsrfFromInput(array $input): void
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) {
+            @session_start();
+        }
+        $token = (string)($input['csrf_token'] ?? '');
+        $sessionToken = (string)($_SESSION['csrf_token'] ?? '');
+        if ($token === '' || $sessionToken === '' || !hash_equals($sessionToken, $token)) {
+            http_response_code(403);
+            echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+            exit;
+        }
+    }
+
+    private function getTunnelKeySigningSecret(): string
+    {
+        $appKey = (string)(getenv('APP_KEY') ?: ($_ENV['APP_KEY'] ?? ''));
+        if ($appKey === '') {
+            // Fail closed if secret missing.
+            return '';
+        }
+        return hash('sha256', $appKey . '|tunnel_access_keys', true);
+    }
+
+    private function jwtEncodeHs256(array $payload, string $secret): string
+    {
+        $header = ['alg' => 'HS256', 'typ' => 'JWT'];
+        $h = $this->base64UrlEncode(json_encode($header, JSON_UNESCAPED_SLASHES));
+        $p = $this->base64UrlEncode(json_encode($payload, JSON_UNESCAPED_SLASHES));
+        $sig = hash_hmac('sha256', $h . '.' . $p, $secret, true);
+        $s = $this->base64UrlEncode($sig);
+        return $h . '.' . $p . '.' . $s;
+    }
+
+    private function base64UrlEncode(string $raw): string
+    {
+        return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
+    }
+
+    /**
+     * Key hashes published by currently-online proxies, cached briefly.
+     *
+     * This sits on the request path via forward_auth, so it must not hit the
+     * frps dashboard for every hit.
+     */
+    private function onlineProxyKeyHashes(int $maxAgeSeconds = 5): array
+    {
+        $cached = $this->readFrpOnlineKeyCache($maxAgeSeconds);
+        if ($cached !== null) {
+            return $cached;
+        }
+        $fresh = $this->fetchFrpOnlineSubdomainKeyHashes();
+        $this->writeFrpOnlineKeyCache($fresh);
+        return $fresh;
+    }
+
+    /**
+     * Is this subdomain allowed to serve traffic right now?
+     *
+     * A tunnel is authorised only while the proxy that is online publishes an
+     * account key that is still valid. Revoking or deleting the key at
+     * /account/keys therefore takes effect on the next request - no restart, no
+     * admin action, and no reliance on the client behaving well.
+     *
+     * Returns [allowed(bool), reason(string)].
+     */
+    private function subdomainAuthorized(string $subdomain): array
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return [false, 'no subdomain'];
+        }
+
+        // Non-tunnel subdomains keep working: these are served by their own
+        // Caddy site files or database records, not by frp.
+        if (file_exists("/etc/caddy/sites-enabled/{$subdomain}.silverqueen.pro.caddy")) {
+            return [true, 'static site'];
+        }
+        if (preg_match('/^owui-[a-z0-9]{6}$/', $subdomain)) {
+            return [true, 'openwebui'];
+        }
+        try {
+            if ($this->db && $this->db->has('virtual_hosts', [
+                'domain' => $subdomain . '.silverqueen.pro',
+                'is_enabled' => 1,
+            ])) {
+                return [true, 'registered domain'];
+            }
+        } catch (\Throwable $_) {
+            // fall through to the key check
+        }
+
+        $presentedHash = (string)($this->onlineProxyKeyHashes()[$subdomain] ?? '');
+        if ($presentedHash === '') {
+            return [false, 'tunnel published no account key'];
+        }
+
+        if (!$this->db) {
+            return [false, 'key store unavailable'];
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', ['id', 'revoked', 'expires_at'], [
+                'subdomain' => $subdomain,
+                'token_hash' => $presentedHash,
+            ]);
+        } catch (\Throwable $_) {
+            return [false, 'key lookup failed'];
+        }
+
+        if (!is_array($row) || empty($row)) {
+            return [false, 'key not recognised'];
+        }
+        if (!empty($row['revoked'])) {
+            return [false, 'key revoked'];
+        }
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            return [false, 'key expired'];
+        }
+
+        return [true, 'key valid'];
+    }
+
+    /**
+     * Per-request authorisation gate for *.silverqueen.pro (Caddy forward_auth).
+     *
+     * GET /api/tunnel/authz  (subdomain taken from the forwarded Host header)
+     */
+    public function tunnelAuthz(): void
+    {
+        // X-Tunnel-Host is set by the forward_auth caller. The subrequest must
+        // carry Host: silverqueen.pro, because a subdomain Host makes the app relay
+        // the request into that very tunnel instead of serving this route.
+        $host = strtolower(trim((string)(
+            $_SERVER['HTTP_X_TUNNEL_HOST']
+            ?? $_SERVER['HTTP_X_FORWARDED_HOST']
+            ?? $_SERVER['HTTP_HOST']
+            ?? ($_GET['host'] ?? '')
+        )));
+        $host = explode(':', $host)[0];
+
+        $subdomain = '';
+        $allowedDomains = ['silverqueen.pro', 'ginto.ai'];
+        foreach ($allowedDomains as $baseDomain) {
+            if (preg_match('/^([a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?)\.' . preg_quote($baseDomain, '/') . '$/', $host, $m)) {
+                $subdomain = $m[1];
+                break;
+            }
+        }
+        if ($subdomain === '' && isset($_GET['subdomain'])) {
+            $subdomain = strtolower(preg_replace('/[^a-z0-9\-]/', '', (string)$_GET['subdomain']));
+        }
+
+        [$allowed, $reason] = $this->subdomainAuthorized($subdomain);
+
+        if ($allowed) {
+            http_response_code(204);
+            return;
+        }
+
+        http_response_code(403);
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        $safeHost = htmlspecialchars($host, ENT_QUOTES, 'UTF-8');
+        $safeReason = htmlspecialchars($reason, ENT_QUOTES, 'UTF-8');
+        echo <<<HTML
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Tunnel not authorised</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(135deg,#6366f1,#8b5cf6);
+font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937}
+.card{background:#fff;border-radius:16px;padding:40px;max-width:520px;margin:20px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+h1{margin:0 0 4px;color:#6366f1;font-size:2rem}h2{margin:0 0 16px;font-size:1.1rem}
+code{background:#f3f4f6;border-radius:6px;padding:2px 6px;font-size:.9rem}
+ul,ol{color:#4b5563;line-height:1.8;font-size:.95rem;padding-left:20px}a{color:#6366f1}
+h3{margin:20px 0 8px;font-size:1rem;color:#374151}
+</style></head><body><div class="card">
+<h1>403</h1><h2>This tunnel is not authorised</h2>
+<p><code>{$safeHost}</code> is not serving because no valid account key is bound to it.</p>
+<p style="color:#6b7280">Reason: {$safeReason}</p>
+<h3>If you own this tunnel</h3>
+<ol>
+<li>Generate a key for this subdomain at
+    <a href="https://silverqueen.pro/account/keys">silverqueen.pro/account/keys</a> and copy it.</li>
+<li>Open the Ginto Tunnel admin <b>on the machine running the tunnel</b>
+    (<code>https://&lt;that machine&gt;:2026</code>).</li>
+<li>Paste the key into <b>Connect with an Account Key</b> and press
+    <b>Bind this machine</b>.</li>
+</ol>
+<p style="color:#6b7280">The keys page only issues keys - binding happens on the
+machine that runs the tunnel, because that is where the key has to be installed.</p>
+</div></body></html>
+HTML;
+    }
+
+    private function base64UrlDecode(string $raw): string
+    {
+        $padded = strtr($raw, '-_', '+/');
+        $remainder = strlen($padded) % 4;
+        if ($remainder > 0) {
+            $padded .= str_repeat('=', 4 - $remainder);
+        }
+        $decoded = base64_decode($padded, true);
+        return $decoded === false ? '' : $decoded;
+    }
+
+    /**
+     * Verify a gtnl- access key and return its database row.
+     *
+     * The stored hash is the source of truth (it is what revoke/expiry act on).
+     * The JWT signature is checked as well when APP_KEY is available, so a key
+     * that was never minted by this server cannot be presented even if the
+     * hash column were somehow poisoned.
+     */
+    private function verifyTunnelAccessKey(string $token): ?array
+    {
+        $token = trim($token);
+        if ($token === '' || strncmp($token, 'gtnl-', 5) !== 0) {
+            return null;
+        }
+        if (!$this->db) {
+            return null;
+        }
+
+        try {
+            $row = $this->db->get('tunnel_access_keys', [
+                'id', 'user_id', 'subdomain', 'jti', 'expires_at', 'revoked',
+            ], [
+                'token_hash' => hash('sha256', $token),
+            ]);
+        } catch (\Throwable $_) {
+            return null;
+        }
+
+        if (!is_array($row) || empty($row)) {
+            return null;
+        }
+        if (!empty($row['revoked'])) {
+            return null;
+        }
+        if (!empty($row['expires_at']) && strtotime((string)$row['expires_at']) < time()) {
+            return null;
+        }
+
+        $secret = $this->getTunnelKeySigningSecret();
+        if ($secret !== '') {
+            $parts = explode('.', substr($token, 5));
+            if (count($parts) !== 3) {
+                return null;
+            }
+            [$h, $p, $s] = $parts;
+            $expected = $this->base64UrlEncode(hash_hmac('sha256', $h . '.' . $p, $secret, true));
+            if (!hash_equals($expected, $s)) {
+                return null;
+            }
+            $payload = json_decode($this->base64UrlDecode($p), true);
+            if (!is_array($payload)) {
+                return null;
+            }
+            // The claims must describe the same grant as the stored row.
+            if ((string)($payload['sd'] ?? '') !== (string)$row['subdomain']) {
+                return null;
+            }
+            if ((int)($payload['sub'] ?? 0) !== (int)$row['user_id']) {
+                return null;
+            }
+            if (!empty($row['jti']) && (string)($payload['jti'] ?? '') !== (string)$row['jti']) {
+                return null;
+            }
+        }
+
+        return $row;
+    }
+
+    /**
+     * The shared frps token. Not in the app .env, so fall back to the frps
+     * environment file the server already ships.
+     */
+    private function resolveFrpAuthToken(): string
+    {
+        $token = (string)(getenv('FRP_AUTH_TOKEN') ?: ($_ENV['FRP_AUTH_TOKEN'] ?? ''));
+        if ($token !== '') {
+            return $token;
+        }
+
+        foreach (['/etc/frp/frps.env'] as $path) {
+            if (!is_readable($path)) {
+                continue;
+            }
+            $lines = @file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach ($lines as $line) {
+                if (preg_match('/^\s*FRP_AUTH_TOKEN\s*=\s*(.*)$/', $line, $m)) {
+                    return trim($m[1], " \t\"'");
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Drop every trace that would keep a subdomain resolvable after its key is
+     * revoked or deleted: the registry entry, any cached authorisation, and the
+     * pid/expiry markers verifyTunnel() treats as proof of an active tunnel.
+     *
+     * Only runs when the subdomain has no remaining usable key, so revoking one
+     * of several keys does not take the tunnel down.
+     */
+    private function purgeSubdomainAuthorization(string $subdomain): void
+    {
+        $subdomain = strtolower(trim($subdomain));
+        if ($subdomain === '') {
+            return;
+        }
+
+        try {
+            if ($this->db) {
+                $remaining = (int)$this->db->count('tunnel_access_keys', [
+                    'subdomain' => $subdomain,
+                    'revoked' => 0,
+                    'OR' => [
+                        'expires_at' => null,
+                        'expires_at[>]' => date('Y-m-d H:i:s'),
+                    ],
+                ]);
+                if ($remaining > 0) {
+                    return;
+                }
+            }
+        } catch (\Throwable $_) {
+            // If the count fails, fall through and purge: failing closed keeps
+            // a revoked key from continuing to serve.
+        }
+
+        try {
+            $registry = $this->readRegistry();
+            if (isset($registry[$subdomain])) {
+                unset($registry[$subdomain]);
+                $this->saveRegistry($registry);
+            }
+        } catch (\Throwable $_) {
+        }
+
+        foreach ([
+            "/tmp/tunnel-{$subdomain}.pid",
+            "/tmp/frpc-{$subdomain}.pid",
+            "/tmp/frpc-{$subdomain}.expiry",
+        ] as $path) {
+            if (file_exists($path)) {
+                @unlink($path);
+            }
+        }
+
+        // Force the next authorisation check to re-read frps rather than trust
+        // a cache entry written before the revocation.
+        @unlink('/tmp/ginto-frp-online-keys.json');
+        @unlink(self::FRP_ONLINE_CACHE_FILE);
+    }
+
+    private function saveRegistry(array $registry): bool
+    {
+        $primaryDir = dirname(self::TUNNEL_REGISTRY_FILE);
+        if (!is_dir($primaryDir)) {
+            @mkdir($primaryDir, 0755, true);
+        }
+
+        $target = (is_dir($primaryDir) && is_writable($primaryDir))
+            ? self::TUNNEL_REGISTRY_FILE
+            : self::TUNNEL_REGISTRY_FALLBACK_FILE;
+
+        return @file_put_contents(
+            $target,
+            json_encode($registry, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)
+        ) !== false;
+    }
+
+    /**
+     * Bind a running frp client to a subdomain using an account key.
+     *
+     * POST /api/tunnel/bind
+     * Body: {"key":"gtnl-...","local_port":2026,"sends_meta":true,"client":"host"}
+     *
+     * This is the machine-facing counterpart to /account/keys: a key generated
+     * there is all a client needs to configure and authorise itself. No admin
+     * approval step, and no session - the key is the credential.
+     */
+    public function bindTunnel(): void
+    {
+        header('Content-Type: application/json');
+
+        $raw = json_decode((string)file_get_contents('php://input'), true);
+        $input = is_array($raw) ? $raw : (is_array($_POST) ? $_POST : []);
+
+        $key = trim((string)($input['key'] ?? ''));
+        $row = $this->verifyTunnelAccessKey($key);
+        if ($row === null) {
+            // One generic error for malformed, unknown, revoked and expired
+            // keys, so this cannot be used to probe which subdomains exist.
+            http_response_code(401);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Invalid, revoked, or expired key',
+            ]);
+            return;
+        }
+
+        $subdomain = strtolower((string)$row['subdomain']);
+        $userId = (int)$row['user_id'];
+        $expiresAt = !empty($row['expires_at']) ? strtotime((string)$row['expires_at']) : 0;
+
+        $frpToken = $this->resolveFrpAuthToken();
+        if ($frpToken === '') {
+            http_response_code(503);
+            echo json_encode([
+                'success' => false,
+                'error' => 'Tunnel server credentials unavailable',
+            ]);
+            return;
+        }
+
+        // Whether to require the running proxy to present the key as a meta.
+        // This is verified against frps rather than taken on trust: enabling it
+        // for a proxy that does not actually publish the meta would fail
+        // certificate issuance for the subdomain. Clients call bind a second
+        // time once the tunnel is up, which is when this turns on.
+        $keyHash = hash('sha256', $key);
+        $metaVerified = false;
+        try {
+            $online = $this->fetchFrpOnlineSubdomainKeyHashes();
+            $seen = (string)($online[$subdomain] ?? '');
+            $metaVerified = $seen !== '' && hash_equals($keyHash, $seen);
+        } catch (\Throwable $_) {
+            $metaVerified = false;
+        }
+
+        try {
+            $registry = $this->readRegistry();
+            $entry = (isset($registry[$subdomain]) && is_array($registry[$subdomain]))
+                ? $registry[$subdomain]
+                : [];
+
+            $entry['subdomain'] = $subdomain;
+            $entry['owner_user_id'] = $userId;
+            $entry['expires_at'] = $expiresAt > 0 ? $expiresAt : (time() + 86400 * 365);
+            $entry['bound_at'] = time();
+            $entry['bound_client'] = substr(preg_replace('/[^\w .:-]/', '', (string)($input['client'] ?? '')), 0, 64);
+
+            if ($metaVerified) {
+                $entry['access_key_hash'] = $keyHash;
+                $entry['access_key_enabled'] = true;
+            } else {
+                // Never leave a stale requirement behind for a tunnel that no
+                // longer publishes the meta.
+                unset($entry['access_key_enabled']);
+            }
+
+            $registry[$subdomain] = $entry;
+            $this->saveRegistry($registry);
+        } catch (\Throwable $_) {
+            // A registry write failure must not block the bind: the frps
+            // dashboard check in verifyTunnel() still authorises the subdomain.
+        }
+
+        try {
+            $this->db->update('tunnel_access_keys', [
+                'last_used_at' => date('Y-m-d H:i:s'),
+            ], ['id' => (int)$row['id']]);
+        } catch (\Throwable $_) {
+            // last_used_at is informational
+        }
+
+        echo json_encode([
+            'success' => true,
+            'subdomain' => $subdomain,
+            'hostname' => $subdomain . '.silverqueen.pro',
+            'server_addr' => 'silverqueen.pro',
+            'server_port' => 7000,
+            'frp_token' => $frpToken,
+            // silverqueen.pro terminates TLS at Caddy and forwards to the frps HTTP
+            // vhost, so the client must register an http-type proxy. See
+            // docs/frp.md.
+            'proxy_type' => 'http',
+            'edge_terminates_tls' => true,
+            'meta_key_name' => 'ginto_key',
+            'meta_verified' => $metaVerified,
+            'expires_at' => $expiresAt,
+        ]);
+    }
+}

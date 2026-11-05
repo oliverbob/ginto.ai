@@ -1,0 +1,599 @@
+<?php
+namespace Ginto\Controllers;
+
+use Ginto\Core\View;
+use Ginto\Core\Database;
+use Ginto\Services\SilverQueenEngine;
+
+/**
+ * SilverQueen (/silverqueen) — the tiered membership + SQB cloud-resource console.
+ *
+ * The whole route tree is hidden behind a hard guard: unless you are logged in AND
+ * either hold an active Pro Trader membership or are an admin, every endpoint here
+ * answers 404. Not 401, not 403 — 404, so the route's existence isn't discoverable
+ * by probing.
+ *
+ * All money maths lives in \Ginto\Services\SilverQueenEngine; this controller is
+ * guard + transport only.
+ */
+class SilverQueenController
+{
+    /** Plans that count as "Pro Trader" for access purposes. */
+    private const PRO_PLANS = ['academy_pro'];
+
+    private ?SilverQueenEngine $engine = null;
+
+    private function engine(): SilverQueenEngine
+    {
+        return $this->engine ??= new SilverQueenEngine();
+    }
+
+    // ------------------------------------------------------------------ pages
+
+    /** GET /silverqueen — the dashboard. */
+    public function index(): void
+    {
+        $userId = $this->guard();
+        $this->captureRef();
+
+        $engine = $this->engine();
+        $engine->enroll($userId, $this->pendingSponsorCode());
+        $engine->sync($userId);   // catch up any 24h boundaries crossed since the last visit
+
+        $elevated = $this->isElevated($userId);
+        $snapshot = $engine->memberSnapshot($userId);
+
+        View::view('silverqueen/dashboard', [
+            'title'      => 'SilverQueen — Resource Allocation Console',
+            'userId'     => $userId,
+            'username'   => $_SESSION['username'] ?? '',
+            'isElevated' => $elevated,
+            'products'   => $engine->products(),
+            'snapshot'   => $snapshot,
+            'admin'      => $elevated ? $engine->adminSnapshot() : null,
+            'inviteBase' => $this->baseUrl() . '/silverqueen?sqref=',
+            'csrf_token' => function_exists('generateCsrfToken') ? generateCsrfToken(true) : ($_SESSION['csrf_token'] ?? ''),
+        ]);
+    }
+
+    // ------------------------------------------------------------------- APIs
+
+    /**
+     * GET /silverqueen/data — the live snapshot the tracker polls. Runs a sync first,
+     * so the numbers on screen are always settled to the current 24h boundary.
+     */
+    public function data(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+
+        try {
+            $engine = $this->engine();
+            $engine->sync($userId);
+            $payload = ['ok' => true, 'snapshot' => $engine->memberSnapshot($userId), 'server_time' => date('c')];
+            if ($this->isElevated($userId)) $payload['admin'] = $engine->adminSnapshot();
+            echo json_encode($payload);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen data: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not load the console.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/purchase — raise a USDT invoice for a card or N SQB units.
+     * Grants nothing: the response is payment instructions, and the order only
+     * completes once the transfer is verified.
+     */
+    public function purchase(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $code = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
+        if ($code === '') { echo json_encode(['ok' => false, 'error' => 'Pick a product first.']); exit; }
+        // Variable products (the SQB engine) are priced by the buyer, so 'amount' wins
+        // when present; fixed products still count units.
+        $qty = array_key_exists('amount', $input) ? (float) $input['amount'] : (int) ($input['units'] ?? 1);
+
+        try {
+            $engine = $this->engine();
+            $engine->enroll($userId, $this->pendingSponsorCode());
+            $result = $engine->createInvoice($userId, $code, $qty);
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen purchase: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not raise the invoice.']);
+        }
+        exit;
+    }
+
+    /** POST /silverqueen/payment/submit — buyer hands over the BEP20 transaction hash. */
+    public function paymentSubmit(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        $txHash     = (string) ($input['tx_hash'] ?? '');
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice is this for?']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->submitPayment($userId, $purchaseId, $txHash);
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentSubmit: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not record the payment.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/payment/recheck — ask the chain again about a submitted
+     * transfer. Same code path the cron sweep uses; this just lets an impatient
+     * buyer (or an admin) trigger it on demand.
+     */
+    public function paymentRecheck(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice?']); exit; }
+
+        try {
+            $engine = $this->engine();
+            // Members may only re-check their own invoices; elevated users, any.
+            if (!$this->isElevated($userId) && !$engine->ownsInvoice($userId, $purchaseId)) {
+                echo json_encode(['ok' => false, 'error' => 'Invoice not found.']);
+                exit;
+            }
+            $result = $engine->autoVerify($purchaseId);
+            echo json_encode(['ok' => true] + $result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentRecheck: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not reach the chain right now.']);
+        }
+        exit;
+    }
+
+    /** POST /silverqueen/payment/cancel — buyer abandons an unpaid invoice. */
+    public function paymentCancel(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->cancelInvoice($userId, (int) ($input['purchase_id'] ?? 0));
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen paymentCancel: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not cancel the invoice.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/verify — elevated: confirm or reject a paid invoice
+     * after checking the transfer on-chain. Confirming is what actually grants the
+     * allocation and pays the referral overrides.
+     */
+    public function adminVerify(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        $decision   = (string) ($input['decision'] ?? '');
+        if ($purchaseId <= 0 || !in_array($decision, ['confirm', 'reject'], true)) {
+            echo json_encode(['ok' => false, 'error' => 'Say which invoice, and confirm or reject.']);
+            exit;
+        }
+
+        try {
+            $engine = $this->engine();
+            $result = $decision === 'confirm'
+                ? $engine->confirmPurchase($purchaseId, $userId)
+                : $engine->rejectPurchase($purchaseId, $userId, (string) ($input['reason'] ?? ''));
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminVerify: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not record the decision.']);
+        }
+        exit;
+    }
+
+    /** POST /silverqueen/claim — Transfer to Wallet: accrued yield → internal wallet. */
+    public function claim(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $this->requireCsrf($this->jsonInput());
+
+        try {
+            $engine = $this->engine();
+            $engine->sync($userId);              // settle first, so nothing due is left behind
+            $result = $engine->claim($userId);
+            if (!empty($result['ok'])) $result['snapshot'] = $engine->memberSnapshot($userId);
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen claim: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not transfer the yield.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/enroll — join the AntFun tree under an invite code. Only has
+     * an effect the first time; sponsorship is immutable once set.
+     */
+    public function enroll(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        $input  = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $code = trim((string) ($input['sponsor'] ?? ''));
+        try {
+            $engine  = $this->engine();
+            $before  = $engine->referralRow($userId);
+            $row     = $engine->enroll($userId, $code);
+            $changed = (int) ($before['sponsor_id'] ?? 0) !== (int) ($row['sponsor_id'] ?? 0);
+            echo json_encode([
+                'ok'       => true,
+                'changed'  => $changed,
+                'referral' => $row,
+                'message'  => $changed ? 'Sponsor linked.' : 'You are already placed in the AntFun tree.',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen enroll: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not join the tree.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/grant — elevated: grant a product outright to a member
+     * who paid off-book, or who is being comped. No invoice or TxHash needed.
+     */
+    public function adminGrant(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $member = trim((string) ($input['member'] ?? ''));
+        $code   = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($input['code'] ?? '')));
+        $note   = (string) ($input['note'] ?? '');
+        // For the buyer-priced engine the operator grants the USDT actually paid or
+        // negotiated; fixed products still count units.
+        $qty = array_key_exists('amount', $input) ? (float) $input['amount'] : (int) ($input['units'] ?? 1);
+        // Default to paying overrides — a granted order should behave like a paid one
+        // unless the operator deliberately says otherwise.
+        $withCommissions = !isset($input['commissions']) || (bool) $input['commissions'];
+
+        if ($member === '') { echo json_encode(['ok' => false, 'error' => 'Who is this for? Enter an email, username, or user id.']); exit; }
+        if ($code === '')   { echo json_encode(['ok' => false, 'error' => 'Pick a product.']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->adminGrant($userId, $member, $code, $qty, $note, $withCommissions);
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminGrant: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not complete the grant.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/accept — elevated: accept payment on an existing invoice
+     * without an on-chain check, for money reconciled some other way.
+     */
+    public function adminAccept(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $input = $this->jsonInput();
+        $this->requireCsrf($input);
+
+        $purchaseId = (int) ($input['purchase_id'] ?? 0);
+        if ($purchaseId <= 0) { echo json_encode(['ok' => false, 'error' => 'Which invoice?']); exit; }
+        $withCommissions = !isset($input['commissions']) || (bool) $input['commissions'];
+
+        try {
+            $engine = $this->engine();
+            $result = $engine->adminMarkPaid($purchaseId, $userId, (string) ($input['note'] ?? ''), $withCommissions);
+            if (!empty($result['ok'])) $result['admin'] = $engine->adminSnapshot();
+            echo json_encode($result);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminAccept: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Could not accept the payment.']);
+        }
+        exit;
+    }
+
+    /** GET /silverqueen/admin/member?q= — elevated: resolve who a grant would land on. */
+    public function adminMemberLookup(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+
+        $q = trim((string) ($_GET['q'] ?? ''));
+        if ($q === '') { echo json_encode(['ok' => false, 'error' => 'Nothing to look up.']); exit; }
+
+        try {
+            $engine = $this->engine();
+            $m = $engine->resolveMember($q);
+            if (!$m) { echo json_encode(['ok' => false, 'error' => 'No account matches that.']); exit; }
+            $uid = (int) $m['id'];
+            echo json_encode([
+                'ok'        => true,
+                'user_id'   => $uid,
+                'name'      => trim((string) ($m['fullname'] ?: $m['username'] ?: ('Member #' . $uid))),
+                'username'  => (string) ($m['username'] ?? ''),
+                'email'     => (string) ($m['email'] ?? ''),
+                'cards'     => $engine->ownedCards($uid),
+                'qualified' => $engine->isQualified($uid),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminMemberLookup: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'Lookup failed.']);
+        }
+        exit;
+    }
+
+    /**
+     * POST /silverqueen/admin/run — force a platform-wide accrual + compounding pass.
+     * Admin only; the same work the cron worker does, on demand.
+     */
+    public function adminRun(): void
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $userId = $this->guardJson();
+        if (!$this->isElevated($userId)) { http_response_code(404); echo json_encode(['ok' => false, 'error' => 'Not found']); exit; }
+        $this->requireCsrf($this->jsonInput());
+
+        try {
+            $engine = $this->engine();
+            $accrual  = $engine->accrueAll();
+            $compound = $engine->compoundAllWallets();
+            $engine->stampWorkerRun();
+            echo json_encode(['ok' => true, 'accrual' => $accrual, 'compound' => $compound, 'admin' => $engine->adminSnapshot()]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen adminRun: ' . $e->getMessage());
+            echo json_encode(['ok' => false, 'error' => 'The pass could not be completed.']);
+        }
+        exit;
+    }
+
+    // ------------------------------------------------------------------ guard
+
+    /**
+     * Public entitlement probe for OTHER surfaces that want to link here — currently the
+     * Academy header's SilverQueen button. It runs the very same rule as the route guard
+     * below, so the two can never drift: if this says false, /silverqueen would 404, and
+     * nothing about the console (least of all the wallet) is ever put on the page.
+     *
+     * Pass a user id, or omit it to test the current session.
+     */
+    public static function canAccess(?int $userId = null): bool
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId ??= (int) ($_SESSION['user_id'] ?? 0);
+        if ($userId <= 0) return false;
+        try {
+            return (new self())->hasAccess($userId);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen canAccess: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * The route guard. Anyone who isn't a logged-in Pro Trader (or an admin) gets a
+     * 404 page and the request ends here — the route stays invisible to everyone else.
+     */
+    private function guard(): int
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = (int) ($_SESSION['user_id'] ?? 0);
+        if ($userId <= 0 || !$this->hasAccess($userId)) $this->notFound();
+        return $userId;
+    }
+
+    /** The same guard for JSON endpoints — still a 404, just machine-readable. */
+    private function guardJson(): int
+    {
+        if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+        $userId = (int) ($_SESSION['user_id'] ?? 0);
+        if ($userId <= 0 || !$this->hasAccess($userId)) {
+            http_response_code(404);
+            echo json_encode(['ok' => false, 'error' => 'Not found']);
+            exit;
+        }
+        return $userId;
+    }
+
+    /**
+     * Active Pro Trader membership, or elevated privileges. Nothing else opens this
+     * door. Elevation implies access — whoever can see the system ledger must be able
+     * to reach the page, even without a Pro subscription of their own.
+     */
+    private function hasAccess(int $userId): bool
+    {
+        if (!$this->isRegistered($userId)) return false;
+        return $this->isElevated($userId) || $this->isProTrader($userId);
+    }
+
+    /**
+     * The session points at a real, live account. A cookie can outlive the user row it
+     * names (deleted, suspended, banned), and that stale session must not be treated as
+     * a member — it is checked before anything else, so no such visitor reaches a query
+     * that could grant entry.
+     */
+    private function isRegistered(int $userId): bool
+    {
+        try {
+            return Database::getInstance()->has('users', [
+                'id' => $userId, 'status' => 'active',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen isRegistered: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Elevated visibility: the deep-metrics view. Admins, plus the `oliverbob` operator
+     * account which owns the pool and needs the raw ledger regardless of role flags.
+     */
+    private function isElevated(int $userId): bool
+    {
+        if ($this->isAdmin()) return true;
+        $username = strtolower(trim((string) ($_SESSION['username'] ?? '')));
+        if ($username === 'oliverbob') return true;
+        try {
+            $u = Database::getInstance()->get('users', 'username', ['id' => $userId]);
+            return strtolower(trim((string) $u)) === 'oliverbob';
+        } catch (\Throwable $e) {
+            return false;
+        }
+    }
+
+    /**
+     * A paid-up Pro Trader membership — the ONLY thing that buys a seat here.
+     *
+     * One query, joined to the plan, so every condition is enforced by the database and
+     * none of them can be satisfied by accident:
+     *
+     *   - the plan is matched by machine name (self::PRO_PLANS) and plan_type 'academy'.
+     *     NOT by display_name: plan titles are editable in the Academy admin screen, and
+     *     any plan re-titled "Pro Trader" used to hand out the console for free.
+     *   - expires_at must be strictly in the future. A NULL expiry no longer passes —
+     *     `NULL > '...'` is NULL in SQL, so open-ended rows are excluded, where the old
+     *     `!empty($expires)` test let them through forever.
+     *   - every active row is considered, not just the newest, so a later Trader/other
+     *     subscription can't mask a genuine Pro one (and vice versa: a stale Pro row that
+     *     has lapsed can no longer stand in for a current membership).
+     *
+     * Anything short of that returns false and the caller answers 404.
+     */
+    private function isProTrader(int $userId): bool
+    {
+        try {
+            $row = Database::getInstance()->get('user_subscriptions',
+                ['[>]subscription_plans' => ['plan_id' => 'id']],
+                ['subscription_plans.name'],
+                [
+                    'user_subscriptions.user_id'       => $userId,
+                    'user_subscriptions.status'        => 'active',
+                    'user_subscriptions.expires_at[>]' => date('Y-m-d H:i:s'),
+                    'subscription_plans.name'          => self::PRO_PLANS,
+                    'subscription_plans.plan_type'     => 'academy',
+                    'ORDER' => ['user_subscriptions.expires_at' => 'DESC'],
+                ]);
+
+            return is_array($row) && in_array((string) ($row['name'] ?? ''), self::PRO_PLANS, true);
+        } catch (\Throwable $e) {
+            error_log('SilverQueen isProTrader: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    private function isAdmin(): bool
+    {
+        try {
+            if (class_exists('\\Ginto\\Controllers\\UserController')) {
+                return (bool) \Ginto\Controllers\UserController::isAdmin();
+            }
+        } catch (\Throwable $e) {}
+        return false;
+    }
+
+    /** Render the app's 404 and stop. */
+    private function notFound(): void
+    {
+        http_response_code(404);
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+           . '<meta name="viewport" content="width=device-width, initial-scale=1">'
+           . '<title>404 Not Found</title>'
+           . '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;'
+           . 'font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:#0b1020;color:#e5e7eb}'
+           . 'div{text-align:center;padding:2rem}h1{font-size:4rem;margin:0;font-weight:800;letter-spacing:-.03em}'
+           . 'p{color:#9ca3af;margin:.5rem 0 1.5rem}a{color:#6366f1;text-decoration:none;font-weight:600}</style>'
+           . '</head><body><div><h1>404</h1><p>The page you requested could not be found.</p>'
+           . '<a href="/">Return home</a></div></body></html>';
+        exit;
+    }
+
+    // ----------------------------------------------------------------- inputs
+
+    /** Body of a JSON (or form-encoded) POST, reusing whatever CSRF middleware cached. */
+    private function jsonInput(): array
+    {
+        if (is_array($GLOBALS['_JSON_BODY'] ?? null)) return $GLOBALS['_JSON_BODY'];
+        $raw = $GLOBALS['_RAW_BODY'] ?? file_get_contents('php://input');
+        $decoded = json_decode((string) $raw, true);
+        return is_array($decoded) ? $decoded : ($_POST ?: []);
+    }
+
+    /**
+     * Every mutating endpoint here moves money, so each one validates CSRF itself
+     * rather than relying on the global filter (which only covers /admin).
+     */
+    private function requireCsrf(array $input): void
+    {
+        $token = $input['csrf_token'] ?? $input['_csrf'] ?? $_POST['csrf_token'] ?? $_POST['_csrf']
+              ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+        if (!function_exists('validateCsrfToken') || !validateCsrfToken((string) $token)) {
+            http_response_code(403);
+            echo json_encode(['ok' => false, 'error' => 'Your session expired — reload the page and try again.']);
+            exit;
+        }
+    }
+
+    /** Remember an AntFun sponsor from ?sqref= for the rest of the visit. */
+    private function captureRef(): void
+    {
+        $ref = trim((string) ($_GET['sqref'] ?? ''));
+        if ($ref !== '') $_SESSION['sq_ref'] = $ref;
+    }
+
+    private function pendingSponsorCode(): ?string
+    {
+        $code = trim((string) ($_SESSION['sq_ref'] ?? $_GET['sqref'] ?? ''));
+        return $code !== '' ? $code : null;
+    }
+
+    private function baseUrl(): string
+    {
+        $secure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+               || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+        return ($secure ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'silverqueen.pro');
+    }
+}

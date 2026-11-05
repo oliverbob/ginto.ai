@@ -1,0 +1,175 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "lightpanda-mcp-server",
+  "description": "Lightpanda headless browser - 11x faster, 9x less memory than Chrome. Web automation for AI agents: fetch pages, extract data, fill forms, click elements, search the web.",
+  "title": "Lightpanda Browser",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/lightpanda-io/browser",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "access": {
+    "required_roles": [],
+    "contexts": ["chat", "agent", "sandbox", "internal_api"]
+  },
+  "config": {
+    "command": "node",
+    "args": ["tools/lightpanda-mcp/src/index.js"],
+    "env": {
+      "LIGHTPANDA_HOST": "127.0.0.1",
+      "LIGHTPANDA_PORT": "9222",
+      "LIGHTPANDA_DISABLE_TELEMETRY": "true"
+    }
+  },
+  "tools": [
+    {
+      "name": "web_fetch",
+      "title": "Fetch Webpage",
+      "description": "Fetch a webpage with full JavaScript execution. Returns the page title and text content. Use this to read articles, documentation, or any web content that requires JS rendering.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to fetch"
+          },
+          "waitForSelector": {
+            "type": "string",
+            "description": "Optional CSS selector to wait for before extracting content"
+          },
+          "waitTime": {
+            "type": "number",
+            "description": "Optional additional wait time in ms (max 10000)"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "web_extract_links",
+      "title": "Extract Links",
+      "description": "Extract all links from a webpage. Returns list of URLs with their link text. Useful for crawling, finding resources, or navigation.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to extract links from"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "web_screenshot",
+      "title": "Screenshot Page",
+      "description": "Capture a screenshot of a webpage. Returns base64-encoded PNG image. Useful for visual verification or when page layout matters.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to screenshot"
+          },
+          "fullPage": {
+            "type": "boolean",
+            "description": "Capture full scrollable page (default: false)"
+          }
+        },
+        "required": ["url"]
+      }
+    },
+    {
+      "name": "web_evaluate",
+      "title": "Evaluate JavaScript",
+      "description": "Execute custom JavaScript on a webpage and return the result. The script runs in the page context with full DOM access.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to load"
+          },
+          "script": {
+            "type": "string",
+            "description": "JavaScript code to execute (must return a value)"
+          }
+        },
+        "required": ["url", "script"]
+      }
+    },
+    {
+      "name": "web_click",
+      "title": "Click Element",
+      "description": "Click an element on a webpage and return the resulting page state. Useful for navigation, button clicks, or triggering actions.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL to load"
+          },
+          "selector": {
+            "type": "string",
+            "description": "CSS selector of element to click"
+          }
+        },
+        "required": ["url", "selector"]
+      }
+    },
+    {
+      "name": "web_fill",
+      "title": "Fill Form",
+      "description": "Fill form fields on a webpage. Provide an array of selector/value pairs to populate inputs, textareas, etc.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "The URL with the form"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "selector": {
+                  "type": "string",
+                  "description": "CSS selector of the input"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Value to type into the input"
+                }
+              },
+              "required": ["selector", "value"]
+            },
+            "description": "Array of {selector, value} objects"
+          }
+        },
+        "required": ["url", "fields"]
+      }
+    },
+    {
+      "name": "web_search",
+      "title": "Web Search",
+      "description": "Search the web using a search engine. Returns top results with titles, links, and snippets.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Search query"
+          },
+          "engine": {
+            "type": "string",
+            "enum": ["duckduckgo", "google", "bing"],
+            "description": "Search engine (default: duckduckgo)"
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}

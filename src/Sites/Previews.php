@@ -1,0 +1,170 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Ginto\Sites;
+
+use Ginto\Sites\Vision\Pipeline;
+
+/**
+ * "Start it now": photos and a description in, a free preview out.
+ *
+ * No account and no payment. One generation per device and per IP address in
+ * 24 hours, paid from the free-preview budget. The page answers at once; the
+ * build runs in a background process (bin/sites-build.php) and the start page
+ * polls. A preview lives 72 hours, is never indexed, and is what a name is
+ * claimed from.
+ */
+final class Previews
+{
+    public const MIN_DESCRIPTION = 20;
+    public const MAX_DESCRIPTION = 2000;
+
+    public function __construct(private $db)
+    {
+    }
+
+    /**
+     * @param list<string> $shas
+     * @return array{id:int, token:string}
+     */
+    /** How often one day's free preview may be rebuilt in place. */
+    public const REBUILDS_A_DAY = 5;
+
+    public function create(string $description, array $shas, string $deviceId, string $ip, ?int $userId, bool $exempt, array $media = [], ?string $template = null, array $posts = []): array
+    {
+        $description = trim($description);
+        if (mb_strlen($description) < self::MIN_DESCRIPTION) {
+            throw new \InvalidArgumentException('Tell us a little more about your shop (a sentence or two).');
+        }
+        if (mb_strlen($description) > self::MAX_DESCRIPTION) {
+            throw new \InvalidArgumentException('Please keep the description under 2,000 characters.');
+        }
+        if ($shas === []) {
+            throw new \InvalidArgumentException('Add at least one product photo.');
+        }
+        $device = hash('sha256', 'sites-device:' . $deviceId);
+        $ipHash = hash('sha256', 'sites-ip:' . $ip);
+        if (!$exempt) {
+            $since = date('Y-m-d H:i:s', time() - 86400);
+            // A member is counted by their own account and device, never by the network
+            // address: phones on one carrier share it, and a stranger's preview must not
+            // refuse them. Only a visitor who is not signed in is counted by address too.
+            if ($userId) {
+                $q = $this->db->pdo->prepare('SELECT COUNT(*) FROM sites_previews WHERE (user_id = ? OR (device_hash = ? AND user_id IS NULL)) AND created_at >= ?');
+                $q->execute([$userId, $device, $since]);
+            } else {
+                $q = $this->db->pdo->prepare('SELECT COUNT(*) FROM sites_previews WHERE (device_hash = ? OR ip_hash = ?) AND created_at >= ?');
+                $q->execute([$device, $ipHash, $since]);
+            }
+            if ((int) $q->fetchColumn() > 0) {
+                // Their own preview from today is continued with what they chose now,
+                // never refused: a member who skipped steps finishes the one they made.
+                $own = $this->db->get('sites_previews', ['id', 'token', 'status', 'rebuilds'], [
+                    // Only ever their own: their account's, or one made unsigned on this very device.
+                    'OR' => $userId ? ['user_id' => $userId, 'AND' => ['device_hash' => $device, 'user_id' => null]] : ['device_hash' => $device],
+                    'created_at[>=]' => $since, 'ORDER' => ['id' => 'DESC']]);
+                if ($own && $own['status'] !== 'building' && (int) $own['rebuilds'] < self::REBUILDS_A_DAY) {
+                    $this->db->update('sites_previews', [
+                        'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
+                        'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
+                        'rebuilds[+]' => 1, 'user_id' => $userId ?: null, 'posts' => $posts ? json_encode(array_values($posts)) : null,
+                        'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
+                    ], ['id' => (int) $own['id']]);
+
+                    return ['id' => (int) $own['id'], 'token' => (string) $own['token']];
+                }
+                throw new LimitReached('preview_daily', $own && $own['status'] === 'building'
+                    ? 'Your preview is still being built. It will be ready in a minute.'
+                    : 'You have rebuilt today\'s preview ' . self::REBUILDS_A_DAY . ' times. Come back tomorrow, or claim the one you made.');
+            }
+        }
+
+        $token = bin2hex(random_bytes(16));
+        $this->db->insert('sites_previews', [
+            'token' => $token, 'user_id' => $userId, 'device_hash' => $device, 'ip_hash' => $ipHash,
+            'description' => $description, 'photos' => json_encode(array_values($shas)), 'status' => 'queued',
+            'media' => $media ? json_encode($media) : null, 'template' => Templates::get($template)['id'],
+            'posts' => $posts ? json_encode(array_values($posts)) : null,
+            'expires_at' => date('Y-m-d H:i:s', time() + Config::PREVIEW_HOURS * 3600),
+        ]);
+
+        return ['id' => (int) $this->db->id(), 'token' => $token];
+    }
+
+    /** Start the build in its own process, so the request returns now. */
+    public static function spawn(int $id): void
+    {
+        $php = PHP_BINARY && !str_contains(PHP_BINARY, 'fpm') ? PHP_BINARY : 'php';
+        $cmd = escapeshellcmd($php) . ' ' . escapeshellarg(ROOT_PATH . '/bin/sites-build.php') . ' ' . (int) $id
+            . ' >> ' . escapeshellarg(STORAGE_PATH . '/logs/sites.log') . ' 2>&1 &';
+        exec($cmd);
+    }
+
+    /** The build itself (run by bin/sites-build.php). */
+    public function build(int $id): void
+    {
+        $row = $this->db->get('sites_previews', '*', ['id' => $id]);
+        if (!$row || !in_array($row['status'], ['queued', 'failed'], true)) {
+            return;
+        }
+        $this->db->update('sites_previews', ['status' => 'building', 'error' => null], ['id' => $id]);
+        $ctx = ['preview_id' => $id, 'user_id' => $row['user_id'] !== null ? (int) $row['user_id'] : null];
+
+        try {
+            $meter = new Meter($this->db);
+            $groq  = new Ai($meter);
+            $shas  = json_decode((string) $row['photos'], true) ?: [];
+            $facts = (new Pipeline($this->db, $groq))->run($shas, $ctx);
+            $photos = array_map(static fn ($sha) => $facts[$sha] ?? ['status' => 'manual', 'vision' => null, 'palette' => []], $shas);
+
+            try {
+                $plan = (new Builder($groq))->build((string) $row['description'], $photos, $ctx);
+            } catch (LimitReached $e) {
+                // The free minute is spent (a preview never uses paid AI): the site is built without AI instead.
+                if (!in_array($e->reason, ['busy', 'preview_budget'], true)) {
+                    throw $e;
+                }
+                $plan = Renderer::fallback((string) $row['description'], $photos);
+            } catch (\Throwable $e) {
+                // AI down or refusing: the seller still sees a site, from their own words and the photos' colours.
+                $plan = Renderer::fallback((string) $row['description'], $photos);
+            }
+
+            $q = $this->db->pdo->prepare('SELECT COALESCE(SUM(cost_usd),0) FROM sites_ai_usage WHERE preview_id = ?');
+            $q->execute([$id]);
+            $this->db->update('sites_previews', ['status' => 'ready', 'site' => json_encode(['plan' => $plan, 'photos' => $photos]),
+                'cost_usd' => (float) $q->fetchColumn()], ['id' => $id]);
+
+            // A held name with no site yet takes this one, and its free trial goes up.
+            if ($row['user_id'] !== null) {
+                $uid  = (int) $row['user_id'];
+                $held = $this->db->get('sites_names', '*', ['user_id' => $uid, 'status' => ['held', 'active']]);
+                if ($held && empty($held['preview_id'])) {
+                    $this->db->update('sites_names', ['preview_id' => $id], ['name' => $held['name']]);
+                    $this->db->update('sites_previews', ['expires_at' => date('Y-m-d H:i:s', time() + 30 * 86400)], ['id' => $id]);
+                    // An active name (paid, or complimentary like Eleanor's) goes live at
+                    // once; a held one goes up on its free trial.
+                    $held['status'] === 'active' ? (new Publisher($this->db))->publish($uid) : (new Publisher($this->db))->publishTrial($uid);
+                }
+            }
+        } catch (\Throwable $e) {
+            $this->db->update('sites_previews', ['status' => 'failed',
+                'error' => mb_substr($e instanceof LimitReached ? $e->getMessage() : 'We could not build it this time. Please try again.', 0, 255)], ['id' => $id]);
+            @file_put_contents(STORAGE_PATH . '/logs/sites.log', date('c') . " BUILD {$id} failed: " . $e->getMessage() . "\n", FILE_APPEND | LOCK_EX);
+        }
+    }
+
+    public function byToken(string $token): ?array
+    {
+        if (preg_match('/^[0-9a-f]{32}$/', $token) !== 1) {
+            return null;
+        }
+        $row = $this->db->get('sites_previews', '*', ['token' => $token]);
+        if (!$row || strtotime((string) $row['expires_at']) < time()) {
+            return null;
+        }
+
+        return $row;
+    }
+}

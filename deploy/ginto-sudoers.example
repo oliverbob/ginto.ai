@@ -1,0 +1,11 @@
+# Example sudoers snippet for Ginto sandbox helper
+# Install under /etc/sudoers.d/ginto-sandboxd (use visudo -f /etc/sudoers.d/ginto-sandboxd)
+
+# Allow the ginto-admin group (create one and add the webserver user) to run only the exact helper commands
+Cmnd_Alias GINTO_SANDBOX_CREATE = /usr/local/sbin/sandboxd.sh create [0-9]*
+Cmnd_Alias GINTO_SANDBOX_DESTROY = /usr/local/sbin/sandboxd.sh destroy [0-9]*
+# Exec intentionally not allowed by default
+
+# Example: allow user 'www-data' to run the create/destroy commands without password
+# Replace 'www-data' with your web server user or a dedicated 'ginto' user/group as appropriate.
+www-data ALL=(root) NOPASSWD: GINTO_SANDBOX_CREATE, GINTO_SANDBOX_DESTROY

@@ -1,0 +1,468 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "name": "paypal-mcp-server",
+  "description": "PayPal MCP Server - Automate payments, invoices, subscriptions, and product catalog management. ADMIN ACCESS REQUIRED.",
+  "title": "PayPal",
+  "status": "active",
+  "repository": {
+    "url": "https://github.com/paypal/agent-toolkit",
+    "source": "github"
+  },
+  "version": "1.0.0",
+  "access": {
+    "required_roles": [1, 2],
+    "contexts": ["admin", "webhook", "cron", "internal_api"]
+  },
+  "config": {
+    "command": "npx",
+    "args": ["-y", "@paypal/mcp", "--tools=all"],
+    "env": {
+      "PAYPAL_ACCESS_TOKEN": "${PAYPAL_ACCESS_TOKEN}",
+      "PAYPAL_ENVIRONMENT": "${PAYPAL_ENVIRONMENT}"
+    }
+  },
+  "remotes": [
+    {
+      "type": "sse",
+      "url": "https://mcp.sandbox.paypal.com/sse",
+      "description": "PayPal Sandbox SSE endpoint for testing"
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.sandbox.paypal.com/http",
+      "description": "PayPal Sandbox Streamable HTTP endpoint"
+    },
+    {
+      "type": "sse",
+      "url": "https://mcp.paypal.com/sse",
+      "description": "PayPal Production SSE endpoint"
+    },
+    {
+      "type": "streamable-http",
+      "url": "https://mcp.paypal.com/http",
+      "description": "PayPal Production Streamable HTTP endpoint"
+    }
+  ],
+  "tools": [
+    {
+      "name": "paypal_create_product",
+      "title": "Create Product",
+      "description": "[ADMIN] Create a new product in the PayPal catalog (PHYSICAL, DIGITAL, or SERVICE)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "The name of the product" },
+          "type": { "type": "string", "enum": ["PHYSICAL", "DIGITAL", "SERVICE"], "description": "The type of product" },
+          "description": { "type": "string", "description": "Product description" }
+        },
+        "required": ["name", "type"]
+      }
+    },
+    {
+      "name": "paypal_list_products",
+      "title": "List Products",
+      "description": "List all products from the PayPal catalog with pagination",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "description": "Page number to retrieve" },
+          "page_size": { "type": "integer", "description": "Number of products per page" }
+        }
+      }
+    },
+    {
+      "name": "paypal_show_product_details",
+      "title": "Show Product Details",
+      "description": "Get details of a specific product by ID",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string", "description": "The product ID to retrieve" }
+        },
+        "required": ["product_id"]
+      }
+    },
+    {
+      "name": "paypal_create_subscription_plan",
+      "title": "Create Subscription Plan",
+      "description": "Create a recurring billing plan with trial/regular cycles (DAY/WEEK/MONTH/YEAR)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string", "description": "The product ID to link the plan to" },
+          "name": { "type": "string", "description": "The plan name" },
+          "billing_cycles": {
+            "type": "array",
+            "description": "Billing cycles (trial + regular)",
+            "items": {
+              "type": "object",
+              "properties": {
+                "tenure_type": { "type": "string", "enum": ["REGULAR", "TRIAL"] },
+                "sequence": { "type": "integer" },
+                "interval_unit": { "type": "string", "enum": ["DAY", "WEEK", "MONTH", "YEAR"] },
+                "interval_count": { "type": "integer" },
+                "pricing": {
+                  "type": "object",
+                  "properties": {
+                    "fixed_price": {
+                      "type": "object",
+                      "properties": {
+                        "value": { "type": "string" },
+                        "currency_code": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "required": ["product_id", "name", "billing_cycles"]
+      }
+    },
+    {
+      "name": "paypal_create_subscription",
+      "title": "Create Subscription",
+      "description": "Subscribe a customer to a billing plan",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "plan_id": { "type": "string", "description": "The subscription plan ID" },
+          "subscriber_name": { "type": "string", "description": "Subscriber's name" },
+          "subscriber_email": { "type": "string", "description": "Subscriber's email" }
+        },
+        "required": ["plan_id"]
+      }
+    },
+    {
+      "name": "paypal_list_subscription_plans",
+      "title": "List Subscription Plans",
+      "description": "List all subscription plans with optional product filter",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string", "description": "Filter by product ID" },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "paypal_show_subscription_details",
+      "title": "Show Subscription Details",
+      "description": "Get details of a specific subscription",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": { "type": "string", "description": "The subscription ID" }
+        },
+        "required": ["subscription_id"]
+      }
+    },
+    {
+      "name": "paypal_cancel_subscription",
+      "title": "Cancel Subscription",
+      "description": "Cancel an active subscription",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": { "type": "string", "description": "The subscription ID to cancel" },
+          "reason": { "type": "string", "description": "Cancellation reason" }
+        },
+        "required": ["subscription_id"]
+      }
+    },
+    {
+      "name": "paypal_update_subscription",
+      "title": "Update Subscription",
+      "description": "Update billing cycle or price of an existing subscription",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "subscription_id": { "type": "string", "description": "The subscription ID to update" },
+          "billing_cycle": { "type": "string", "description": "New billing cycle" },
+          "price": { "type": "string", "description": "New price" }
+        },
+        "required": ["subscription_id"]
+      }
+    },
+    {
+      "name": "paypal_create_invoice",
+      "title": "Create Invoice",
+      "description": "Create a new invoice with line items",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "recipient_email": { "type": "string", "description": "Recipient's email address" },
+          "items": {
+            "type": "array",
+            "description": "Invoice line items",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "quantity": { "type": "integer" },
+                "unit_price": { "type": "number" }
+              },
+              "required": ["name", "quantity", "unit_price"]
+            }
+          }
+        },
+        "required": ["recipient_email", "items"]
+      }
+    },
+    {
+      "name": "paypal_list_invoices",
+      "title": "List Invoices",
+      "description": "List invoices with optional status filter",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["DRAFT", "SENT", "PAID", "CANCELLED"] },
+          "page": { "type": "integer" },
+          "page_size": { "type": "integer" }
+        }
+      }
+    },
+    {
+      "name": "paypal_get_invoice",
+      "title": "Get Invoice",
+      "description": "Get details of a specific invoice",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "description": "The invoice ID" }
+        },
+        "required": ["invoice_id"]
+      }
+    },
+    {
+      "name": "paypal_send_invoice",
+      "title": "Send Invoice",
+      "description": "Send an invoice to the recipient",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "description": "The invoice ID to send" }
+        },
+        "required": ["invoice_id"]
+      }
+    },
+    {
+      "name": "paypal_send_invoice_reminder",
+      "title": "Send Invoice Reminder",
+      "description": "Send a reminder for an unpaid invoice",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "description": "The invoice ID" }
+        },
+        "required": ["invoice_id"]
+      }
+    },
+    {
+      "name": "paypal_cancel_invoice",
+      "title": "Cancel Invoice",
+      "description": "Cancel a sent invoice",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "description": "The invoice ID to cancel" }
+        },
+        "required": ["invoice_id"]
+      }
+    },
+    {
+      "name": "paypal_generate_invoice_qr",
+      "title": "Generate Invoice QR Code",
+      "description": "Generate a QR code for an invoice",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "invoice_id": { "type": "string", "description": "The invoice ID" }
+        },
+        "required": ["invoice_id"]
+      }
+    },
+    {
+      "name": "paypal_create_order",
+      "title": "Create Order",
+      "description": "Create a payment order for items",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "quantity": { "type": "integer" },
+                "unit_price": { "type": "number" }
+              }
+            }
+          },
+          "currency": { "type": "string", "default": "USD" }
+        },
+        "required": ["items"]
+      }
+    },
+    {
+      "name": "paypal_get_order",
+      "title": "Get Order",
+      "description": "Get details of a specific order/payment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "payment_id": { "type": "string", "description": "The payment/order ID" }
+        },
+        "required": ["payment_id"]
+      }
+    },
+    {
+      "name": "paypal_pay_order",
+      "title": "Capture Payment",
+      "description": "Capture payment for an authorized order",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string", "description": "The order ID to capture" }
+        },
+        "required": ["order_id"]
+      }
+    },
+    {
+      "name": "paypal_create_refund",
+      "title": "Create Refund",
+      "description": "Process a refund for a captured payment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "capture_id": { "type": "string", "description": "The captured payment ID" },
+          "amount": { "type": "number", "description": "Refund amount (optional, full refund if omitted)" },
+          "currency": { "type": "string", "default": "USD" }
+        },
+        "required": ["capture_id"]
+      }
+    },
+    {
+      "name": "paypal_get_refund",
+      "title": "Get Refund Details",
+      "description": "Get details of a specific refund",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "refund_id": { "type": "string", "description": "The refund ID" }
+        },
+        "required": ["refund_id"]
+      }
+    },
+    {
+      "name": "paypal_list_transactions",
+      "title": "List Transactions",
+      "description": "List all transactions with date filtering",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": { "type": "string", "description": "Start date (ISO format)" },
+          "end_date": { "type": "string", "description": "End date (ISO format)" }
+        }
+      }
+    },
+    {
+      "name": "paypal_get_merchant_insights",
+      "title": "Get Merchant Insights",
+      "description": "Get business intelligence metrics and analytics",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "start_date": { "type": "string", "description": "Start date" },
+          "end_date": { "type": "string", "description": "End date" },
+          "insight_type": { "type": "string", "enum": ["ORDERS", "SALES"] },
+          "time_interval": { "type": "string", "enum": ["DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "YEARLY"] }
+        },
+        "required": ["start_date", "end_date", "insight_type", "time_interval"]
+      }
+    },
+    {
+      "name": "paypal_list_disputes",
+      "title": "List Disputes",
+      "description": "List all disputes with optional status filter",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["OPEN", "RESOLVED"] }
+        }
+      }
+    },
+    {
+      "name": "paypal_get_dispute",
+      "title": "Get Dispute",
+      "description": "Get details of a specific dispute",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dispute_id": { "type": "string", "description": "The dispute ID" }
+        },
+        "required": ["dispute_id"]
+      }
+    },
+    {
+      "name": "paypal_accept_dispute",
+      "title": "Accept Dispute Claim",
+      "description": "Accept a dispute, resolving in favor of buyer",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dispute_id": { "type": "string", "description": "The dispute ID to accept" }
+        },
+        "required": ["dispute_id"]
+      }
+    },
+    {
+      "name": "paypal_create_shipment_tracking",
+      "title": "Create Shipment Tracking",
+      "description": "Add tracking info to a PayPal transaction",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tracking_number": { "type": "string" },
+          "transaction_id": { "type": "string" },
+          "carrier": { "type": "string", "description": "FEDEX, UPS, USPS, etc." },
+          "order_id": { "type": "string" },
+          "status": { "type": "string", "enum": ["ON_HOLD", "SHIPPED", "DELIVERED", "CANCELLED", "LOCAL_PICKUP"] }
+        },
+        "required": ["tracking_number", "transaction_id", "carrier"]
+      }
+    },
+    {
+      "name": "paypal_get_shipment_tracking",
+      "title": "Get Shipment Tracking",
+      "description": "Get tracking info for an order",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "order_id": { "type": "string", "description": "The order ID" },
+          "transaction_id": { "type": "string" }
+        },
+        "required": ["order_id"]
+      }
+    },
+    {
+      "name": "paypal_update_shipment_tracking",
+      "title": "Update Shipment Tracking",
+      "description": "Update tracking info for a shipment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "transaction_id": { "type": "string" },
+          "tracking_number": { "type": "string" },
+          "new_tracking_number": { "type": "string" },
+          "status": { "type": "string", "enum": ["ON_HOLD", "SHIPPED", "DELIVERED", "CANCELLED", "LOCAL_PICKUP"] },
+          "carrier": { "type": "string" }
+        },
+        "required": ["transaction_id", "tracking_number", "status"]
+      }
+    }
+  ]
+}

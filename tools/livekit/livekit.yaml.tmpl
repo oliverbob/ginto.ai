@@ -1,0 +1,54 @@
+# LiveKit SFU — silverqueen.pro
+#
+# Written by bin/install-livekit.sh. Edit the template in the repo, not the
+# copy on the server: the installer overwrites /etc/livekit/livekit.yaml every
+# run, and a change made in place is lost the next time anybody deploys.
+#
+# No secrets here. The API key and secret live in /etc/livekit/livekit.env,
+# which is root-only and outside the repository — this file is public.
+
+port: 7880
+
+# Bound to loopback. Caddy terminates TLS at sfu.silverqueen.pro and proxies
+# to it, so the signalling port is never exposed directly and the certificate
+# is managed in one place with every other one on this host.
+bind_addresses:
+  - 127.0.0.1
+
+rtc:
+  # One UDP port, not a range.
+  #
+  # A range of ten thousand ports is the usual advice and is right on a big
+  # dedicated box. Here it is wrong twice: this server is small enough that a
+  # firewall rule per port is real work, and if media ever has to be relayed
+  # through the frp tunnel, a single port is one proxy while a range is ten
+  # thousand. Mux costs a little throughput and buys the simple version.
+  udp_port: 7882
+
+  # For networks that block UDP entirely — corporate wifi, some mobile
+  # carriers. Slower, and better than a call that cannot connect.
+  tcp_port: 7881
+
+  # Discover the public address rather than hard-coding it. The VPS has one
+  # static address today, and hard-coding it is the line nobody updates.
+  use_external_ip: true
+
+# A conference is twelve people. The room dies on its own when they leave, so
+# an abandoned one does not sit consuming a slot until somebody notices.
+room:
+  max_participants: 12
+  empty_timeout: 300
+  departure_timeout: 20
+
+# Single node. Redis is what turns several LiveKit servers into one cluster,
+# and there is one server. Adding it now would be a dependency bought for a
+# problem this platform does not have yet.
+
+logging:
+  level: info
+  json: false
+
+# Keys come from the environment, so this file can be public. See
+# /etc/livekit/livekit.env.
+keys:
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}

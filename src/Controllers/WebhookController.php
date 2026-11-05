@@ -1,0 +1,1398 @@
+<?php
+namespace Ginto\Controllers;
+
+use Ginto\Core\Database;
+use Ginto\Services\MallCommerceService;
+use Exception;
+
+class WebhookController
+{
+    /** @var mixed Database instance */
+    protected $db;
+
+    /** @var string PayPal Webhook ID from .env */
+    private $paypal_webhook_id;
+
+    /** @var string PayPal Client ID from .env */
+    private $paypal_client_id;
+
+    /** @var string PayPal Client Secret from .env */
+    private $paypal_client_secret;
+
+    /** @var string PayPal Environment ('sandbox' or 'live') from .env */
+    private $paypal_environment;
+
+    /** @var array PayPal API URLs */
+    private $paypal_urls = [
+        'sandbox' => [
+            'api' => 'https://api-m.sandbox.paypal.com',
+            'auth' => 'https://api-m.sandbox.paypal.com/v1/oauth2/token'
+        ],
+        'live' => [
+            'api' => 'https://api-m.paypal.com',
+            'auth' => 'https://api-m.paypal.com/v1/oauth2/token'
+        ]
+    ];
+
+    public function loginEx()
+    {   // using the medoo (for AI context, parent)
+        $email = trim($_POST['email'] ?? '');
+        $password = $_POST['password'] ?? '';
+
+        $user = $this->db->get("users", "*", ["email" => $email]);
+        exit;
+    }
+
+
+    /**
+     * Constructor to load environment variables and validate them.
+     */
+    public function __construct($db = null)
+    {
+        if ($db === null) {
+            $db = Database::getInstance();
+        }
+        $this->db = $db;
+
+        // DEBUG: write resolved PayPal env sources for troubleshooting
+        $dbg = "WEBHOOK CONSTRUCT: _ENV PAYPAL_CLIENT_ID=" . ($_ENV['PAYPAL_CLIENT_ID'] ?? 'NULL') . " | getenv PAYPAL_CLIENT_ID=" . (getenv('PAYPAL_CLIENT_ID') ?: 'NULL') . PHP_EOL;
+        @file_put_contents(__DIR__ . '/../../../install_debug.log', $dbg, FILE_APPEND | LOCK_EX);
+
+        // Assign .env values to class properties
+        // Prefer $_ENV values (Dotenv may populate $_ENV) then fallback to getenv()
+        $this->paypal_webhook_id = $_ENV['PAYPAL_WEBHOOK_ID'] ?? getenv('PAYPAL_WEBHOOK_ID');
+        $this->paypal_client_id = $_ENV['PAYPAL_CLIENT_ID'] ?? getenv('PAYPAL_CLIENT_ID');
+        $this->paypal_client_secret = $_ENV['PAYPAL_CLIENT_SECRET'] ?? getenv('PAYPAL_CLIENT_SECRET');
+        $this->paypal_environment = $_ENV['PAYPAL_ENVIRONMENT'] ?? getenv('PAYPAL_ENVIRONMENT');
+    }
+
+    /**
+     * Assert PayPal environment variables are present (called only by PayPal methods).
+     */
+    private function requirePaypalConfig(): void
+    {
+        if (
+            empty($this->paypal_webhook_id) ||
+            empty($this->paypal_client_id) ||
+            empty($this->paypal_client_secret) ||
+            empty($this->paypal_environment)
+        ) {
+            throw new \Exception(
+                'CRITICAL ERROR: One or more required PayPal environment variables are not set. ' .
+                'Please check that your .env file is being loaded correctly and contains all required keys.'
+            );
+        }
+    }
+
+    /**
+     * Main method to handle incoming PayPal webhook requests.
+     */
+    public function webhook()
+    {
+        $this->requirePaypalConfig();
+        error_reporting(E_ALL);
+        ini_set('display_errors', 1);
+
+        // Set response headers
+        header('Content-Type: application/json');
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
+        header('Access-Control-Allow-Headers: Content-Type');
+
+        // Handle preflight OPTIONS request
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            http_response_code(200);
+            exit();
+        }
+
+        // Handle different request methods
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            http_response_code(200);
+            echo json_encode(['status' => 'webhook endpoint active', 'timestamp' => date('c')]);
+            $this->logWebhook('GET request received - webhook verification');
+            exit();
+        }
+
+        // Only accept POST requests for actual webhook events
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit();
+        }
+
+        // Main webhook processing
+        try {
+            $raw_post_data = file_get_contents('php://input');
+            
+            if (empty($raw_post_data)) {
+                http_response_code(400);
+                echo json_encode(['error' => 'No data received']);
+                exit();
+            }
+            
+            $headers = $this->getPayPalHeaders();
+            $this->logWebhook('Webhook received', ['headers' => array_keys($headers)]);
+            
+            // Verify webhook signature (recommended for production)
+            if ($this->paypal_environment === 'live' && !$this->verifyWebhookSignature($headers, $raw_post_data)) {
+                $this->logWebhook('Webhook signature verification failed');
+                http_response_code(401);
+                echo json_encode(['error' => 'Unauthorized']);
+                exit();
+            }
+            
+            $webhook_event = json_decode($raw_post_data, true);
+            
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                $this->logWebhook('Invalid JSON received');
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid JSON']);
+                exit();
+            }
+            
+            $this->processWebhookEvent($webhook_event);
+            
+            http_response_code(200);
+            echo json_encode(['status' => 'success']);
+            
+        } catch (Exception $e) {
+            $this->logWebhook('Exception occurred', ['error' => $e->getMessage()]);
+            http_response_code(500);
+            echo json_encode(['error' => 'Internal server error']);
+        }
+    }
+
+    // --- Private Helper Methods (formerly global functions) ---
+
+    private function getPayPalHeaders()
+    {
+        $headers = [];
+        foreach ($_SERVER as $key => $value) {
+            if (strpos($key, 'HTTP_PAYPAL_') === 0) {
+                $header_name = str_replace('HTTP_', '', $key);
+                $header_name = str_replace('_', '-', $header_name);
+                $headers[$header_name] = $value;
+            }
+        }
+        
+        $paypal_header_keys = [
+            'PAYPAL-TRANSMISSION-ID', 'PAYPAL-CERT-ID', 'PAYPAL-TRANSMISSION-SIG',
+            'PAYPAL-TRANSMISSION-TIME', 'PAYPAL-AUTH-ALGO'
+        ];
+        
+        foreach ($paypal_header_keys as $header) {
+            $server_key = 'HTTP_' . str_replace('-', '_', $header);
+            if (isset($_SERVER[$server_key])) {
+                $headers[$header] = $_SERVER[$server_key];
+            }
+        }
+        return $headers;
+    }
+
+    private function logWebhook($message, $data = null)
+    {
+        $log = date('Y-m-d H:i:s') . ' - ' . $message;
+        if ($data) {
+            $log .= ' - ' . json_encode($data);
+        }
+        $log .= PHP_EOL;
+        // Ensure the log file path is correct for your framework structure
+        file_put_contents(__DIR__ . '/../../../webhook.log', $log, FILE_APPEND | LOCK_EX);
+    }
+
+    private function getPayPalAccessToken()
+    {
+        $auth_url = $this->paypal_urls[$this->paypal_environment]['auth'];
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $auth_url);
+        curl_setopt($ch, CURLOPT_HEADER, false);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
+        curl_setopt($ch, CURLOPT_USERPWD, $this->paypal_client_id . ':' . $this->paypal_client_secret);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: application/json',
+            'Accept-Language: en_US',
+        ]);
+        
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            $this->logWebhook('Failed to get access token', ['http_code' => $httpCode, 'response' => $result]);
+            return false;
+        }
+        
+        $data = json_decode($result, true);
+        return $data['access_token'] ?? false;
+    }
+
+    private function verifyWebhookSignature($headers, $body)
+    {
+        $access_token = $this->getPayPalAccessToken();
+        if (!$access_token) {
+            return false;
+        }
+        
+        $verification_data = [
+            'transmission_id'   => $headers['PAYPAL-TRANSMISSION-ID'] ?? '',
+            'cert_id'           => $headers['PAYPAL-CERT-ID'] ?? '',
+            'auth_algo'         => $headers['PAYPAL-AUTH-ALGO'] ?? '',
+            'transmission_time' => $headers['PAYPAL-TRANSMISSION-TIME'] ?? '',
+            'transmission_sig'  => $headers['PAYPAL-TRANSMISSION-SIG'] ?? '',
+            'webhook_id'        => $this->paypal_webhook_id,
+            'webhook_event'     => json_decode($body, true)
+        ];
+        
+        $verify_url = $this->paypal_urls[$this->paypal_environment]['api'] . '/v1/notifications/verify-webhook-signature';
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $verify_url);
+        curl_setopt($ch, CURLOPT_HEADER, false);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($verification_data));
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $access_token,
+        ]);
+        
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        
+        if ($httpCode !== 200) {
+            $this->logWebhook('Webhook verification failed', ['http_code' => $httpCode, 'response' => $result]);
+            return false;
+        }
+        
+        $verification = json_decode($result, true);
+        return ($verification['verification_status'] ?? '') === 'SUCCESS';
+    }
+
+    /**
+     * Processes a webhook event, ensuring it is handled only once (idempotency) using Medoo.
+     *
+     * @param array $event The webhook event data from PayPal.
+     * @throws Exception if a database error occurs, to signal PayPal to retry.
+     */
+    private function processWebhookEvent($event)
+    {
+        $event_id = $event['id'] ?? null;
+        $event_type = $event['event_type'] ?? '';
+
+        if (!$event_id) {
+            $this->logWebhook('Webhook event is missing an ID. Cannot process.', $event);
+            return;
+        }
+
+        // --- IDEMPOTENCY CHECK WITH MEDOO ---
+        // Medoo's `action` method handles transactions beautifully. It automatically
+        // commits if the function returns true, and rolls back if it returns false or throws an exception.
+        $transactionResult = $this->db->action(function($database) use ($event_id) {
+            
+            // 1. Use `has()` to efficiently check if the event ID already exists.
+            $isDuplicate = $database->has('paypal_processed_events', ['event_id' => $event_id]);
+
+            if ($isDuplicate) {
+                // Return a specific string to signal that this is a duplicate.
+                // We don't want to roll back, so we return a non-false value.
+                return 'DUPLICATE';
+            }
+            
+            // 2. If it's a new event, insert its ID.
+            $insertResult = $database->insert('paypal_processed_events', [
+                'event_id' => $event_id
+            ]);
+
+            // `insert()` returns a PDOStatement object on success, or false on failure.
+            // If it fails, returning false here will cause `action()` to automatically roll back.
+            return $insertResult !== false;
+        });
+
+        // --- HANDLE THE TRANSACTION OUTCOME ---
+
+        // Case 1: The event was a duplicate.
+        if ($transactionResult === 'DUPLICATE') {
+            $this->logWebhook('Duplicate event received and ignored.', ['event_id' => $event_id]);
+            return; // Exit gracefully with a 200 OK so PayPal doesn't retry.
+        }
+
+        // Case 2: The transaction failed (e.g., database error during insert).
+        if ($transactionResult === false) {
+            // Medoo's `action` has already rolled back. We just need to log and throw.
+            $this->logWebhook('CRITICAL: Database transaction failed. PayPal will retry.', [
+                'event_id' => $event_id,
+                'error' => $this->db->error() // Get Medoo's last error info.
+            ]);
+            // Throw an exception. The main `webhook()` method will catch this
+            // and return a 500 error, telling PayPal to try again later.
+            throw new Exception('Database transaction failed for event ID: ' . $event_id);
+        }
+
+        // --- END OF IDEMPOTENCY CHECK ---
+
+        // If we reach here, the transaction was successful and the event is new.
+        $this->logWebhook('Processing new event', ['event_type' => $event_type, 'event_id' => $event_id]);
+        
+        $resource = $event['resource'] ?? [];
+        
+        switch ($event_type) {
+            case 'PAYMENT.CAPTURE.COMPLETED':
+                $this->handlePaymentCompleted($resource);
+                break;
+            case 'PAYMENT.CAPTURE.DENIED':
+                $this->handlePaymentDenied($resource);
+                break;
+            case 'PAYMENT.CAPTURE.REFUNDED':
+                $this->handlePaymentRefunded($resource);
+                break;
+            case 'BILLING.SUBSCRIPTION.CREATED':
+                $this->handleSubscriptionCreated($resource);
+                break;
+            case 'BILLING.SUBSCRIPTION.ACTIVATED':
+                $this->handleSubscriptionActivated($resource);
+                break;
+            case 'BILLING.SUBSCRIPTION.CANCELLED':
+                $this->handleSubscriptionCancelled($resource);
+                break;
+            case 'BILLING.SUBSCRIPTION.PAYMENT.FAILED':
+                $this->handleSubscriptionPaymentFailed($resource);
+                break;
+            default:
+                $this->logWebhook('Unhandled event type', ['event_type' => $event_type]);
+        }
+    }
+
+    private function handlePaymentCompleted($payment)
+    {
+        $captureId = $payment['id'] ?? '';
+        $amount = $payment['amount']['value'] ?? '';
+        $currency = $payment['amount']['currency_code'] ?? '';
+
+        $this->logWebhook('Payment completed', [
+            'capture_id' => $captureId,
+            'amount' => $amount,
+            'currency' => $currency,
+        ]);
+
+        // Resolve PayPal order ID from the capture resource
+        $orderId = $payment['supplementary_data']['related_ids']['order_id'] ?? null;
+
+        // If not in supplementary_data, try to get it from custom_id or invoice_id
+        if (!$orderId) {
+            $orderId = $payment['custom_id'] ?? ($payment['invoice_id'] ?? null);
+        }
+
+        if (!$orderId && $captureId) {
+            // Last resort: look up the order via the PayPal API using the capture
+            try {
+                $handler = new \Ginto\Handlers\PayPalHandler();
+                $captureDetails = $handler->getOrder($captureId);
+                $orderId = $captureDetails['id'] ?? null;
+            } catch (\Throwable $e) {
+                $this->logWebhook('Could not resolve order ID from capture', ['error' => $e->getMessage()]);
+            }
+        }
+
+        if (!$orderId) {
+            $this->logWebhook('Payment completed but no order ID could be resolved', ['capture_id' => $captureId]);
+            return;
+        }
+
+        // Find pending payment session by gateway_reference (PayPal order ID)
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($orderId);
+
+            if (!$session) {
+                $this->logWebhook('No pending payment session for PayPal order', ['order_id' => $orderId]);
+                return;
+            }
+
+            if ($session['status'] === 'completed') {
+                $this->logWebhook('Payment session already completed (synchronous capture)', ['order_id' => $orderId]);
+                return;
+            }
+
+            $commerce->completePaymentSession((string)$session['session_ref'], [
+                'gateway' => 'paypal',
+                'gateway_reference' => $orderId,
+                'gateway_payment_id' => $captureId,
+                'gateway_payload_json' => json_encode($payment),
+            ]);
+
+            $this->logWebhook('Payment session completed via webhook', [
+                'session_ref' => $session['session_ref'],
+                'purpose' => $session['purpose'],
+                'order_id' => $orderId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logWebhook('Error completing payment session from webhook', [
+                'order_id' => $orderId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    private function handlePaymentDenied($payment)
+    {
+        $captureId = $payment['id'] ?? '';
+        $this->logWebhook('Payment denied', ['payment_id' => $captureId]);
+
+        $orderId = $payment['supplementary_data']['related_ids']['order_id']
+                ?? ($payment['custom_id'] ?? ($payment['invoice_id'] ?? null));
+
+        if (!$orderId) {
+            return;
+        }
+
+        try {
+            $commerce = new \Ginto\Services\MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($orderId);
+
+            if ($session && $session['status'] === 'pending') {
+                $this->db->update('mall_payment_sessions', [
+                    'status' => 'failed',
+                    'updated_at' => date('Y-m-d H:i:s'),
+                ], ['id' => $session['id']]);
+
+                $this->logWebhook('Payment session marked failed', [
+                    'session_ref' => $session['session_ref'],
+                    'order_id' => $orderId,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            $this->logWebhook('Error handling payment denied', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private function handlePaymentRefunded($refund)
+    {
+        $this->logWebhook('Payment refunded', [
+            'refund_id' => $refund['id'] ?? '',
+            'amount' => $refund['amount']['value'] ?? '',
+            'currency' => $refund['amount']['currency_code'] ?? ''
+        ]);
+        // Add your refund logic here
+    }
+
+    private function handleSubscriptionCreated($subscription)
+    {
+        $this->logWebhook('Subscription created', [
+            'subscription_id' => $subscription['id'] ?? '',
+            'subscriber_email' => $subscription['subscriber']['email_address'] ?? ''
+        ]);
+        // Add your subscription creation logic here
+    }
+
+    private function handleSubscriptionActivated($subscription)
+    {
+        $subscription_id = $subscription['id'] ?? null;
+        $paypal_plan_id = $subscription['plan_id'] ?? null;
+        $user_id = $subscription['custom_id'] ?? null; // Get user ID from the JS SDK call
+        
+        // Extract dates from the webhook payload
+        $start_date = isset($subscription['start_time']) ? date('Y-m-d H:i:s', strtotime($subscription['start_time'])) : date('Y-m-d H:i:s');
+        $period_end_date = isset($subscription['billing_info']['next_billing_time']) ? date('Y-m-d H:i:s', strtotime($subscription['billing_info']['next_billing_time'])) : date('Y-m-d H:i:s', strtotime('+1 month'));
+
+        if (!$user_id || !$subscription_id) {
+            $this->logWebhook('CRITICAL: Missing user_id or subscription_id in ACTIVATED event.', $subscription);
+            return;
+        }
+
+        $this->logWebhook('Subscription activated via webhook', [
+            'subscription_id' => $subscription_id, 
+            'user_id' => $user_id,
+            'paypal_plan_id' => $paypal_plan_id
+        ]);
+
+        // Map PayPal plan ID to our plan
+        $planMapping = [
+            $_ENV['PAYPAL_PLAN_GO'] ?? getenv('PAYPAL_PLAN_GO') => 'go',
+            $_ENV['PAYPAL_PLAN_PLUS'] ?? getenv('PAYPAL_PLAN_PLUS') => 'plus',
+            $_ENV['PAYPAL_PLAN_PRO'] ?? getenv('PAYPAL_PLAN_PRO') => 'pro',
+        ];
+        
+        $planName = $planMapping[$paypal_plan_id] ?? 'plus';
+        $plan = $this->db->get('subscription_plans', '*', ['name' => $planName]);
+        
+        if (!$plan) {
+            $this->logWebhook('CRITICAL: Could not find plan for PayPal plan ID: ' . $paypal_plan_id);
+            return;
+        }
+
+        // Check if subscription already exists in user_subscriptions
+        $existing = $this->db->get('user_subscriptions', 'id', ['paypal_subscription_id' => $subscription_id]);
+        
+        if ($existing) {
+            // Update existing subscription
+            $this->db->update('user_subscriptions', [
+                'status' => 'active',
+                'started_at' => $start_date,
+                'expires_at' => $period_end_date,
+                'updated_at' => date('Y-m-d H:i:s')
+            ], ['paypal_subscription_id' => $subscription_id]);
+        } else {
+            // Cancel any existing active subscriptions for this user
+            $this->db->update('user_subscriptions', [
+                'status' => 'cancelled',
+                'cancelled_at' => date('Y-m-d H:i:s')
+            ], [
+                'user_id' => $user_id,
+                'status' => 'active'
+            ]);
+            
+            // Insert new subscription
+            $this->db->insert('user_subscriptions', [
+                'user_id' => $user_id,
+                'plan_id' => $plan['id'],
+                'status' => 'active',
+                'started_at' => $start_date,
+                'expires_at' => $period_end_date,
+                'payment_method' => 'paypal',
+                'paypal_subscription_id' => $subscription_id,
+                'paypal_plan_id' => $paypal_plan_id,
+                'amount_paid' => $plan['price_monthly'],
+                'currency' => $plan['price_currency'] ?? 'PHP',
+                'auto_renew' => 1,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s')
+            ]);
+        }
+        
+        // Update user's plan in users table
+        $this->db->update('users', [
+            'subscription_plan' => $planName
+        ], ['id' => $user_id]);
+        
+        $this->logWebhook('Subscription activated successfully', [
+            'user_id' => $user_id,
+            'plan' => $planName
+        ]);
+    }
+
+    private function handleSubscriptionCancelled($subscription)
+    {
+        $subscription_id = $subscription['id'] ?? null;
+        
+        if (!$subscription_id) {
+            $this->logWebhook('CRITICAL: Missing subscription_id in CANCELLED event.', $subscription);
+            return;
+        }
+
+        $this->logWebhook('Subscription cancelled', ['subscription_id' => $subscription_id]);
+
+        // Get the subscription to find the user
+        $existingSub = $this->db->get('user_subscriptions', ['id', 'user_id'], ['paypal_subscription_id' => $subscription_id]);
+        
+        // Update subscription status to cancelled
+        $this->db->update('user_subscriptions', [
+            'status' => 'cancelled',
+            'cancelled_at' => date('Y-m-d H:i:s'),
+            'auto_renew' => 0,
+            'updated_at' => date('Y-m-d H:i:s')
+        ], ['paypal_subscription_id' => $subscription_id]);
+        
+        // Update user's plan back to free if subscription was cancelled
+        if ($existingSub && $existingSub['user_id']) {
+            $this->db->update('users', [
+                'subscription_plan' => 'free'
+            ], ['id' => $existingSub['user_id']]);
+        }
+        
+        $this->logWebhook('Subscription cancelled successfully', ['subscription_id' => $subscription_id]);
+    }
+
+    private function handleSubscriptionPaymentFailed($subscription)
+    {
+        $subscription_id = $subscription['id'] ?? null;
+        $this->logWebhook('Subscription payment failed', ['subscription_id' => $subscription_id]);
+        
+        // Mark subscription as having payment issues
+        if ($subscription_id) {
+            $this->db->update('user_subscriptions', [
+                'status' => 'pending',
+                'updated_at' => date('Y-m-d H:i:s')
+            ], ['paypal_subscription_id' => $subscription_id]);
+        }
+    }
+
+    /**
+     * Checks if the currently logged-in user has an active subscription to a specific plan.
+     *
+     * @param string $planId The PayPal Plan ID (P-...) to check against.
+     * @return bool True if the user has an active subscription, false otherwise.
+     */
+    public function isUserSubscribedToPlan(string $planId): bool
+    {
+        $user_id = $_SESSION['user_id'] ?? null;
+        if (!$user_id) {
+            return false;
+        }
+
+        return $this->db->has('user_subscriptions', [
+            "AND" => [
+                'user_id' => $user_id,
+                'paypal_plan_id' => $planId,
+                'status' => 'active'
+            ]
+        ]);
+    }
+
+    /**
+     * PUBLIC method to check the live status of the "Sai Code Daily" subscription.
+     * This is the method you will call from your application.
+     *
+     * @return array An array containing the status and a user-friendly message.
+     */
+    public function checkSaiCodeDailyStatus(): array
+    {
+        // 1. Identify the user and the specific plan we are checking for.
+        $userId = $_SESSION['user_id'] ?? null;
+        $saiCodeDailyPlanId = 'P-43S89794RD1094113NAV52CA';
+
+        if (!$userId) {
+            return ['is_active' => false, 'message' => 'User not logged in.'];
+        }
+
+        // 2. Find the user's subscription ID from your local database.
+        $localSubscription = $this->db->get('subscriptions', [
+            'paypal_subscription_id',
+            'status'
+        ], [
+            "AND" => [
+                'user_id' => $userId,
+                'paypal_plan_id' => $saiCodeDailyPlanId
+            ],
+            'ORDER' => ['created_at' => 'DESC'] // Get the most recent one
+        ]);
+
+        $lastQuery = $this->db->log();
+
+        if (!$localSubscription) {
+            return ['is_active' => false, 'message' => 'No subscription found for this plan.', 'last_query' => $lastQuery];
+        }
+        
+        $subscriptionId = $localSubscription['paypal_subscription_id'];
+
+        // 3. Fetch the live details for that subscription ID from PayPal.
+        $paypalDetails = $this->getSubscriptionDetailsFromPayPal($subscriptionId);
+
+        if ($paypalDetails === false) {
+            // API call failed. We'll trust our local database as a fallback.
+            $isActive = ($localSubscription['status'] === 'ACTIVE');
+            $message = 'Could not contact PayPal. Status shown is based on last known record: ' . $localSubscription['status'];
+            return ['is_active' => $isActive, 'message' => $message];
+        }
+
+        // 4. We have a live response from PayPal. This is the absolute truth.
+        $liveStatus = $paypalDetails['status'] ?? 'UNKNOWN'; // e.g., 'ACTIVE', 'CANCELLED', 'SUSPENDED'
+        
+        // 5. (Self-Healing) If our local DB is out of sync, update it now.
+        if ($liveStatus !== $localSubscription['status']) {
+            $this->logWebhook('Syncing local status based on live check.', [
+                'subscription_id' => $subscriptionId,
+                'old_status' => $localSubscription['status'],
+                'new_status' => $liveStatus
+            ]);
+            $this->db->update('subscriptions', 
+                ['status' => $liveStatus], 
+                ['paypal_subscription_id' => $subscriptionId]
+            );
+        }
+
+        // 6. Return the final, authoritative result.
+        if ($liveStatus === 'ACTIVE') {
+            return ['is_active' => true, 'message' => 'Subscription is active on PayPal.'];
+        } else {
+            return ['is_active' => false, 'message' => 'PayPal reports subscription is not active. Status: ' . $liveStatus];
+        }
+
+        return [
+        'is_active' => true, 
+        'message' => 'PayPal confirmed your subscription is ACTIVE.', 
+        'subscription_details' => $paypalDetails,
+        'last_query' => $lastQuery // Add it here too
+    ];
+    }
+
+
+    /**
+     * PRIVATE helper method to fetch details of a specific subscription from the PayPal API.
+     *
+     * @param string $subscriptionId The PayPal Subscription ID (starts with 'I-').
+     * @return array|false The subscription data as an array on success, or false on failure.
+     */
+    private function getSubscriptionDetailsFromPayPal(string $subscriptionId)
+    {
+        $access_token = $this->getPayPalAccessToken();
+        if (!$access_token) {
+            $this->logWebhook('Failed to get access token for direct subscription check.');
+            return false;
+        }
+
+        $url = $this->paypal_urls[$this->paypal_environment]['api'] . '/v1/billing/subscriptions/' . $subscriptionId;
+
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Content-Type: application/json',
+            'Authorization: Bearer ' . $access_token,
+        ]);
+
+        $result = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($httpCode !== 200) {
+            $this->logWebhook('Failed to fetch subscription details from PayPal.', [
+                'subscription_id' => $subscriptionId,
+                'http_code' => $httpCode,
+                'response' => $result
+            ]);
+            return false;
+        }
+
+        return json_decode($result, true);
+    }
+
+    // ===================================================================
+    // NEW METHOD TO DISPLAY THE STATUS PAGE (Your 'whatever' method)
+    // ===================================================================
+    public function saiCodeCheck()
+    {
+        // 1. Call our internal logic method to get the live status from PayPal.
+        $statusData = $this->checkSaiCodeDailyStatus();
+        
+        // 2. Pass the entire result array to your view file.
+        // Your framework's `$this->view()` will make the keys of this array
+        // available as variables inside webhook.view.php (e.g., $is_active, $message).
+        $this->view('webhook', ['webhook' => $statusData]);
+    }
+
+    /**
+     * Pass a payment event on to sq.silverqueen.pro.
+     *
+     * PayMongo is registered against this domain, so every QR payment the
+     * wallet takes — classroom tuition, a teacher's subscription — is told to
+     * this endpoint. This server has no idea what any of them were *for*;
+     * sq does, because sq is where the intent id was minted and recorded.
+     *
+     * Best effort by design, and quiet about failing. PayMongo retries a
+     * delivery it did not get a 2xx for, and if this were allowed to fail the
+     * whole webhook the retries would re-run every handler above as well —
+     * including the ones that have already credited somebody. So a relay that
+     * cannot get through is logged and swallowed, and sq reconciles by asking
+     * about intents it is still waiting on.
+     *
+     * Signed the same way sq signs its calls here: HMAC over timestamp and
+     * body, so neither can be altered without the other, and a captured
+     * request cannot be replayed tomorrow.
+     */
+    private function relayToSilverQueen(string $eventType, array $event, string $rawBody): void
+    {
+        $secret = (string) (getenv('SQ_RELAY_SECRET') ?: ($_ENV['SQ_RELAY_SECRET'] ?? ''));
+        $url    = (string) (getenv('SQ_RELAY_URL')
+            ?: ($_ENV['SQ_RELAY_URL'] ?? 'https://sq.silverqueen.pro/api/v1/internal/paymongo'));
+
+        if ($secret === '') {
+            error_log('sq relay: SQ_RELAY_SECRET is not set — event ' . $eventType . ' not relayed');
+
+            return;
+        }
+
+        $body = json_encode([
+            'event_type' => $eventType,
+            'event'      => $event,
+        ]);
+
+        if ($body === false) {
+            return;
+        }
+
+        $when      = (string) time();
+        $signature = hash_hmac('sha256', $when . '.' . $body, $secret);
+
+        try {
+            $ch = curl_init($url);
+
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => $body,
+                CURLOPT_RETURNTRANSFER => true,
+                // Short: PayMongo is waiting on this request, and a slow
+                // relay would turn a delivered event into a retried one.
+                CURLOPT_TIMEOUT        => 8,
+                CURLOPT_CONNECTTIMEOUT => 4,
+                CURLOPT_HTTPHEADER     => [
+                    'Content-Type: application/json',
+                    'X-SQ-Timestamp: ' . $when,
+                    'X-SQ-Signature: ' . $signature,
+                ],
+            ]);
+
+            $response = curl_exec($ch);
+            $status   = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+            curl_close($ch);
+
+            if ($status < 200 || $status >= 300) {
+                error_log('sq relay: ' . $eventType . ' returned ' . $status . ' — ' . substr((string) $response, 0, 200));
+            }
+        } catch (\Throwable $e) {
+            error_log('sq relay: ' . $eventType . ' failed — ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Handle incoming PayMongo webhook events.
+     * Endpoint: POST /webhooks/paymongo
+     *
+     * Verifies the Paymongo-Signature header using HMAC-SHA256 and the
+     * PAYMONGO_WEBHOOK_SECRET env var, then dispatches on event type.
+     */
+    public function paymongoWebhook()
+    {
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+            http_response_code(200);
+            echo json_encode(['status' => 'paymongo webhook endpoint active']);
+            exit();
+        }
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+            exit();
+        }
+
+        $rawBody = file_get_contents('php://input');
+        if (empty($rawBody)) {
+            // Return 200; empty-body deliveries should be acknowledged, not rejected.
+            http_response_code(200);
+            echo json_encode(['status' => 'ok', 'note' => 'empty body']);
+            exit();
+        }
+
+        // Verify webhook signature — the ONLY legitimate reason to return non-200.
+        $sigHeader = $_SERVER['HTTP_PAYMONGO_SIGNATURE'] ?? '';
+        if (!\Ginto\Handlers\PayMongoHandler::verifyWebhookSignature($sigHeader, $rawBody)) {
+            error_log('PayMongo webhook: invalid signature');
+            http_response_code(401);
+            echo json_encode(['error' => 'Invalid signature']);
+            exit();
+        }
+
+        $event = json_decode($rawBody, true);
+        // PayMongo puts the event type at data.attributes.type (data.type is always "event").
+        $eventType = $event['data']['attributes']['type'] ?? ($event['data']['type'] ?? '');
+        if (json_last_error() !== JSON_ERROR_NONE || $eventType === '' || $eventType === 'event') {
+            // Acknowledge with 200; malformed but authenticated payloads should not disable the endpoint.
+            error_log('PayMongo webhook: invalid JSON or missing event type — body: ' . substr($rawBody, 0, 500));
+            http_response_code(200);
+            echo json_encode(['status' => 'ok', 'note' => 'unrecognised payload']);
+            exit();
+        }
+
+        error_log("PayMongo webhook received: {$eventType}");
+
+        try {
+            switch ($eventType) {
+                case 'payment.paid':
+                    $this->handlePaymongoPaymentPaid($event);
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
+                    break;
+
+                // QR PH, which is what the wallet's classrooms are paid with.
+                // Nothing here knows what the money was for — sq does — so
+                // these are acknowledged and passed straight on.
+                case 'qr.paid':
+                case 'qrph.paid':
+                case 'qr.expired':
+                case 'qrph.expired':
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
+                    break;
+                case 'payment.failed':
+                    $this->handlePaymongoPaymentFailed($event);
+                    $this->relayToSilverQueen($eventType, $event, $rawBody);
+                    break;
+                case 'checkout_session.payment.paid':
+                    $this->handleGintoPayCheckoutPaid($event);
+                    break;
+                case 'subscription.activated':
+                case 'subscription.invoice.paid':
+                case 'subscription.past_due':
+                case 'subscription.unpaid':
+                case 'subscription.cancelled':
+                    $this->handlePaymongoSubscription($event, $eventType);
+                    break;
+                default:
+                    // Acknowledge unknown events with 200 — do not return non-2xx for event types we don't handle.
+                    error_log("PayMongo webhook: unhandled event type {$eventType}");
+                    break;
+            }
+        } catch (\Throwable $e) {
+            // Log the error but still return 200 so PayMongo does not disable the webhook.
+            // A 500 response causes PayMongo to retry and eventually disable the endpoint.
+            error_log('PayMongo webhook error: ' . $e->getMessage() . ' | event: ' . $eventType);
+        }
+
+        http_response_code(200);
+        echo json_encode(['status' => 'ok']);
+        exit();
+    }
+
+    /**
+     * Handle PayMongo native subscription events → keep user_subscriptions in sync.
+     * Maps the event to a user via the stored gateway_subscription_id, falling back to
+     * the PayMongo customer's email. Defensive: logs the payload and never throws.
+     */
+    private function handlePaymongoSubscription(array $event, string $eventType): void
+    {
+        $resource = $event['data']['attributes']['data'] ?? [];
+        $attr     = $resource['attributes'] ?? [];
+        $resId    = (string) ($resource['id'] ?? '');
+        error_log('PayMongo ' . $eventType . ' resource: ' . json_encode($resource));
+
+        // Subscription id: the resource is either the subscription (sub_…) or an invoice referencing one.
+        $subId = $attr['subscription_id'] ?? ($attr['subscription'] ?? '');
+        if ($subId === '' && str_starts_with($resId, 'sub_')) $subId = $resId;
+
+        // Customer → email (for mapping to a local user).
+        $customerId = (string) ($attr['customer_id'] ?? ($attr['customer'] ?? ''));
+        $email = (string) ($attr['customer_email'] ?? ($attr['email'] ?? ''));
+        if ($email === '' && $customerId !== '') {
+            $email = (string) (\Ginto\Handlers\PayMongoHandler::getCustomerEmail($customerId) ?? '');
+        }
+
+        // Resolve the user: by stored subscription id first, else by email.
+        $userId = null;
+        if ($subId !== '') {
+            $row = $this->db->get('user_subscriptions', ['user_id'], ['gateway_subscription_id' => $subId]);
+            $userId = is_array($row) ? ($row['user_id'] ?? null) : null;
+        }
+        if (empty($userId) && $email !== '') {
+            $userId = $this->db->get('users', 'id', ['email' => $email]);
+        }
+        if (empty($userId)) {
+            error_log("PayMongo subscription: could not map to a user (sub={$subId} email={$email})");
+            return;
+        }
+
+        $now = date('Y-m-d H:i:s');
+        switch ($eventType) {
+            case 'subscription.activated':
+            case 'subscription.invoice.paid':
+                $this->activatePaymongoSubscription((int) $userId, $subId, $attr);
+                break;
+            case 'subscription.unpaid':   // final failure → access ends
+                $this->db->update('user_subscriptions',
+                    ['status' => 'expired', 'updated_at' => $now],
+                    ['user_id' => $userId, 'payment_method' => 'paymongo', 'status' => 'active']);
+                break;
+            case 'subscription.cancelled':
+                $this->db->update('user_subscriptions',
+                    ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+                    ['user_id' => $userId, 'payment_method' => 'paymongo', 'status' => 'active']);
+                break;
+            // subscription.past_due → retrying; keep access during the grace period (no change).
+        }
+    }
+
+    /** Activate a Ginto Trading Academy membership from a paid PayMongo checkout session. */
+    private function activateAcademyOrder(string $checkoutSessionId, ?string $gatewayPaymentId): void
+    {
+        if ($checkoutSessionId === '') return;
+        $order = $this->db->get('academy_orders', '*', ['checkout_session_id' => $checkoutSessionId, 'status' => 'pending']);
+        if (!is_array($order)) return; // not an academy order, or already processed
+
+        $userId = (int) $order['user_id'];
+        $planId = $order['plan_id'] ?? null;
+        $now    = date('Y-m-d H:i:s');
+        $expires = date('Y-m-d H:i:s', strtotime('+1 month'));
+
+        // End any prior active subscription, then grant the Academy membership.
+        $this->db->update('user_subscriptions',
+            ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+            ['user_id' => $userId, 'status' => 'active']);
+        $this->db->insert('user_subscriptions', [
+            'user_id'           => $userId,
+            'plan_id'           => $planId,
+            'status'            => 'active',
+            'started_at'        => $now,
+            'expires_at'        => $expires,
+            'payment_method'    => 'paymongo',
+            'payment_reference' => $checkoutSessionId,
+            'gateway_payment_id'=> $gatewayPaymentId,
+            'amount_paid'       => $order['amount'] ?? 0,
+            'currency'          => $order['currency'] ?? 'PHP',
+            'auto_renew'        => 0,
+            'created_at'        => $now,
+            'updated_at'        => $now,
+        ]);
+        $this->db->update('academy_orders', ['status' => 'completed', 'updated_at' => $now], ['id' => $order['id']]);
+        error_log("Academy membership activated: user={$userId} plan={$planId} cs={$checkoutSessionId}");
+    }
+
+    /** Activate or extend a user's PayMongo subscription by one billing period. */
+    private function activatePaymongoSubscription(int $userId, string $subId, array $attr): void
+    {
+        $now  = date('Y-m-d H:i:s');
+        $plan = $this->db->get('subscription_plans', '*', ['plan_type' => 'courses', 'is_active' => 1, 'ORDER' => ['price' => 'ASC']]);
+
+        $existing = $subId !== ''
+            ? $this->db->get('user_subscriptions', '*', ['gateway_subscription_id' => $subId])
+            : null;
+
+        // Extend from the later of now / current expiry so mid-cycle renewals stack correctly.
+        $base = $now;
+        if (is_array($existing) && !empty($existing['expires_at']) && strtotime($existing['expires_at']) > time()) {
+            $base = $existing['expires_at'];
+        }
+        $expires = date('Y-m-d H:i:s', strtotime($base . ' +1 month'));
+
+        if (is_array($existing)) {
+            $this->db->update('user_subscriptions',
+                ['status' => 'active', 'expires_at' => $expires, 'updated_at' => $now],
+                ['id' => $existing['id']]);
+            return;
+        }
+
+        // No row yet: end any prior active sub for this user, then create the PayMongo one.
+        $this->db->update('user_subscriptions',
+            ['status' => 'cancelled', 'cancelled_at' => $now, 'updated_at' => $now],
+            ['user_id' => $userId, 'status' => 'active']);
+        $this->db->insert('user_subscriptions', [
+            'user_id'                 => $userId,
+            'plan_id'                 => $plan['id'] ?? null,
+            'status'                  => 'active',
+            'started_at'              => $now,
+            'expires_at'              => $expires,
+            'payment_method'          => 'paymongo',
+            'gateway_subscription_id' => $subId,
+            'payment_reference'       => $subId,
+            'amount_paid'             => isset($attr['amount']) ? ((int) $attr['amount']) / 100 : ($plan['price'] ?? 0),
+            'currency'                => 'PHP',
+            'auto_renew'              => 1,
+            'created_at'              => $now,
+            'updated_at'              => $now,
+        ]);
+    }
+
+    /**
+     * Handle payment.paid event from PayMongo.
+     * Updates any pending subscription_payments record to 'completed'.
+     */
+    private function handlePaymongoPaymentPaid(array $event): void
+    {
+        $attributes = $event['data']['attributes']['data']['attributes'] ?? [];
+        $piId       = $attributes['payment_intent_id'] ?? '';
+        $paymentId  = $event['data']['attributes']['data']['id'] ?? null;
+        $amount     = (int)($attributes['amount'] ?? 0); // centavos
+
+        if (empty($piId)) {
+            error_log('PayMongo payment.paid: missing payment_intent_id');
+            return;
+        }
+
+        error_log("PayMongo payment.paid: pi_id={$piId}, amount={$amount}");
+
+        // Mark any pending paymongo_qrph payments for this PI as completed
+        $this->db->update('subscription_payments', [
+            'status'   => 'completed',
+            'paid_at'  => date('Y-m-d H:i:s'),
+            'notes'    => 'Confirmed via PayMongo webhook',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], [
+            'payment_reference' => $piId,
+            'payment_method'    => 'paymongo_qrph',
+            'status'            => 'pending',
+        ]);
+
+        // Standalone GintoPay card flow uses payment_intent_id as tracking key in pending_registrations.
+        $pending = $this->db->get('pending_registrations', '*', [
+            'checkout_session_id' => $piId,
+            'status'              => 'pending',
+        ]);
+
+        if ($pending) {
+            $this->processPendingRegistration(
+                $pending,
+                $piId,
+                $piId,
+                $paymentId,
+                'payment.paid_webhook'
+            );
+        }
+
+        // Mall QR checkout sessions also use PayMongo payment_intent_id as gateway reference.
+        if (!empty($piId)) {
+            try {
+                $commerce = new MallCommerceService($this->db);
+                $session = $commerce->getPaymentSessionByGatewayReference($piId);
+                if ($session) {
+                    $commerce->completePaymentSession((string)$session['session_ref'], [
+                        'gateway' => 'paymongo',
+                        'gateway_reference' => $piId,
+                        'gateway_payment_id' => $paymentId,
+                        'gateway_payload_json' => json_encode($event),
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                error_log('PayMongo payment.paid mall finalization error: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Handle payment.failed event from PayMongo.
+     */
+    private function handlePaymongoPaymentFailed(array $event): void
+    {
+        $attributes = $event['data']['attributes']['data']['attributes'] ?? [];
+        $piId       = $attributes['payment_intent_id'] ?? '';
+
+        if (empty($piId)) {
+            return;
+        }
+
+        error_log("PayMongo payment.failed: pi_id={$piId}");
+
+        $this->db->update('subscription_payments', [
+            'status'     => 'failed',
+            'notes'      => 'Failed via PayMongo webhook',
+            'updated_at' => date('Y-m-d H:i:s'),
+        ], [
+            'payment_reference' => $piId,
+            'payment_method'    => 'paymongo_qrph',
+            'status'            => 'pending',
+        ]);
+
+        // Mark mall payment sessions as failed for matching PayMongo payment intent IDs.
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $commerce->failPaymentSessionByGatewayReference($piId, 'PayMongo payment.failed webhook');
+        } catch (\Throwable $e) {
+            error_log('PayMongo payment.failed mall finalization error: ' . $e->getMessage());
+        }
+    }
+
+    // ===================================================================
+    // LOGIC METHODS - These do the actual work
+    // ===================================================================
+
+    /**
+     * Handle checkout_session.payment.paid event from PayMongo.
+     * This is fired when a user completes payment on the hosted Ginto Pay checkout.
+     * Creates the user account and subscription from the stored pending_registrations row.
+     */
+    private function handleGintoPayCheckoutPaid(array $event): void
+    {
+        // Event structure: data.attributes.data = { id: 'cs_xxx', attributes: { payments: [...] } }
+        $sessionData      = $event['data']['attributes']['data'] ?? [];
+        $checkoutSessionId = $sessionData['id'] ?? '';
+        $sessionAttrs     = $sessionData['attributes'] ?? [];
+        $payments         = $sessionAttrs['payments'] ?? [];
+
+        if (empty($checkoutSessionId)) {
+            error_log('GintoPay webhook: missing checkout_session_id in event');
+            return;
+        }
+
+        error_log("GintoPay webhook checkout_session.payment.paid: cs_id={$checkoutSessionId}");
+
+        // Extract PayMongo payment and payment_intent IDs from the payments array
+        $gatewayPaymentId = null;
+        $paymentIntentId  = null;
+        if (!empty($payments[0]['id'])) {
+            $gatewayPaymentId = $payments[0]['id'];
+            $paymentIntentId  = $payments[0]['attributes']['payment_intent_id'] ?? null;
+        }
+
+        // Look up the pending registration by checkout_session_id
+        $pending = $this->db->get('pending_registrations', '*', [
+            'checkout_session_id' => $checkoutSessionId,
+            'status'              => 'pending',
+        ]);
+
+        if (!$pending) {
+            // Could be a duplicate delivery or an already-processed session — safe to ignore
+            error_log("GintoPay webhook: no pending registration for cs_id={$checkoutSessionId} (already processed or unknown)");
+            // Continue checking mall card checkout sessions which also use checkout_session IDs.
+        } else {
+            $this->processPendingRegistration(
+                $pending,
+                $checkoutSessionId,
+                $paymentIntentId,
+                $gatewayPaymentId,
+                'checkout_session.payment.paid'
+            );
+        }
+
+        // Ginto Trading Academy orders correlate by checkout_session_id too.
+        try {
+            $this->activateAcademyOrder($checkoutSessionId, $gatewayPaymentId);
+        } catch (\Throwable $e) {
+            error_log('Academy order activation error: ' . $e->getMessage());
+        }
+
+        // Mall card checkout sessions store gateway_reference as checkout_session_id.
+        try {
+            $commerce = new MallCommerceService($this->db);
+            $session = $commerce->getPaymentSessionByGatewayReference($checkoutSessionId);
+            if ($session) {
+                $commerce->completePaymentSession((string)$session['session_ref'], [
+                    'gateway' => 'paymongo',
+                    'gateway_reference' => $checkoutSessionId,
+                    'gateway_payment_id' => $gatewayPaymentId,
+                    'gateway_payload_json' => json_encode($event),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            error_log('PayMongo checkout_session.payment.paid mall finalization error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Create account/subscription/payment records from a pending registration row.
+     */
+    private function processPendingRegistration(
+        array $pending,
+        string $paymentReference,
+        ?string $paymentIntentId,
+        ?string $gatewayPaymentId,
+        string $sourceEvent
+    ): void {
+        $regData = json_decode($pending['reg_data'] ?? '', true);
+        if (empty($regData) || !is_array($regData)) {
+            error_log("GintoPay webhook: corrupt reg_data for ref={$paymentReference}");
+            $this->db->update('pending_registrations', ['status' => 'failed'], ['id' => $pending['id']]);
+            return;
+        }
+
+        // Guard against duplicate processing
+        $existing = $this->db->get('subscription_payments', 'id', ['payment_reference' => $paymentReference]);
+        if ($existing) {
+            $this->db->update('pending_registrations', [
+                'status'       => 'completed',
+                'processed_at' => date('Y-m-d H:i:s'),
+            ], ['id' => $pending['id']]);
+            return;
+        }
+
+        $planIdMap   = ['free' => 1, 'go' => 2, 'plus' => 3, 'pro' => 4, 'starter' => 1, 'professional' => 2, 'executive' => 3, 'gold' => 4, 'platinum' => 5];
+        $packageName = strtolower($regData['package'] ?? 'go');
+        $planId      = $planIdMap[$packageName] ?? 2;
+        // Ginto Pay subscriptions are monthly-only.
+        $duration    = '1m';
+        $amountPhp   = (float)($pending['amount'] ?? $regData['amount'] ?? 0);
+        $now         = date('Y-m-d H:i:s');
+        $expiresAt   = date('Y-m-d H:i:s', strtotime('+1 month'));
+        $publicId    = substr(md5(uniqid(mt_rand(), true)), 0, 12);
+
+        try {
+            $this->db->insert('users', [
+                'email'             => $regData['email'],
+                'username'          => $regData['username'],
+                'password_hash'     => $regData['password_hash'],
+                'fullname'          => $regData['fullname'],
+                'phone'             => $regData['phone'],
+                'country'           => $regData['country'],
+                'referrer_id'       => $regData['referrer_id'] ?? null,
+                'public_id'         => $publicId,
+                'payment_status'    => 'paid',
+                'subscription_plan' => $packageName,
+                'created_at'        => $now,
+            ]);
+
+            $userId = $this->db->id();
+            if (!$userId) {
+                error_log("GintoPay webhook: failed to insert user for ref={$paymentReference}");
+                return;
+            }
+
+            $transactionId = \Ginto\Helpers\TransactionHelper::generateTransactionId($this->db);
+            $auditData     = \Ginto\Helpers\TransactionHelper::captureAuditData();
+
+            $paymentNotes = json_encode([
+                'email'               => $regData['email'],
+                'username'            => $regData['username'],
+                'fullname'            => $regData['fullname'],
+                'phone'               => $regData['phone'],
+                'country'             => $regData['country'],
+                'billing_line1'       => $regData['billing_line1'] ?? '',
+                'billing_line2'       => $regData['billing_line2'] ?? '',
+                'billing_city'        => $regData['billing_city'] ?? '',
+                'billing_state'       => $regData['billing_state'] ?? '',
+                'billing_postal_code' => $regData['billing_postal_code'] ?? '',
+                'billing_country'     => $regData['billing_country'] ?? ($regData['country'] ?? ''),
+                'paymongo_session_id' => (strpos($paymentReference, 'cs_') === 0) ? $paymentReference : null,
+                'paymongo_pi_id'      => $paymentIntentId,
+                'paymongo_payment_id' => $gatewayPaymentId,
+                'payment_gateway'     => 'paymongo',
+                'payment_type'        => 'card',
+                'duration'            => $duration,
+                'source'              => $sourceEvent,
+            ]);
+
+            $this->db->insert('subscription_payments', array_merge([
+                'user_id'            => $userId,
+                'subscription_id'    => null,
+                'plan_id'            => $planId,
+                'type'               => 'registration',
+                'amount'             => $amountPhp,
+                'currency'           => 'PHP',
+                'payment_method'     => 'ginto_pay_card',
+                'payment_reference'  => $paymentReference,
+                'gateway_payment_id' => $gatewayPaymentId,
+                'status'             => 'paid',
+                'notes'              => $paymentNotes,
+                'transaction_id'     => $transactionId,
+            ], $auditData));
+
+            $paymentRowId = $this->db->id();
+            if (!$paymentRowId) {
+                $this->db->delete('users', ['id' => $userId]);
+                error_log("GintoPay webhook: failed to insert payment for ref={$paymentReference}");
+                return;
+            }
+
+            $this->db->insert('user_subscriptions', [
+                'user_id'            => $userId,
+                'plan_id'            => $planId,
+                'status'             => 'active',
+                'started_at'         => $now,
+                'expires_at'         => $expiresAt,
+                'payment_method'     => 'ginto_pay_card',
+                'payment_reference'  => $paymentReference,
+                'gateway_payment_id' => $gatewayPaymentId,
+                'amount_paid'        => $amountPhp,
+                'currency'           => 'PHP',
+                'auto_renew'         => 1,
+                'created_at'         => $now,
+                'updated_at'         => $now,
+            ]);
+
+            $subscriptionId = $this->db->id();
+            if ($subscriptionId) {
+                $this->db->update('subscription_payments', ['subscription_id' => $subscriptionId], ['id' => $paymentRowId]);
+            }
+
+            $this->db->update('pending_registrations', [
+                'status'       => 'completed',
+                'user_id'      => $userId,
+                'processed_at' => $now,
+            ], ['id' => $pending['id']]);
+
+            error_log("GintoPay webhook: account created user_id={$userId}, payment_id={$paymentRowId}, ref={$paymentReference}");
+        } catch (\Throwable $e) {
+            error_log('GintoPay webhook processPendingRegistration error: ' . $e->getMessage());
+        }
+    }
+
+}

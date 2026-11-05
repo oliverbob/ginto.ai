@@ -1,0 +1,37 @@
+# Ginto FRP client tunnel config
+# Expected server settings:
+# - serverAddr: silverqueen.pro
+# - serverPort: 7000
+# - auth.method: token
+# - subdomain host: *.silverqueen.pro
+
+# Fill this in before running:
+# - auth.token: your server FRP auth token (shared secret)
+#
+# Operator-key note:
+# FRP v0.66.0 does not accept proxy metadata fields in TOML.
+# If you need the operator-key feature, use an INI config (see bin/tunnel.ini).
+
+serverAddr = "silverqueen.pro"
+serverPort = 7000
+
+auth.method = "token"
+auth.token = "PUT_YOUR_FRP_AUTH_TOKEN_HERE"
+
+transport.tls.enable = true
+transport.tls.disableCustomTLSFirstByte = true
+transport.poolCount = 3
+
+log.to = "/tmp/frpc-tunnel.log"
+log.level = "info"
+log.maxDays = 3
+
+[[proxies]]
+name = "az-tunnel"
+type = "http"
+localIP = "127.0.0.1"
+localPort = 8088
+subdomain = "az"
+hostHeaderRewrite = "127.0.0.1"
+
+

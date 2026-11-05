@@ -1,0 +1,480 @@
+:root {
+    --bg-color: #31363f;
+    --text-color: #dcdfe4;
+    --main-color: #61afef;
+    --error-color: #e06c75;
+    --correct-color: #98c379;
+    --light-on-color: #98c379;
+    --light-off-color: #21252b;
+    --font-body: 'Poppins', sans-serif;
+    --font-mono: 'Source Code Pro', monospace;
+    --key-gap: 8px;
+    --base-key-size: 50px;
+}
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-body);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.container {
+    width: 100%;
+    max-width: 1200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+#lesson-info {
+    text-align: center;
+    margin-bottom: 1rem;
+    width: 100%;
+    max-width: 950px;
+}
+#lesson-title {
+    margin: 0;
+    font-size: 1.8rem;
+    color: var(--main-color);
+}
+#lesson-targets {
+    font-size: 1rem;
+    color: var(--text-color);
+    opacity: 0.8;
+}
+.stats {
+    display: flex;
+    justify-content: space-around;
+    font-size: 1.5rem;
+    font-weight: 600;
+    width: 100%;
+    max-width: 950px;
+}
+#text-display {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    line-height: 1.8;
+    background-color: #21252b;
+    padding: 1.5rem;
+    border-radius: 8px;
+    text-align: left;
+    user-select: none;
+    width: 100%;
+    max-width: 950px;
+    box-sizing: border-box;
+    min-height: 70px;
+}
+#input-field {
+    opacity: 0;
+    position: absolute;
+    z-index: -1;
+}
+.correct { color: var(--correct-color); }
+.incorrect {
+    color: #dcdfe4;
+    background-color: var(--error-color);
+    border-radius: 3px;
+    padding: 2px 0;
+}
+.cursor {
+    border-left: 2px solid var(--main-color);
+    animation: blink-bar 1s infinite;
+    margin-left: -1px;
+    margin-right: -1px;
+}
+@keyframes blink-bar { 50% { border-left-color: transparent; } }
+
+.controls { margin-top: 1rem; }
+#restart-btn {
+    background-color: var(--main-color);
+    color: #21252b;
+    border: none;
+    padding: 0.8rem 2rem;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+#restart-btn:hover { transform: scale(1.05); }
+
+#keyboard-container {
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    align-items: flex-start;
+    margin-top: 1rem;
+}
+.keyboard-row { display: flex; gap: var(--key-gap); }
+.key {
+    background-color: #3b4048; color: var(--text-color);
+    height: var(--base-key-size); width: var(--base-key-size);
+    display: inline-flex; justify-content: center; align-items: center;
+    border-radius: 5px; font-family: var(--font-mono); font-size: 0.9rem;
+    border-bottom: 3px solid #21252b; transition: all 0.1s ease-out;
+    text-transform: none; text-align: center; line-height: 1.2; box-sizing: border-box;
+}
+.key-pressed { background-color: var(--main-color); color: #21252b; transform: translateY(2px) scale(0.98); border-bottom-width: 1px; }
+#main-keyboard-block, #numpad-block { display: flex; flex-direction: column; gap: var(--key-gap); }
+#nav-block { display: flex; flex-direction: column; gap: var(--key-gap); margin-top: calc(var(--base-key-size) + var(--key-gap)); }
+.f-group { display: flex; gap: var(--key-gap); }
+.f-group-spacer { width: 30px; }
+.arrow-cluster { display: flex; flex-direction: column; gap: var(--key-gap); align-items: center; }
+.key-bs { width: calc(var(--base-key-size) * 2 + var(--key-gap)); }
+.key-tab { width: calc(var(--base-key-size) * 1.5); }
+.key-caps { width: calc(var(--base-key-size) * 1.75); }
+.key-enter { width: calc(var(--base-key-size) * 2.25); }
+.key-shift-l { width: calc(var(--base-key-size) * 2.25); }
+.key-shift-r { width: calc(var(--base-key-size) * 2.75); }
+.key-backslash { width: calc(var(--base-key-size) * 1.5); }
+.key-mod { width: 60px; }
+.key-space { flex-grow: 1; }
+.status-lights { display: flex; gap: 12px; padding-right: 5px; padding-bottom: 12px; justify-content: flex-end; align-items: center; height: var(--base-key-size); box-sizing: border-box; }
+.light { width: 10px; height: 10px; background-color: var(--light-off-color); border-radius: 50%; border: 1px solid #111; transition: all 0.2s; }
+.light.active { background-color: var(--light-on-color); box-shadow: 0 0 8px var(--light-on-color); }
+.numpad-layout { display: flex; gap: var(--key-gap); }
+.numpad-main-col, .numpad-side-col { display: flex; flex-direction: column; gap: var(--key-gap); }
+.numpad-plus, .numpad-enter { height: calc(var(--base-key-size) * 2 + var(--key-gap)); }
+.numpad-zero { width: calc(var(--base-key-size) * 2 + var(--key-gap)); }
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+.modal-content { background-color: var(--bg-color); padding: 2rem 3rem; border-radius: 10px; text-align: center; border: 1px solid var(--main-color); box-shadow: 0 5px 25px rgba(0,0,0,0.5); }
+#results-summary { font-size: 1.5rem; margin: 1.5rem 0; }
+#results-message { font-size: 1.2rem; font-weight: 600; }
+.modal-buttons { margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; }
+.modal-buttons button { background-color: var(--main-color); color: #21252b; border: none; padding: 0.8rem 2rem; border-radius: 5px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: transform 0.2s; }
+.modal-buttons button:hover { transform: scale(1.05); }
+.hidden { display: none !important; }
+.pass { color: var(--correct-color); }
+.fail { color: var(--error-color); }
+
+.controls {
+    display: flex;
+    gap: 1rem; /* Add space between buttons */
+    align-items: center;
+    justify-content: center;
+}
+
+#home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #4a5058; /* A neutral color matching the theme */
+    color: var(--text-color);
+    border: none;
+    padding: 0;
+    width: 46px; /* Similar height to the restart button's padding */
+    height: 46px;
+    border-radius: 5px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none; /* Remove underline from link */
+}
+
+#home-btn:hover {
+    background-color: #5f6672;
+    transform: scale(1.05);
+}
+
+#side-widgets {
+    position: fixed;
+    top: 50%;
+    left: 15px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2rem;
+    z-index: 10;
+}
+
+/* Analog Clock Styles */
+#analog-clock {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    background-color: #21252b; /* Match text display bg */
+    border: 4px solid #3b4048; /* Match key color */
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#analog-clock::before { /* Center pin */
+    content: '';
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: var(--main-color);
+    border-radius: 50%;
+    z-index: 12;
+    border: 2px solid #21252b;
+}
+
+.clock-hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom;
+    border-radius: 5px;
+}
+
+#hour-hand {
+    width: 6px;
+    height: 40px;
+    background-color: var(--text-color);
+    transform: translateX(-50%);
+    z-index: 9;
+}
+#minute-hand {
+    width: 4px;
+    height: 60px;
+    background-color: var(--text-color);
+    transform: translateX(-50%);
+    z-index: 10;
+}
+#second-hand {
+    width: 2px;
+    height: 65px;
+    background-color: var(--main-color);
+    transform: translateX(-50%);
+    z-index: 11;
+}
+
+/* Progress Pie Chart Styles */
+#progress-pie-chart {
+    position: relative;
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    /* The gradient will be controlled by JS */
+    background: conic-gradient(var(--correct-color) 0deg, #3b4048 0deg);
+    display: grid;
+    place-items: center;
+    transition: background 0.2s ease-out;
+}
+
+#progress-pie-chart::before { /* Creates the donut hole */
+    content: "";
+    position: absolute;
+    width: 80%;
+    height: 80%;
+    background: #21252b; /* Match text display bg */
+    border-radius: 50%;
+} 
+
+#progress-pie-text {
+    position: relative; /* Ensure it's on top of the ::before pseudo-element */
+    font-family: var(--font-mono);
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+/* Responsive: Hide widgets on smaller screens to avoid overlap */
+@media (max-width: 1500px) {
+    #side-widgets {
+        display: none;
+    }
+}
+
+.key:has(.symbol) {
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding: 5px;
+}
+.key .symbol {
+    font-size: 0.8rem;
+    color: #a0a4a8;
+    line-height: 1;
+}
+.key .main {
+    font-size: 1.1rem;
+    font-weight: 500;
+    line-height: 1;
+}
+.key-backslash .main, .key-backslash .symbol {
+    align-self: center;
+}
+
+/* ============== NEW RIGHT-ALIGNED ADMIN HEADER STYLES ============== */
+.admin-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    
+    /* MODIFICATION: Changed from 'space-between' to 'flex-end' */
+    justify-content: flex-end; /* This pushes all content to the right */
+    
+    z-index: 1001;
+    
+    /* Glassmorphism Effect */
+    background-color: rgba(33, 37, 43, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-header-title {
+    /* This will now be on the far left, so we hide it or reposition it */
+    position: absolute;
+    left: 24px; /* Keep it aligned with padding */
+    top: 50%;
+    transform: translateY(-50%);
+    
+    color: var(--text-color);
+    font-weight: 500;
+    opacity: 0.8;
+    letter-spacing: 0.5px;
+}
+
+.typeahead-container {
+    position: relative;
+    width: 450px;
+    
+    /* MODIFICATION: Added right margin for spacing */
+    margin-right: 65px; /* This creates the 50px gap from the edge */
+}
+
+/* Wrapper to hold the search icon and input field */
+.search-wrapper {
+    position: relative;
+}
+
+.search-wrapper .fa-search {
+    position: absolute;
+    top: 50%;
+    left: 20px;
+    transform: translateY(-50%);
+    color: rgba(220, 223, 228, 0.4);
+    font-size: 0.9rem;
+}
+
+#admin-user-search {
+    width: 100%;
+    padding: 10px 15px 10px 45px; /* Left padding makes space for the icon */
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid transparent; /* Hide the default border */
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+#admin-user-search::placeholder {
+    color: rgba(220, 223, 228, 0.4);
+    transition: color 0.2s ease;
+}
+
+#admin-user-search:focus {
+    outline: none;
+    background-color: rgba(0, 0, 0, 0.3);
+    /* A subtle glow effect on focus */
+    box-shadow: 0 0 0 2px var(--main-color);
+}
+
+#typeahead-results {
+    position: absolute;
+    top: calc(100% + 5px); /* Add a small gap */
+    left: 0; right: 0;
+    background: #282c34; /* Slightly different background */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    max-height: 300px;
+    overflow-y: auto;
+    backdrop-filter: blur(5px);
+    -webkit-backdrop-filter: blur(5px);
+}
+
+.typeahead-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    cursor: pointer;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    transition: background-color 0.2s ease;
+}
+.typeahead-item:last-child { border-bottom: none; }
+.typeahead-item:hover { background-color: var(--main-color); color: #21252b; }
+.typeahead-item img { width: 40px; height: 40px; border-radius: 50%; margin-right: 12px; }
+.typeahead-info strong { display: block; }
+.typeahead-info small { opacity: 0.7; }
+/* ============================================================= */
+
+/* NEW: Admin Avatar Styles */
+.admin-avatar-container {
+    position: absolute;
+    margin-right:0px;
+}
+#admin-avatar-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s;
+}
+#admin-avatar-img:hover {
+    border-color: var(--main-color);
+}
+/* avatar end */
+
+/* ============== NEW TOAST NOTIFICATION STYLES ============== */
+#toast-notification {
+    position: fixed;
+    top: 20px;
+    right: -400px; /* Start off-screen */
+    min-width: 300px;
+    max-width: 400px;
+    background-color: #21252b;
+    color: var(--text-color);
+    padding: 1rem 1.5rem;
+    border-radius: 8px;
+    border-left: 5px solid; /* Color will be set by JS */
+    box-shadow: 0 5px 15px rgba(0,0,0,0.4);
+    transition: right 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+#toast-notification.show {
+    right: 20px; /* Slide in */
+}
+
+#toast-notification.success { border-left-color: var(--correct-color); }
+#toast-notification.error { border-left-color: var(--error-color); }
+
+#toast-icon {
+    font-size: 1.5rem;
+}
+#toast-icon.success { color: var(--correct-color); }
+#toast-icon.error { color: var(--error-color); }
+
+#toast-message {
+    font-weight: 500;
+}
+/* ========================================================== */
+
+/* Admin Modal */
+#admin-user-modal .modal-content { width: 90%; max-width: 450px; }
+.admin-toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #3b4048; }
+/* Simple Toggle Switch */
+.toggle-switch { position: relative; display: inline-block; width: 50px; height: 28px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #555; transition: .4s; border-radius: 28px; }
+.toggle-slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .toggle-slider { background-color: var(--correct-color); }
+input:checked + .toggle-slider:before { transform: translateX(22px); }

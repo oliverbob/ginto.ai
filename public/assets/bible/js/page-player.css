@@ -1,0 +1,459 @@
+/*
+
+ SoundManager 2: "page as playlist" example
+ ------------------------------------------
+ http://schillmania.com/projects/soundmanager2/
+
+*/
+
+.spectrum-container {
+ display:none;
+}
+
+ul.use-spectrum li.sm2_playing .spectrum-container {
+ position:absolute;
+ left:0px;
+ top:0px;
+ margin-left:-266px;
+ margin-top:-1px;
+ display:block;
+ background-color:#5588bb;
+ border:1px solid #99ccff;
+ border-radius:4px;
+}
+
+ul.use-spectrum .spectrum-box {
+ position:relative;
+ width:255px;
+ font-size:1em;
+ padding:2px 0px;
+ height:1.2em;
+ overflow:hidden;
+}
+
+ul.use-spectrum .spectrum-box .spectrum {
+ position:absolute;
+ left:0px;
+ top:-2px;
+ margin-top:20px;
+ display:block;
+ font-size:1px;
+ width:1px;
+ height:1px; /* set to 50px for a thick line, 1px for a thin line, etc. */
+ overflow:hidden;
+ background-color:#FEFEFC;
+}
+
+ul.playlist {
+	list-style-type:none;
+	margin:0px;
+	padding:0px;
+	font-size: 100%;
+}
+
+ul.playlist li {
+	/* assume all items will be sounds rather than wait for onload etc. in this example.. may differ for your uses. */
+		-webkit-box-shadow: 0px 1px 1px rgba(0,0,0,.2);
+	-moz-box-shadow: 0px 1px 1px rgba(0,0,0,.2);
+	box-shadow: 0px 1px 1px rgba(0,0,0,.2);
+ position:relative;
+	display:block;
+	width:auto;
+	font-size:80%;
+	color:#666;
+	padding-top:6px;
+	padding-bottom:6px;
+	padding-left:30px;
+	padding-right:5px;
+	border:none;
+	/* letter-spacing:-1px; ZOMG WEB X.0. ;) */
+	background-color:#F3F1EB;
+	-webkit-border-radius:5px;
+	-moz-border-radius:5px;
+	border-radius:5px;
+	-webkit-transition-property: hover;
+	-webkit-transition: background-color 0.15s ease-in-out;
+	-moz-transition: background-color 0.15s linear 0s; /* firefox 4 */
+	-o-transition-property: background-color; /* opera 10.5 */
+	-o-transition-duration: 0.15s;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	background-image:url(../img/audio-headphones.png);
+	background-position:10px 50%;
+	background-repeat:no-repeat;
+
+}
+
+ul.playlist li a {
+ display:block;
+ text-decoration:none;
+ font-weight:normal;
+ color:#333;
+ font-size:100%;
+ outline:none;
+ position:relative;
+ z-index:2;
+}
+
+ul.playlist li.sm2_playing,
+ul.playlist li.sm2_paused,
+ul.playlist li.sm2_playing a {
+	color:#222;
+	border-radius:3px;
+}
+
+ul.playlist li:hover {
+	background-color:#EFEDE4;
+	-webkit-box-shadow: 0px 1px 1px rgba(0,0,0,.4);
+	-moz-box-shadow: 0px 1px 1px rgba(0,0,0,.4);
+	box-shadow: 0px 1px 1px rgba(0,0,0,.4);
+}
+
+ul.playlist li:hover a {
+ color:#222;
+}
+
+ul.playlist li.sm2_playing,
+ul.playlist li.sm2_playing:hover {
+	background:#cbc0a9 url(../img/audio-play.png) no-repeat 10px 50%;
+}
+
+ul.playlist li.sm2_paused {
+	background:#E2DCCF url(../img/audio-pause.png) no-repeat 10px 50%;
+}
+
+ul.playlist li.sm2_playing:hover a,
+ul.playlist li.sm2_paused a {
+	color:#333;
+}
+
+ul.playlist li .controls {
+ display:none;
+}
+
+ul.playlist li .peak,
+ul.playlist.use-peak li .peak {
+ display:none;
+ position:absolute;
+ top:0.55em;
+ right:0.5em;
+}
+
+ul.playlist li.sm2_playing .controls,
+ul.playlist li.sm2_paused .controls {
+ position:relative;
+ display:block;
+}
+
+ul.playlist.use-peak li.sm2_playing .peak,
+ul.playlist.use-peak li.sm2_paused .peak {
+ display:inline;
+ display:inline-block;
+}
+
+ul.playlist.use-peak li .peak {
+ display:none; /* IE 7 */
+}
+
+ul.playlist li.sm2_paused .controls {
+ background-color:#666;
+}
+
+ul.playlist li:hover .controls .statusbar {
+ position:relative;
+ cursor:ew-resize;
+ cursor:-moz-grab;
+ cursor:grab;
+}
+
+ul.playlist li.sm2_paused .controls .statusbar {
+ background-color:#ccc;
+}
+
+ul.playlist li .controls {
+	position:relative;
+	margin-top:0.25em;
+	margin-bottom:0.25em;
+	background-color:#CCC;
+}
+
+ul.playlist li .controls .statusbar {
+	position:relative;
+	height:0.5em;
+	background-color:#999;
+	border:2px solid #FEFEFC;
+	border-radius:2px;
+	overflow:hidden;
+	cursor:-moz-grab;
+	cursor:grab;
+}
+
+ul.playlist li .controls.dragging .statusbar {
+ cursor:-moz-grabbing;
+ cursor:grabbing;
+}
+
+ul.playlist li .controls .statusbar .position,
+ul.playlist li .controls .statusbar .loading,
+ul.playlist li .controls .statusbar .annotation {
+ position:absolute;
+ left:0px;
+ top:0px;
+ height:0.5em;
+}
+
+ul.playlist li .controls .statusbar .position {
+	background-color:#333;
+	border-right:3px solid #9D261D;
+	border-radius:3px;
+}
+
+ul.playlist li.sm2_paused .controls .statusbar .position {
+ background-color:#666;
+ border-color:#666;
+}
+
+ul.playlist li .controls .statusbar .loading {
+ background-color:#eee;
+}
+
+ul.playlist li .controls .statusbar .position,
+ul.playlist li .controls .statusbar .loading {
+ width:0px;
+}
+
+ul.playlist li.sm2_playing a.sm2_link,
+ul.playlist li.sm2_paused a.sm2_link {
+ margin-right:4.5em; /* room for timing stuff */
+}
+
+ul.playlist li .timing {
+	position:absolute;
+	display:none;
+	text-align:right;
+	right:1em;
+	top:1em;
+	width:auto;
+	height:1em;
+	padding:3px 5px;
+	background-color:#333;
+	border:1px solid #999;
+	border-radius:4px;
+	letter-spacing:0px;
+	font:44% monaco,"VT-100","lucida console",courier,system;
+	line-height:1em;
+	vertical-align:middle;
+	color:#FEFEFC
+}
+
+ul.playlist.use-peak li .timing {
+ right:4.25em;
+}
+
+ul.playlist li:hover .timing {
+ z-index:2;
+}
+
+ul.playlist li .timing div.sm2_timing {
+ margin:0px;
+ padding:0px;
+ margin-top:-1em;
+}
+
+ul.playlist li.sm2_playing .timing,
+ul.playlist li.sm2_paused .timing {
+ display:block;
+}
+
+ul.playlist li.sm2_paused .timing .sm2_position {
+ text-decoration:blink; /* hee hee. first actual appropriate use? :D */
+}
+
+ul.playlist li.sm2_paused .timing,
+ul.playlist.use-peak li.sm2_paused .peak {
+	background-color:#666;
+	border-color:#ccc;
+}
+
+/* peak data */
+
+/* ul.playlist ... */
+
+ul.playlist.use-peak li .peak {
+ display:none;
+ zoom:1;
+ border:1px solid #99ccff;
+ padding:2px;
+ height:0.55em;
+ border-radius:4px;
+ background-color:#5588bb;
+ width:0.8em;
+ height:0.55em;
+ margin-top:-3px;
+}
+
+ul.playlist.use-peak li .peak-box {
+ position:relative;
+ width:100%;
+ height:0.55em;
+ overflow:hidden;
+}
+
+ul.playlist li .peak .l,
+ul.playlist li .peak .r {
+ position:absolute;
+ left:0px;
+ top:0px;
+ width:7px;
+ height:50px;
+ background:#FEFEFC;
+ border:1px solid #FEFEFC;
+ border-radius:1px;
+ margin-top:1em;
+}
+
+ul.playlist li .peak .l {
+ margin-right:1px;
+}
+
+ul.playlist li .peak .r {
+ left:10px;
+}
+
+#control-template {
+ display:none;
+}
+.noMargin {
+	margin: 0px;
+}
+
+/**
+ * SoundManager 2 + useFlashBlock
+ * ------------------------------
+ * Flash positioning and flashblock / clicktoflash handling
+ */
+
+#sm2-container {
+ /**
+  * where the SM2 flash movie goes. by default, relative container.
+  * set relative or absolute here, and don't touch it later or bad things will happen (see below comments.)
+  */
+ position: absolute;
+ width: 1px;
+ height: 1px;
+ overflow: hidden;
+ /* screw IE 6, just make it display nice */
+ _overflow: hidden;
+}
+
+#sm2-container object,
+#sm2-container embed {
+ /**
+  * the actual SWF movie bit.
+  * important: The SWF needs to be able to be moved off-screen without display: or position: changes.
+  * changing display: or position: or overflow: here or on parent can cause SWF reload or other weird issues after unblock
+  * e.g., SM2 starts but strange errors, no whileplaying() etc.
+  */
+ width: 48px;
+ height: 48px;
+ /* some flash blockers may also respect this rule */
+ max-width: 48px;
+ max-height: 48px;
+}
+
+#sm2-container.swf_timedout {
+ /* expand to show the timed-out SWF content */
+ position: relative;
+ width: 48px;
+ height: 48px;
+}
+
+#sm2-container.swf_timedout,
+#sm2-container.swf_timedout object,
+#sm2-container.swf_timedout embed {
+ /**
+  * when SM2 didn't start normally, time-out case. flash blocked, missing SWF, no flash?
+  * 48px square flash placeholder is typically used by blockers.
+  */
+ min-width: 48px;
+ min-height: 48px;
+}
+
+#sm2-container.swf_unblocked {
+ /* SWF unblocked, or was never blocked to begin with; try to collapse container as much as possible. */
+ width: 1px;
+ height: 1px;
+}
+
+#sm2-container.swf_loaded object,
+#sm2-container.swf_loaded embed,
+#sm2-container.swf_unblocked object,
+#sm2-container.swf_unblocked embed {
+ /* hide flash off-screen (relative to container) when it has loaded OK */
+ left: -9999em;
+ top: -9999em;
+}
+
+#sm2-container.swf_error {
+ /* when there is a fatal error (flash loaded, but SM2 failed) */
+ display: none;
+}
+
+#sm2-container.high_performance,
+#sm2-container.high_performance.swf_timeout {
+ /* "high performance" case: keep on-screen at all times */
+ position: absolute;
+ position: fixed;
+}
+
+#sm2-container.high_performance {
+ overflow: hidden;
+ _top: -9999px; /* IE 6 hax, no position:fixed */
+ _left: -9999px;
+ bottom: 0px;
+ left: 0px;
+ /**
+  * special case: show at first with w/h, hide when unblocked.
+  * might be bad/annoying.
+  * try to stay within ClickToFlash "invisible" limits (so it won't be blocked.)
+  */
+ z-index: 99; /* try to stay on top */
+}
+
+#sm2-container.high_performance.swf_loaded,
+#sm2-container.high_performance.swf_unblocked {
+ z-index: auto;
+}
+
+#sm2-container.high_performance.swf_loaded,
+#sm2-container.high_performance.swf_unblocked,
+#sm2-container.high_performance.swf_unblocked object,
+#sm2-container.high_performance.swf_unblocked embed {
+ /**
+  * 8x8px is required minimum to load in fx/win32 in some cases(?)
+  * 6x6+ good for fast performance, even better when on-screen via position:fixed
+  * also, clickToFlash (Safari <5.1) may auto-load "invisible" SWFs at this size
+  */
+ height: 8px;
+ width: 8px;
+}
+
+#sm2-container.high_performance.swf_loaded {
+ /* stay bottom/left */
+ top: auto;
+ bottom: 0px;
+ left: 0px;
+}
+
+#sm2-container.high_performance.swf_loaded object,
+#sm2-container.high_performance.swf_loaded embed,
+#sm2-container.high_performance.swf_unblocked object,
+#sm2-container.high_performance.swf_unblocked embed {
+ /* high-performance case must stay on-screen */
+ left: auto;
+ top: auto;
+}
+
+#sm2-container.high_performance.swf_timedout {
+ z-index: 99; /* try to stay on top */
+}

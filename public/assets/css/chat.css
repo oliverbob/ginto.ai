@@ -1,0 +1,869 @@
+/* ============ MESSENGER-STYLE CHAT BUBBLES ============ */
+/* Complete styling for Facebook Messenger-like conversation UI */
+
+/* ============ MARKDOWN TABLE STYLING ============ */
+.markdown-table,
+.prose table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 1rem 0 !important;
+  font-size: 0.875rem !important;
+  overflow-x: auto !important;
+  display: block !important;
+}
+
+.markdown-table thead,
+.prose table thead {
+  background: rgba(55, 65, 81, 0.5) !important;
+}
+
+.markdown-table th,
+.markdown-table td,
+.prose table th,
+.prose table td {
+  padding: 0.75rem 1rem !important;
+  text-align: left !important;
+  border: 1px solid #374151 !important;
+  white-space: nowrap !important;
+}
+
+.markdown-table th,
+.prose table th {
+  font-weight: 600 !important;
+  color: #f9fafb !important;
+}
+
+.markdown-table td,
+.prose table td {
+  color: #d1d5db !important;
+}
+
+.markdown-table tbody tr:hover,
+.prose table tbody tr:hover {
+  background: rgba(55, 65, 81, 0.3) !important;
+}
+
+/* ============ SPINNER ANIMATION ============ */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-6px); }
+}
+
+.dancing-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  font-size: 20px;
+  color: #a855f7;
+}
+
+.dancing-dots span {
+  animation: bounce 1.4s infinite ease-in-out;
+}
+
+.dancing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.dancing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dancing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.search-spinner {
+  animation: spin 1s linear infinite !important;
+  color: #a855f7 !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.search-spinner.hidden {
+  display: none !important;
+}
+
+.activity-spinner {
+  animation: spin 1s linear infinite !important;
+  color: #a855f7 !important;
+  border: none !important;
+  background: none !important;
+}
+
+.activity-spinner.hidden {
+  display: none !important;
+}
+
+/* ============ MESSAGE PAIR CONTAINER ============ */
+.messenger-pair {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  margin-bottom: 24px !important;
+  padding: 0 !important;
+}
+
+/* ============ USER MESSAGE (RIGHT-ALIGNED, BLUE) ============ */
+.messenger-row-user {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  width: 100% !important;
+}
+
+.messenger-bubble-user {
+    background: rgb(45 48 116 / 50%) !important;
+    color: #ffffff !important;
+    padding: 12px 16px !important;
+    border-radius: 18px !important;
+    border-bottom-right-radius: 4px !important;
+    max-width: 70% !important;
+    font-size: 0.9375rem !important;
+    line-height: 1.4 !important;
+    word-wrap: break-word !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+}
+
+.messenger-bubble-user .messenger-text {
+  white-space: pre-wrap !important;
+  color: #ffffff !important;
+}
+
+/* ============ ASSISTANT RESPONSE (USING EXISTING CARD STRUCTURE) ============ */
+.convo-card-body {
+  width: 100% !important;
+  max-width: 100% !important;
+  padding: 10px !important;
+  background: linear-gradient(to bottom right, rgba(67, 56, 202, 0.06), rgba(17, 24, 39, 0.4), rgba(88, 28, 135, 0.06)) !important;
+  border: 1px solid rgba(99, 102, 241, 0.12) !important;
+  border-radius: 18px 18px 18px 4px !important;
+}
+
+/* ============ REASONING SECTION (COLLAPSIBLE) ============ */
+.messenger-reasoning {
+  margin-bottom: 12px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .messenger-reasoning {
+  border-bottom-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.messenger-reasoning-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  color: #65676b !important;
+  padding: 4px 8px !important;
+  border-radius: 8px !important;
+  transition: background 0.15s !important;
+}
+
+.dark .messenger-reasoning-toggle {
+  color: #b0b3b8 !important;
+}
+
+.messenger-reasoning-toggle:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #050505 !important;
+}
+
+.dark .messenger-reasoning-toggle:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #e4e6eb !important;
+}
+
+.messenger-reasoning-chevron {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0 !important;
+  transition: transform 0.2s ease !important;
+}
+
+.messenger-reasoning-chevron.open {
+  transform: rotate(180deg) !important;
+}
+
+.messenger-reasoning-content {
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+  color: #65676b !important;
+  margin-top: 8px !important;
+  padding-left: 4px !important;
+  max-height: 250px !important;
+  overflow-y: auto !important;
+}
+
+.dark .messenger-reasoning-content {
+  color: #b0b3b8 !important;
+}
+
+/* ============ REASONING TIMELINE ITEMS ============ */
+.reasoning-item {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 12px !important;
+  padding-left: 4px !important;
+  margin-bottom: 0 !important;
+  position: relative !important;
+}
+
+.reasoning-item-indicator {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 12px !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  height: auto !important;
+  padding-top: 0 !important;
+}
+
+.reasoning-item-dot {
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background: #9ca3af !important;
+  flex-shrink: 0 !important;
+  z-index: 2 !important;
+  position: relative !important;
+  margin-top: 6px !important;
+}
+
+.dark .reasoning-item-dot {
+  background: #6b7280 !important;
+}
+
+.reasoning-item-dot-green {
+  background: #0084ff !important;
+}
+
+.dark .reasoning-item-dot-green {
+  background: #0084ff !important;
+}
+
+/* Line connecting dots - use ::after pseudo-element on the item itself */
+.reasoning-item::before {
+  content: '' !important;
+  position: absolute !important;
+    /* Align the vertical line to the center of the indicator column.
+      The item has 4px left padding and indicator width is 12px, so
+      4 + (12/2) = 10px centers the line under the dot. Top is set
+      to match the dot's visual center (margin-top 6px + 4px radius = 10px). */
+    left: 10px !important;
+    top: 10px !important;
+  bottom: -12px !important;
+  width: 2px !important;
+  background: #d1d5db !important;
+  z-index: 1 !important;
+}
+
+.dark .reasoning-item::before {
+  background: #4b5563 !important;
+}
+
+/* Hide line on last item */
+.reasoning-item:last-child::before,
+.reasoning-item-last::before {
+  display: none !important;
+}
+
+/* Legacy line element - hide it since we use ::before now */
+.reasoning-item-line {
+  display: none !important;
+}
+
+.reasoning-item-text {
+  flex: 1 !important;
+  padding-bottom: 12px !important;
+  font-size: 0.8125rem !important;
+  line-height: 1.5 !important;
+  color: #65676b !important;
+}
+
+.dark .reasoning-item-text {
+  color: #b0b3b8 !important;
+}
+
+.reasoning-item-text p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* ============ RESPONSE CONTENT ============ */
+.messenger-response {
+  line-height: 1.5 !important;
+}
+
+.messenger-response p {
+  margin: 0.5em 0 !important;
+}
+
+.messenger-response p:first-child {
+  margin-top: 0 !important;
+}
+
+.messenger-response p:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Prose styling for response content */
+.messenger-response.prose {
+  color: #050505 !important;
+}
+
+.dark .messenger-response.prose {
+  color: #e4e6eb !important;
+}
+
+.messenger-response.prose h1,
+.messenger-response.prose h2,
+.messenger-response.prose h3 {
+  color: #050505 !important;
+  margin-top: 1em !important;
+  margin-bottom: 0.5em !important;
+  font-weight: 600 !important;
+}
+
+.dark .messenger-response.prose h1,
+.dark .messenger-response.prose h2,
+.dark .messenger-response.prose h3 {
+  color: #e4e6eb !important;
+}
+
+.messenger-response.prose strong {
+  color: #050505 !important;
+  font-weight: 600 !important;
+}
+
+.dark .messenger-response.prose strong {
+  color: #ffffff !important;
+}
+
+.messenger-response.prose ul,
+.messenger-response.prose ol {
+  margin: 0.5em 0 !important;
+  padding-left: 1.5em !important;
+}
+
+.messenger-response.prose li {
+  margin: 0.25em 0 !important;
+}
+
+.messenger-response.prose code {
+  background: rgba(0, 0, 0, 0.08) !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-size: 0.875em !important;
+  color: #d946ef !important;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace !important;
+}
+
+.dark .messenger-response.prose code {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #f0abfc !important;
+}
+
+.messenger-response.prose pre {
+  background: #1e1e1e !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  overflow-x: auto !important;
+  margin: 0.75em 0 !important;
+}
+
+.messenger-response.prose pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  color: #d4d4d4 !important;
+}
+
+/* ============ USER IMAGE ATTACHMENT ============ */
+.messenger-image {
+  max-width: 70% !important;
+  margin-bottom: 8px !important;
+}
+
+.messenger-image img {
+  border-radius: 12px !important;
+  max-width: 100% !important;
+  cursor: pointer !important;
+}
+
+/* ============ CITATIONS ============ */
+.messenger-citations {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin-top: 12px !important;
+  padding-top: 12px !important;
+  border-top: 1px solid rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .messenger-citations {
+  border-top-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.messenger-citation {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 4px 10px !important;
+  background: rgba(0, 0, 0, 0.05) !important;
+  border-radius: 12px !important;
+  font-size: 0.75rem !important;
+  color: #65676b !important;
+  text-decoration: none !important;
+  transition: background 0.15s !important;
+}
+
+.dark .messenger-citation {
+  background: rgba(255, 255, 255, 0.1) !important;
+  color: #b0b3b8 !important;
+}
+
+.messenger-citation:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+.dark .messenger-citation:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Citation links (used in card-citations-list) */
+.citation,
+.citation-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 12px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 16px !important;
+  font-size: 0.8125rem !important;
+  color: #b0b3b8 !important;
+  text-decoration: none !important;
+  transition: background 0.15s !important;
+}
+
+.citation:hover,
+.citation-chip:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #e4e6eb !important;
+}
+
+.citation img,
+.citation-chip img {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  vertical-align: middle !important;
+  object-fit: cover !important;
+}
+
+.citation span,
+.citation-chip span {
+  white-space: nowrap !important;
+}
+
+/* ============ ACTION BUTTONS ============ */
+.messenger-actions {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  margin-top: 6px !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s !important;
+}
+
+.messenger-row-assistant:hover .messenger-actions {
+  opacity: 1 !important;
+}
+
+.messenger-action-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: #000000 !important;
+  transition: all 0.15s !important;
+}
+
+.dark .messenger-action-btn {
+  color: #ffffff !important;
+}
+
+.messenger-action-btn:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #000000 !important;
+}
+
+.dark .messenger-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.messenger-action-btn.active {
+  color: #0084ff !important;
+}
+
+.messenger-action-btn svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+/* ============ HIDE OLD CARD STYLES ============ */
+.convo-card {
+  display: none !important;
+}
+
+/* ============ USER MESSAGE ACTION BUTTONS ============ */
+.user-message-actions {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+  margin-top: 4px !important;
+  padding: 0 !important;
+  opacity: 0 !important;
+  transition: opacity 0.15s !important;
+}
+
+.messenger-row-user:hover .user-message-actions {
+  opacity: 1 !important;
+}
+
+/* User action buttons - force black in light mode, white in dark mode */
+.user-action-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  background: transparent !important;
+  border: none !important;
+  cursor: pointer !important;
+  color: #1a1a1a !important;
+  transition: all 0.15s !important;
+}
+
+html:not(.dark) .user-action-btn {
+  color: #1a1a1a !important;
+}
+
+html:not(.dark) .user-action-btn svg {
+  stroke: #1a1a1a !important;
+}
+
+.user-action-btn svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke: #1a1a1a !important;
+}
+
+.dark .user-action-btn,
+html.dark .user-action-btn {
+  color: #ffffff !important;
+}
+
+.dark .user-action-btn svg,
+html.dark .user-action-btn svg {
+  stroke: #ffffff !important;
+}
+
+.user-action-btn:hover {
+  background: rgba(0, 0, 0, 0.15) !important;
+  color: #000000 !important;
+}
+
+.user-action-btn:hover svg {
+  stroke: #000000 !important;
+}
+
+.dark .user-action-btn:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+  color: #ffffff !important;
+}
+
+.dark .user-action-btn:hover svg {
+  stroke: #ffffff !important;
+}
+
+/* ============ EDIT IN PLACE ============ */
+.user-message-edit-area {
+  margin-top: 8px;
+  width: 100%;
+}
+
+.user-message-edit-area.hidden {
+  display: none !important;
+}
+
+.user-edit-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.user-edit-textarea:focus {
+  outline: none;
+  border-color: rgba(99, 102, 241, 0.6);
+}
+
+.user-edit-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.user-edit-cancel-btn,
+.user-edit-save-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+}
+
+.user-edit-cancel-btn {
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.user-edit-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+
+.user-edit-save-btn {
+  background: #6366f1;
+  color: #fff;
+}
+
+.user-edit-save-btn:hover {
+  background: #4f46e5;
+}
+
+/* ============ VERSION NAVIGATION ============ */
+.version-nav {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  background: rgba(99, 102, 241, 0.1) !important;
+  border-radius: 16px !important;
+  padding: 2px 6px !important;
+}
+
+.version-nav .action-btn {
+  width: 24px !important;
+  height: 24px !important;
+  padding: 4px !important;
+}
+
+.version-nav .action-btn:hover {
+  background: rgba(99, 102, 241, 0.2) !important;
+}
+
+.version-indicator {
+  font-size: 0.8125rem !important;
+  font-weight: 500 !important;
+  color: #a5b4fc !important;
+  min-width: 36px !important;
+  text-align: center !important;
+  user-select: none !important;
+}
+
+/* ============ CONTAINER STYLING ============ */
+.convo-history {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 16px 0 !important;
+}
+
+/* ============ LIGHT MODE STYLES (INVERSE OF DARK) ============ */
+
+/* Light mode: Convo card body - light gradient background */
+html:not(.dark) .convo-card-body {
+  background: linear-gradient(to bottom right, rgba(99, 102, 241, 0.08), rgba(248, 250, 252, 0.95), rgba(168, 85, 247, 0.08)) !important;
+  border: 1px solid rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Light mode: User message bubble */
+html:not(.dark) .messenger-bubble-user {
+  background: rgb(79 70 229 / 90%) !important;
+  color: #ffffff !important;
+}
+
+/* Light mode: Reasoning section */
+html:not(.dark) .messenger-reasoning {
+  border-bottom-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .messenger-reasoning-toggle {
+  color: #374151 !important;
+}
+
+html:not(.dark) .messenger-reasoning-toggle:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Reasoning content */
+html:not(.dark) .messenger-reasoning-content {
+  color: #4b5563 !important;
+}
+
+/* Light mode: Reasoning dots */
+html:not(.dark) .reasoning-item-dot {
+  background: #9ca3af !important;
+}
+
+html:not(.dark) .reasoning-item-dot-green {
+  background: #3b82f6 !important;
+}
+
+/* Light mode: Reasoning lines */
+html:not(.dark) .reasoning-item::before {
+  background: #d1d5db !important;
+}
+
+/* Light mode: Reasoning text */
+html:not(.dark) .reasoning-item-text {
+  color: #4b5563 !important;
+}
+
+/* Light mode: Response prose */
+html:not(.dark) .messenger-response.prose {
+  color: #111827 !important;
+}
+
+html:not(.dark) .messenger-response.prose h1,
+html:not(.dark) .messenger-response.prose h2,
+html:not(.dark) .messenger-response.prose h3 {
+  color: #111827 !important;
+}
+
+html:not(.dark) .messenger-response.prose strong {
+  color: #000000 !important;
+}
+
+html:not(.dark) .messenger-response.prose code {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #9333ea !important;
+}
+
+html:not(.dark) .messenger-response.prose pre {
+  background: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+html:not(.dark) .messenger-response.prose pre code {
+  background: transparent !important;
+  color: #e2e8f0 !important;
+}
+
+/* Light mode: Citations */
+html:not(.dark) .messenger-citations {
+  border-top-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not(.dark) .messenger-citation {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .messenger-citation:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Action buttons */
+html:not(.dark) .messenger-action-btn {
+  color: #6b7280 !important;
+}
+
+html:not(.dark) .messenger-action-btn:hover {
+  background: rgba(0, 0, 0, 0.08) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Tables */
+html:not(.dark) .markdown-table thead,
+html:not(.dark) .prose table thead {
+  background: rgba(243, 244, 246, 0.8) !important;
+}
+
+html:not(.dark) .markdown-table th,
+html:not(.dark) .markdown-table td,
+html:not(.dark) .prose table th,
+html:not(.dark) .prose table td {
+  border-color: #e5e7eb !important;
+}
+
+html:not(.dark) .markdown-table th,
+html:not(.dark) .prose table th {
+  color: #111827 !important;
+}
+
+html:not(.dark) .markdown-table td,
+html:not(.dark) .prose table td {
+  color: #374151 !important;
+}
+
+html:not(.dark) .markdown-table tbody tr:hover,
+html:not(.dark) .prose table tbody tr:hover {
+  background: rgba(243, 244, 246, 0.5) !important;
+}
+
+/* Light mode: Citations in cards */
+html:not(.dark) .citation,
+html:not(.dark) .citation-chip {
+  background: rgba(0, 0, 0, 0.05) !important;
+  color: #4b5563 !important;
+}
+
+html:not(.dark) .citation:hover,
+html:not(.dark) .citation-chip:hover {
+  background: rgba(0, 0, 0, 0.1) !important;
+  color: #111827 !important;
+}
+
+/* Light mode: Version navigation */
+html:not(.dark) .version-nav {
+  background: rgba(99, 102, 241, 0.08) !important;
+}
+
+html:not(.dark) .version-indicator {
+  color: #6366f1 !important;
+}

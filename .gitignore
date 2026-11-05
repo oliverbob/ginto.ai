@@ -1,0 +1,41 @@
+# Ignore vendor dependencies — we keep these out of git and install with composer.
+vendor/
+
+# Common extras to ignore (optional)
+.idea/
+.vscode/
+node_modules/
+vendor/
+.DS_Store
+
+# Local environment files (do not commit secrets)
+.env
+# Anything derived from it too — bin/rotate-relay-secret.sh writes .env.bak-<stamp>
+# before each edit, and those backups hold the live signing secret. The negation
+# matters: .env.* alone also swallows .env.example, and a template nobody can
+# commit is how the next person ends up with no reference for what to set.
+.env.*
+!.env.example
+.installed
+.install_config
+
+# Ignore nested git repos (MCP tools)
+tools/groq-mcp/
+tools/geojsonph/
+
+# Storage directory (now at ../storage, but ignore any local storage/ just in case)
+storage/
+
+# Log files are stored outside repo at ../storage/logs
+!public/lib/novnc/vendor/
+
+# SDCPU virtual environment
+tools/sdcpu/venv/
+
+# Agent instruction file
+agents.do
+
+# Local nested gntl repo used for testing
+gntl/.claude/
+bin/live/
+.github/

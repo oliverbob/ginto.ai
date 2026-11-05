@@ -1,0 +1,1473 @@
+<?php
+// silverqueen/dashboard.php — the SilverQueen resource-allocation console.
+// Mobile-first: one column on phones, two from md, three from xl. Every number on
+// this page is settled server-side; the ticking figures are clearly labelled as
+// projections toward the next 24h boundary.
+$snapshot   = $snapshot   ?? [];
+$products   = $products   ?? [];
+$admin      = $admin      ?? null;
+$isElevated = $isElevated ?? false;
+$inviteBase = $inviteBase ?? '';
+$csrf       = $csrf_token ?? '';
+
+$wallet     = $snapshot['wallet'] ?? [];
+$owned      = $snapshot['owned_cards'] ?? [];
+$qualified  = !empty($snapshot['qualified']);
+$allocs     = $snapshot['allocations'] ?? [];
+$downline   = $snapshot['downline'] ?? [1 => [], 2 => []];
+$commission = $snapshot['commissions'] ?? ['total' => 0, 'levels' => [1 => 0, 2 => 0], 'count' => 0];
+$referral   = $snapshot['referral'] ?? [];
+$txns       = $snapshot['transactions'] ?? [];
+$ratePct    = rtrim(rtrim(number_format(((float) ($snapshot['daily_rate'] ?? 0.005)) * 100, 3), '0'), '.');
+
+// USDT (BEP20) is the only accepted payment method — see Views/payments/address.php.
+$payment    = $snapshot['payment'] ?? ['address' => '', 'network' => 'BNB Smart Chain (BEP20)', 'token' => 'USDT', 'qr' => '/assets/images/pay_usdt.jpeg'];
+$openInv    = $snapshot['open_invoices'] ?? [];
+$rejected   = $snapshot['rejected'] ?? [];
+// product_code => open invoice, so a card with a live invoice can't be re-ordered.
+$openByCode = [];
+foreach ($openInv as $inv) $openByCode[(string) $inv['product_code']] = $inv;
+
+$cardLabels = ['card_virtual' => 'Virtual', 'card_physical' => 'Physical', 'card_nft' => 'NFT Tracker'];
+$money = static fn($n, $d = 2) => number_format((float) $n, $d);
+?>
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow">
+<title><?= htmlspecialchars($title ?? 'SilverQueen') ?></title>
+<script>
+  (function(){const t=localStorage.getItem('theme');document.documentElement.classList.toggle('dark',t==='dark'||(t!=='light'&&true));})();
+  function sqToggleTheme(){const d=!document.documentElement.classList.contains('dark');document.documentElement.classList.toggle('dark',d);try{localStorage.setItem('theme',d?'dark':'light');}catch(e){}}
+</script>
+<script src="/assets/js/tailwindcss.js"></script>
+<script>tailwind.config={darkMode:'class',theme:{extend:{colors:{primary:'#6366f1',secondary:'#8b5cf6',silver:'#94a3b8'}}}};</script>
+<link rel="stylesheet" href="/assets/fontawesome/css/all.min.css">
+<style>
+  .dark{color-scheme:dark}
+  .sq-num{font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  /* Thin meter, rounded ends, anchored at the track's start. */
+  .sq-meter{height:6px;border-radius:999px;overflow:hidden}
+  .sq-meter>span{display:block;height:100%;border-radius:999px}
+  /* Tree connectors, drawn with borders so they survive text scaling. */
+  .sq-branch{position:relative;padding-left:1.25rem}
+  .sq-branch::before{content:'';position:absolute;left:.4rem;top:0;bottom:50%;width:1px;background:currentColor;opacity:.25}
+  .sq-branch::after{content:'';position:absolute;left:.4rem;top:50%;width:.7rem;height:1px;background:currentColor;opacity:.25}
+  .sq-branch:last-child::before{bottom:50%}
+  @media (prefers-reduced-motion:no-preference){.sq-pulse{animation:sqp 2.4s ease-in-out infinite}}
+  @keyframes sqp{0%,100%{opacity:1}50%{opacity:.45}}
+</style>
+</head>
+<body class="bg-gray-50 dark:bg-[#0b1020] text-gray-900 dark:text-gray-100 min-h-screen antialiased">
+
+<header class="sticky top-0 z-30 border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-[#0b1020]/90 backdrop-blur">
+  <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="w-9 h-9 shrink-0 rounded-xl bg-gradient-to-br from-slate-300 to-slate-500 dark:from-slate-400 dark:to-slate-700 text-white inline-flex items-center justify-center">
+        <i class="fas fa-chess-queen"></i>
+      </span>
+      <div class="min-w-0">
+        <div class="font-extrabold leading-tight truncate">Silver<span class="text-primary">Queen</span></div>
+        <div class="text-[10px] uppercase tracking-wider text-gray-400 hidden sm:block">Resource allocation console</div>
+      </div>
+    </div>
+    <div class="flex items-center gap-2 sm:gap-3">
+      <div class="text-right leading-tight">
+        <div class="text-[10px] uppercase tracking-wider text-gray-400">Wallet</div>
+        <div class="font-bold sq-num text-sm sm:text-base" id="sqWalletChip">$<?= $money($wallet['balance'] ?? 0) ?></div>
+      </div>
+      <?php if ($isElevated): ?>
+        <span class="hidden sm:inline text-[10px] font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+          <i class="fas fa-shield-halved mr-1"></i>Elevated
+        </span>
+      <?php endif; ?>
+      <button onclick="sqToggleTheme()" title="Toggle light / dark"
+              class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary">
+        <i class="fas fa-circle-half-stroke"></i>
+      </button>
+      <a href="/logout" title="Log out" class="w-9 h-9 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-500 inline-flex items-center justify-center">
+        <i class="fas fa-arrow-right-from-bracket"></i>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 py-6 space-y-6">
+
+  <!-- ── Headline tiles ──────────────────────────────────────────────────── -->
+  <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-4">
+      <div class="text-[11px] uppercase tracking-wider text-gray-400">Allocated principal</div>
+      <div class="mt-1 text-2xl sm:text-3xl font-extrabold sq-num" id="sqPrincipal">$<?= $money($snapshot['principal'] ?? 0) ?></div>
+      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <span id="sqAllocs"><?= (int) ($snapshot['alloc_count'] ?? 0) ?></span> allocation<?= ((int) ($snapshot['alloc_count'] ?? 0)) === 1 ? '' : 's' ?>
+        · <span id="sqActive"><?= (int) ($snapshot['active_count'] ?? 0) ?></span> active
+      </div>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-4">
+      <div class="text-[11px] uppercase tracking-wider text-gray-400">Daily yield rate</div>
+      <div class="mt-1 text-2xl sm:text-3xl font-extrabold sq-num" id="sqDaily">$<?= $money($snapshot['daily_yield'] ?? 0) ?></div>
+      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400"><?= $ratePct ?>%/day · <?= (int) ($snapshot['term_days'] ?? 365) ?>-day term</div>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-4">
+      <div class="text-[11px] uppercase tracking-wider text-gray-400">Transferred to date</div>
+      <div class="mt-1 text-2xl sm:text-3xl font-extrabold sq-num" id="sqClaimed">$<?= $money($snapshot['claimed_total'] ?? 0) ?></div>
+      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Lifetime yield moved to wallet</div>
+    </div>
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-4">
+      <div class="text-[11px] uppercase tracking-wider text-gray-400">Compounded</div>
+      <div class="mt-1 text-2xl sm:text-3xl font-extrabold sq-num" id="sqCompounded">$<?= $money($wallet['total_compounded'] ?? 0) ?></div>
+      <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">Earned by assets left in wallet</div>
+    </div>
+  </section>
+
+  <!-- ── Yield tracker + wallet ──────────────────────────────────────────── -->
+  <section class="grid gap-4 lg:grid-cols-3">
+    <div class="lg:col-span-2 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+      <div class="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <div class="flex items-center gap-2 font-bold"><i class="fas fa-wave-square text-primary"></i> Yield tracker</div>
+          <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+            Yield settles every 24 hours from the moment a unit is purchased — Day&nbsp;1 pays nothing, Day&nbsp;2 onwards pays <?= $ratePct ?>%.
+          </p>
+        </div>
+        <span class="text-[11px] px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300 inline-flex items-center gap-1.5">
+          <i class="fas fa-circle text-[6px] sq-pulse"></i> Live
+        </span>
+      </div>
+
+      <div class="mt-5 grid sm:grid-cols-2 gap-4">
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Available to transfer</div>
+          <div class="mt-1 text-4xl font-extrabold sq-num text-primary" id="sqPending">$<?= $money($snapshot['pending_yield'] ?? 0, 4) ?></div>
+          <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Next settlement in <span class="font-semibold sq-num" id="sqNextAccrual" data-at="<?= htmlspecialchars((string) ($snapshot['next_accrual_at'] ?? '')) ?>">—</span>
+          </div>
+          <button type="button" id="sqClaimBtn" onclick="sqClaim(this)"
+                  class="mt-4 w-full sm:w-auto px-5 py-3 rounded-xl font-semibold text-white bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  <?= ((float) ($snapshot['pending_yield'] ?? 0)) > 0 ? '' : 'disabled' ?>>
+            <i class="fas fa-arrow-right-arrow-left mr-2"></i>Transfer to Wallet
+          </button>
+        </div>
+        <div class="rounded-xl bg-gray-50 dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-4">
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Wallet balance</div>
+          <div class="mt-1 text-3xl font-extrabold sq-num" id="sqWallet">$<?= $money($wallet['balance'] ?? 0, 4) ?></div>
+          <dl class="mt-3 space-y-1.5 text-xs">
+            <div class="flex justify-between gap-2">
+              <dt class="text-gray-500 dark:text-gray-400">Compounding at</dt>
+              <dd class="font-semibold sq-num"><?= $ratePct ?>%/24h</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-gray-500 dark:text-gray-400">Next recalculation</dt>
+              <dd class="font-semibold sq-num" id="sqNextCompound" data-at="<?= htmlspecialchars((string) ($snapshot['next_compound_at'] ?? '')) ?>">—</dd>
+            </div>
+            <div class="flex justify-between gap-2">
+              <dt class="text-gray-500 dark:text-gray-400">Projected next cycle</dt>
+              <dd class="font-semibold sq-num text-emerald-600 dark:text-emerald-400" id="sqWalletDaily">+$<?= $money($snapshot['wallet_daily'] ?? 0, 4) ?></dd>
+            </div>
+          </dl>
+          <p class="mt-3 text-[11px] text-gray-400 leading-snug">
+            Assets left in the wallet are re-rated every 24 hours, compounding onto the base allocation.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Qualification -->
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+      <div class="flex items-center gap-2 font-bold"><i class="fas fa-id-card-clip text-primary"></i> Hardware qualification</div>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">All three cards unlock SQB engine units.</p>
+      <ul class="mt-4 space-y-2.5">
+        <?php foreach ($cardLabels as $code => $label):
+          $has = in_array($code, $owned, true); ?>
+          <li class="flex items-center gap-3">
+            <span class="w-7 h-7 shrink-0 rounded-lg inline-flex items-center justify-center text-xs <?= $has
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                  : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500' ?>">
+              <i class="fas <?= $has ? 'fa-check' : 'fa-lock' ?>"></i>
+            </span>
+            <span class="flex-1 text-sm font-medium"><?= htmlspecialchars($label) ?></span>
+            <span class="text-xs <?= $has ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400' ?>">
+              <?= $has ? 'Held' : 'Missing' ?>
+            </span>
+          </li>
+        <?php endforeach; ?>
+      </ul>
+      <div class="mt-4 sq-meter bg-gray-100 dark:bg-gray-800">
+        <span class="bg-primary" style="width:<?= (int) round(count(array_intersect(array_keys($cardLabels), $owned)) / 3 * 100) ?>%"></span>
+      </div>
+      <div class="mt-3 text-sm font-semibold <?= $qualified ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400' ?>">
+        <i class="fas <?= $qualified ? 'fa-unlock' : 'fa-lock' ?> mr-1.5"></i>
+        <?= $qualified ? 'SQB engines unlocked' : 'SQB engines locked' ?>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Catalogue ───────────────────────────────────────────────────────── -->
+  <section>
+    <div class="flex items-baseline justify-between gap-3 flex-wrap">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-layer-group text-primary"></i> Products</h2>
+      <span class="text-xs text-gray-500 dark:text-gray-400">
+        <i class="fab fa-bitcoin text-amber-500 mr-1"></i>Paid in USDT on <?= htmlspecialchars((string) $payment['network']) ?> — the only accepted method
+      </span>
+    </div>
+    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <?php foreach ($products as $p):
+        $code    = (string) $p['code'];
+        $isCard  = $p['kind'] === 'card';
+        $has     = $isCard && in_array($code, $owned, true);
+        $locked  = !$isCard && !$qualified;
+        $pending = $openByCode[$code] ?? null; ?>
+        <article class="rounded-2xl border p-5 flex flex-col <?= $has
+              ? 'border-emerald-300 dark:border-emerald-500/40 bg-emerald-50/50 dark:bg-emerald-500/5'
+              : 'border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834]' ?>">
+          <div class="flex items-start justify-between gap-2">
+            <span class="w-10 h-10 rounded-xl inline-flex items-center justify-center <?= $isCard
+                  ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary' ?>">
+              <i class="fas <?= $isCard ? 'fa-credit-card' : 'fa-microchip' ?>"></i>
+            </span>
+            <?php if ($has): ?>
+              <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300">
+                <i class="fas fa-check mr-1"></i>Owned
+              </span>
+            <?php elseif ($pending): ?>
+              <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">
+                <i class="fas fa-hourglass-half mr-1"></i><?= $pending['status'] === 'awaiting_confirmation' ? 'Verifying' : 'Unpaid' ?>
+              </span>
+            <?php elseif ($locked): ?>
+              <span class="text-[10px] font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+                <i class="fas fa-lock mr-1"></i>Locked
+              </span>
+            <?php endif; ?>
+          </div>
+
+          <h3 class="mt-3 font-bold leading-tight"><?= htmlspecialchars((string) $p['name']) ?></h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400 flex-1"><?= htmlspecialchars((string) ($p['description'] ?? '')) ?></p>
+
+          <?php
+          $variable = ($p['pricing_mode'] ?? 'fixed') === 'variable';
+          $minAmt   = (float) ($p['min_amount'] ?: $p['price']);
+          ?>
+          <div class="mt-3 flex items-baseline gap-1">
+            <?php if ($variable): ?>
+              <span class="text-xs font-semibold text-gray-400">from</span>
+              <span class="text-2xl font-extrabold sq-num"><?= $money($minAmt) ?></span>
+              <span class="text-xs font-semibold text-gray-400">USDT</span>
+            <?php else: ?>
+              <span class="text-2xl font-extrabold sq-num"><?= $money($p['price']) ?></span>
+              <span class="text-xs font-semibold text-gray-400">USDT</span>
+            <?php endif; ?>
+          </div>
+          <?php if (!$isCard): ?>
+            <div class="mt-1 text-[11px] text-gray-500 dark:text-gray-400">
+              <?= rtrim(rtrim(number_format((float) $p['daily_rate'] * 100, 3), '0'), '.') ?>%/day · <?= (int) $p['term_days'] ?> days
+            </div>
+            <?php if ($variable): ?>
+              <div class="mt-3">
+                <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqStakeInput">Amount to allocate</label>
+                <div class="relative">
+                  <input id="sqStakeInput" type="number" min="<?= $minAmt ?>" step="0.01" value="<?= (int) $minAmt ?>"
+                         inputmode="decimal" <?= $locked ? 'disabled' : '' ?>
+                         data-min="<?= $minAmt ?>" data-rate="<?= (float) $p['daily_rate'] ?>" data-term="<?= (int) $p['term_days'] ?>"
+                         class="w-full pl-3 pr-14 py-2.5 rounded-lg text-base font-bold sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020] disabled:opacity-40"
+                         oninput="sqStakeRecalc()">
+                  <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 pointer-events-none">USDT</span>
+                </div>
+                <div class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400" id="sqStakeHint">
+                  Minimum <?= $money($minAmt) ?> USDT — put in whatever you like above that.
+                </div>
+                <div class="mt-2 rounded-lg bg-gray-50 dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 px-3 py-2 text-xs">
+                  <div class="flex justify-between gap-2">
+                    <span class="text-gray-500 dark:text-gray-400">Daily yield</span>
+                    <span class="font-bold sq-num text-emerald-600 dark:text-emerald-400" id="sqStakeDaily">—</span>
+                  </div>
+                  <div class="flex justify-between gap-2 mt-0.5">
+                    <span class="text-gray-500 dark:text-gray-400">Over <?= (int) $p['term_days'] ?> days</span>
+                    <span class="font-bold sq-num" id="sqStakeTotal">—</span>
+                  </div>
+                </div>
+              </div>
+            <?php endif; ?>
+          <?php endif; ?>
+
+          <?php if ($pending): ?>
+            <button type="button" onclick='sqOpenPay(<?= json_encode([
+                      "purchase_id" => (int) $pending["id"], "product" => (string) $p["name"],
+                      "amount" => (float) $pending["total"], "units" => (int) $pending["units"],
+                      "status" => (string) $pending["status"],
+                    ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                    class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm bg-amber-500 text-white hover:bg-amber-600 transition">
+              <i class="fas fa-qrcode mr-1.5"></i><?= $pending['status'] === 'awaiting_confirmation' ? 'View payment' : 'Pay now' ?>
+            </button>
+          <?php else: ?>
+            <button type="button" onclick="sqBuy(this,'<?= htmlspecialchars($code) ?>',<?= $variable ? 'true' : 'false' ?>)"
+                    class="mt-4 w-full px-4 py-2.5 rounded-xl font-semibold text-sm transition <?= ($has || $locked)
+                      ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
+                      : ($isCard ? 'bg-primary text-white hover:bg-primary/90' : 'bg-secondary text-white hover:bg-secondary/90') ?>"
+                    <?= ($has || $locked) ? 'disabled' : '' ?>>
+              <?php if ($has): ?><i class="fas fa-check mr-1.5"></i>In your account
+              <?php elseif ($locked): ?><i class="fas fa-lock mr-1.5"></i>Hold all three cards
+              <?php else: ?><i class="fab fa-bitcoin mr-1.5"></i>Pay with USDT<?php endif; ?>
+            </button>
+          <?php endif; ?>
+        </article>
+      <?php endforeach; ?>
+    </div>
+  </section>
+
+  <!-- ── Open invoices / payment status ──────────────────────────────────── -->
+  <?php if ($openInv || $rejected): ?>
+  <section class="rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-amber-50/50 dark:bg-amber-500/5 p-5">
+    <h2 class="text-lg font-bold flex items-center gap-2">
+      <i class="fas fa-file-invoice-dollar text-amber-600 dark:text-amber-400"></i> Your orders
+    </h2>
+
+    <?php foreach ($openInv as $inv):
+      $waiting = $inv['status'] === 'awaiting_confirmation'; ?>
+      <div class="mt-3 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white dark:bg-[#111834] p-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">
+              <?= htmlspecialchars((string) $inv['product_code']) ?>
+              <?php if ((int) $inv['units'] > 1): ?><span class="text-gray-400">× <?= (int) $inv['units'] ?></span><?php endif; ?>
+            </div>
+            <div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              Invoice #<?= (int) $inv['id'] ?> · raised <?= htmlspecialchars(date('M j, H:i', strtotime((string) $inv['created_at']))) ?>
+            </div>
+            <?php if ($waiting && !empty($inv['tx_hash'])): ?>
+              <div class="mt-1 text-[11px] text-gray-400 font-mono break-all"><?= htmlspecialchars((string) $inv['tx_hash']) ?></div>
+              <?php if (!empty($inv['verify_note'])): ?>
+                <div class="mt-1 text-[11px] text-blue-600 dark:text-blue-400">
+                  <i class="fas fa-link mr-1"></i><?= htmlspecialchars((string) $inv['verify_note']) ?>
+                </div>
+              <?php endif; ?>
+            <?php endif; ?>
+          </div>
+          <div class="text-right shrink-0">
+            <div class="text-lg font-extrabold sq-num"><?= $money($inv['total']) ?> <span class="text-xs text-gray-400">USDT</span></div>
+            <span class="mt-1 inline-block text-[10px] font-bold px-2 py-1 rounded-full <?= $waiting
+                  ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300'
+                  : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300' ?>">
+              <i class="fas <?= $waiting ? 'fa-hourglass-half' : 'fa-circle-exclamation' ?> mr-1"></i>
+              <?= $waiting ? 'Verifying on-chain' : 'Awaiting payment' ?>
+            </span>
+          </div>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2">
+          <button type="button" onclick='sqOpenPay(<?= json_encode([
+                    "purchase_id" => (int) $inv["id"], "product" => (string) $inv["product_code"],
+                    "amount" => (float) $inv["total"], "units" => (int) $inv["units"],
+                    "status" => (string) $inv["status"],
+                  ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'
+                  class="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-500 text-white hover:bg-amber-600">
+            <i class="fas fa-qrcode mr-1.5"></i><?= $waiting ? 'View details' : 'Pay now' ?>
+          </button>
+          <?php if ($waiting): ?>
+            <button type="button" onclick="sqRecheck(this,<?= (int) $inv['id'] ?>)"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary">
+              <i class="fas fa-rotate mr-1.5"></i>Check now
+            </button>
+          <?php else: ?>
+            <button type="button" onclick="sqCancelInvoice(this,<?= (int) $inv['id'] ?>)"
+                    class="px-4 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-red-500">
+              Cancel
+            </button>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+
+    <?php foreach ($rejected as $inv): ?>
+      <div class="mt-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-white dark:bg-[#111834] p-4">
+        <div class="flex items-start justify-between gap-3 flex-wrap">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm"><?= htmlspecialchars((string) $inv['product_code']) ?></div>
+            <div class="mt-0.5 text-xs text-red-600 dark:text-red-400">
+              <i class="fas fa-circle-xmark mr-1"></i><?= htmlspecialchars((string) ($inv['rejection_reason'] ?: 'Payment could not be verified.')) ?>
+            </div>
+            <div class="mt-0.5 text-[11px] text-gray-400">Invoice #<?= (int) $inv['id'] ?> — order again to retry.</div>
+          </div>
+          <div class="text-right shrink-0 text-sm font-semibold sq-num text-gray-400"><?= $money($inv['total']) ?> USDT</div>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </section>
+  <?php endif; ?>
+
+  <!-- ── Allocations ─────────────────────────────────────────────────────── -->
+  <section class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+    <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-server text-primary"></i> SQB allocations</h2>
+    <?php if (!$allocs): ?>
+      <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">
+        No engine units yet. <?= $qualified ? 'Buy your first SQB unit above to start accruing.' : 'Collect all three membership cards to unlock engine units.' ?>
+      </p>
+    <?php else: ?>
+      <div class="mt-4 space-y-3">
+        <?php foreach ($allocs as $a):
+          $days   = (int) $a['days_accrued'];
+          $term   = max(1, (int) $a['term_days']);
+          $pct    = min(100, (int) round($days / $term * 100));
+          $active = $a['status'] === 'active'; ?>
+          <div class="rounded-xl border border-gray-200 dark:border-gray-800 p-4">
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-3">
+                <span class="w-9 h-9 rounded-lg bg-secondary/10 text-secondary inline-flex items-center justify-center"><i class="fas fa-microchip"></i></span>
+                <div>
+                  <div class="font-semibold text-sm"><?= $money($a['principal']) ?> USDT allocated</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    Started <?= htmlspecialchars(date('M j, Y', strtotime((string) $a['start_at']))) ?>
+                    · <?= $money((float) $a['principal'] * (float) $a['daily_rate'], 2) ?>/day
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 text-right">
+                <div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Accrued</div>
+                  <div class="font-bold sq-num text-sm">$<?= $money($a['accrued'], 4) ?></div>
+                </div>
+                <div>
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Transferred</div>
+                  <div class="font-bold sq-num text-sm">$<?= $money($a['claimed_total'], 4) ?></div>
+                </div>
+                <span class="text-[10px] font-bold px-2 py-1 rounded-full <?= $active
+                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300'
+                      : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' ?>">
+                  <?= $active ? 'Active' : 'Matured' ?>
+                </span>
+              </div>
+            </div>
+            <div class="mt-3 flex items-center gap-3">
+              <div class="flex-1 sq-meter bg-gray-100 dark:bg-gray-800"><span class="bg-secondary" style="width:<?= $pct ?>%"></span></div>
+              <span class="text-xs text-gray-500 dark:text-gray-400 sq-num shrink-0">Day <?= $days ?> / <?= $term ?></span>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <!-- ── AntFun referral tree ────────────────────────────────────────────── -->
+  <section class="grid gap-4 lg:grid-cols-3">
+    <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-sitemap text-primary"></i> AntFun network</h2>
+      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+        A hierarchy of its own — separate from how you joined the platform.
+      </p>
+
+      <div class="mt-4">
+        <label class="text-[11px] uppercase tracking-wider text-gray-400" for="sqInvite">Your invite link</label>
+        <div class="mt-1.5 flex gap-2">
+          <input id="sqInvite" type="text" readonly onclick="this.select()"
+                 value="<?= htmlspecialchars($inviteBase . (string) ($referral['code'] ?? '')) ?>"
+                 class="flex-1 min-w-0 px-3 py-2 rounded-lg text-xs border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#0b1020]">
+          <button type="button" onclick="sqCopyInvite(this)" class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+      </div>
+
+      <?php if (empty($referral['sponsor_id'])): ?>
+        <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800">
+          <label class="text-[11px] uppercase tracking-wider text-gray-400" for="sqSponsor">Sponsor code</label>
+          <div class="mt-1.5 flex gap-2">
+            <input id="sqSponsor" type="text" placeholder="Paste an invite code"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <button type="button" onclick="sqJoin(this)" class="shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 hover:opacity-90">Link</button>
+          </div>
+          <p class="mt-1.5 text-[11px] text-gray-400">Placement is permanent once set.</p>
+        </div>
+      <?php endif; ?>
+
+      <dl class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-800 space-y-2 text-sm">
+        <div class="flex justify-between gap-2">
+          <dt class="text-gray-500 dark:text-gray-400">Level 1 · 15%</dt>
+          <dd class="font-bold sq-num"><?= count($downline[1] ?? []) ?> · $<?= $money($commission['levels'][1] ?? 0) ?></dd>
+        </div>
+        <div class="flex justify-between gap-2">
+          <dt class="text-gray-500 dark:text-gray-400">Level 2 · 5%</dt>
+          <dd class="font-bold sq-num"><?= count($downline[2] ?? []) ?> · $<?= $money($commission['levels'][2] ?? 0) ?></dd>
+        </div>
+        <div class="flex justify-between gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+          <dt class="font-semibold">Total earned</dt>
+          <dd class="font-extrabold sq-num text-emerald-600 dark:text-emerald-400">$<?= $money($commission['total'] ?? 0) ?></dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="lg:col-span-2 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+      <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-diagram-project text-primary"></i> Your two levels</h2>
+      <?php if (empty($downline[1])): ?>
+        <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">No one has joined under you yet. Share your invite link to start building.</p>
+      <?php else: ?>
+        <div class="mt-4 space-y-2 text-gray-900 dark:text-gray-100">
+          <?php foreach ($downline[1] as $l1): ?>
+            <div class="rounded-xl border border-gray-200 dark:border-gray-800 overflow-hidden">
+              <div class="flex items-center gap-3 p-3 bg-gray-50 dark:bg-[#0b1020]">
+                <span class="w-8 h-8 shrink-0 rounded-lg bg-primary/10 text-primary inline-flex items-center justify-center text-xs font-bold">L1</span>
+                <div class="flex-1 min-w-0">
+                  <div class="font-semibold text-sm truncate"><?= htmlspecialchars((string) $l1['name']) ?></div>
+                  <div class="text-[11px] text-gray-500 dark:text-gray-400"><?= (int) $l1['children'] ?> in their level 1</div>
+                </div>
+                <div class="text-right shrink-0">
+                  <div class="text-[10px] uppercase tracking-wider text-gray-400">Volume</div>
+                  <div class="font-bold sq-num text-sm">$<?= $money($l1['volume']) ?></div>
+                </div>
+              </div>
+              <?php $kids = array_values(array_filter($downline[2] ?? [], static fn($c) => (int) $c['sponsor_id'] === (int) $l1['user_id']));
+              if ($kids): ?>
+                <div class="p-3 space-y-2">
+                  <?php foreach ($kids as $l2): ?>
+                    <div class="sq-branch flex items-center gap-3">
+                      <span class="w-7 h-7 shrink-0 rounded-lg bg-secondary/10 text-secondary inline-flex items-center justify-center text-[10px] font-bold">L2</span>
+                      <div class="flex-1 min-w-0 text-sm truncate"><?= htmlspecialchars((string) $l2['name']) ?></div>
+                      <div class="font-semibold sq-num text-xs shrink-0">$<?= $money($l2['volume']) ?></div>
+                    </div>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
+  </section>
+
+  <!-- ── Wallet ledger ───────────────────────────────────────────────────── -->
+  <section class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834] p-5">
+    <h2 class="text-lg font-bold flex items-center gap-2"><i class="fas fa-receipt text-primary"></i> Wallet activity</h2>
+    <?php if (!$txns): ?>
+      <p class="mt-3 text-sm text-gray-500 dark:text-gray-400">Nothing yet. Transfers, compounding, and referral overrides land here.</p>
+    <?php else: ?>
+      <div class="mt-4 -mx-5 px-5 overflow-x-auto">
+        <table class="w-full text-sm min-w-[520px]">
+          <thead>
+            <tr class="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-gray-200 dark:border-gray-800">
+              <th class="pb-2 font-medium">When</th>
+              <th class="pb-2 font-medium">Type</th>
+              <th class="pb-2 font-medium">Detail</th>
+              <th class="pb-2 font-medium text-right">Amount</th>
+              <th class="pb-2 font-medium text-right">Balance</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800" id="sqTxnBody">
+            <?php
+            $typeMeta = [
+              'yield_claim' => ['Transfer',  'fa-arrow-right-arrow-left'],
+              'compound'    => ['Compound',  'fa-arrows-rotate'],
+              'commission'  => ['Override',  'fa-user-group'],
+              'purchase'    => ['Purchase',  'fa-cart-shopping'],
+              'adjustment'  => ['Adjustment','fa-sliders'],
+            ];
+            foreach ($txns as $t):
+              [$label, $icon] = $typeMeta[$t['type']] ?? ['Entry', 'fa-circle'];
+              $amt = (float) $t['amount']; ?>
+              <tr>
+                <td class="py-2.5 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(date('M j, H:i', strtotime((string) $t['created_at']))) ?></td>
+                <td class="py-2.5 whitespace-nowrap"><i class="fas <?= $icon ?> text-gray-400 mr-1.5"></i><?= $label ?></td>
+                <td class="py-2.5 text-gray-500 dark:text-gray-400"><?= htmlspecialchars((string) ($t['note'] ?? '')) ?></td>
+                <td class="py-2.5 text-right font-semibold sq-num <?= $amt >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' ?>">
+                  <?= $amt >= 0 ? '+' : '−' ?>$<?= $money(abs($amt), 4) ?>
+                </td>
+                <td class="py-2.5 text-right sq-num text-gray-500 dark:text-gray-400">$<?= $money($t['balance_after'], 4) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    <?php endif; ?>
+  </section>
+
+  <?php if ($isElevated && is_array($admin)): ?>
+  <!-- ── Elevated: system-wide ledger ────────────────────────────────────── -->
+  <section class="rounded-2xl border-2 border-amber-300 dark:border-amber-500/40 bg-amber-50/40 dark:bg-amber-500/5 p-5">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <h2 class="text-lg font-bold flex items-center gap-2">
+        <i class="fas fa-shield-halved text-amber-600 dark:text-amber-400"></i> System ledger
+        <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300">Elevated</span>
+      </h2>
+      <button type="button" onclick="sqAdminRun(this)"
+              class="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700">
+        <i class="fas fa-play mr-1.5"></i>Force accrual pass
+      </button>
+    </div>
+
+    <div class="mt-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <?php
+      $adminTiles = [
+        ['Pool principal',     '$' . $money($admin['pool_principal']),   $admin['active_allocs'] . ' active allocations'],
+        ['Wallet float',       '$' . $money($admin['wallet_float']),     'liquidity held by members'],
+        ['Unclaimed yield',    '$' . $money($admin['unclaimed_yield']),  'accrued, not yet transferred'],
+        ['Total liability',    '$' . $money($admin['liability']),        $admin['coverage_pct'] . '% of gross sales'],
+        ['Gross sales',        '$' . $money($admin['gross_sales']),      $admin['members'] . ' enrolled members'],
+        ['Commissions paid',   '$' . $money($admin['commissions_paid']), 'L1 15% + L2 5%'],
+        ['Net inflow',         '$' . $money($admin['net_inflow']),       'sales − overrides'],
+        ['Daily payout cost',  '$' . $money($admin['pool_daily_cost'] + $admin['wallet_daily_cost']), 'allocations + compounding'],
+      ];
+      foreach ($adminTiles as [$label, $value, $sub]): ?>
+        <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-3.5">
+          <div class="text-[11px] uppercase tracking-wider text-gray-400"><?= htmlspecialchars($label) ?></div>
+          <div class="mt-0.5 text-xl font-extrabold sq-num"><?= htmlspecialchars($value) ?></div>
+          <div class="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400"><?= htmlspecialchars((string) $sub) ?></div>
+        </div>
+      <?php endforeach; ?>
+    </div>
+
+    <!-- Manual override: grant a product without an invoice or a TxHash. -->
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="font-semibold text-sm">
+        <i class="fas fa-hand-holding-dollar mr-1.5 text-gray-400"></i>Manual grant
+      </div>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        For someone who paid you off-book — cash, GCash, bank, a transfer you reconciled yourself — or who is being comped.
+        Grants exactly like a verified payment: the allocation starts and referral overrides pay.
+      </p>
+
+      <div class="mt-3 grid gap-3 sm:grid-cols-2">
+        <div class="sm:col-span-2">
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantMember">Member</label>
+          <div class="flex gap-2">
+            <input id="sqGrantMember" type="text" placeholder="email, username, or user id" autocomplete="off"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <button type="button" onclick="sqLookupMember(this)"
+                    class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 dark:border-gray-700 text-gray-500 hover:text-primary">
+              <i class="fas fa-magnifying-glass"></i>
+            </button>
+          </div>
+          <div id="sqGrantWho" class="mt-1.5 text-[11px] text-gray-500 dark:text-gray-400"></div>
+        </div>
+
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantProduct">Product</label>
+          <select id="sqGrantProduct" onchange="sqGrantRecalc()"
+                  class="w-full px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <?php foreach ($products as $p): ?>
+              <?php $vMode = ($p['pricing_mode'] ?? 'fixed') === 'variable';
+                    $vMin  = (float) ($p['min_amount'] ?: $p['price']); ?>
+              <option value="<?= htmlspecialchars((string) $p['code']) ?>"
+                      data-price="<?= (float) $p['price'] ?>"
+                      data-kind="<?= htmlspecialchars((string) $p['kind']) ?>"
+                      data-variable="<?= $vMode ? '1' : '0' ?>"
+                      data-min="<?= $vMin ?>">
+                <?= htmlspecialchars((string) $p['name']) ?> — <?= $vMode ? 'from ' . $money($vMin) : $money($p['price']) ?> USDT
+              </option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantUnits">
+            <span id="sqGrantQtyLabel">Units</span>
+          </label>
+          <div class="relative">
+            <input id="sqGrantUnits" type="number" min="1" step="1" value="1" inputmode="decimal" oninput="sqGrantRecalc()"
+                   class="w-full pl-3 pr-14 py-2 rounded-lg text-sm sq-num border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+            <span id="sqGrantQtyUnit" class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 pointer-events-none hidden">USDT</span>
+          </div>
+          <div id="sqGrantQtyHint" class="mt-1 text-[11px] text-gray-400"></div>
+        </div>
+
+        <div class="sm:col-span-2">
+          <label class="block text-[11px] uppercase tracking-wider text-gray-400 mb-1" for="sqGrantNote">Note <span class="normal-case text-gray-400">(kept on the record)</span></label>
+          <input id="sqGrantNote" type="text" maxlength="255" placeholder="e.g. Paid ₱6,800 cash at the Cebu meetup, 27 Jul"
+                 class="w-full px-3 py-2 rounded-lg text-sm border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+        </div>
+
+        <label class="sm:col-span-2 flex items-start gap-2 text-xs text-gray-600 dark:text-gray-300 cursor-pointer">
+          <input id="sqGrantComm" type="checkbox" checked class="mt-0.5 h-4 w-4 rounded" style="accent-color:#6366f1">
+          <span>Pay the 15% / 5% referral overrides on this grant. Untick when comping — a free grant usually shouldn't pay the upline.</span>
+        </label>
+      </div>
+
+      <div class="mt-3 flex items-center justify-between gap-3 flex-wrap">
+        <div class="text-sm text-gray-500 dark:text-gray-400">
+          Order value <span class="font-bold sq-num text-gray-900 dark:text-gray-100" id="sqGrantTotal"><?= $money($products[0]['price'] ?? 0) ?></span> USDT
+        </div>
+        <button type="button" onclick="sqDoGrant(this)"
+                class="px-5 py-2.5 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700">
+          <i class="fas fa-gift mr-1.5"></i>Grant now
+        </button>
+      </div>
+      <p class="mt-2 text-[11px] text-gray-400 leading-snug">
+        A grant skips the three-card qualification gate, so SQB engines can be granted to anyone. Duplicate cards are still refused.
+      </p>
+    </div>
+
+    <!-- Unpaid invoices: raised by a member, no transfer submitted yet. -->
+    <?php if (!empty($admin['unpaid_invoices'])): ?>
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="font-semibold text-sm">
+        <i class="fas fa-file-invoice mr-1.5 text-gray-400"></i>Unpaid invoices
+        <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300"><?= count($admin['unpaid_invoices']) ?></span>
+      </div>
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Raised but never paid on-chain. Accept one if the money reached you another way.</p>
+      <div class="mt-3 space-y-2">
+        <?php foreach ($admin['unpaid_invoices'] as $u): ?>
+          <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-3 flex items-center justify-between gap-3 flex-wrap">
+            <div class="min-w-0">
+              <div class="font-semibold text-sm truncate"><?= htmlspecialchars((string) $u['member']) ?></div>
+              <div class="text-xs text-gray-500 dark:text-gray-400">
+                #<?= (int) $u['id'] ?> · <?= htmlspecialchars((string) $u['product_code']) ?>
+                <?php if ((int) $u['units'] > 1): ?> × <?= (int) $u['units'] ?><?php endif; ?>
+                · raised <?= htmlspecialchars(date('M j, H:i', strtotime((string) $u['created_at']))) ?>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 shrink-0">
+              <div class="font-bold sq-num text-sm"><?= $money($u['total']) ?> USDT</div>
+              <button type="button" onclick="sqAcceptInvoice(this,<?= (int) $u['id'] ?>)"
+                      class="px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700">
+                <i class="fas fa-check mr-1"></i>Accept payment
+              </button>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
+    <!-- Payment verification queue: confirming here is what grants the allocation. -->
+    <div class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <div class="font-semibold text-sm">
+          <i class="fas fa-clipboard-check mr-1.5 text-gray-400"></i>Payments awaiting verification
+          <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300"><?= count($admin['review_queue']) ?></span>
+        </div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 sq-num">
+          <?= $money($admin['awaiting_value']) ?> USDT submitted · <?= $money($admin['pending_value']) ?> USDT unpaid
+        </div>
+      </div>
+
+      <?php if (!$admin['review_queue']): ?>
+        <p class="mt-3 text-xs text-gray-500 dark:text-gray-400">Nothing waiting. Submitted transfers appear here for an on-chain check.</p>
+      <?php else: ?>
+        <div class="mt-3 space-y-2">
+          <?php foreach ($admin['review_queue'] as $q): ?>
+            <div class="rounded-lg border border-gray-200 dark:border-gray-800 p-3">
+              <div class="flex items-start justify-between gap-3 flex-wrap">
+                <div class="min-w-0">
+                  <div class="font-semibold text-sm truncate"><?= htmlspecialchars((string) $q['member']) ?></div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    #<?= (int) $q['id'] ?> · <?= htmlspecialchars((string) $q['product_code']) ?>
+                    <?php if ((int) $q['units'] > 1): ?> × <?= (int) $q['units'] ?><?php endif; ?>
+                    · submitted <?= htmlspecialchars(date('M j, H:i', strtotime((string) $q['paid_at']))) ?>
+                  </div>
+                </div>
+                <div class="font-bold sq-num text-sm shrink-0"><?= $money($q['total']) ?> USDT</div>
+              </div>
+
+              <div class="mt-2 flex items-center gap-2">
+                <input type="text" readonly onclick="this.select()" value="<?= htmlspecialchars((string) $q['tx_hash']) ?>"
+                       class="flex-1 min-w-0 px-2 py-1.5 rounded text-[10px] font-mono border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-[#0b1020]">
+                <a href="https://bscscan.com/tx/<?= rawurlencode((string) $q['tx_hash']) ?>" target="_blank" rel="noopener noreferrer"
+                   class="shrink-0 px-2.5 py-1.5 rounded text-xs font-semibold border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-primary"
+                   title="Open on BscScan"><i class="fas fa-arrow-up-right-from-square"></i></a>
+              </div>
+
+              <?php
+              // What the chain itself reported. These rows are only still here because
+              // the verifier hasn't been able to confirm them yet.
+              $vv = (string) ($q['verify_verdict'] ?? '');
+              $vStyle = [
+                'pending'     => ['fa-hourglass-half', 'text-blue-600 dark:text-blue-400'],
+                'not_found'   => ['fa-question',       'text-amber-600 dark:text-amber-400'],
+                'unavailable' => ['fa-plug-circle-xmark', 'text-gray-500 dark:text-gray-400'],
+                'mismatch'    => ['fa-triangle-exclamation', 'text-red-600 dark:text-red-400'],
+                'failed'      => ['fa-circle-xmark',   'text-red-600 dark:text-red-400'],
+                'confirmed'   => ['fa-circle-check',   'text-emerald-600 dark:text-emerald-400'],
+              ][$vv] ?? ['fa-hourglass-half', 'text-gray-500 dark:text-gray-400'];
+              ?>
+              <div class="mt-2 rounded-lg bg-gray-50 dark:bg-[#0b1020] border border-gray-200 dark:border-gray-800 p-2">
+                <div class="text-[11px] <?= $vStyle[1] ?> font-medium">
+                  <i class="fas <?= $vStyle[0] ?> mr-1"></i>
+                  <?= $vv !== '' ? htmlspecialchars((string) ($q['verify_note'] ?? $vv)) : 'Not checked yet.' ?>
+                </div>
+                <?php if (!empty($q['chain_from'])): ?>
+                  <div class="mt-1 text-[10px] text-gray-500 dark:text-gray-400 font-mono break-all">
+                    from <?= htmlspecialchars((string) $q['chain_from']) ?>
+                    · <?= $money($q['chain_amount'], 4) ?> USDT
+                    · <?= (int) $q['confirmations'] ?> conf
+                  </div>
+                <?php endif; ?>
+              </div>
+
+              <div class="mt-2 flex gap-2">
+                <button type="button" onclick="sqRecheck(this,<?= (int) $q['id'] ?>)"
+                        class="flex-1 px-3 py-2 rounded-lg text-xs font-semibold bg-primary text-white hover:bg-primary/90">
+                  <i class="fas fa-rotate mr-1"></i>Re-check chain
+                </button>
+                <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'confirm')"
+                        class="px-3 py-2 rounded-lg text-xs font-semibold border border-emerald-300 dark:border-emerald-500/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10"
+                        title="Override the verifier and grant this order">
+                  <i class="fas fa-check mr-1"></i>Force
+                </button>
+                <button type="button" onclick="sqVerify(this,<?= (int) $q['id'] ?>,'reject')"
+                        class="px-3 py-2 rounded-lg text-xs font-semibold border border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10">
+                  <i class="fas fa-xmark mr-1"></i>Reject
+                </button>
+              </div>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+
+      <p class="mt-3 text-[11px] text-gray-400 leading-snug">
+        Payments verify themselves against <?= htmlspecialchars((string) ($admin['verifier']['chain'] ?? 'BNB Smart Chain')) ?>
+        via <?= htmlspecialchars((string) ($admin['verifier']['source'] ?? 'public JSON-RPC')) ?>, and complete automatically at
+        <?= (int) ($admin['verifier']['min_confirmations'] ?? 12) ?> confirmations — anything sitting here is still unconfirmed,
+        unseen, or disputed. <strong>Force</strong> overrides the verifier and grants the order anyway; use it only when you have
+        confirmed the transfer yourself on BscScan.
+      </p>
+    </div>
+
+    <div class="mt-4 grid gap-4 lg:grid-cols-2">
+      <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+        <div class="font-semibold text-sm">Revenue by product</div>
+        <table class="mt-3 w-full text-sm">
+          <thead><tr class="text-left text-[11px] uppercase tracking-wider text-gray-400">
+            <th class="pb-1.5 font-medium">Product</th><th class="pb-1.5 font-medium text-right">Orders</th>
+            <th class="pb-1.5 font-medium text-right">Units</th><th class="pb-1.5 font-medium text-right">Revenue</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <?php foreach ($admin['by_product'] as $r): ?>
+              <tr>
+                <td class="py-1.5"><?= htmlspecialchars((string) $r['product_code']) ?></td>
+                <td class="py-1.5 text-right sq-num"><?= (int) $r['orders'] ?></td>
+                <td class="py-1.5 text-right sq-num"><?= (int) $r['units'] ?></td>
+                <td class="py-1.5 text-right sq-num font-semibold">$<?= $money($r['revenue']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if (!$admin['by_product']): ?><tr><td colspan="4" class="py-2 text-gray-400 text-xs">No completed purchases yet.</td></tr><?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834] p-4">
+        <div class="font-semibold text-sm">Largest holders</div>
+        <table class="mt-3 w-full text-sm">
+          <thead><tr class="text-left text-[11px] uppercase tracking-wider text-gray-400">
+            <th class="pb-1.5 font-medium">Member</th><th class="pb-1.5 font-medium text-right">Units</th>
+            <th class="pb-1.5 font-medium text-right">Principal</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <?php foreach ($admin['top_holders'] as $h): ?>
+              <tr>
+                <td class="py-1.5 truncate max-w-[12rem]"><?= htmlspecialchars((string) $h['name']) ?></td>
+                <td class="py-1.5 text-right sq-num"><?= (int) $h['units'] ?></td>
+                <td class="py-1.5 text-right sq-num font-semibold">$<?= $money($h['principal']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            <?php if (!$admin['top_holders']): ?><tr><td colspan="3" class="py-2 text-gray-400 text-xs">No allocations yet.</td></tr><?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <?php if (!empty($admin['manual_grants'])): ?>
+    <details class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834]">
+      <summary class="p-4 cursor-pointer font-semibold text-sm select-none">
+        <i class="fas fa-clipboard-list mr-1.5 text-gray-400"></i>Manual grants &amp; accepted payments
+        <span class="ml-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"><?= count($admin['manual_grants']) ?></span>
+      </summary>
+      <div class="px-4 pb-4 -mx-0 overflow-x-auto">
+        <table class="w-full text-sm min-w-[560px]">
+          <thead><tr class="text-left text-[11px] uppercase tracking-wider text-gray-400 border-b border-gray-200 dark:border-gray-800">
+            <th class="pb-2 font-medium">When</th><th class="pb-2 font-medium">Member</th>
+            <th class="pb-2 font-medium">Product</th><th class="pb-2 font-medium text-right">Value</th>
+            <th class="pb-2 font-medium">Reason</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100 dark:divide-gray-800">
+            <?php foreach ($admin['manual_grants'] as $g): ?>
+              <tr>
+                <td class="py-2 text-gray-500 dark:text-gray-400 whitespace-nowrap"><?= htmlspecialchars(date('M j, H:i', strtotime((string) ($g['confirmed_at'] ?: $g['created_at'])))) ?></td>
+                <td class="py-2 truncate max-w-[10rem]"><?= htmlspecialchars((string) $g['member']) ?></td>
+                <td class="py-2 text-gray-500 dark:text-gray-400">
+                  <?= htmlspecialchars((string) $g['product_code']) ?><?php if ((int) $g['units'] > 1): ?> × <?= (int) $g['units'] ?><?php endif; ?>
+                </td>
+                <td class="py-2 text-right sq-num font-semibold"><?= $money($g['total']) ?></td>
+                <td class="py-2 text-gray-500 dark:text-gray-400 text-xs"><?= htmlspecialchars((string) ($g['verify_note'] ?? '')) ?></td>
+              </tr>
+            <?php endforeach; ?>
+          </tbody>
+        </table>
+      </div>
+    </details>
+    <?php endif; ?>
+
+    <details class="mt-4 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-white/70 dark:bg-[#111834]">
+      <summary class="p-4 cursor-pointer font-semibold text-sm select-none"><i class="fas fa-bug mr-1.5 text-gray-400"></i>Engine parameters &amp; worker state</summary>
+      <div class="px-4 pb-4">
+        <dl class="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Accrual rows written</dt><dd class="sq-num font-semibold"><?= (int) $admin['accrual_rows'] ?></dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Matured allocations</dt><dd class="sq-num font-semibold"><?= (int) $admin['matured_allocs'] ?></dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Qualified members</dt><dd class="sq-num font-semibold"><?= (int) $admin['qualified'] ?> / <?= (int) $admin['members'] ?></dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Worker last run</dt><dd class="sq-num font-semibold"><?= htmlspecialchars((string) ($admin['worker_last_run'] ?? 'never')) ?></dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Last accrual settled</dt><dd class="sq-num font-semibold"><?= htmlspecialchars((string) ($admin['last_accrual']['accrued_for'] ?? '—')) ?></dd></div>
+          <div class="flex justify-between gap-2"><dt class="text-gray-500 dark:text-gray-400">Server time</dt><dd class="sq-num font-semibold"><?= htmlspecialchars((string) $admin['params']['server_time']) ?></dd></div>
+        </dl>
+        <pre class="mt-3 p-3 rounded-lg bg-gray-900 text-gray-100 text-[11px] overflow-x-auto"><?= htmlspecialchars(json_encode($admin['params'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) ?></pre>
+      </div>
+    </details>
+  </section>
+  <?php endif; ?>
+
+  <p class="text-center text-[11px] text-gray-400 pb-4 max-w-2xl mx-auto leading-relaxed">
+    Payment is accepted in USDT on <?= htmlspecialchars((string) $payment['network']) ?> only — orders unlock after the transfer is verified on-chain.
+    Yields shown are modelled, not guaranteed returns.
+  </p>
+</main>
+
+<!-- ── USDT payment sheet ─────────────────────────────────────────────────
+     Bottom sheet on phones, centred dialog from sm up. The wallet address is
+     rendered as text as well as the QR, so a buyer who cannot scan can copy it. -->
+<div id="sqPayModal" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="sqClosePay()"></div>
+  <div class="absolute inset-x-0 bottom-0 sm:inset-0 sm:flex sm:items-center sm:justify-center p-0 sm:p-4">
+    <div class="relative w-full sm:max-w-md max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl bg-white dark:bg-[#111834] border border-gray-200 dark:border-gray-800 shadow-2xl">
+
+      <div class="sticky top-0 flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-[#111834]">
+        <div class="min-w-0">
+          <div class="font-bold leading-tight">Pay with USDT</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400 truncate" id="sqPayProduct">—</div>
+        </div>
+        <button type="button" onclick="sqClosePay()" class="w-9 h-9 shrink-0 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 hover:text-red-500">
+          <i class="fas fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Network warning: wrong-chain transfers are unrecoverable. -->
+        <div class="rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 p-3 text-xs leading-snug text-red-700 dark:text-red-300">
+          <i class="fas fa-triangle-exclamation mr-1"></i>
+          Send <strong>USDT</strong> on <strong><?= htmlspecialchars((string) $payment['network']) ?></strong> only.
+          Funds sent on another network are <strong>permanently lost</strong> and cannot be refunded.
+        </div>
+
+        <div class="text-center">
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Amount to send</div>
+          <div class="mt-0.5 text-3xl font-extrabold sq-num" id="sqPayAmount">—</div>
+          <div class="text-xs text-gray-500 dark:text-gray-400">exact amount, USDT</div>
+        </div>
+
+        <div class="flex justify-center">
+          <div class="p-3 rounded-xl bg-white border border-gray-200 dark:border-gray-700">
+            <img src="<?= htmlspecialchars((string) $payment['qr']) ?>" alt="USDT BEP20 wallet QR code"
+                 class="w-44 h-44 object-contain" loading="lazy">
+          </div>
+        </div>
+
+        <div>
+          <div class="text-[11px] uppercase tracking-wider text-gray-400">Wallet address</div>
+          <div class="mt-1.5 flex gap-2">
+            <input id="sqPayAddress" type="text" readonly onclick="this.select()"
+                   value="<?= htmlspecialchars((string) $payment['address']) ?>"
+                   class="flex-1 min-w-0 px-3 py-2 rounded-lg text-[11px] font-mono border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-[#0b1020]">
+            <button type="button" onclick="sqCopyAddress(this)" class="shrink-0 px-3 py-2 rounded-lg text-sm font-semibold bg-primary text-white hover:bg-primary/90">
+              <i class="fas fa-copy"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="sqPayForm" class="pt-1 border-t border-gray-200 dark:border-gray-800">
+          <label class="block mt-3 text-[11px] uppercase tracking-wider text-gray-400" for="sqPayTx">Transaction hash</label>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            After sending, paste the TxHash from your wallet. We read it straight off BNB Smart Chain —
+            once it has enough confirmations your order unlocks automatically.
+          </p>
+          <input id="sqPayTx" type="text" placeholder="0x…" autocomplete="off" spellcheck="false"
+                 class="mt-2 w-full px-3 py-2.5 rounded-lg text-xs font-mono border border-gray-300 dark:border-gray-700 bg-white dark:bg-[#0b1020]">
+          <button type="button" onclick="sqSubmitTx(this)"
+                  class="mt-3 w-full px-4 py-3 rounded-xl font-semibold text-white bg-emerald-600 hover:bg-emerald-700 transition">
+            <i class="fas fa-paper-plane mr-1.5"></i>I have sent the payment
+          </button>
+        </div>
+
+        <div id="sqPayWaiting" class="hidden rounded-xl border border-blue-200 dark:border-blue-500/30 bg-blue-50 dark:bg-blue-500/10 p-4 text-center">
+          <i class="fas fa-hourglass-half text-blue-600 dark:text-blue-300 text-xl"></i>
+          <div class="mt-2 font-semibold text-sm">Verifying your transfer</div>
+          <p class="mt-1 text-xs text-gray-600 dark:text-gray-300">
+            We're reading the transaction from BNB Smart Chain. Your order unlocks automatically as soon as it clears.
+          </p>
+          <button type="button" onclick="sqRecheckCurrent(this)"
+                  class="mt-3 px-4 py-2 rounded-lg text-xs font-semibold border border-blue-300 dark:border-blue-500/40 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-500/20">
+            <i class="fas fa-rotate mr-1"></i>Check now
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="sqToast" class="fixed bottom-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-80 z-50 hidden">
+  <div class="rounded-xl px-4 py-3 shadow-lg text-sm font-medium flex items-center gap-2" id="sqToastBody"></div>
+</div>
+
+<script>
+(function () {
+  const CSRF = <?= json_encode($csrf) ?>;
+  const RATE = <?= json_encode((float) ($snapshot['daily_rate'] ?? 0.005)) ?>;
+  let state = {
+    pending:  <?= json_encode((float) ($snapshot['pending_yield'] ?? 0)) ?>,
+    daily:    <?= json_encode((float) ($snapshot['daily_yield'] ?? 0)) ?>,
+    nextAccrual:  <?= json_encode($snapshot['next_accrual_at'] ?? null) ?>,
+    nextCompound: <?= json_encode($snapshot['next_compound_at'] ?? null) ?>,
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const usd = (n, d = 2) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+
+  function toast(message, ok = true) {
+    const box = $('sqToast'), body = $('sqToastBody');
+    body.className = 'rounded-xl px-4 py-3 shadow-lg text-sm font-medium flex items-center gap-2 ' +
+      (ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white');
+    body.innerHTML = '<i class="fas ' + (ok ? 'fa-circle-check' : 'fa-circle-exclamation') + '"></i><span></span>';
+    body.querySelector('span').textContent = message;
+    box.classList.remove('hidden');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => box.classList.add('hidden'), 4000);
+  }
+
+  /** HH:MM:SS until an ISO timestamp, or '—' when there's nothing pending. */
+  function countdown(iso) {
+    if (!iso) return '—';
+    const ms = new Date(iso).getTime() - Date.now();
+    if (!isFinite(ms)) return '—';
+    if (ms <= 0) return 'due now';
+    const s = Math.floor(ms / 1000);
+    return String(Math.floor(s / 3600)).padStart(2, '0') + ':' +
+           String(Math.floor(s / 60) % 60).padStart(2, '0') + ':' +
+           String(s % 60).padStart(2, '0');
+  }
+
+  // The settled figure is authoritative; this only ticks the countdowns beside it.
+  setInterval(() => {
+    $('sqNextAccrual').textContent  = countdown(state.nextAccrual);
+    $('sqNextCompound').textContent = countdown(state.nextCompound);
+  }, 1000);
+
+  function paint(s) {
+    if (!s) return;
+    state.pending      = Number(s.pending_yield || 0);
+    state.daily        = Number(s.daily_yield || 0);
+    state.nextAccrual  = s.next_accrual_at;
+    state.nextCompound = s.next_compound_at;
+
+    $('sqPrincipal').textContent  = usd(s.principal);
+    $('sqDaily').textContent      = usd(s.daily_yield);
+    $('sqClaimed').textContent    = usd(s.claimed_total);
+    $('sqCompounded').textContent = usd(s.wallet && s.wallet.total_compounded);
+    $('sqPending').textContent    = usd(s.pending_yield, 4);
+    $('sqWallet').textContent     = usd(s.wallet && s.wallet.balance, 4);
+    $('sqWalletChip').textContent = usd(s.wallet && s.wallet.balance);
+    $('sqWalletDaily').textContent = '+' + usd(s.wallet_daily, 4);
+    $('sqAllocs').textContent     = s.alloc_count;
+    $('sqActive').textContent     = s.active_count;
+    $('sqClaimBtn').disabled      = !(Number(s.pending_yield) > 0);
+  }
+
+  async function post(url, body) {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+      credentials: 'same-origin',
+      body: JSON.stringify(Object.assign({ csrf_token: CSRF }, body || {})),
+    });
+    return res.json();
+  }
+
+  /**
+   * The SQB engine is buyer-priced: the minimum is a floor, not a price. Show what
+   * the typed amount actually earns, and flag anything under the floor before the
+   * server has to.
+   */
+  window.sqStakeRecalc = function () {
+    const input = $('sqStakeInput');
+    if (!input) return;
+    const min    = parseFloat(input.getAttribute('data-min')) || 0;
+    const rate   = parseFloat(input.getAttribute('data-rate')) || 0;
+    const term   = parseInt(input.getAttribute('data-term'), 10) || 0;
+    const amount = parseFloat(input.value);
+    const hint   = $('sqStakeHint'), daily = $('sqStakeDaily'), total = $('sqStakeTotal');
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    if (!isFinite(amount) || amount <= 0) {
+      hint.textContent = 'Minimum ' + fmt(min) + ' USDT — put in whatever you like above that.';
+      hint.className = 'mt-1.5 text-[11px] text-gray-500 dark:text-gray-400';
+      daily.textContent = '—'; total.textContent = '—';
+      return;
+    }
+    if (amount < min) {
+      hint.textContent = 'Below the ' + fmt(min) + ' USDT minimum.';
+      hint.className = 'mt-1.5 text-[11px] text-red-600 dark:text-red-400 font-medium';
+    } else {
+      hint.textContent = 'Yields ' + (rate * 100).toFixed(1) + '% of this, every day, for ' + term + ' days.';
+      hint.className = 'mt-1.5 text-[11px] text-gray-500 dark:text-gray-400';
+    }
+    daily.textContent = '+' + fmt(amount * rate) + ' USDT';
+    total.textContent = fmt(amount * rate * term) + ' USDT';
+  };
+
+  // ---- USDT payment sheet --------------------------------------------------
+  let payInvoice = null;
+
+  window.sqOpenPay = function (inv) {
+    payInvoice = inv;
+    $('sqPayProduct').textContent = inv.product + (inv.units > 1 ? ' × ' + inv.units : '') + ' · invoice #' + inv.purchase_id;
+    $('sqPayAmount').textContent  = Number(inv.amount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const waiting = inv.status === 'awaiting_confirmation';
+    $('sqPayForm').classList.toggle('hidden', waiting);
+    $('sqPayWaiting').classList.toggle('hidden', !waiting);
+    $('sqPayTx').value = '';
+    $('sqPayModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  };
+
+  window.sqClosePay = function () {
+    $('sqPayModal').classList.add('hidden');
+    document.body.style.overflow = '';
+    payInvoice = null;
+  };
+
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') sqClosePay(); });
+
+  window.sqCopyAddress = function (btn) {
+    const input = $('sqPayAddress');
+    const done = () => { const h = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(() => btn.innerHTML = h, 1500); };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+    } else { input.select(); document.execCommand('copy'); done(); }
+  };
+
+  window.sqSubmitTx = async function (btn) {
+    if (!payInvoice) return;
+    const tx = ($('sqPayTx').value || '').trim();
+    if (!/^0x[a-fA-F0-9]{64}$/.test(tx)) {
+      toast('Paste the full transaction hash — 0x followed by 64 characters.', false);
+      return;
+    }
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Submitting';
+    try {
+      const r = await post('/silverqueen/payment/submit', { purchase_id: payInvoice.purchase_id, tx_hash: tx });
+      if (r.ok) {
+        // The chain is checked on submit, so this may already be settled.
+        toast(r.message || 'Payment submitted for verification.', r.status !== 'rejected');
+        setTimeout(() => location.reload(), r.status === 'completed' ? 900 : 1600);
+        return;
+      }
+      toast(r.error || 'Could not submit the payment.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqRecheckCurrent = function (btn) {
+    if (payInvoice) sqRecheck(btn, payInvoice.purchase_id);
+  };
+
+  window.sqRecheck = async function (btn, purchaseId) {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1"></i>Checking';
+    try {
+      const r = await post('/silverqueen/payment/recheck', { purchase_id: purchaseId });
+      if (r.ok) {
+        const settled = r.status === 'completed' || r.status === 'rejected';
+        toast(r.message || 'Checked.', r.status !== 'rejected');
+        if (settled) { setTimeout(() => location.reload(), 1200); return; }
+      } else {
+        toast(r.error || 'Could not reach the chain.', false);
+      }
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqCancelInvoice = async function (btn, purchaseId) {
+    btn.disabled = true;
+    try {
+      const r = await post('/silverqueen/payment/cancel', { purchase_id: purchaseId });
+      if (r.ok) { toast('Invoice cancelled.'); setTimeout(() => location.reload(), 700); return; }
+      toast(r.error || 'Could not cancel.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+  };
+
+  window.sqVerify = async function (btn, purchaseId, decision) {
+    let reason = '';
+    if (decision === 'reject') {
+      reason = window.prompt('Why is this payment being rejected?', 'Transfer could not be verified on-chain.');
+      if (reason === null) return;
+    }
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    try {
+      const r = await post('/silverqueen/admin/verify', { purchase_id: purchaseId, decision, reason });
+      if (r.ok) {
+        toast(decision === 'confirm'
+          ? 'Payment confirmed — allocation granted and overrides paid.'
+          : 'Invoice rejected.');
+        setTimeout(() => location.reload(), 1000);
+        return;
+      }
+      toast(r.error || 'Could not record the decision.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqBuy = async function (btn, code, isVariable) {
+    let body = { code, units: 1 };
+    if (isVariable) {
+      const input  = $('sqStakeInput');
+      const amount = parseFloat(input && input.value);
+      const min    = parseFloat(input && input.getAttribute('data-min')) || 0;
+      if (!isFinite(amount) || amount <= 0) { toast('Enter how much you want to allocate.', false); return; }
+      if (amount < min) {
+        toast('The minimum is ' + min.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' USDT.', false);
+        return;
+      }
+      body = { code, amount };
+    }
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Processing';
+    try {
+      const r = await post('/silverqueen/purchase', body);
+      if (r.ok) {
+        // Nothing is granted yet — this opens the payment sheet for the new invoice.
+        sqOpenPay({ purchase_id: r.purchase_id, product: r.product, amount: r.amount, units: r.units, status: 'pending' });
+        btn.disabled = false;
+        btn.innerHTML = original;
+        return;
+      }
+      toast(r.error || 'Could not raise the invoice.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqClaim = async function (btn) {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-2"></i>Transferring';
+    try {
+      const r = await post('/silverqueen/claim', {});
+      if (r.ok) {
+        toast(usd(r.amount, 4) + ' moved to your wallet — it starts compounding now.');
+        paint(r.snapshot);
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast(r.error || 'Nothing to transfer.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqJoin = async function (btn) {
+    const code = ($('sqSponsor').value || '').trim();
+    if (!code) { toast('Enter a sponsor code first.', false); return; }
+    btn.disabled = true;
+    try {
+      const r = await post('/silverqueen/enroll', { sponsor: code });
+      toast(r.ok ? r.message : (r.error || 'Could not link.'), !!r.ok && !!r.changed);
+      if (r.ok && r.changed) setTimeout(() => location.reload(), 900);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+  };
+
+  window.sqCopyInvite = function (btn) {
+    const input = $('sqInvite');
+    const done = () => { const h = btn.innerHTML; btn.innerHTML = '<i class="fas fa-check"></i>'; setTimeout(() => btn.innerHTML = h, 1500); };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(input.value).then(done).catch(() => { input.select(); document.execCommand('copy'); done(); });
+    } else { input.select(); document.execCommand('copy'); done(); }
+  };
+
+  // ---- Manual override (elevated) -----------------------------------------
+  /**
+   * The quantity box means different things per product: units for a fixed-price
+   * card, USDT for the buyer-priced engine — where the operator types the amount
+   * actually paid or negotiated. Relabel it so it can't be misread.
+   */
+  window.sqGrantRecalc = function () {
+    const sel = $('sqGrantProduct'), qtyEl = $('sqGrantUnits'), out = $('sqGrantTotal');
+    if (!sel || !out) return;
+    const opt      = sel.options[sel.selectedIndex];
+    const price    = parseFloat(opt.getAttribute('data-price')) || 0;
+    const isCard   = opt.getAttribute('data-kind') === 'card';
+    const variable = opt.getAttribute('data-variable') === '1';
+    const min      = parseFloat(opt.getAttribute('data-min')) || 0;
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    $('sqGrantQtyLabel').textContent = variable ? 'Amount granted' : 'Units';
+    $('sqGrantQtyUnit').classList.toggle('hidden', !variable);
+    qtyEl.step = variable ? '0.01' : '1';
+    qtyEl.min  = variable ? min : 1;
+    qtyEl.disabled = isCard;
+
+    // Switching modes: a leftover "1" would silently mean 1 USDT.
+    if (variable && parseFloat(qtyEl.value) < min) qtyEl.value = min;
+    if (isCard) qtyEl.value = 1;
+
+    if (variable) {
+      const amount = parseFloat(qtyEl.value);
+      const short  = isFinite(amount) && amount < min;
+      $('sqGrantQtyHint').textContent = short ? 'Below the ' + fmt(min) + ' USDT minimum.' : 'Minimum ' + fmt(min) + ' USDT.';
+      $('sqGrantQtyHint').className = 'mt-1 text-[11px] ' + (short ? 'text-red-600 dark:text-red-400 font-medium' : 'text-gray-400');
+      out.textContent = isFinite(amount) ? fmt(amount) : '0.00';
+      return;
+    }
+    $('sqGrantQtyHint').textContent = '';
+    $('sqGrantQtyHint').className = 'mt-1 text-[11px] text-gray-400';
+    const units = isCard ? 1 : Math.max(1, parseInt(qtyEl.value, 10) || 1);
+    out.textContent = fmt(price * units);
+  };
+
+  window.sqLookupMember = async function (btn) {
+    const q = ($('sqGrantMember').value || '').trim();
+    const who = $('sqGrantWho');
+    if (!q) { who.textContent = ''; return; }
+    who.textContent = 'Looking up…';
+    try {
+      const res = await fetch('/silverqueen/admin/member?q=' + encodeURIComponent(q), { credentials: 'same-origin' });
+      const r = await res.json();
+      if (r.ok) {
+        who.innerHTML = '<span class="text-emerald-600 dark:text-emerald-400">'
+          + '<i class="fas fa-circle-check mr-1"></i>' + escapeHtml(r.name) + '</span>'
+          + ' · #' + r.user_id + (r.email ? ' · ' + escapeHtml(r.email) : '')
+          + ' · holds ' + r.cards.length + '/3 cards' + (r.qualified ? ' · qualified' : '');
+      } else {
+        who.innerHTML = '<span class="text-red-600 dark:text-red-400"><i class="fas fa-circle-xmark mr-1"></i>'
+          + escapeHtml(r.error || 'No match') + '</span>';
+      }
+    } catch (e) {
+      who.textContent = 'Lookup failed.';
+    }
+  };
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  window.sqDoGrant = async function (btn) {
+    const member = ($('sqGrantMember').value || '').trim();
+    if (!member) { toast('Enter an email, username, or user id first.', false); return; }
+    const sel  = $('sqGrantProduct');
+    const opt  = sel.options[sel.selectedIndex];
+    const code = sel.value;
+    const note = ($('sqGrantNote').value || '').trim();
+    const comm = $('sqGrantComm').checked;
+    const variable = opt.getAttribute('data-variable') === '1';
+    const min = parseFloat(opt.getAttribute('data-min')) || 0;
+    const fmt = (n) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    let body = { member, code, note, commissions: comm };
+    let what;
+    if (variable) {
+      const amount = parseFloat($('sqGrantUnits').value);
+      if (!isFinite(amount) || amount <= 0) { toast('Enter the USDT amount to grant.', false); return; }
+      if (amount < min) { toast('The minimum is ' + fmt(min) + ' USDT.', false); return; }
+      body.amount = amount;
+      what = opt.text.split(' — ')[0] + ' for ' + fmt(amount) + ' USDT';
+    } else {
+      const units = Math.max(1, parseInt($('sqGrantUnits').value, 10) || 1);
+      body.units = units;
+      what = opt.text + (units > 1 ? ' × ' + units : '');
+    }
+
+    if (!window.confirm('Grant ' + what + ' to "' + member + '"?'
+        + (comm ? '\n\nReferral overrides WILL be paid.' : '\n\nNo referral overrides will be paid.'))) return;
+
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Granting';
+    try {
+      const r = await post('/silverqueen/admin/grant', body);
+      if (r.ok) {
+        toast('Granted ' + r.product + ' to ' + r.member + '.'
+          + (r.commissions && r.commissions.length ? ' Overrides paid.' : ''));
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast(r.error || 'Grant failed.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqAcceptInvoice = async function (btn, purchaseId) {
+    const note = window.prompt('Accept this payment without an on-chain check?\nNote for the record:',
+                               'Payment reconciled manually.');
+    if (note === null) return;
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i>';
+    try {
+      const r = await post('/silverqueen/admin/accept', { purchase_id: purchaseId, note });
+      if (r.ok) { toast('Payment accepted — order granted.'); setTimeout(() => location.reload(), 1100); return; }
+      toast(r.error || 'Could not accept the payment.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  window.sqAdminRun = async function (btn) {
+    const original = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin mr-1.5"></i>Running';
+    try {
+      const r = await post('/silverqueen/admin/run', {});
+      if (r.ok) {
+        toast('Settled ' + usd(r.accrual.amount, 4) + ' of yield and ' + usd(r.compound.amount, 4) + ' of compounding.');
+        setTimeout(() => location.reload(), 1200);
+        return;
+      }
+      toast(r.error || 'The pass failed.', false);
+    } catch (e) {
+      toast('Network error — try again.', false);
+    }
+    btn.disabled = false;
+    btn.innerHTML = original;
+  };
+
+  // Prime the buyer-priced calculators so the figures are right before any typing.
+  if ($('sqStakeInput')) sqStakeRecalc();
+  if ($('sqGrantProduct')) sqGrantRecalc();
+
+  // Re-settle from the server every 60s so a crossed 24h boundary shows up
+  // without a reload, and pause while the tab is hidden.
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const res = await fetch('/silverqueen/data', { credentials: 'same-origin' });
+      const r = await res.json();
+      if (r.ok) paint(r.snapshot);
+    } catch (e) { /* transient — the next tick retries */ }
+  }, 60000);
+})();
+</script>
+</body>
+</html>

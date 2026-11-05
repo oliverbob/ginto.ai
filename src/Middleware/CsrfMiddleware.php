@@ -1,0 +1,222 @@
+<?php
+namespace Ginto\Middleware;
+
+class CsrfMiddleware
+{
+    // Routes that skip CSRF validation (API endpoints called with session cookie)
+    // Note: /chat is intentionally NOT in this list below. It will be allowed
+    // for localhost requests or when a valid admin token header is present.
+    // All other POST/PUT/PATCH/DELETE requests must provide a CSRF token.
+    private static array $skipPaths = [
+        '/mcp/call',
+        '/mcp/chat',
+        '/mcp/discover',
+        '/audio/tts',
+        '/audio/stt',
+        '/websearch', // Isolated test page for GPT-OSS browser_search
+        '/api/subscription/activate', // PayPal callback - no CSRF available
+        '/api/register/paypal-order', // PayPal order creation - JS SDK call
+        '/api/register/paypal-capture', // PayPal payment capture - JS SDK call
+        '/api/validate-registration', // Pre-validates username/email before PayPal subscription - JS SDK call
+        '/api/addon/activate', // Addon subscription activation - PayPal SDK call
+        '/register', // Registration - validates CSRF internally in UserController
+        '/webhook', // PayPal webhook - external caller
+        '/bank-payments', // Bank transfer registration - validates CSRF internally in handler
+        '/gcash-payments', // GCash registration - validates CSRF internally in handler
+        '/crypto-payments', // Crypto USDT registration - validates CSRF internally in handler
+        '/api/payments/crypto-info', // Crypto info API - AJAX only, no mutation
+        '/api/mall/wallet/topup/create', // Wallet top-up session create - validated by MallCheckoutController
+        '/api/mall/cart/sync',            // Cart sync call from frontend localStorage
+        '/api/mall/cart/refresh',         // Cart refresh call from frontend localStorage
+        '/debug/session-set',             // Debug helper: allow localhost POST to set session for testing
+        '/login',                         // Login form — cross-origin POST from hub page; no session to protect
+        '/login-m',                       // Mobile app JSON login — authenticates via credentials, no CSRF session
+        '/api/auth/cross-login',          // Cross-domain JWT login — credentials-only, no session cookie to protect
+        '/logout-m',                      // Mobile app JSON logout — kills session, CSRF not applicable
+        '/api/tunnel/bind',               // Tunnel clients (frpc hosts) authenticate with a gtnl- key, not a browser session
+        '/api/v1/relay/trade/buy',        // Relay callers carry a signed, single-use token; there is no session to hold a CSRF token
+        '/api/v1/relay/trade/sell',
+        '/api/v1/relay/analyze',
+        '/api/internal/sites-card',       // the feed card's Sites calls: HMAC-signed by the chat server (SitesCardController)
+        '/sites/chat',                    // visitors' questions on members' live sites: no session, rate-limited (CustomerChat)
+        '/api/internal/api-keys',         // SilverQueen /superadmin API Keys: HMAC-signed, nonce once (ApiKeysRelayController)
+        // The payments relay for sq.silverqueen.pro. There is no session and
+        // no browser here — sq authenticates with an HMAC over the timestamp
+        // and the exact body, which SqRelayController checks before it does
+        // anything at all. A CSRF token would be a token protecting nothing.
+        '/relay/paymongo/qr',
+        // And the status door beside it, on exactly the same reasoning. It was
+        // added to the router without being added here, which does not read as
+        // a missing exemption from the outside: an unexempt POST is refused
+        // with "Invalid CSRF token" and a 403, the same answer an unregistered
+        // path gives, so the route looked like it had never been added at all.
+        '/relay/paymongo/status',
+        // A SilverQueen shop's storefront, provisioned here. The same HMAC,
+        // checked by SqMallRelayController before anything else.
+        '/relay/mall/provision',
+        '/relay/mall/sellers',
+        // PayMongo's own deliveries. Signed by PayMongo and verified against
+        // PAYMONGO_WEBHOOK_SECRET in the handler; a rejection here would show
+        // up as a disabled endpoint on their dashboard rather than as an error
+        // anybody sees.
+        '/webhooks/paymongo',
+    ];
+
+    /**
+     * Additional skip paths registered at runtime.
+     * Use addSkipPaths() to merge environment values or other sources during bootstrap.
+     */
+    private static array $customSkipPaths = [];
+
+    /**
+     * Cached list parsed from the CSRF_WHITELIST environment variable.
+     */
+    private static ?array $envSkipPaths = null;
+
+    /**
+     * Register extra paths that should bypass CSRF validation.
+     */
+    public static function addSkipPaths(array $paths): void
+    {
+        $merged = self::$customSkipPaths;
+        foreach ($paths as $path) {
+            $normalized = self::normalizePath((string)$path);
+            if ($normalized === '') {
+                continue;
+            }
+            $merged[] = $normalized;
+        }
+        self::$customSkipPaths = array_values(array_unique($merged));
+    }
+
+    private static function isPathWhitelisted(string $path): bool
+    {
+        return in_array($path, self::getEffectiveSkipPaths(), true);
+    }
+
+    private static function getEffectiveSkipPaths(): array
+    {
+        return array_values(array_unique(array_merge(
+            self::$skipPaths,
+            self::$customSkipPaths,
+            self::getEnvSkipPaths()
+        )));
+    }
+
+    private static function getEnvSkipPaths(): array
+    {
+        if (self::$envSkipPaths !== null) {
+            return self::$envSkipPaths;
+        }
+        $raw = getenv('CSRF_WHITELIST') ?: ($_ENV['CSRF_WHITELIST'] ?? '');
+        if (!$raw) {
+            return self::$envSkipPaths = [];
+        }
+        $parts = preg_split('/[\r\n,]+/', $raw);
+        $paths = [];
+        if (is_array($parts)) {
+            foreach ($parts as $part) {
+                $normalized = self::normalizePath((string)$part);
+                if ($normalized !== '') {
+                    $paths[] = $normalized;
+                }
+            }
+        }
+        return self::$envSkipPaths = array_values(array_unique($paths));
+    }
+
+    private static function normalizePath(string $path): string
+    {
+        $trimmed = trim($path);
+        if ($trimmed === '') {
+            return '';
+        }
+        if ($trimmed[0] !== '/') {
+            $trimmed = '/' . ltrim($trimmed, '/');
+        }
+        return $trimmed;
+    }
+
+    public function handle()
+    {
+        $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+        // We only validate for mutating methods; GET/HEAD/OPTIONS can skip
+        if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'])) {
+            // Ensure session is started so we can read tokens for logging/debug
+            if (session_status() !== PHP_SESSION_ACTIVE) @session_start();
+
+            // Check if this path should skip CSRF
+            $path = parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '';
+            $path = self::normalizePath($path);
+            // No request logging here (2026-10-24): an earlier debug block wrote
+            // the CSRF token and the session cookie of EVERY post to
+            // /tmp/csrf-debug.log (world-readable) and storage/logs -- i.e. live
+            // logins. Removed; the logs were emptied and those sessions ended.
+
+            // Special-case /chat: allow if request originates from localhost or
+            // if caller supplies a valid admin token header. Otherwise require CSRF.
+            if ($path === '/chat') {
+                $remote = $_SERVER['REMOTE_ADDR'] ?? '';
+                $tokenHeader = $_SERVER['HTTP_X_GINTO_ADMIN_TOKEN'] ?? $_SERVER['HTTP_X_ADMIN_TOKEN'] ?? null;
+                $expected = getenv('GINTO_ADMIN_TOKEN') ?: getenv('ADMIN_TOKEN');
+                // No localhost pass: behind the proxy every visitor arrives as
+                // 127.0.0.1, so it waived CSRF for everyone (closed 2026-10-24).
+                if ($expected && $tokenHeader && hash_equals((string)$expected, (string)$tokenHeader)) {
+                    return;
+                }
+                // else fall through and require CSRF token below
+            }
+            // Temporary bypass: allow barangay zone save and geo registration during debugging (session-based login already required)
+            if (in_array($path, ['/api/barangay/seller/zones/save', '/api/barangay/product/zones/save', '/api/barangay/register-geo'], true)) {
+                error_log('CsrfMiddleware: bypassing CSRF for ' . $path);
+                return;
+            }
+            if (self::isPathWhitelisted($path)) {
+                return;
+            }
+            // Accept common token names used across the app: '_csrf' (admin), 'csrf_token' (public forms)
+            // Also parse JSON body if Content-Type is application/json. Make parsing idempotent
+            // because middleware may be invoked more than once during dispatch.
+            $token = $_POST['_csrf'] ?? $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? null;
+
+            // Reuse previously-parsed raw/json body if available (avoid re-consuming php://input)
+            $rawBody = $GLOBALS['_RAW_BODY'] ?? null;
+            $jsonData = $GLOBALS['_JSON_BODY'] ?? null;
+
+            if (!$token) {
+                $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
+                if (stripos($contentType, 'application/json') !== false) {
+                    if (is_array($jsonData)) {
+                        // Use cached parsed JSON
+                        $token = $jsonData['_csrf'] ?? $jsonData['csrf_token'] ?? null;
+                    } else {
+                        // First time parsing this request body: read and cache it
+                        $rawBody = @file_get_contents('php://input');
+                        $GLOBALS['_RAW_BODY'] = $rawBody;
+                        $jsonData = json_decode($rawBody, true);
+                        if (is_array($jsonData)) {
+                            $GLOBALS['_JSON_BODY'] = $jsonData;
+                            $token = $jsonData['_csrf'] ?? $jsonData['csrf_token'] ?? null;
+                        }
+                    }
+                }
+            }
+            if (!function_exists('validateCsrfToken')) {
+                error_log('CSRF validation helper missing');
+                http_response_code(500);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'CSRF validation not configured']);
+                exit;
+            }
+            if (!$token || !validateCsrfToken($token)) {
+                // Nothing about the request is written down: an earlier debug
+                // block logged its headers, cookie and body (passwords on a
+                // login form) to /tmp. Removed 2026-10-24.
+                http_response_code(403);
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'error' => 'Invalid CSRF token']);
+                exit;
+            }
+        }
+    }
+}

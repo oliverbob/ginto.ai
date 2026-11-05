@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OpenMall – Your Marketplace</title>
+    <!-- TailwindCSS CDN (latest) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Tailwind config – enable dark mode class strategy
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1d4ed8', // blue-700
+                        secondary: '#f59e0b', // amber-500
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        /* Simple fade‑in animation for product cards */
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors duration-300">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm fixed inset-x-0 top-0 z-20">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center h-16">
+            <a href="#" class="text-2xl font-bold text-primary">OpenMall</a>
+            <nav class="ml-8 hidden md:flex space-x-4">
+                <a href="#" class="hover:text-primary">Home</a>
+                <a href="#categories" class="hover:text-primary">Categories</a>
+                <a href="#products" class="hover:text-primary">Products</a>
+                <a href="#" class="hover:text-primary">Contact</a>
+            </nav>
+            <div class="flex-1"></div>
+            <!-- Search -->
+            <div class="relative w-full max-w-xs mr-4">
+                <input type="text" id="searchInput" placeholder="Search products..."
+                    class="w-full pl-10 pr-3 py-2 rounded-md bg-gray-100 dark:bg-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary" />
+                <svg class="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M11 19a8 8 0 100-16 8 8 0 000 16z"></path></svg>
+            </div>
+            <!-- Dark mode toggle -->
+            <button id="themeToggle" aria-label="Toggle dark mode" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                <svg id="themeIcon" class="w-6 h-6 text-gray-800 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-9.66h-1M4.34 12.34h-1m15.02 5.66l-.71-.71M6.34 6.34l-.71-.71m12.02 12.02l-.71-.71M6.34 17.66l-.71-.71M12 5a7 7 0 000 14 7 7 0 000-14z"></path></svg>
+            </button>
+            <!-- Cart button -->
+            <button id="cartBtn" aria-label="Open cart" class="relative p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary ml-2">
+                <svg class="w-6 h-6 text-gray-800 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.35 2.7a1 1 0 00.9 1.5h12.9M7 13l4 8m6-8l1.35 2.7a1 1 0 01-.9 1.5H9"></path></svg>
+                <span id="cartCount" class="absolute -top-1 -right-1 bg-red-600 text-xs text-white rounded-full w-5 h-5 flex items-center justify-center hidden">0</span>
+            </button>
+            <!-- Auth button (login/register) -->
+            <button id="authBtn" class="ml-4 px-4 py-2 bg-primary text-white rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary">Login / Register</button>
+        </div>
+    </header>
+
+    <main class="pt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Hero / Banner -->
+        <section class="py-12 text-center">
+            <h1 class="text-4xl font-extrabold mb-4">Welcome to OpenMall</h1>
+            <p class="text-lg text-gray-600 dark:text-gray-300 mb-6">Your one‑stop shop for everything – from gadgets to fashion.</p>
+            <a href="#products" class="inline-block bg-secondary text-white px-6 py-3 rounded-md hover:bg-secondary/90 transition">Start Shopping</a>
+        </section>
+
+        <!-- Categories preview -->
+        <section id="categories" class="my-12">
+            <h2 class="text-2xl font-semibold mb-4">Shop by Category</h2>
+            <div id="categoryList" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4"></div>
+        </section>
+
+        <!-- Product grid -->
+        <section id="products" class="my-12">
+            <h2 class="text-2xl font-semibold mb-4">Featured Products</h2>
+            <div id="productGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
+        </section>
+    </main>
+
+    <!-- Cart Sidebar (off‑canvas) -->
+    <aside id="cartSidebar" class="fixed inset-y-0 right-0 w-80 bg-white dark:bg-gray-800 shadow-lg transform translate-x-full transition-transform duration-300 z-30">
+        <div class="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 class="text-lg font-medium">Your Cart</h3>
+            <button id="closeCart" aria-label="Close cart" class="p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div id="cartItems" class="p-4 overflow-y-auto flex-1"></div>
+        <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+            <div class="flex justify-between font-semibold mb-4">
+                <span>Total:</span>
+                <span id="cartTotal">$0.00</span>
+            </div>
+            <button id="checkoutBtn" class="w-full bg-primary text-white py-2 rounded-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Proceed to Checkout</button>
+        </div>
+    </aside>
+
+    <!-- Login / Register Modal -->
+    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-40" aria-modal="true" role="dialog">
+        <div class="bg-white dark:bg-gray-800 rounded-lg w-full max-w-md p-6 relative">
+            <button id="closeAuth" aria-label="Close" class="absolute top-2 right-2 p-2 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-primary">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+            <div class="flex justify-center mb-4">
+                <button id="showLogin" class="px-4 py-2 border-b-2 border-primary text-primary font-medium">Login</button>
+                <button id="showRegister" class="px-4 py-2 text-gray-600 dark:text-gray-300 font-medium">Register</button>
+            </div>
+            <!-- Login Form -->
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label for="loginEmail" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="loginEmail" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary" />
+                </div>
+                <div>
+                    <label for="loginPassword" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="loginPassword" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary" />
+                </div>
+                <button type="submit" class="w-full bg-primary text-white py-2 rounded-md hover:bg-primary/90">Login</button>
+            </form>
+            <!-- Register Form (hidden by default) -->
+            <form id="registerForm" class="space-y-4 hidden">
+                <div>
+                    <label for="regFullName" class="block text-sm font-medium">Full Name</label>
+                    <input type="text" id="regFullName" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary" />
+                </div>
+                <div>
+                    <label for="regEmail" class="block text-sm font-medium">Email</label>
+                    <input type="email" id="regEmail" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary" />
+                </div>
+                <div>
+                    <label for="regPassword" class="block text-sm font-medium">Password</label>
+                    <input type="password" id="regPassword" required minlength="6" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary" />
+                </div>
+                <div>
+                    <label for="regRole" class="block text-sm font-medium">Register as</label>
+                    <select id="regRole" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 focus:ring-primary focus:border-primary">
+                        <option value="buyer" selected>Buyer</option>
+                        <option value="seller">Seller</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-primary text-white py-2 rounded-md hover:bg-primary/90">Create Account</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white dark:bg-gray-800 py-8 mt-12 border-t border-gray-200 dark:border-gray-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-600 dark:text-gray-400">
+            © 2025 OpenMall. All rights reserved.
+        </div>
+    </footer>
+
+    <!-- ==================== JavaScript ==================== -->
+    <script>
+        // ---------- Theme handling ----------
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const rootEl = document.documentElement;
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') rootEl.classList.add('dark');
+        const updateIcon = () => {
+            if (rootEl.classList.contains('dark')) {
+                themeIcon.setAttribute('d', 'M12 3v1m0 16v1m8.66-9.66h-1M4.34 12.34h-1m15.02 5.66l-.71-.71M6.34 6.34l-.71-.71m12.02 12.02l-.71-.71M6.34 17.66l-.71-.71M12 5a7 7 0 000 14 7 7 0 000-14z');
+            } else {
+                themeIcon.setAttribute('d', 'M21 21l-4.35-4.35M12 19a8 8 0 100-16 8 8 0 000 16z');
+            }
+        };
+        updateIcon();
+        themeToggle.addEventListener('click', () => {
+            rootEl.classList.toggle('dark');
+            localStorage.setItem('theme', rootEl.classList.contains('dark') ? 'dark' : 'light');
+            updateIcon();
+        });
+
+        // ---------- Mock data ----------
+        const mockCategories = [
+            { id: 1, name: 'Electronics', icon: '📱' },
+            { id: 2, name: 'Fashion', icon: '👗' },
+            { id: 3, name: 'Home & Living', icon: '🏠' },
+            { id: 4, name: 'Sports', icon: '⚽' },
+            { id: 5, name: 'Beauty', icon: '💄' },
+            { id: 6, name: 'Toys', icon: '🧸' },
+            { id: 7, name: 'Automotive', icon: '🚗' },
+            { id: 8, name: 'Books', icon: '📚' },
+        ];
+        const mockProducts = [
+            { id: 101, title: 'Wireless Bluetooth Earbuds', price: 2999, image: 'https://picsum.photos/seed/earbuds/400/300', rating: 4.5, reviews: 124 },
+            { id: 102, title: 'Smartwatch Series 7', price: 7499, image: 'https://picsum.photos/seed/smartwatch/400/300', rating: 4.2, reviews: 87 },
+            { id: 103, title: 'Men’s Casual Sneakers', price: 4599, image: 'https://picsum.photos/seed/sneakers/400/300', rating: 4.7, reviews: 210 },
+            { id: 104, title: 'Stainless Steel Kitchen Knife Set', price: 8999, image: 'https://picsum.photos/seed/knife/400/300', rating: 4.3, reviews: 56 },
+            { id: 105, title: 'LED Desk Lamp with USB Charging', price: 2599, image: 'https://picsum.photos/seed/lamp/400/300', rating: 4.6, reviews: 143 },
+            { id: 106, title: 'Portable Power Bank 20000mAh', price: 3299, image: 'https://picsum.photos/seed/powerbank/400/300', rating: 4.4, reviews: 98 },
+            { id: 107, title: 'Women’s Summer Maxi Dress', price: 3899, image: 'https://picsum.photos/seed/dress/400/300', rating: 4.5, reviews: 73 },
+            { id: 108, title: 'Kids’ Building Blocks Set (500 pcs)', price: 1999, image: 'https://picsum.photos/seed/blocks/400/300', rating: 4.8, reviews: 165 },
+            { id: 109, title: 'Noise‑Cancelling Over‑Ear Headphones', price: 11999, image: 'https://picsum.photos/seed/headphones/400/300', rating: 4.6, reviews: 212 },
+            { id: 110, title: '4K Ultra‑HD Action Camera', price: 6999, image: 'https://picsum.photos/seed/camera/400/300', rating: 4.1, reviews: 44 },
+        ];
+
+        // ---------- Render categories ----------
+        const categoryListEl = document.getElementById('categoryList');
+        mockCategories.forEach(cat => {
+            const btn = document.createElement('button');
+            btn.className = 'flex items-center space-x-2 p-3 bg-white dark:bg-gray-700 rounded-lg shadow hover:shadow-md transition';
+            btn.innerHTML = `<span class="text-2xl">${cat.icon}</span><span class="font-medium">${cat.name}</span>`;
+            btn.addEventListener('click', () => {
+                // Simple filter – in a real app you would call the API
+                const filtered = mockProducts.filter(p => p.title.toLowerCase().includes(cat.name.toLowerCase()));
+                renderProducts(filtered);
+            });
+            categoryListEl.appendChild(btn);
+        });
+
+        // ---------- Render product cards ----------
+        const productGridEl = document.getElementById('productGrid');
+        function renderProducts(list) {
+            productGridEl.innerHTML = '';
+            if (list.length === 0) {
+                productGridEl.innerHTML = '<p class="col-span-full text-center text-gray-500">No products found.</p>';
+                return;
+            }
+            list.forEach(p => {
+                const card = document.createElement('div');
+                card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition fade-in';
+                card.innerHTML = `
+                    <img src="${p.image}" alt="${p.title}" class="w-full h-48 object-cover rounded-t-lg" loading="lazy" />
+                    <div class="p-4 flex flex-col justify-between h-48">
+                        <h3 class="font-medium text-sm mb-2 line-clamp-2">${p.title}</h3>
+                        <div class="flex items-center justify-between mt-auto">
+                            <span class="text-primary font-semibold">$${(p.price/100).toFixed(2)}</span>
+                            <button data-id="${p.id}" class="add-to-cart btn bg-secondary text-white px-3 py-1 rounded-md hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-secondary" aria-label="Add ${p.title} to cart">Add</button>
+                        </div>
+                        <div class="mt-2 flex items-center text-xs text-gray-500 dark:text-gray-400">
+                            <span class="mr-1">⭐ ${p.rating.toFixed(1)}</span>
+                            <span>(${p.reviews})</span>
+                        </div>
+                    </div>
+                `;
+                productGridEl.appendChild(card);
+            });
+        }
+        renderProducts(mockProducts);
+
+        // ---------- Search (debounced) ----------
+        const searchInput = document.getElementById('searchInput');
+        let searchTimeout;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                const term = searchInput.value.trim().toLowerCase();
+                if (!term) { renderProducts(mockProducts); return; }
+                const filtered = mockProducts.filter(p => p.title.toLowerCase().includes(term));
+                renderProducts(filtered);
+            }, 300);
+        });
+
+        // ---------- Cart logic ----------
+        const cart = {};
+        const cartBtn = document.getElementById('cartBtn');
+        const cartSidebar = document.getElementById('cartSidebar');
+        const closeCart = document.getElementById('closeCart');
+        const cartItemsEl = document.getElementById('cartItems');
+        const cartCountEl = document.getElementById('cartCount');
+        const cartTotalEl = document.getElementById('cartTotal');
+        const checkoutBtn = document.getElementById('checkoutBtn');
+
+        function updateCartUI() {
+            const ids = Object.keys(cart);
+            cartCountEl.textContent = ids.reduce((sum, id) => sum + cart[id].qty, 0);
+            cartCountEl.classList.toggle('hidden', ids.length === 0);
+            // Render items
+            cartItemsEl.innerHTML = '';
+            let totalCents = 0;
+            ids.forEach(id => {
+                const item = cart[id];
+                totalCents += item.price * item.qty;
+                const div = document.createElement('div');
+                div.className = 'flex items-center mb-4';
+                div.innerHTML = `
+                    <img src="${item.image}" alt="${item.title}" class="w-12 h-12 object-cover rounded mr-3" />
+                    <div class="flex-1">
+                        <p class="font-medium text-sm truncate">${item.title}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">$${(item.price/100).toFixed(2)} × ${item.qty}</p>
+                    </div>
+                    <button data-id="${id}" class="remove-item text-red-600 hover:text-red-800 focus:outline-none" aria-label="Remove ${item.title}">✕</button>
+                `;
+                cartItemsEl.appendChild(div);
+            });
+            cartTotalEl.textContent = `$${(totalCents/100).toFixed(2)}`;
+            checkoutBtn.disabled = ids.length === 0;
+        }
+
+        // Add to cart handler (delegated)
+        productGridEl.addEventListener('click', e => {
+            if (e.target.matches('.add-to-cart')) {
+                const id = e.target.dataset.id;
+                const product = mockProducts.find(p => p.id == id);
+                if (!product) return;
+                if (cart[id]) {
+                    cart[id].qty += 1;
+                } else {
+                    cart[id] = { ...product, qty: 1 };
+                }
+                updateCartUI();
+            }
+        });
+
+        // Remove from cart (delegated)
+        cartItemsEl.addEventListener('click', e => {
+            if (e.target.matches('.remove-item')) {
+                const id = e.target.dataset.id;
+                delete cart[id];
+                updateCartUI();
+            }
+        });
+
+        cartBtn.addEventListener('click', () => {
+            cartSidebar.classList.remove('translate-x-full');
+            cartSidebar.classList.add('translate-x-0');
+        });
+        closeCart.addEventListener('click', () => {
+            cartSidebar.classList.remove('translate-x-0');
+            cartSidebar.classList.add('translate-x-full');
+        });
+
+        // ---------- Checkout (mock) ----------
+        checkoutBtn.addEventListener('click', () => {
+            // In a real app you would POST to /checkout with JWT
+            alert('Checkout successful! 🎉\nOrder total: ' + cartTotalEl.textContent);
+            // Reset cart
+            Object.keys(cart).forEach(k => delete cart[k]);
+            updateCartUI();
+            closeCart.click();
+        });
+
+        // ---------- Auth modal (mock only) ----------
+        const authBtn = document.getElementById('authBtn');
+        const authModal = document.getElementById('authModal');
+        const closeAuth = document.getElementById('closeAuth');
+        const showLogin = document.getElementById('showLogin');
+        const showRegister = document.getElementById('showRegister');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+
+        authBtn.addEventListener('click', () => authModal.classList.remove('hidden'));
+        closeAuth.addEventListener('click', () => authModal.classList.add('hidden'));
+        showLogin.addEventListener('click', () => {
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+            showLogin.classList.add('text-primary');
+            showRegister.classList.remove('text-primary');
+        });
+        showRegister.addEventListener('click', () => {
+            registerForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+            showRegister.classList.add('text-primary');
+            showLogin.classList.remove('text-primary');
+        });
+
+        // Mock login – just store a flag in localStorage
+        loginForm.addEventListener('submit', e => {
+            e.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const token = btoa(email + ':' + Date.now()); // dummy token
+            localStorage.setItem('authToken', token);
+            authModal.classList.add('hidden');
+            authBtn.textContent = 'My Account';
+        });
+        registerForm.addEventListener('submit', e => {
+            e.preventDefault();
+            // In a real app you would POST to /auth/register
+            alert('Account created – you can now log in.');
+            showLogin.click();
+        });
+
+        // ---------- Utility: line‑clamp (fallback) ----------
+        // Tailwind v3 includes line-clamp plugin via CDN – we add a quick CSS fallback
+        const style = document.createElement('style');
+        style.textContent = `.line-clamp-2 {display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;}`;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

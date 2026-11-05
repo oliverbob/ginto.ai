@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modern Mall - Your Shopping Destination</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .hero-gradient {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .store-card {
+            transition: all 0.3s ease;
+        }
+        .store-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .nav-link {
+            position: relative;
+            transition: color 0.3s ease;
+        }
+        .nav-link:hover {
+            color: #667eea;
+        }
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            width: 0;
+            height: 2px;
+            bottom: -5px;
+            left: 0;
+            background-color: #667eea;
+            transition: width 0.3s ease;
+        }
+        .nav-link:hover::after {
+            width: 100%;
+        }
+        .category-badge {
+            transition: all 0.3s ease;
+        }
+        .category-badge:hover {
+            background-color: #667eea;
+            color: white;
+        }
+        .mall-map {
+            background: linear-gradient(45deg, #f0f9ff, #e0f2fe);
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-lg sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <div class="flex items-center">
+                    <i class="fas fa-shopping-mall text-2xl text-purple-600 mr-3"></i>
+                    <span class="text-xl font-bold text-gray-800">Modern Mall</span>
+                </div>
+                <div class="hidden md:flex space-x-8">
+                    <a href="#home" class="nav-link text-gray-700 hover:text-purple-600">Home</a>
+                    <a href="#stores" class="nav-link text-gray-700 hover:text-purple-600">Stores</a>
+                    <a href="#dining" class="nav-link text-gray-700 hover:text-purple-600">Dining</a>
+                    <a href="#entertainment" class="nav-link text-gray-700 hover:text-purple-600">Entertainment</a>
+                    <a href="#map" class="nav-link text-gray-700 hover:text-purple-600">Mall Map</a>
+                    <a href="#contact" class="nav-link text-gray-700 hover:text-purple-600">Contact</a>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button class="text-gray-700 hover:text-purple-600">
+                        <i class="fas fa-search text-xl"></i>
+                    </button>
+                    <button class="text-gray-700 hover:text-purple-600">
+                        <i class="fas fa-user text-xl"></i>
+                    </button>
+                    <button class="text-gray-700 hover:text-purple-600">
+                        <i class="fas fa-heart text-xl"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home" class="relative text-white py-20">
+  <img src="https://picsum.photos/seed/hero/1600/600" alt="Mall entrance" class="absolute inset-0 w-full h-full object-cover opacity-70" loading="lazy" />
+  <div class="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+    <h1 class="text-5xl md:text-6xl font-bold mb-6">Welcome to Modern Mall</h1>
+    <p class="text-xl md:text-2xl mb-8">Your Ultimate Shopping & Entertainment Destination</p>
+    <div class="flex flex-col sm:flex-row justify-center gap-4">
+      <button class="bg-white text-purple-600 px-8 py-3 rounded-full font-semibold hover:bg-gray-100 transition duration-300">
+        <i class="fas fa-map-marked-alt mr-2"></i>View Mall Map
+      </button>
+      <button class="border-2 border-white text-white px-8 py-3 rounded-full font-semibold hover:bg-white hover:text-purple-600 transition duration-300">
+        <i class="fas fa-calendar mr-2"></i>View Events
+      </button>
+    </div>
+  </div>
+</section>
+
+    <!-- Quick Info Bar -->
+    <section class="bg-white py-4 border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap justify-center items-center gap-6 text-sm text-gray-600">
+                <div class="flex items-center">
+                    <i class="fas fa-clock text-purple-600 mr-2"></i>
+                    <span>Mon-Sat: 10AM-9PM, Sun: 12PM-6PM</span>
+                </div>
+                <div class="flex items-center">
+                    <i class="fas fa-parking text-purple-600 mr-2"></i>
+                    <span>Free Parking Available</span>
+                </div>
+                <div class="flex items-center">
+                    <i class="fas fa-wifi text-purple-600 mr-2"></i>
+                    <span>Free WiFi Throughout</span>
+                </div>
+                <div class="flex items-center">
+                    <i class="fas fa-wheelchair text-purple-600 mr-2"></i>
+                    <span>Wheelchair Accessible</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Featured Stores -->
+    <section id="stores" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Featured Stores</h2>
+                <p class="text-xl text-gray-600">Discover amazing brands and exclusive offers</p>
+            </div>
+            
+            <!-- Category Filter -->
+            <div class="flex flex-wrap justify-center gap-3 mb-12">
+                <button class="category-badge bg-purple-600 text-white px-6 py-2 rounded-full">All</button>
+                <button class="category-badge bg-gray-200 text-gray-700 px-6 py-2 rounded-full">Fashion</button>
+                <button class="category-badge bg-gray-200 text-gray-700 px-6 py-2 rounded-full">Electronics</button>
+                <button class="category-badge bg-gray-200 text-gray-700 px-6 py-2 rounded-full">Beauty</button>
+                <button class="category-badge bg-gray-200 text-gray-700 px-6 py-2 rounded-full">Sports</button>
+                <button class="category-badge bg-gray-200 text-gray-700 px-6 py-2 rounded-full">Home</button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <!-- Store Card 1 -->
+                <div class="store-card bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="h-48 bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                        <i class="fas fa-tshirt text-6xl text-white"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Fashion Forward</h3>
+                        <p class="text-gray-600 mb-3">Trendy clothing for all ages</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Level 2, Store 205</span>
+                            <button class="text-purple-600 hover:text-purple-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Store Card 2 -->
+                <div class="store-card bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="h-48 bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                        <i class="fas fa-mobile-alt text-6xl text-white"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Tech Hub</h3>
+                        <p class="text-gray-600 mb-3">Latest gadgets and electronics</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Level 1, Store 108</span>
+                            <button class="text-purple-600 hover:text-purple-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Store Card 3 -->
+                <div class="store-card bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="h-48 bg-gradient-to-br from-pink-400 to-pink-600 flex items-center justify-center">
+                        <i class="fas fa-palette text-6xl text-white"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Beauty Bliss</h3>
+                        <p class="text-gray-600 mb-3">Cosmetics and skincare</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Level 2, Store 234</span>
+                            <button class="text-purple-600 hover:text-purple-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Store Card 4 -->
+                <div class="store-card bg-white rounded-lg shadow-md overflow-hidden">
+                    <div class="h-48 bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center">
+                        <i class="fas fa-running text-6xl text-white"></i>
+                    </div>
+                    <div class="p-6">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-2">Sports Zone</h3>
+                        <p class="text-gray-600 mb-3">Athletic wear and equipment</p>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Level 3, Store 312</span>
+                            <button class="text-purple-600 hover:text-purple-800">
+                                <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Dining Section -->
+    <section id="dining" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Dining Options</h2>
+                <p class="text-xl text-gray-600">From quick bites to fine dining</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-utensils text-3xl text-yellow-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Food Court</h3>
+                    <p class="text-gray-600">Variety of cuisines and quick service options</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-coffee text-3xl text-red-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Cafés</h3>
+                    <p class="text-gray-600">Relax with coffee and light refreshments</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-wine-glass text-3xl text-green-600"></i>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-800 mb-2">Fine Dining</h3>
+                    <p class="text-gray-600">Upscale restaurants for special occasions</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Entertainment Section -->
+    <section id="entertainment" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Entertainment</h2>
+                <p class="text-xl text-gray-600">Fun activities for the whole family</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white rounded-lg p-6 text-center shadow-md">
+                    <i class="fas fa-film text-4xl text-purple-600 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Cinema</h3>
+                    <p class="text-gray-600 text-sm">Latest movies in premium theaters</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 text-center shadow-md">
+                    <i class="fas fa-gamepad text-4xl text-purple-600 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Arcade</h3>
+                    <p class="text-gray-600 text-sm">Games and entertainment for all ages</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 text-center shadow-md">
+                    <i class="fas fa-bowling-ball text-4xl text-purple-600 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Bowling</h3>
+                    <p class="text-gray-600 text-sm">Modern bowling alleys with lounge</p>
+                </div>
+                <div class="bg-white rounded-lg p-6 text-center shadow-md">
+                    <i class="fas fa-child text-4xl text-purple-600 mb-4"></i>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Play Area</h3>
+                    <p class="text-gray-600 text-sm">Safe and fun environment for kids</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Mall Map Section -->
+    <section id="map" class="py-16 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Mall Map</h2>
+                <p class="text-xl text-gray-600">Navigate your way around the mall</p>
+            </div>
+
+            <div class="mall-map rounded-lg p-8">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div class="text-center">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Level 1</h3>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span>Electronics</span>
+                                    <span class="text-purple-600">Stores 100-150</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Food Court</span>
+                                    <span class="text-purple-600">Center</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Services</span>
+                                    <span class="text-purple-600">Stores 151-180</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Level 2</h3>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span>Fashion</span>
+                                    <span class="text-purple-600">Stores 200-250</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Beauty</span>
+                                    <span class="text-purple-600">Stores 251-280</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Accessories</span>
+                                    <span class="text-purple-600">Stores 281-300</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="text-xl font-semibold text-gray-800 mb-4">Level 3</h3>
+                        <div class="bg-white rounded-lg p-4 shadow-sm">
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span>Sports</span>
+                                    <span class="text-purple-600">Stores 300-330</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Home & Living</span>
+                                    <span class="text-purple-600">Stores 331-360</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span>Entertainment</span>
+                                    <span class="text-purple-600">North Wing</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="py-16 bg-gray-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold text-gray-800 mb-4">Contact Us</h2>
+                <p class="text-xl text-gray-600">We're here to help make your visit enjoyable</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-phone text-2xl text-purple-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Phone</h3>
+                    <p class="text-gray-600">(555) 123-4567</p>
+                    <p class="text-gray-600">Customer Service</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-envelope text-2xl text-purple-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Email</h3>
+                    <p class="text-gray-600">info@modernmall.com</p>
+                    <p class="text-gray-600">General Inquiries</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-map-marker-alt text-2xl text-purple-600"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-800 mb-2">Address</h3>
+                    <p class="text-gray-600">123 Shopping Center Dr</p>
+                    <p class="text-gray-600">Mall City, ST 12345</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-8">
+                <div>
+                    <div class="flex items-center mb-4">
+                        <i class="fas fa-shopping-mall text-2xl mr-3"></i>
+                        <span class="text-xl font-bold">Modern Mall</span>
+                    </div>
+                    <p class="text-gray-400">Your premier shopping and entertainment destination with over 200 stores and services.</p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Quick Links</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#stores" class="hover:text-white">Store Directory</a></li>
+                        <li><a href="#dining" class="hover:text-white">Dining</a></li>
+                        <li><a href="#entertainment" class="hover:text-white">Entertainment</a></li>
+                        <li><a href="#map" class="hover:text-white">Mall Map</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Services</h3>
+                    <ul class="space-y-2 text-gray-400">
+                        <li><a href="#" class="hover:text-white">Gift Cards</a></li>
+                        <li><a href="#" class="hover:text-white">Lost & Found</a></li>
+                        <li><a href="#" class="hover:text-white">Customer Service</a></li>
+                        <li><a href="#" class="hover:text-white">Accessibility</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold mb-4">Connect With Us</h3>
+                    <div class="flex space-x-4">
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-facebook text-2xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-twitter text-2xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-instagram text-2xl"></i>
+                        </a>
+                        <a href="#" class="text-gray-400 hover:text-white">
+                            <i class="fab fa-youtube text-2xl"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+                <p>&copy; 2024 Modern Mall. All rights reserved. | Privacy Policy | Terms of Service</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Category filter functionality
+        const categoryButtons = document.querySelectorAll('.category-badge');
+        categoryButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                categoryButtons.forEach(btn => {
+                    btn.classList.remove('bg-purple-600', 'text-white');
+                    btn.classList.add('bg-gray-200', 'text-gray-700');
+                });
+                this.classList.remove('bg-gray-200', 'text-gray-700');
+                this.classList.add('bg-purple-600', 'text-white');
+            });
+        });
+
+        // Add scroll effect to navigation
+        window.addEventListener('scroll', function() {
+            const nav = document.querySelector('nav');
+            if (window.scrollY > 100) {
+                nav.classList.add('shadow-xl');
+            } else {
+                nav.classList.remove('shadow-xl');
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,53 @@
+{
+    "name": "oliverbob/php-cms",
+    "description": "A simple PHP MVC CMS",
+    "type": "project",
+    "require": {
+        "php": "^8.3",
+        "vlucas/phpdotenv": "^5.6",
+        "catfan/medoo": "^2.1",
+        "cboden/ratchet": "^0.4.4",
+        "react/event-loop": "^1.2",
+        "react/socket": "^1.11",
+        "react/zmq": "^0.4.0",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-zmq": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "App\\": "app/",
+            "Core\\": "core/"
+        }
+    },
+    "config": {
+        "process-timeout": 0,
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    },
+    "scripts": {
+        "start-http": "php -S 0.0.0.0:8082 -t public",
+        "start-ws": "php bin/chat_server.php",
+        "stop-http": "sh -c 'trap \"\" TERM; pids=$(pgrep -f \"php -S 0.0.0.0:8082 -t public\" || true); if [ -n \"$pids\" ]; then for pid in $pids; do kill \"$pid\" || true; done; fi; exit 0'",
+        "start-wh": "php -S 0.0.0.0:20000 -t bin/webhook",
+        "wh": [
+            "@php -r \"echo 'Starting Webhook listener on port 20000...\\n';\"",
+            "@composer start-wh"
+        ],
+        "start": [
+            "@php -r \"echo 'Starting HTTP server (port 8082) and WebSocket server (port 8082, ZMQ 5555)...\\nRun HTTP and WebSocket servers in separate terminals.\\nHTTP: composer start-http\\nWS: composer start-ws\\n';\""
+        ],
+        "restart-http": [
+            "@php -r \"echo 'Stopping HTTP server...\\n';\"",
+            "@composer stop-http",
+            "@php -r \"echo 'Dumping autoload...\\n';\"",
+            "composer dump-autoload -o",
+            "@php -r \"echo 'Starting HTTP server...\\n';\"",
+            "@composer start-http"
+        ]
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
