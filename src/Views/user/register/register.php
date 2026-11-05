@@ -686,7 +686,7 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
         <div class="flex items-center space-x-4 md:space-x-6">
           <a href="#program-overview" class="hidden md:inline font-medium transition-colors" style="color: var(--text-primary);">Program</a>
           <a href="#how-it-works" class="hidden md:inline font-medium transition-colors" style="color: var(--text-primary);">Join Now</a>
-          <a href="<?php echo BASE_URL; ?>/login" class="header-login-btn" tabindex="0">
+          <a href="<?php echo BASE_URL; ?>/login?form=1" class="header-login-btn" tabindex="0">
             <i class="fas fa-user-circle"></i> Login
           </a>
         </div>

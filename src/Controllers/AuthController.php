@@ -57,8 +57,17 @@ class AuthController
                     $_SESSION['login_redirect'] = $next;
                 }
             }
-            View::view('user/login_sq', [
-                'title' => 'Login — SilverQueen'
+            if (($_GET['form'] ?? '') === '1') {
+                View::view('user/login_sq', [
+                    'title' => 'Login — SilverQueen Marketplace'
+                ]);
+                return;
+            }
+
+            // The story is the public pre-login experience. The existing form remains
+            // available at /login?form=1 and still posts to this same /login action.
+            View::view('silverqueen_home', [
+                'title' => 'SilverQueen — Social Trade for Every Barangay'
             ]);
         }
     }

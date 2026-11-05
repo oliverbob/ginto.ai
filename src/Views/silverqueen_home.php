@@ -10,12 +10,12 @@
   <meta name="description" content="Discover SilverQueen: a Philippine platform connecting barangay communities through social feeds, neighborhood commerce, and local last-mile delivery.">
   <meta name="keywords" content="SilverQueen, barangay, Philippines, barangay e-commerce, community marketplace, social commerce, last-mile delivery, local riders, Ginto AI, digital barangay, Luzon, Visayas, Mindanao">
   <meta name="robots" content="index,follow,max-image-preview:large">
-  <link rel="canonical" href="https://silverqueen.pro/">
+  <link rel="canonical" href="https://silverqueen.pro/login">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="SilverQueen">
   <meta property="og:title" content="SilverQueen — Social Trade for Every Barangay">
   <meta property="og:description" content="A Philippine platform bringing community, local sellers, and last-mile delivery together across barangays.">
-  <meta property="og:url" content="https://silverqueen.pro/">
+  <meta property="og:url" content="https://silverqueen.pro/login">
   <meta property="og:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg">
   <meta property="og:image:alt" content="A night view of the Philippine archipelago illuminated by community lights">
   <meta name="twitter:card" content="summary_large_image">
@@ -32,7 +32,7 @@
   <header class="site-header">
     <a class="wordmark" href="#cover" aria-label="SilverQueen home"><span class="wordmark-mark" aria-hidden="true">SQ</span><span>SilverQueen<span class="wordmark-period">.</span></span></a>
     <div class="header-note">A barangay-first movement</div>
-    <a class="header-login" href="/login">Log in</a>
+    <a class="header-login" href="/login?form=1">Log in</a>
     <a class="header-cta" href="/register">Join the Movement <span aria-hidden="true">↗</span></a>
   </header>
   <main>
