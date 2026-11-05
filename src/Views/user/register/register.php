@@ -53,7 +53,20 @@ $paymongoEnabled = in_array('paymongo', $activeProcessors, true);
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ginto Rewards Program - Unlock Residual Income</title>
+  <title>Join SilverQueen — Community Commerce for Every Barangay</title>
+  <meta name="description" content="Join SilverQueen to connect with your barangay, discover neighborhood sellers, and take part in a growing Philippine social commerce and local delivery network.">
+  <meta name="keywords" content="SilverQueen registration, join barangay marketplace, Philippines social commerce, local delivery, community marketplace, Ginto AI">
+  <meta name="robots" content="noindex,follow">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="SilverQueen">
+  <meta property="og:title" content="Join SilverQueen — Community Commerce for Every Barangay">
+  <meta property="og:description" content="Create your SilverQueen account and connect with your local community, sellers, and riders.">
+  <meta property="og:url" content="https://silverqueen.pro/register">
+  <meta property="og:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Join SilverQueen">
+  <meta name="twitter:description" content="Connect with your local community, sellers, and riders.">
+  <meta name="twitter:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg">
   <script>
     // Prevent auto-scroll on page load with hash - must run before page renders
     if (window.location.hash) {

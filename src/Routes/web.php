@@ -205,8 +205,8 @@ $router->req('/forgot-password', 'PasswordResetController@forgotPassword');
 $router->req('/reset-password',  'PasswordResetController@resetPassword');
 $router->req('/transcribe', 'AudioController@transcribe');
 
-// Home page serves chat directly (messenger works on both / and /chat)
-$router->get('/', 'ChatController@index');
+// SilverQueen story landing page; authenticated chat remains available at /chat.
+$router->get('/', function() { \Ginto\Core\View::view('silverqueen_home', ['title' => 'SilverQueen — Social Trade for Every Barangay']); });
 $router->post('/', 'ChatController@stream');
 
 // Bible routes

@@ -25,8 +25,8 @@ class AuthController
     }
 
     /**
-     * Home page - redirect admins to /admin, regular users stay on current page
-     * Note: / now serves ChatController directly (see web.php routes)
+     * Legacy home action - the public root now serves the SilverQueen story landing page.
+     * Authenticated chat remains available at /chat.
      */
     public function index(): void
     {

@@ -4,7 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title ?? 'Ginto') ?></title>
+    <title><?= htmlspecialchars($title ?? 'SilverQueen Marketplace — Login') ?></title>
+    <meta name="description" content="Sign in to the SilverQueen Marketplace to connect with your barangay community, shop local sellers, and access local delivery.">
+    <meta name="keywords" content="SilverQueen Marketplace login, barangay marketplace, Philippines e-commerce, local community commerce, Ginto AI">
+    <meta name="robots" content="noindex,follow">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SilverQueen Marketplace">
+    <meta property="og:title" content="Sign in to SilverQueen Marketplace">
+    <meta property="og:description" content="Access community feeds, local sellers, and barangay delivery on SilverQueen.">
+    <meta property="og:url" content="https://silverqueen.pro/login">
+    <meta property="og:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Sign in to SilverQueen Marketplace">
+    <meta name="twitter:description" content="Access community feeds, local sellers, and barangay delivery on SilverQueen.">
+    <meta name="twitter:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg">
     <link rel="stylesheet" href="/assets/css/tailwind.css">
     <link rel="stylesheet" href="/assets/fontawesome/css/all.min.css">
     <link rel="icon" type="image/png" href="/assets/images/ginto.png">
@@ -298,7 +311,7 @@
         <!-- Tabs -->
         <div class="sq-tabs">
             <button type="button" class="sq-tab active-ginto" id="tab-ginto" onclick="switchTab('ginto')">
-                <i class="fas fa-coins" style="margin-right:0.35rem;"></i>Ginto
+                <i class="fas fa-store" style="margin-right:0.35rem;"></i>Marketplace
             </button>
             <button type="button" class="sq-tab" id="tab-sqs" onclick="switchTab('sqs')">
                 <i class="fas fa-gem" style="margin-right:0.35rem;"></i>SilverQueen
@@ -310,7 +323,7 @@
         <div class="sq-panel active" id="panel-ginto">
             <div class="sq-logo-area ginto">
                 <img src="/assets/images/ginto.png" alt="Ginto">
-                <h2>Ginto</h2>
+                <h2>Marketplace</h2>
                 <p>silverqueen.pro</p>
             </div>
             <form action="https://silverqueen.pro/login" method="POST">
@@ -326,7 +339,7 @@
                         <svg class="pw-closed" style="width:18px;height:18px;" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7 1.274-4.057 5.065-7 9.542-7 1.05 0 2.05.15 3 .425M12 5c4.477 0 8.268 2.943 9.542 7a10.04 10.04 0 01-1.5 3.5M16.5 13.5a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z"/></svg>
                     </button>
                 </div>
-                <button type="submit" class="sq-btn sq-btn-ginto">Login to Ginto</button>
+                <button type="submit" class="sq-btn sq-btn-ginto">Login to Marketplace</button>
             </form>
             <div class="sq-footer-links">
                 <a href="https://silverqueen.pro/register" class="sq-link sq-link-ginto">Create an account</a>
