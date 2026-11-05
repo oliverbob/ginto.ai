@@ -162,7 +162,7 @@ function sqLogin(e) {
         btn.textContent = 'Verifying…';
         btn.disabled = true;
 
-        fetch('/api/auth/cross-login/verify', {
+        fetch('https://sq.silverqueen.pro/api/auth/cross-login/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
@@ -177,7 +177,7 @@ function sqLogin(e) {
                 localStorage.setItem('sq_token', accessToken);
                 localStorage.setItem('sq_refresh', tokens.refresh_token || '');
                 localStorage.setItem('sq_user', JSON.stringify(user.user || user));
-                window.location.href = '/login-jwt?token=' + encodeURIComponent(accessToken);
+                window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
             } else {
                 var errMsg = (user.error && typeof user.error === 'string') ? user.error
                     : (data.error && typeof data.error === 'string') ? data.error
@@ -201,7 +201,7 @@ function sqLogin(e) {
     btn.textContent = 'Signing in…';
     btn.disabled = true;
 
-    fetch('/api/auth/cross-login', {
+    fetch('https://sq.silverqueen.pro/api/auth/cross-login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -226,8 +226,8 @@ function sqLogin(e) {
             return;
         }
 
-        if (user.two_factor_required || data.two_factor_required) {
-            errEl.textContent = user.error || data.error || 'Two-factor authentication is enabled. Sign in through the account security login flow.';
+        if ((user.two_factor_required || data.two_factor_required) && !user.requires_2fa) {
+            errEl.textContent = user.error || data.error || 'Two-factor authentication is enabled. Please use the SilverQueen verification step.';
             errEl.style.display = 'block';
             btn.textContent = 'Login to SilverQueen';
             btn.disabled = false;
@@ -238,7 +238,7 @@ function sqLogin(e) {
             localStorage.setItem('sq_token', accessToken);
             localStorage.setItem('sq_refresh', refreshToken);
             localStorage.setItem('sq_user', JSON.stringify(user.user || user));
-            window.location.href = '/login-jwt?token=' + encodeURIComponent(accessToken);
+            window.location.href = 'https://sq.silverqueen.pro/login-jwt?token=' + encodeURIComponent(accessToken);
         } else {
             var errMsg = (user.error && typeof user.error === 'string') ? user.error
                 : (data.error && typeof data.error === 'string') ? data.error
