@@ -86,6 +86,12 @@ $router->get('/api/code-token', function() {
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');
+$router->get('/sqb-engines-v3', function() {
+    \Ginto\Core\View::view('silverqueen_sqb_engine_v3', [
+        'title' => 'SilverQueen: Your Engine in Every Barangay',
+        'sqbEnginesPageV3' => true,
+    ]);
+});
 $router->get('/sqb-engine-v2', function() {
     \Ginto\Core\View::view('silverqueen_sqb_engine_v2', [
         'title' => 'SilverQueen: Your Engine in Every Barangay',
