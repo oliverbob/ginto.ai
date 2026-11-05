@@ -91,4 +91,23 @@ document.getElementById('togglePassword').addEventListener('click', () => {
 });
 </script>
 
+
+<!-- SilverQueen/Ginto AI Footer -->
+<footer class="w-full mt-12 mb-6 px-4">
+  <div class="max-w-4xl mx-auto text-center text-xs text-gray-600 dark:text-gray-400 leading-relaxed space-y-2">
+    <p><strong>silverqueen.pro</strong> is the full implementation of <a href="https://github.com/oliverbob/ginto.ai" target="_blank" rel="noopener noreferrer" class="text-amber-600 dark:text-amber-400 hover:underline">https://github.com/oliverbob/ginto.ai</a>.</p>
+    <p>It is the first business example implementing the full scale and power of the Ginto AI project repo.</p>
+    <p><strong>sq.silverqueen.pro</strong> and <strong>gk.silverqueen.pro</strong> are the children projects built around the same project by Github user <strong>"oliverbob"</strong>.</p>
+    <p>Its vision is to help in the digitization of the <strong>42,064 barangays</strong> of the Philippines primarily, but also welcomes project ventures (<strong>strictly with no venture capitalist involvement</strong>) across the world.</p>
+    <p>The stage name of the author is <strong>Bob Reyes</strong>, otherwise known as <strong>Datu Gyud</strong> in SilverQueen.</p>
+    <p>These projects are run and managed by its current operator <strong>Ginto Services Corporation</strong> with <strong>COMPANY REG. NO.: 2026040246055-25</strong>.</p>
+    <p><strong>Ginto Services Corporation</strong> is a company duly registered in the Philippines on April 2026 to accommodate the full potential of the Ginto AI project, but does not in any way automatically own Ginto AI. <strong>Ginto AI</strong> is an open source project of <strong>Bob Reyes</strong> which predates the creation of SilverQueen.</p>
+    <p>All online transactions are reported to the <strong>Bureau of Internal Revenue</strong> for full compliance.</p>
+    <p>For more information about its privacy, terms and policy, refer to the links found in <a href="https://sq.silverqueen.pro" target="_blank" rel="noopener noreferrer" class="text-amber-600 dark:text-amber-400 hover:underline">sq.silverqueen.pro</a> or especially from within <strong>Terms &amp; User Policy</strong> · <strong>Privacy</strong> · <strong>About</strong>.</p>
+    <div class="flex justify-center mt-4">
+      <img src="https://comchain.silverqueen.pro/assets/img/bir-registration-seal.png" alt="BIR Registration Seal" class="max-h-24 object-contain">
+    </div>
+  </div>
+</footer>
+
 <?php require_once __DIR__ . '/../layout/footer.php'; ?>
