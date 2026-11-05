@@ -1,11 +1,21 @@
+<?php
+// Keep every editable package and sample placeholder in one place.
+$sqbV2Placeholders = [
+    'silver_space' => '[X GB / posting limits]',
+    'gold_space' => '[higher limits]',
+    'platinum_space' => '[highest limits]',
+    'engine_credit' => '[x]',
+];
+$escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>SilverQueen: Your Engine in Every Barangay</title>
-  
-  
+
+
   <link rel="icon" href="assets/images/logo-symbol-white.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -612,52 +622,579 @@
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:image" content="https://silverqueen.pro/assets/silverqueen/images/archipelago.jpeg"><meta name="twitter:title" content="SilverQueen: Your Engine in Every Barangay"><meta name="twitter:description" content="SilverQueen Engines give barangay sellers more space, more reach, and a local last-mile route. Choose SilverSuite, GoldSuite, or PlatinumSuite.">
 <link rel="canonical" href="https://silverqueen.pro/sqb-engine-v2">
 <link rel="preload" as="image" href="/assets/silverqueen/sqb-engine-v2/assets/frames/frame_0001.webp" type="image/webp" fetchpriority="high">
-<style>:root{--display:'Bebas Neue',system-ui,sans-serif;--body:'Inter',Arial,sans-serif;--cyan:#00E5FF;--gold:#FFC83D;--pink:#FF2E93;--ink:#050A10}.st-header{background:rgba(5,10,16,.92)!important;color:#fff!important;border-bottom:1px solid rgba(255,255,255,.08);z-index:40}.st-header__logo{color:#fff!important}.st-header__nav a{color:#dce9ef!important}.st-header__cta{background:#FFC83D!important;color:#050A10!important}.st-header__burger{color:#fff}.v2-header-tagline{color:#9aaeb9;font-size:10px;letter-spacing:.16em;font-weight:800;white-space:nowrap;margin-left:auto;margin-right:22px}.v2-wrap{background:#050A10;color:#eff8fc;font-family:Inter,Arial,sans-serif}.v2-wrap *{box-sizing:border-box}.v2-section{position:relative;min-height:72vh;padding:clamp(64px,10vw,140px) max(6vw,22px);display:flex;align-items:center;justify-content:center;scroll-margin-top:72px}.v2-inner{width:min(1160px,100%);margin:auto}.v2-kicker{font-size:12px;letter-spacing:.19em;color:#00E5FF;font-weight:800;text-transform:uppercase;margin:0 0 18px}.v2-section h2{font-family:'Bebas Neue',Impact,sans-serif;font-size:clamp(42px,7vw,88px);line-height:.98;letter-spacing:.01em;margin:0 0 22px;color:#fff}.v2-section h3{font-size:clamp(22px,3vw,32px);margin:8px 0 12px}.v2-lede,.v2-copy{font-size:clamp(17px,1.7vw,21px);line-height:1.65;color:#b8c8d2;max-width:780px}.v2-hero{min-height:100vh;padding:0}.v2-hero .st-hero__sticky{height:100svh}.v2-hero .st-hero__overlay{padding:22px;pointer-events:auto;background:linear-gradient(0deg,rgba(5,10,16,.62),rgba(5,10,16,.08) 80%)}.v2-hero .st-hero__overlay h1{font-size:clamp(48px,9vw,110px);max-width:1000px;line-height:.95}.v2-hero .st-hero__overlay p{font-size:clamp(18px,2vw,26px);max-width:760px}.v2-label{color:#FFC83D;text-transform:uppercase;letter-spacing:.15em;font-weight:800;font-size:12px}.v2-btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 23px;border-radius:999px;background:#FFC83D;color:#071019;text-decoration:none;font-weight:800;margin:10px 8px 0 0}.v2-btn--outline{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.28)}.v2-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:30px}.v2-card{padding:26px;border:1px solid rgba(0,229,255,.19);border-radius:18px;background:linear-gradient(145deg,rgba(12,31,42,.9),rgba(8,14,23,.96));box-shadow:0 0 30px rgba(0,229,255,.04)}.v2-card p{color:#bac8d0;line-height:1.6}.v2-card--featured{border-color:#FFC83D;box-shadow:0 0 38px rgba(255,200,61,.11);transform:translateY(-8px)}.v2-tag{font-size:12px;color:#00E5FF;letter-spacing:.12em;font-weight:800}.v2-price{font-size:40px;font-weight:850;color:#FFC83D;margin:10px 0}.v2-list{padding-left:18px;color:#cad7de;line-height:1.9}.v2-steps{display:flex;gap:12px;flex-wrap:wrap;margin:28px 0}.v2-steps span{padding:12px 15px;border:1px solid rgba(0,229,255,.27);border-radius:999px;color:#d8faff}.v2-disclaimer{font-size:13px!important;color:#8d9ca4!important}.v2-auth{background:radial-gradient(ellipse at center,rgba(0,229,255,.07),transparent 65%)}.v2-auth .auth-content{width:min(860px,100%);margin:auto}.sq-disclosure-footer{display:block!important;width:100%;margin:0;padding:56px max(6vw,22px) 28px;background:#071019!important;color:#a7b5bd!important;border-top:1px solid rgba(0,229,255,.2);font:15px/1.7 Inter,Arial,sans-serif}.sq-disclosure-inner{width:min(980px,100%);margin:0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:12px}.sq-disclosure-inner p{margin:0;color:#a7b5bd}.sq-disclosure-footer a{color:#00E5FF;text-decoration:none}.sq-disclosure-footer a:hover{text-decoration:underline}.sq-disclosure-footer .footer-brand{font:700 30px/1 'Bebas Neue',Impact,sans-serif;color:#fff;letter-spacing:.03em;margin-bottom:8px}.sq-disclosure-links{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.sq-disclosure-footer img{display:block;width:112px;max-width:100%;height:auto;margin-top:12px}.sq-disclosure-footer .footer-end{font-size:12px;color:#6f838e;margin-top:8px}.v2-rollout-rows{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:32px 0}.v2-rollout-rows div{padding:16px;border-left:2px solid #00E5FF;background:rgba(255,255,255,.03)}.v2-rollout-rows b{color:#FFC83D;display:block;margin-bottom:6px}.v2-engine{border-color:rgba(255,46,147,.4)}.v2-status{color:#FF2E93;font-size:12px;letter-spacing:.12em;font-weight:800}.v2-map-note{font-size:12px;color:#83949d;margin-top:18px}.v2-footer-line{color:#00E5FF}.v2-hero-cta{pointer-events:auto}.v2-hero .st-hero__overlay>*{pointer-events:auto}@media(prefers-reduced-motion:reduce){.v2-hero{height:100svh!important}}@media(max-width:760px){.v2-header-tagline{display:none}.v2-grid{grid-template-columns:1fr}.v2-card--featured{transform:none}.v2-rollout-rows{grid-template-columns:1fr 1fr}.v2-section{min-height:auto;padding:76px 22px}.v2-hero{min-height:100vh;padding:0}.v2-hero .st-hero__sticky{height:60svh;top:0}.v2-hero .st-hero__overlay{height:60svh}.v2-auth .auth-content{padding:12px}.v2-hero .st-hero__overlay h1{font-size:clamp(44px,12vw,68px)}}@media(max-width:380px){.v2-rollout-rows{grid-template-columns:1fr}.v2-btn{width:100%;margin-right:0}}</style>
-</head>
-<?php
-// Keep every requested editable placeholder in this single configuration block.
-$sqbV2Placeholders = [
-    'silver_space' => '[X GB / posting limits]',
-    'gold_space' => '[higher limits]',
-    'platinum_space' => '[highest limits]',
-    'engine_credit' => '[x]',
-];
-$escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-?>
-<body><div class="v2-wrap" id="cover">
-<header class="st-header"><a class="st-header__logo" href="#cover">SilverQueen.</a><span class="v2-header-tagline">A BARANGAY-FIRST MOVEMENT</span><nav class="st-header__nav"><a href="#network">Network</a><a href="#packages">Engines</a><a href="#barangay-engine">How it works</a><a href="#auth">Log in</a><a class="st-header__cta" href="#auth">Join the Movement</a></nav><button class="st-header__burger" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button></header>
-<main>
-<section class="st-hero st-hero--scroll v2-hero" style="height:528vh" aria-label="SilverQueen introduction"><div class="st-hero__sticky"><canvas class="st-hero__canvas" data-frames-path="/assets/silverqueen/sqb-engine-v2/assets/frames/" data-frames-count="176" data-scrub-vh="528" data-frames-ext="webp" aria-hidden="true"></canvas><div class="st-hero__overlay"><span class="v2-label">SOCIAL TRADE · LOCAL ENGINES</span><h1>SilverQueen: An Engine in Every Barangay</h1><p>More space to post, sell, and deliver, powered by an SQB Engine that works inside your own radius.</p><a class="v2-btn v2-hero-cta" href="#auth">Join the Movement ↗</a></div></div></section>
-<section class="v2-section" id="network"><div class="v2-inner"><p class="v2-kicker">THE DISTANCE BETWEEN US</p><h2>Great barangays.<br>Limited space.</h2><p class="v2-lede">Free accounts can post, sell, and connect, within limits. When your community, store, or videos outgrow those limits, an SQB Engine gives you room to grow, and keeps the work of serving your barangay local.</p><div class="v2-card" style="margin-top:28px"><strong style="font-size:clamp(40px,8vw,76px);color:#FFC83D">40,000+</strong><p>barangays across an island nation with different needs and distances.</p></div><p class="v2-disclaimer">A national-scale vision, not a claim of current platform coverage.</p></div></section>
-<section class="v2-section" id="pillars"><div class="v2-inner"><p class="v2-kicker">THREE PILLARS · ONE LOCAL LOOP</p><h2>Every barangay has an engine.</h2><p class="v2-lede">Space to grow. Reach to be seen. A local route to the doorstep.</p><div class="v2-grid"><article class="v2-card"><span class="v2-tag">01 / 03 · SPACE</span><h3>Room to grow.</h3><p>Premium engines lift your limits on text, images, and video uploads.</p></article><article class="v2-card"><span class="v2-tag">02 / 03 · REACH</span><h3>Be seen close to home.</h3><p>Ads delivery favors engine owners. Higher suites get stronger delivery and a wider audience.</p></article><article class="v2-card"><span class="v2-tag">03 / 03 · LAST MILE</span><h3>Your radius, your route.</h3><p>Each engine serves its own radius, so the last mile stays local, tracked, and paid for.</p></article></div></div></section>
-<section class="v2-section" id="rollout"><div class="v2-inner"><p class="v2-kicker">AN ENGINE ROLLOUT VISION</p><h2>One engine at a time.<br><span style="color:#FFC83D">One network together.</span></h2><p class="v2-lede">Start with local engines in Luzon. Link the Visayas. Bring Mindanao into the route. Every engine lights up the barangay next to it.</p><div class="v2-rollout-rows"><div><b>01 Luzon</b>First engines</div><div><b>02 Visayas</b>Island links</div><div><b>03 Mindanao</b>Regional hubs</div><div><b>04 One network</b>Shared connectivity</div></div><p class="v2-disclaimer">◉ Rollout vision, not a claim of current coverage.</p><p class="v2-map-note">Illustrative sample · not live coverage</p></div></section>
-<section class="v2-section" id="packages"><div class="v2-inner"><p class="v2-kicker">CHOOSE YOUR ENGINE</p><h2>Three suites. One growing network.</h2><div class="v2-grid"><article class="v2-card"><span class="v2-tag">SILVERSUITE</span><div class="v2-price">$130</div><h3>Start your engine.</h3><ul class="v2-list"><li>Space: <?= $escV2($sqbV2Placeholders['silver_space']) ?></li><li>Ads delivery: Boosted</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Eligible</li></ul><a class="v2-btn" href="/register?suite=silver">Choose Silver</a></article><article class="v2-card v2-card--featured"><span class="v2-tag">GOLDSUITE · FEATURED</span><div class="v2-price">$260</div><h3>Grow your radius.</h3><ul class="v2-list"><li>Space: <?= $escV2($sqbV2Placeholders['gold_space']) ?></li><li>Ads delivery: Stronger, wider audience</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Higher allocation</li></ul><a class="v2-btn" href="/register?suite=gold">Choose Gold</a></article><article class="v2-card"><span class="v2-tag">PLATINUMSUITE</span><div class="v2-price">$1018</div><h3>Anchor your barangay.</h3><ul class="v2-list"><li>Space: <?= $escV2($sqbV2Placeholders['platinum_space']) ?></li><li>Ads delivery: Highest priority, widest audience</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Highest allocation</li><li>Starlink Connect: Eligible (see next section)</li></ul><a class="v2-btn" href="/register?suite=platinum">Choose Platinum</a></article></div><p class="v2-copy">Engines are available to anyone. Merchant partners nationwide may host engines for their area.</p><p class="v2-disclaimer">No guarantee of earnings, ad delivery results, or coverage.</p></div></section>
-<section class="v2-section" id="free-premium"><div class="v2-inner"><p class="v2-kicker">FREE TO START</p><h2>Free to start.<br>Premium to scale.</h2><p class="v2-lede">Free accounts have limits on post length, image count, and video uploads. They're generous, but capped. Premium members get higher limits and automatic slice allocation, and engine owners get priority in ads delivery.</p></div></section>
-<section class="v2-section" id="barangay-engine"><div class="v2-inner"><p class="v2-kicker">THE BARANGAY ENGINE</p><h2>A small order. A local engine in motion.</h2><p class="v2-lede">A neighborhood order moves through one connected loop, from a seller's shelf to a nearby rider, with the local engine handling the capacity.</p><div class="v2-steps"><span>01 · Placed</span><span>02 · Rider assigned</span><span>03 · In transit</span><span>04 · Delivered</span></div><div class="v2-grid"><article class="v2-card v2-engine"><span class="v2-tag">MERCHANT SALES</span><h3>₱12,480</h3><p>Today · sample</p></article><article class="v2-card v2-engine"><span class="v2-tag">RIDER EARNINGS</span><h3>₱1,240</h3><p>Today · sample</p></article><article class="v2-card v2-engine"><span class="v2-tag">ENGINE CREDIT</span><h3>₱<?= $escV2($sqbV2Placeholders['engine_credit']) ?></h3><p>Today · sample</p><p>Capacity credit for the engine serving this radius</p></article></div><p class="v2-status">SAMPLE DATA · Illustrative activity</p><p class="v2-disclaimer">Illustrative sample · not live coverage</p></div></section>
-<section class="v2-section" id="starlink"><div class="v2-inner"><p class="v2-kicker">STARLINK CONNECT · IN DEVELOPMENT</p><h2>Connectivity for the last mile.</h2><p class="v2-lede">We're working with Starlink distributors to bring shared connectivity to PlatinumSuite communities.</p><div class="v2-grid"><article class="v2-card"><span class="v2-tag">01 · COMMUNITY KIOSK</span><h3>5–10 PlatinumSuite holders within 1 KM</h3><p>A shared community kiosk with Starlink access and extended tunneled service. It pauses when power drops and resumes when it returns.</p></article><article class="v2-card"><span class="v2-tag">02 · SOLAR-BACKED</span><h3>12–20 PlatinumSuite holders</h3><p>A 24/7 solar-backed setup with expandable tunneled Starlink, tracking, and POS tools.</p></article><article class="v2-card"><span class="v2-tag">03 · REGIONAL HUB</span><h3>Collaborator groups above ₱1M / $1M in regional sales</h3><p>A regional Solar Powered Hub and Market Park in a low-traffic area, with a proposed Ginto Solar Hub.</p></article></div><p class="v2-footer-line">Built with our network of 300+ solar merchants. Availability varies by location and distributor approval.</p></div></section>
-<section class="v2-section" id="join"><div class="v2-inner"><p class="v2-kicker">THE NEXT CONNECTION STARTS HERE</p><h2>Power every community.<br>Bridge every island.</h2><p class="v2-lede">A more connected Philippines begins with the people already making their barangay move.</p><a class="v2-btn v2-btn--outline" href="#packages">Choose Your Suite ↓</a><a class="v2-btn" href="#auth">Join the Movement ↗</a><p class="v2-label" style="margin-top:22px">Space. Reach. Last mile.</p></div></section>
-<section class="v2-section v2-auth" id="auth"><div class="auth-content"><p class="v2-kicker">YOUR ENGINE STARTS HERE</p><h2>Welcome to SilverQueen</h2><p class="v2-lede">Sign in to manage your engine, or join the movement and connect with your barangay.</p><?php require __DIR__ . '/user/login_form_partial.php'; ?></div></section>
-</main>
-</div>  <footer class="site-footer sq-disclosure-footer" aria-label="SilverQueen and Ginto public disclosures">
-    <div class="sq-disclosure-inner">
-      <a class="footer-brand" href="#cover">SilverQueen</a>
-      <p><strong>silverqueen.pro</strong> is the full implementation of <a href="https://github.com/oliverbob/ginto.ai" target="_blank" rel="noopener noreferrer">Ginto AI</a>, the first business example implementing the full scale and power of the project.</p>
-      <p><strong>sq.silverqueen.pro</strong> and <strong>gk.silverqueen.pro</strong> are child projects built around the same projects by GitHub user <strong>oliverbob</strong>.</p>
-      <p>The vision is to help digitize the <strong>42,064 barangays</strong> of the Philippines, while welcoming project ventures around the world that strictly do not involve venture capitalists.</p>
-      <p>The author’s stage name is <strong>Bob Reyes</strong>, also known as <strong>Datu Gyud</strong> in SilverQueen.</p>
-      <p>These projects are run and managed by their current operator, <strong>Ginto Services Corporation</strong> (Company Reg. No. <strong>2026040246055-25</strong>), registered in the Philippines in April 2026 to accommodate the potential of Ginto AI. This does not automatically make the corporation the owner of Ginto AI: Ginto AI is Bob Reyes’s open-source project and predates SilverQueen.</p>
-      <p>All online transactions are reported to the <strong>Bureau of Internal Revenue</strong> for full compliance.</p>
-      <p>For public disclosures, see <a href="https://sq.silverqueen.pro" target="_blank" rel="noopener noreferrer">sq.silverqueen.pro</a> or use these direct links:</p>
-      <nav class="sq-disclosure-links" aria-label="Public disclosures">
-        <a href="https://sq.silverqueen.pro/terms" target="_blank" rel="noopener noreferrer">Terms &amp; User Policy</a><span aria-hidden="true">·</span>
-        <a href="https://sq.silverqueen.pro/privacy" target="_blank" rel="noopener noreferrer">Privacy</a><span aria-hidden="true">·</span>
-        <a href="https://sq.silverqueen.pro/about" target="_blank" rel="noopener noreferrer">About</a>
-      </nav>
-      <img src="https://comchain.silverqueen.pro/assets/img/bir-registration-seal.png" alt="BIR Registration Seal" loading="lazy">
-      <span class="footer-end">Illustrative concept · Philippines</span>
+<style>:root{--display:'Bebas Neue',system-ui,sans-serif;--body:'Inter',Arial,sans-serif;--cyan:#00E5FF;--gold:#FFC83D;--pink:#FF2E93;--ink:#050A10}.st-header{background:rgba(5,10,16,.92)!important;color:#fff!important;border-bottom:1px solid rgba(255,255,255,.08);z-index:40}.st-header__logo{color:#fff!important}.st-header__nav a{color:#dce9ef!important}.st-header__cta{background:#FFC83D!important;color:#050A10!important}.stx-closing-statement__cta{background:#FFC83D!important;color:#050A10!important;box-shadow:0 4px 20px rgba(255,200,61,.2)!important}.stx-closing-statement__cta:hover{background:#ffe08a!important;color:#050A10!important}.st-header__burger{color:#fff}.v2-header-tagline{color:#9aaeb9;font-size:10px;letter-spacing:.16em;font-weight:800;white-space:nowrap;margin-left:auto;margin-right:22px}.v2-wrap{background:#050A10;color:#eff8fc;font-family:Inter,Arial,sans-serif}.v2-wrap *{box-sizing:border-box}.v2-section{position:relative;min-height:72vh;padding:clamp(64px,10vw,140px) max(6vw,22px);display:flex;align-items:center;justify-content:center;scroll-margin-top:72px}.v2-inner{width:min(1160px,100%);margin:auto}.v2-kicker{font-size:12px;letter-spacing:.19em;color:#00E5FF;font-weight:800;text-transform:uppercase;margin:0 0 18px}.v2-section h2{font-family:'Bebas Neue',Impact,sans-serif;font-size:clamp(42px,7vw,88px);line-height:.98;letter-spacing:.01em;margin:0 0 22px;color:#fff}.v2-section h3{font-size:clamp(22px,3vw,32px);margin:8px 0 12px}.v2-lede,.v2-copy{font-size:clamp(17px,1.7vw,21px);line-height:1.65;color:#b8c8d2;max-width:780px}.v2-hero{min-height:100vh;padding:0}.v2-hero .st-hero__sticky{height:100svh}.v2-hero .st-hero__overlay{padding:22px;pointer-events:auto;background:linear-gradient(0deg,rgba(5,10,16,.62),rgba(5,10,16,.08) 80%)}.v2-hero .st-hero__overlay h1{font-size:clamp(48px,9vw,110px);max-width:1000px;line-height:.95}.v2-hero .st-hero__overlay p{font-size:clamp(18px,2vw,26px);max-width:760px}.v2-label{color:#FFC83D;text-transform:uppercase;letter-spacing:.15em;font-weight:800;font-size:12px}.v2-btn{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:0 23px;border-radius:999px;background:#FFC83D;color:#071019;text-decoration:none;font-weight:800;margin:10px 8px 0 0}.v2-btn--outline{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.28)}.v2-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:30px}.v2-card{padding:26px;border:1px solid rgba(0,229,255,.19);border-radius:18px;background:linear-gradient(145deg,rgba(12,31,42,.9),rgba(8,14,23,.96));box-shadow:0 0 30px rgba(0,229,255,.04)}.v2-card p{color:#bac8d0;line-height:1.6}.v2-card--featured{border-color:#FFC83D;box-shadow:0 0 38px rgba(255,200,61,.11);transform:translateY(-8px)}.v2-tag{font-size:12px;color:#00E5FF;letter-spacing:.12em;font-weight:800}.v2-price{font-size:40px;font-weight:850;color:#FFC83D;margin:10px 0}.v2-list{padding-left:18px;color:#cad7de;line-height:1.9}.v2-steps{display:flex;gap:12px;flex-wrap:wrap;margin:28px 0}.v2-steps span{padding:12px 15px;border:1px solid rgba(0,229,255,.27);border-radius:999px;color:#d8faff}.v2-disclaimer{font-size:13px!important;color:#8d9ca4!important}.v2-auth{background:radial-gradient(ellipse at center,rgba(0,229,255,.07),transparent 65%)}.v2-auth .auth-content{width:min(860px,100%);margin:auto}.sq-disclosure-footer{display:block!important;width:100%;margin:0;padding:56px max(6vw,22px) 28px;background:#071019!important;color:#a7b5bd!important;border-top:1px solid rgba(0,229,255,.2);font:15px/1.7 Inter,Arial,sans-serif}.sq-disclosure-inner{width:min(980px,100%);margin:0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:12px}.sq-disclosure-inner p{margin:0;color:#a7b5bd}.sq-disclosure-footer a{color:#00E5FF;text-decoration:none}.sq-disclosure-footer a:hover{text-decoration:underline}.sq-disclosure-footer .footer-brand{font:700 30px/1 'Bebas Neue',Impact,sans-serif;color:#fff;letter-spacing:.03em;margin-bottom:8px}.sq-disclosure-links{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.sq-disclosure-footer img{display:block;width:112px;max-width:100%;height:auto;margin-top:12px}.sq-disclosure-footer .footer-end{font-size:12px;color:#6f838e;margin-top:8px}.v2-rollout-rows{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:32px 0}.v2-rollout-rows div{padding:16px;border-left:2px solid #00E5FF;background:rgba(255,255,255,.03)}.v2-rollout-rows b{color:#FFC83D;display:block;margin-bottom:6px}.v2-engine{border-color:rgba(255,46,147,.4)}.v2-status{color:#FF2E93;font-size:12px;letter-spacing:.12em;font-weight:800}.v2-map-note{font-size:12px;color:#83949d;margin-top:18px}.v2-footer-line{color:#00E5FF}.v2-hero-cta{pointer-events:auto}.v2-hero .st-hero__overlay>*{pointer-events:auto}@media(prefers-reduced-motion:reduce){.v2-hero{height:100svh!important}}@media(max-width:760px){.v2-header-tagline{display:none}.v2-grid{grid-template-columns:1fr}.v2-card--featured{transform:none}.v2-rollout-rows{grid-template-columns:1fr 1fr}.v2-section{min-height:auto;padding:76px 22px}.v2-hero{min-height:100vh;padding:0}.v2-hero .st-hero__sticky{height:60svh;top:0}.v2-hero .st-hero__overlay{height:60svh}.v2-auth .auth-content{padding:12px}.v2-hero .st-hero__overlay h1{font-size:clamp(44px,12vw,68px)}}@media(max-width:380px){.v2-rollout-rows{grid-template-columns:1fr}.v2-btn{width:100%;margin-right:0}}</style>
+<style>
+body{background:#050A10!important;color:#f5f8fb!important}.v2-wrap{background:#050A10;color:#eff8fc;font-family:Inter,Arial,sans-serif}.st-header{background:rgba(5,10,16,.94)!important;color:#fff!important;z-index:50}.st-header__logo{color:#fff!important}.st-header__nav a{color:#e4edf2!important}.st-header__cta{background:#FFC83D!important;color:#050A10!important}.stx-closing-statement__cta{background:#FFC83D!important;color:#050A10!important;box-shadow:0 4px 20px rgba(255,200,61,.2)!important}.stx-closing-statement__cta:hover{background:#ffe08a!important;color:#050A10!important}.st-header__burger{color:#fff!important}.sqb-header-tagline{color:#9aadb7;font:800 10px/1 Inter,Arial,sans-serif;letter-spacing:.16em;white-space:nowrap;margin-left:auto;margin-right:20px}.sqb-hero-kicker,.sqb-overline{color:#00E5FF;font:800 12px/1.4 Inter,Arial,sans-serif;letter-spacing:.17em;text-transform:uppercase}.st-hero__overlay{pointer-events:none}.st-hero__overlay>*{pointer-events:auto}.st-hero__overlay h1{font-family:'Bebas Neue',Impact,sans-serif!important;font-size:clamp(48px,9vw,110px)!important}.st-hero__overlay p{font:clamp(18px,2vw,26px)/1.45 Inter,Arial,sans-serif!important;max-width:760px;color:#fff;text-shadow:0 1px 16px rgba(0,0,0,.65)}.sqb-hero-cta,.sqb-extra-section a{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:0 24px;border-radius:999px;background:#FFC83D;color:#050A10!important;text-decoration:none;font-weight:800}.sqb-story-heading{max-width:980px;margin:55px auto 0;padding:0 24px;color:#fff}.sqb-story-heading h2{font:clamp(42px,7vw,82px)/.98 'Bebas Neue',Impact,sans-serif;margin:12px 0 16px}.sqb-story-heading>p:last-child{font-size:20px;line-height:1.6;color:#b8c8d2}.sqb-scenes-label{max-width:1160px;margin:24px auto;padding:0 24px}.sqb-disclaimer{color:#9aaab2;font-size:13px;margin-top:22px}.sqb-rollout-intro{max-width:980px;margin:60px auto 24px;padding:0 24px;color:#fff}.sqb-rollout-intro h2,.sqb-extra-section h2,.sqb-login-section h2{font:clamp(42px,7vw,82px)/.98 'Bebas Neue',Impact,sans-serif;margin:12px 0 20px}.sqb-rollout-intro h2 span{color:#FFC83D}.sqb-rollout-intro>p:last-child,.sqb-extra-inner>p{font:clamp(17px,1.7vw,21px)/1.65 Inter,Arial,sans-serif;color:#b8c8d2;max-width:800px}.sqb-rollout-note{max-width:980px;margin:10px auto 40px;padding:0 24px;color:#9aaab2;font-size:13px}.sqb-extra-section,.sqb-login-section{padding:clamp(70px,10vw,130px) max(22px,6vw);background:#050A10;color:#eff8fc}.sqb-extra-inner,.sqb-login-inner{width:min(1160px,100%);margin:auto}.sqb-package-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:32px}.sqb-package,.sqb-sample-grid article{border:1px solid rgba(0,229,255,.2);border-radius:18px;padding:26px;background:linear-gradient(145deg,rgba(12,31,42,.92),rgba(8,14,23,.98));color:#eff8fc}.sqb-package-featured{border-color:#FFC83D;transform:translateY(-8px)}.sqb-package-name,.sqb-sample-grid b{color:#00E5FF;font-size:12px;font-weight:800;letter-spacing:.14em}.sqb-package-price,.sqb-sample-grid strong{display:block;color:#FFC83D;font-size:38px;font-weight:850;margin:12px 0}.sqb-package h3{font-size:24px}.sqb-package ul{padding-left:19px;color:#c2d0d8;line-height:1.85}.sqb-package-partners{margin-top:28px;color:#d7e0e5}.sqb-package-disclaimer,.sqb-rollout-note{font-size:13px;color:#9aaab2}.sqb-order-flow{padding:0 24px 42px;max-width:1100px;margin:auto}.sqb-order-flow .sqb-overline{text-align:center;line-height:1.8}.sqb-sample-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:24px}.sqb-sample-grid strong{font-size:28px}.sqb-sample-grid span,.sqb-sample-grid small{display:block;color:#b8c8d2;margin-top:6px}.sqb-sample-label{text-align:center;color:#FF2E93;font-weight:800;letter-spacing:.12em;font-size:12px;margin-top:22px}.sqb-starlink-intro,.sqb-starlink-foot{max-width:850px;margin:18px auto;color:#b8c8d2;font:18px/1.6 Inter,Arial,sans-serif}.stx-testimonials__quote{padding:26px;border:1px solid rgba(0,229,255,.2);border-radius:16px;background:rgba(8,20,29,.8);margin:18px auto;max-width:940px}.stx-testimonials__text{font-size:clamp(22px,4vw,38px)!important;color:#fff!important}.stx-testimonials__attribution{font:15px/1.6 Inter,Arial,sans-serif!important;color:#b8c8d2!important}.stx-closing-statement__heading{max-width:980px}.stx-closing-statement__manifesto{max-width:800px}.sqb-join-cta{margin-left:12px}.sqb-login-inner>p:not(.sqb-overline){font-size:18px;line-height:1.6;color:#b8c8d2;max-width:760px}.sq-disclosure-footer{display:block!important;width:100%;margin:0;padding:56px max(6vw,22px) 28px;background:#071019!important;color:#a7b5bd!important;border-top:1px solid rgba(0,229,255,.2);font:15px/1.7 Inter,Arial,sans-serif}.sq-disclosure-inner{width:min(980px,100%);margin:0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:12px}.sq-disclosure-inner p{margin:0;color:#a7b5bd}.sq-disclosure-footer a{color:#00E5FF;text-decoration:none}.sq-disclosure-footer a:hover{text-decoration:underline}.sq-disclosure-footer .footer-brand{font:700 30px/1 'Bebas Neue',Impact,sans-serif;color:#fff;letter-spacing:.03em;margin-bottom:8px}.sq-disclosure-links{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.sq-disclosure-footer img{display:block;width:112px;max-width:100%;height:auto;margin-top:12px}.sq-disclosure-footer .footer-end{font-size:12px;color:#6f838e;margin-top:8px}
+@media(max-width:760px){.sqb-header-tagline{display:none}.sqb-package-grid,.sqb-sample-grid{grid-template-columns:1fr}.sqb-package-featured{transform:none}.stx-brief-intro{padding:75px 22px!important}.sqb-join-cta{margin:12px 0 0}.st-chpin__stick{position:relative!important;top:auto!important}.st-chpin{height:auto!important}.st-chart{width:100%!important;min-width:0!important;margin:0!important}.st-ch-svg{width:100%!important}}
+@media(prefers-reduced-motion:reduce){.st-hero--scroll{height:100svh!important}.st-hero__sticky{position:absolute!important}.st-scbg-l,.st-el{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+</style>
+</head><body><div class="v2-wrap">
+  <script>try{history.scrollRestoration='manual'}catch(e){}(function(){var t=false;function m(){t=true;}['wheel','touchstart','keydown','pointerdown'].forEach(function(n){addEventListener(n,m,{passive:true});});addEventListener('load',function(){if(!t&&!location.hash)window.scrollTo(0,0);});})();</script>
+  <header class="st-header" style="background:#0a0a0a;--hdr-sub-bg:#0a0a0a;color:#f5f5f5;font-family:'Bebas Neue',system-ui,sans-serif"><a class="st-header__logo" href="#cover" style="color:#f5f5f5">SilverQueen.</a><span class="sqb-header-tagline">A BARANGAY-FIRST MOVEMENT</span><nav class="st-header__nav"><a href="#sec-1" style="color:#f5f5f5">Network</a><a href="#auth" style="color:#f5f5f5">Log in</a><a href="#sec-3" style="color:#f5f5f5">Engines</a><a href="#sec-4" style="color:#f5f5f5">How it works</a><a class="st-header__cta" href="#auth" style="background:#ff3366;color:#FFFFFF">Join the Movement</a></nav><button class="st-header__burger" type="button" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button></header>
+  <main class="st-canvas">
+    <span id="cover" class="st-anchor" aria-hidden="true"></span><span id="sec-1" class="st-anchor" aria-hidden="true"></span>
+    <section class="st-hero st-hero--scroll v2-hero" data-element-id="e8dbfaa0-7cbe-4109-8ea1-8bcf5c389de0" style="height:528vh;">
+      <div class="st-hero__sticky" style="">
+        <canvas class="st-hero__canvas" data-frames-path="/assets/silverqueen/sqb-engine-v2/assets/frames/" data-frames-count="176" data-scrub-vh="528" data-frames-ext="webp" style="background:url('/assets/silverqueen/sqb-engine-v2/assets/frames/frame_0001.webp') var(--st-hero-focus,50%) 50%/cover no-repeat"></canvas>
+      <div class="st-hero__overlay"><span class="sqb-hero-kicker">SOCIAL TRADE · LOCAL ENGINES</span><h1>SilverQueen: An Engine in Every Barangay</h1><p>More space to post, sell, and deliver, powered by an SQB Engine that works inside your own radius.</p><a class="sqb-hero-cta" href="#auth">Join the Movement ↗</a></div>
+      </div>
+    </section>
+    <span id="sec-2" class="st-anchor" aria-hidden="true"></span>
+    <div class="st-el st-custom" data-element-id="brief-intro" style="margin-top:64px;margin-bottom:64px;"><section class="stx-brief-intro"><p class="sqb-overline">THE DISTANCE BETWEEN US</p>
+  <div class="stx-brief-intro__container">
+    <h2 class="stx-brief-intro__heading" data-st-reveal>Great barangays. Limited space.</h2>
+
+    <div class="stx-brief-intro__grid">
+      <div class="stx-brief-intro__metrics">
+        <div class="stx-brief-intro__metric" data-st-reveal style="transition-delay:0.1s">
+          <div class="stx-brief-intro__metric-value">40,000+</div>
+          <div class="stx-brief-intro__metric-label">BARANGAYS<br>Across the Philippines</div>
+        </div>
+
+        <div class="stx-brief-intro__metric" data-st-reveal style="transition-delay:0.2s">
+          <div class="stx-brief-intro__metric-value">FREE</div>
+          <div class="stx-brief-intro__metric-label">ACCOUNT START<br>Social trade</div>
+        </div>
+
+        <div class="stx-brief-intro__metric" data-st-reveal style="transition-delay:0.3s">
+          <div class="stx-brief-intro__metric-value">LOCAL</div>
+          <div class="stx-brief-intro__metric-label">ENGINE<br>Last-mile route</div>
+        </div>
+      </div>
+
+      <div class="stx-brief-intro__content" data-st-reveal style="transition-delay:0.4s">
+        <p class="stx-brief-intro__paragraph">Free accounts can post, sell, and connect, within limits. When your community, store, or videos outgrow those limits, an SQB Engine gives you room to grow, and keeps the work of serving your barangay local.</p><p class="sqb-disclaimer">A national-scale vision, not a claim of current platform coverage.</p>
+      </div>
     </div>
-  </footer><?php if (!empty($loginError)): ?><script>window.addEventListener('load',function(){document.getElementById('auth')?.scrollIntoView({block:'start'});});</script><?php endif; ?><script>try{history.scrollRestoration='manual'}catch(e){}(function(){var t=false;function m(){t=true;}['wheel','touchstart','keydown','pointerdown'].forEach(function(n){addEventListener(n,m,{passive:true});});addEventListener('load',function(){if(!t&&!location.hash)window.scrollTo(0,0);});})();</script>
-<script>(function(){if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('canvas[data-frames-count]').forEach(function(c){c.setAttribute('data-frames-count','1');});}})();
+  </div>
+
+  <style>
+    .stx-brief-intro {
+      background-color: #0a0a0a;
+      color: #f5f5f5;
+      padding: 120px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stx-brief-intro__container {
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .stx-brief-intro__heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(4rem, 10vw, 9rem);
+      line-height: 0.9;
+      letter-spacing: 0.02em;
+      text-transform: uppercase;
+      margin: 0 0 80px 0;
+      color: #f5f5f5;
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stx-brief-intro__heading.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-brief-intro__grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+
+    @media (min-width: 960px) {
+      .stx-brief-intro__grid {
+        grid-template-columns: 1fr 1.2fr;
+        gap: 80px;
+      }
+    }
+
+    .stx-brief-intro__metrics {
+      display: flex;
+      flex-direction: column;
+      gap: 56px;
+    }
+
+    .stx-brief-intro__metric {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stx-brief-intro__metric.st-in {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    .stx-brief-intro__metric-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3.5rem, 8vw, 6rem);
+      line-height: 1;
+      letter-spacing: 0.01em;
+      color: #ff3366;
+      margin-bottom: 12px;
+    }
+
+    .stx-brief-intro__metric-label {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(0.95rem, 1.5vw, 1.125rem);
+      line-height: 1.5;
+      color: #f5f5f5;
+      font-weight: 500;
+      letter-spacing: 0.01em;
+    }
+
+    .stx-brief-intro__content {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stx-brief-intro__content.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-brief-intro__paragraph {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1.125rem, 2vw, 1.375rem);
+      line-height: 1.7;
+      color: #f5f5f5;
+      margin: 0;
+      max-width: 38rem;
+      font-weight: 400;
+      letter-spacing: -0.01em;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stx-brief-intro__heading,
+      .stx-brief-intro__metric,
+      .stx-brief-intro__content {
+        transition: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+</section></div>
+    <span id="sec-3" class="st-anchor" aria-hidden="true"></span><div class="sqb-story-heading"><p class="sqb-overline">THREE PILLARS · ONE LOCAL LOOP</p><h2>Every barangay has an engine.</h2><p>Space to grow. Reach to be seen. A local route to the doorstep.</p></div>
+    <div class="st-el" data-element-id="stacking-strategy" style="position:relative;margin-top:64px;margin-right:auto;margin-bottom:64px;margin-left:auto;width:50%;max-width:100%;min-width:min(800px,100%);"><div class="st-scbg" aria-hidden="true" data-st-scbg><div class="st-scbg-l" data-i="0" style="background-image:url('/assets/silverqueen/sqb-engine-v2/assets/images/img-9b62334e-f80a-48f6-bfd1-34b233f584cd.png')"></div><div class="st-scbg-l" data-i="1" style="background-image:url('/assets/silverqueen/sqb-engine-v2/assets/images/img-fd2b3148-fb09-4f7a-81fd-b830fec0dc27.png')"></div><div class="st-scbg-l" data-i="2" style="background-image:url('/assets/silverqueen/sqb-engine-v2/assets/images/img-74c5e9a5-3921-4610-bbe6-2f47f07d88e8.png')"></div><div class="st-scbg-l" data-i="3" style="background-image:url('/assets/silverqueen/sqb-engine-v2/assets/images/img-5ad3689c-b885-47b2-839b-b55df16253b6.png')"></div></div><div style="position:relative;z-index:1;display:flex;flex-direction:column"><div data-st-card="0" style="position:sticky;top:24px;z-index:1;display:flex;flex-direction:column;overflow:hidden;padding:8px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);box-shadow:0 -10px 30px rgba(0,0,0,0.28);background:#0a0a0a;min-height:56vh"><div style="position:relative;overflow:hidden;border-radius:10px;text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-9b62334e-f80a-48f6-bfd1-34b233f584cd.png" alt="" loading="lazy" decoding="async" style="width:100%;height:auto;max-height:55vh;object-fit:contain;display:block" /></div><div style="padding:14px 14px 16px;flex-shrink:0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">SPACE · ROOM TO GROW</h3><p class="st-text" style="margin-top:6px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Premium engines lift your limits on text, images, and video uploads.</p></div></div><div data-st-card="1" style="position:sticky;top:40px;z-index:2;margin-top:24px;display:flex;flex-direction:column;overflow:hidden;padding:8px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);box-shadow:0 -10px 30px rgba(0,0,0,0.28);background:#0a0a0a;min-height:56vh"><div style="position:relative;overflow:hidden;border-radius:10px;text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-fd2b3148-fb09-4f7a-81fd-b830fec0dc27.png" alt="" loading="lazy" decoding="async" style="width:100%;height:auto;max-height:55vh;object-fit:contain;display:block" /></div><div style="padding:14px 14px 16px;flex-shrink:0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">REACH · BE SEEN CLOSE TO HOME</h3><p class="st-text" style="margin-top:6px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Ads delivery favors engine owners. Higher suites get stronger delivery and a wider audience.</p></div></div><div data-st-card="2" style="position:sticky;top:56px;z-index:3;margin-top:24px;display:flex;flex-direction:column;overflow:hidden;padding:8px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);box-shadow:0 -10px 30px rgba(0,0,0,0.28);background:#0a0a0a;min-height:56vh"><div style="position:relative;overflow:hidden;border-radius:10px;text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-74c5e9a5-3921-4610-bbe6-2f47f07d88e8.png" alt="" loading="lazy" decoding="async" style="width:100%;height:auto;max-height:55vh;object-fit:contain;display:block" /></div><div style="padding:14px 14px 16px;flex-shrink:0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">LAST MILE · YOUR RADIUS, YOUR ROUTE</h3><p class="st-text" style="margin-top:6px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Each engine serves its own radius, so the last mile stays local, tracked, and paid for.</p></div></div><div data-st-card="3" style="position:sticky;top:72px;z-index:4;margin-top:24px;display:flex;flex-direction:column;overflow:hidden;padding:8px;border-radius:16px;border:1px solid rgba(255,255,255,0.10);box-shadow:0 -10px 30px rgba(0,0,0,0.28);background:#0a0a0a;min-height:56vh"><div style="position:relative;overflow:hidden;border-radius:10px;text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-5ad3689c-b885-47b2-839b-b55df16253b6.png" alt="" loading="lazy" decoding="async" style="width:100%;height:auto;max-height:55vh;object-fit:contain;display:block" /></div><div style="padding:14px 14px 16px;flex-shrink:0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">ONE LOCAL LOOP</h3><p class="st-text" style="margin-top:6px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Space to grow. Reach to be seen. A local route to the doorstep.</p></div></div></div></div>
+    <span id="sec-4" class="st-anchor" aria-hidden="true"></span><p class="sqb-overline sqb-scenes-label">SPACE · REACH · LAST MILE</p>
+    <div class="st-el st-bleed st-fs" data-element-id="execution" style="margin-top:64px;margin-bottom:64px;"><div class="st-sp-scene"><div class="st-sp-text"><h2 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">SOCIAL · COMMUNITY FEEDS</h2><p class="st-text" style="margin-top:12px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Local community feeds and member-to-member sharing keep people connected around the places they call home.</p></div><div class="st-sp-imgcol"><div class="st-sp-img" style="background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-2a15d155-c99a-4c93-8235-166037d7ab56.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div></div></div><div class="st-sp-scene rev"><div class="st-sp-text"><h2 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">MARKETPLACE · SELL DIRECTLY</h2><p class="st-text" style="margin-top:12px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Local producers and micro-sellers can sell directly to neighbors.</p></div><div class="st-sp-imgcol"><div class="st-sp-img" style="background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-908250bb-bd6d-4cb0-8af9-7ea815dd83a9.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div></div></div><div class="st-sp-scene"><div class="st-sp-text"><h2 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">DELIVERY · BARANGAY ROUTES</h2><p class="st-text" style="margin-top:12px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Rider assignment at the barangay level, with tracking, keeps the last mile local.</p></div><div class="st-sp-imgcol"><div class="st-sp-img" style="background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-5542ad72-60d5-4dfb-9f7f-4249a0ff4469.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div></div></div></div>
+    <span id="sec-5" class="st-anchor" aria-hidden="true"></span><div class="sqb-rollout-intro"><p class="sqb-overline">AN ENGINE ROLLOUT VISION</p><h2>One engine at a time.<br><span>One network together.</span></h2><p>Start with local engines in Luzon. Link the Visayas. Bring Mindanao into the route. Every engine lights up the barangay next to it.</p></div>
+    <div class="st-el st-bleed" data-element-id="work-gallery" style="padding-left:48px;margin-top:64px;margin-bottom:64px;"><div style="overflow:hidden;padding:5px"><div id="car-work-gallery" data-off="0" style="display:flex;gap:20px;transition:transform .5s ease;touch-action:pan-y"><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-b8d4d391-c446-4325-994d-50733f432575.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Luzon · First engines</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">A rollout vision for local engines, connected island by island.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-eb43e7e5-d3c2-44e9-823f-099408a4cf8b.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Visayas · Island links</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Illustrative community activity around a barangay engine.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-805d0c32-f13b-4e17-88c3-9e18323aec4d.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Mindanao · Regional hubs</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">An island link connects neighboring local engines.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-8590fc85-a69d-4e08-a937-28bbc4533586.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">One network · Shared connectivity</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Shared connectivity is a network rollout vision, not a claim of current coverage.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-26078440-aa67-4c36-9e80-956b723dc9e6.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Community feeds</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Local producers and micro-sellers can sell directly to neighbors.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-46caa313-5b25-49e4-9eaa-5682aa3ad874.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Local sellers</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Rider assignment begins at the barangay level, with delivery tracking.</p></div></div><div style="flex:0 0 320px;display:flex;flex-direction:column"><div style="position:relative;height:200px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.05);text-align:center;width:100%;"><img src="/assets/silverqueen/sqb-engine-v2/assets/images/img-f5f03456-3c69-4612-bbd6-ba8e035abb5c.png" alt="" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;display:block" /></div><div style="padding:14px 2px 0"><h3 class="st-text" style="font-family:'Bebas Neue',system-ui,sans-serif;font-size:2rem;font-weight:700;font-style:normal;line-height:1.2;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Nearby rider routes</h3><p class="st-text" style="margin-top:4px;font-family:'Inter',system-ui,sans-serif;font-size:1.125rem;font-weight:400;font-style:normal;line-height:1.6;text-align:left;text-transform:none;text-decoration:none;color:#f5f5f5;width:100%;">Community commerce, connected through local routes.</p></div></div></div></div><div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;padding-right:40px"><button onclick="(function(){var t=document.getElementById('car-work-gallery');var c=parseInt(t.dataset.off)||0;c=Math.min(0,c+340);t.dataset.off=c;t.style.transform='translateX('+c+'px)'})()" class="st-car-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15,18 9,12 15,6"></polyline></svg></button><button onclick="(function(){var t=document.getElementById('car-work-gallery');var vp=t.parentElement;var c=parseInt(t.dataset.off)||0;var max=-(t.scrollWidth-vp.clientWidth);c=Math.max(max,c-340);t.dataset.off=c;t.style.transform='translateX('+c+'px)'})()" class="st-car-btn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,6 15,12 9,18"></polyline></svg></button></div><script>(function(){var t=document.getElementById('car-work-gallery');if(!t)return;var sx=0,sy=0,dr=false,ax=0;t.addEventListener('touchstart',function(e){sx=e.touches[0].clientX;sy=e.touches[0].clientY;dr=true;ax=0;t.style.transition='none'},{passive:true});t.addEventListener('touchmove',function(e){if(!dr)return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(!ax){if(Math.abs(dx)<6&&Math.abs(dy)<6)return;ax=Math.abs(dx)>Math.abs(dy)?1:-1;if(ax<0){dr=false;t.style.transition='transform .5s ease';t.style.transform='translateX('+(parseInt(t.dataset.off)||0)+'px)';return}}var c=parseInt(t.dataset.off)||0;t.style.transform='translateX('+(c+dx)+'px)'},{passive:true});function fin(e){if(!dr){ax=0;return}dr=false;t.style.transition='transform .5s ease';var dx=(e.changedTouches&&e.changedTouches[0]?e.changedTouches[0].clientX:sx)-sx;var vp=t.parentElement;var c=parseInt(t.dataset.off)||0;if(ax>0&&Math.abs(dx)>50){var max=-(t.scrollWidth-vp.clientWidth);if(dx<0)c=Math.max(max,c-340);else c=Math.min(0,c+340)}t.dataset.off=c;t.style.transform='translateX('+c+'px)';ax=0}t.addEventListener('touchend',fin,{passive:true});t.addEventListener('touchcancel',fin,{passive:true})})()</script></div>
+    <section class="sqb-extra-section sqb-packages" id="packages"><div class="sqb-extra-inner"><p class="sqb-overline">CHOOSE YOUR ENGINE</p><h2>Three suites. One growing network.</h2><div class="sqb-package-grid"><article class="sqb-package"><p class="sqb-package-name">SILVERSUITE</p><div class="sqb-package-price">$130</div><h3>Start your engine.</h3><ul><li>Space: <?= $escV2($sqbV2Placeholders['silver_space']) ?></li><li>Ads delivery: Boosted</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Eligible</li></ul><a href="/register?suite=silver">Choose Silver</a></article><article class="sqb-package sqb-package-featured"><p class="sqb-package-name">GOLDSUITE · FEATURED</p><div class="sqb-package-price">$260</div><h3>Grow your radius.</h3><ul><li>Space: <?= $escV2($sqbV2Placeholders['gold_space']) ?></li><li>Ads delivery: Stronger, wider audience</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Higher allocation</li></ul><a href="/register?suite=gold">Choose Gold</a></article><article class="sqb-package"><p class="sqb-package-name">PLATINUMSUITE</p><div class="sqb-package-price">$1018</div><h3>Anchor your barangay.</h3><ul><li>Space: <?= $escV2($sqbV2Placeholders['platinum_space']) ?></li><li>Ads delivery: Highest priority, widest audience</li><li>Slice auto-allocation: Included</li><li>Last-mile capacity credits: Highest allocation</li><li>Starlink Connect: Eligible (see next section)</li></ul><a href="/register?suite=platinum">Choose Platinum</a></article></div><p class="sqb-package-partners">Engines are available to anyone. Merchant partners nationwide may host engines for their area.</p><p class="sqb-package-disclaimer">No guarantee of earnings, ad delivery results, or coverage.</p></div></section><span id="sec-6" class="st-anchor" aria-hidden="true"></span>
+    <div class="st-el st-custom" data-element-id="impact-numbers" style="margin-top:64px;margin-bottom:64px;"><section class="stx-impact-numbers">
+  <div class="stx-impact-numbers__container">
+    <h2 class="stx-impact-numbers__heading" data-st-reveal>FREE TO START</h2>
+
+    <div class="stx-impact-numbers__stats">
+      <div class="stx-impact-numbers__stat-row" data-stat-row="1">
+        <div class="stx-impact-numbers__number" data-counter >FREE</div>
+        <div class="stx-impact-numbers__label">Free posting and media limits</div>
+      </div>
+
+      <div class="stx-impact-numbers__stat-row" data-stat-row="2">
+        <div class="stx-impact-numbers__number stx-impact-numbers__number--purple" data-counter >MORE</div>
+        <div class="stx-impact-numbers__label">Higher limits with premium</div>
+      </div>
+
+      <div class="stx-impact-numbers__stat-row" data-stat-row="3">
+        <div class="stx-impact-numbers__number stx-impact-numbers__number--yellow" data-counter >LOCAL</div>
+        <div class="stx-impact-numbers__label">Priority ads delivery for engine owners</div>
+      </div>
+    </div>
+
+    <div class="stx-impact-numbers__summary" data-st-reveal>
+      <p>Free accounts have limits on post length, image count, and video uploads. They're generous, but capped. Premium members get higher limits and automatic slice allocation, and engine owners get priority in ads delivery.</p>
+    </div>
+  </div>
+
+  <style>
+    .stx-impact-numbers {
+      background: linear-gradient(180deg, rgba(26, 26, 26, 0.3) 0%, rgba(10, 10, 10, 0) 100%);
+      padding: 120px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stx-impact-numbers__container {
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .stx-impact-numbers__heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 8vw, 7rem);
+      color: #f5f5f5;
+      margin: 0 0 80px 0;
+      letter-spacing: 0.02em;
+      line-height: 0.95;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1), transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .stx-impact-numbers__heading.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-impact-numbers__stats {
+      margin-bottom: 100px;
+    }
+
+    .stx-impact-numbers__stat-row {
+      padding: 60px 0;
+      border-bottom: 1px solid rgba(245, 245, 245, 0.08);
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1), transform 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .stx-impact-numbers__stat-row:first-child {
+      padding-top: 0;
+    }
+
+    .stx-impact-numbers__stat-row:last-child {
+      border-bottom: none;
+    }
+
+    .stx-impact-numbers__stat-row.stx-impact-numbers--visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-impact-numbers__number {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(5rem, 16vw, 14rem);
+      line-height: 0.9;
+      color: #ff3366;
+      margin-bottom: 16px;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      display: block;
+    }
+
+    .stx-impact-numbers__number--purple {
+      color: #8833ff;
+    }
+
+    .stx-impact-numbers__number--yellow {
+      color: #ffcc00;
+    }
+
+    .stx-impact-numbers__label {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1.125rem, 2.5vw, 1.5rem);
+      color: #f5f5f5;
+      line-height: 1.4;
+      max-width: 42rem;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+
+    .stx-impact-numbers__summary {
+      max-width: 52rem;
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.2s, transform 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.2s;
+    }
+
+    .stx-impact-numbers__summary.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-impact-numbers__summary p {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1rem, 1.8vw, 1.125rem);
+      line-height: 1.7;
+      color: rgba(245, 245, 245, 0.85);
+      margin: 0;
+    }
+
+    @media (max-width: 768px) {
+      .stx-impact-numbers {
+        padding: 80px 24px;
+      }
+
+      .stx-impact-numbers__heading {
+        margin-bottom: 60px;
+      }
+
+      .stx-impact-numbers__stats {
+        margin-bottom: 60px;
+      }
+
+      .stx-impact-numbers__stat-row {
+        padding: 40px 0;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stx-impact-numbers__heading,
+      .stx-impact-numbers__stat-row,
+      .stx-impact-numbers__summary {
+        transition: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+  </style>
+
+
+</section></div>
+    <span id="sec-7" class="st-anchor" aria-hidden="true"></span>
+    <div class="st-chpin" id="trk-ch-results-chart"><div class="st-chpin__stick"><div class="st-el st-chart" data-element-id="results-chart" style="background-color:rgba(255,255,255,0.03);padding-top:24px;padding-right:24px;padding-bottom:24px;padding-left:24px;margin-top:64px;margin-right:auto;margin-bottom:64px;margin-left:auto;width:72%;max-width:100%;border-radius:14px;min-width:min(680px,100%);"><div style="margin-bottom:20px"><div style="font-size:22px;font-weight:700;line-height:1.25;font-family:'Bebas Neue',system-ui,sans-serif">THE BARANGAY ENGINE · SAMPLE ORDER FLOW</div><div style="margin-top:6px;font-size:15px;line-height:1.5;opacity:.65">A neighborhood order moves through one connected loop, from a seller's shelf to a nearby rider, with the local engine handling the capacity.</div></div><svg id="ch-results-chart" class="st-ch-svg" viewBox="0 0 600 240" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="g-ch-results-chart" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#00E5FF" stop-opacity="0.35"/><stop offset="100%" stop-color="#00E5FF" stop-opacity="0"/></linearGradient></defs><polygon class="st-ch-area" points="12,240 12,120 108,120 204,120 300,120 396,120 492,120 588,120 588,240" fill="url(#g-ch-results-chart)"/><polyline class="st-ch-line" points="12,120 108,120 204,120 300,120 396,120 492,120 588,120" fill="none" stroke="#00E5FF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="--len:629"/><circle class="st-ch-dot" cx="12" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="108" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="204" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="300" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="396" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="492" cy="120" r="4.5" fill="#00E5FF"/><circle class="st-ch-dot" cx="588" cy="120" r="4.5" fill="#00E5FF"/></svg><div class="st-ch-xlabels"><span>Placed</span><span>Seller confirms</span><span>Rider assigned</span><span>Pickup</span><span>In transit</span><span>Nearby</span><span>Delivered</span></div><script>(function(){var e=document.getElementById('ch-results-chart');var t=document.getElementById('trk-ch-results-chart');if(!e||!t)return;var r=false;function u(){r=false;var vh=window.innerHeight;var b=t.getBoundingClientRect();var span=b.height-vh;var p=span>60?Math.min(1,Math.max(0,(-b.top)/span)):((vh-b.top)/(vh*0.6));p=Math.min(1,Math.max(0,p));e.style.setProperty('--p',Math.min(1,p/0.8).toFixed(3))}function s(){if(r)return;r=true;requestAnimationFrame(u)}window.addEventListener('scroll',s,{passive:true});window.addEventListener('resize',s);u()})()</script></div></div></div>
+    <span id="sec-8" class="st-anchor" aria-hidden="true"></span>
+    <div class="st-el st-custom" data-element-id="testimonials" style="margin-top:64px;margin-bottom:64px;"><section class="stx-testimonials">
+  <div class="stx-testimonials__container">
+    <p class="sqb-overline">STARLINK CONNECT · IN DEVELOPMENT</p><h2 class="stx-testimonials__heading" data-st-reveal>Connectivity for the last mile.</h2><p class="sqb-starlink-intro">We're working with Starlink distributors to bring shared connectivity to PlatinumSuite communities.</p>
+
+    <div class="stx-testimonials__quote" data-st-reveal style="transition-delay:0.15s">
+      <blockquote class="stx-testimonials__text">5–10 PlatinumSuite holders within 1 KM</blockquote>
+      <cite class="stx-testimonials__attribution">
+        <span class="stx-testimonials__dash">01 / 03</span>A shared community kiosk with Starlink access and extended tunneled service. It pauses when power drops and resumes when it returns.</cite>
+    </div>
+
+    <div class="stx-testimonials__quote" data-st-reveal style="transition-delay:0.3s">
+      <blockquote class="stx-testimonials__text">12–20 PlatinumSuite holders</blockquote>
+      <cite class="stx-testimonials__attribution">
+        <span class="stx-testimonials__dash">02 / 03</span>A 24/7 solar-backed setup with expandable tunneled Starlink, tracking, and POS tools.</cite>
+    </div>
+
+    <div class="stx-testimonials__quote" data-st-reveal style="transition-delay:0.45s">
+      <blockquote class="stx-testimonials__text">Collaborator groups above ₱1M / $1M in regional sales</blockquote>
+      <cite class="stx-testimonials__attribution">
+        <span class="stx-testimonials__dash">03 / 03</span>A regional Solar Powered Hub and Market Park in a low-traffic area, with a proposed Ginto Solar Hub.</cite>
+    </div>
+  </div>
+
+    <p class="sqb-starlink-foot">Built with our network of 300+ solar merchants. Availability varies by location and distributor approval.</p>
+  <style>
+    .stx-testimonials {
+      background: linear-gradient(180deg, rgba(136, 51, 255, 0.02) 0%, rgba(26, 26, 26, 0.4) 100%);
+      padding: clamp(5rem, 12vw, 9rem) 1.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stx-testimonials__container {
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .stx-testimonials__heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3.5rem, 8vw, 7rem);
+      line-height: 0.9;
+      letter-spacing: 0.02em;
+      color: #f5f5f5;
+      margin: 0 0 clamp(3rem, 8vw, 6rem) 0;
+      font-weight: 400;
+      text-transform: uppercase;
+      opacity: 0;
+      transform: translateY(2rem);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stx-testimonials__heading.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-testimonials__quote {
+      margin-bottom: clamp(4rem, 10vw, 8rem);
+      opacity: 0;
+      transform: translateY(3rem);
+      transition: opacity 1s cubic-bezier(0.16, 1, 0.3, 1), transform 1s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .stx-testimonials__quote.st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .stx-testimonials__quote:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .stx-testimonials__text {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(2rem, 5.5vw, 4.5rem);
+      line-height: 1.15;
+      letter-spacing: 0.01em;
+      color: #f5f5f5;
+      font-style: normal;
+      margin: 0 0 clamp(1.5rem, 3vw, 2.5rem) 0;
+      font-weight: 400;
+      max-width: 62rem;
+    }
+
+    .stx-testimonials__attribution {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(0.95rem, 1.8vw, 1.15rem);
+      line-height: 1.6;
+      color: rgba(245, 245, 245, 0.65);
+      font-style: normal;
+      display: block;
+      max-width: 50rem;
+    }
+
+    .stx-testimonials__dash {
+      color: #ff3366;
+      font-weight: 500;
+      margin-right: 0.4em;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stx-testimonials__heading,
+      .stx-testimonials__quote {
+        transition: none;
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    @media (min-width: 48rem) {
+      .stx-testimonials__attribution {
+        padding-left: 2rem;
+      }
+    }
+  </style>
+</section></div>
+    <span id="sec-9" class="st-anchor" aria-hidden="true"></span>
+    <div class="st-el st-custom" data-element-id="closing-statement" style="text-align:center;padding-top:120px;padding-bottom:120px;margin-top:64px;margin-bottom:64px;"><section class="stx-closing-statement">
+  <div class="stx-closing-statement__container">
+    <p class="sqb-overline">THE NEXT CONNECTION STARTS HERE</p><h2 class="stx-closing-statement__heading" data-st-reveal>Power every community. Bridge every island.</h2>
+    <p class="stx-closing-statement__manifesto" data-st-reveal style="transition-delay:0.15s">A more connected Philippines begins with the people already making their barangay move. Space. Reach. Last mile.</p>
+    <div class="stx-closing-statement__cta-wrapper" data-st-reveal style="transition-delay:0.3s">
+      <a href="#packages" class="stx-closing-statement__cta">Choose Your Suite ↓</a><a class="stx-closing-statement__cta sqb-join-cta" href="#auth">Join the Movement ↗</a>
+    </div>
+  </div>
+  <style>
+    .stx-closing-statement {
+      background-color: #0a0a0a;
+      color: #f5f5f5;
+      padding: clamp(100px, 15vh, 180px) 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stx-closing-statement::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 1px;
+      height: 80px;
+      background: linear-gradient(to bottom, transparent, #ff3366, transparent);
+      opacity: 0.4;
+    }
+
+    .stx-closing-statement__container {
+      max-width: 56rem;
+      margin: 0 auto;
+      text-align: center;
+    }
+
+    .stx-closing-statement__heading {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 8vw, 6rem);
+      line-height: 0.95;
+      letter-spacing: 0.02em;
+      color: #f5f5f5;
+      margin: 0 0 clamp(48px, 8vh, 80px) 0;
+      font-weight: 400;
+    }
+
+    .stx-closing-statement__manifesto {
+      font-family: 'Inter', sans-serif;
+      font-size: clamp(1.125rem, 2.2vw, 1.5rem);
+      line-height: 1.75;
+      color: #f5f5f5;
+      margin: 0 0 clamp(48px, 8vh, 72px) 0;
+      font-weight: 400;
+      max-width: 52rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    .stx-closing-statement__cta-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .stx-closing-statement__cta {
+      display: inline-block;
+      padding: 18px 48px;
+      background-color: #ff3366;
+      color: #ffffff;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 50px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      letter-spacing: 0.01em;
+      box-shadow: 0 4px 20px rgba(255, 51, 102, 0.3);
+    }
+
+    .stx-closing-statement__cta:hover {
+      background-color: #e62958;
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(255, 51, 102, 0.4);
+    }
+
+    .stx-closing-statement__cta:active {
+      transform: translateY(0);
+    }
+
+    .stx-closing-statement [data-st-reveal] {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .stx-closing-statement [data-st-reveal].st-in {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stx-closing-statement [data-st-reveal] {
+        opacity: 1;
+        transform: none;
+        transition: none;
+      }
+      .stx-closing-statement__cta {
+        transition: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stx-closing-statement {
+        padding: clamp(80px, 12vh, 120px) 20px;
+      }
+      .stx-closing-statement__cta {
+        padding: 16px 36px;
+        font-size: 0.9375rem;
+      }
+    }
+  </style>
+</section></div>
+  <script>(function(){if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){document.querySelectorAll('canvas[data-frames-count]').forEach(function(c){c.setAttribute('data-frames-count','1');});}})();
 (function () {
   document.querySelectorAll('canvas[data-frames-path]').forEach(function (canvas) {
     var base = canvas.getAttribute('data-frames-path');
@@ -708,6 +1245,7 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
       while (cache.size > maxCache && keys.length) {
         var key = keys.shift();
         var img = cache.get(key);
+        if (img) img.src = '';
         cache.delete(key);
         if (current === key) current = -1;
       }
@@ -778,6 +1316,49 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 </script>
 <script>
 (function(){
+  var ws=[].slice.call(document.querySelectorAll('[data-st-scbg]'));
+  if(!ws.length)return;
+  function tick(){
+    var mid=window.innerHeight*0.5;
+    ws.forEach(function(bg){
+      var w=bg.parentElement;if(!w)return;
+      var cards=[].slice.call(w.querySelectorAll('[data-st-card]'));
+      var layers=[].slice.call(bg.querySelectorAll('.st-scbg-l'));
+      if(!cards.length||!layers.length)return;
+      var act=-1;
+      for(var i=0;i<cards.length;i++){ if(cards[i].getBoundingClientRect().top<=mid) act=i; }
+      if(act<0) act=0;
+      layers.forEach(function(l){ l.classList.toggle('on', +l.getAttribute('data-i')===act); });
+    });
+  }
+  var raf=null;
+  function onS(){ if(raf)return; raf=requestAnimationFrame(function(){raf=null;tick();}); }
+  window.addEventListener('scroll',onS,{passive:true});
+  window.addEventListener('resize',onS);
+  tick();
+})();
+</script>          <section class="sqb-login-section" id="auth"><div class="sqb-login-inner"><p class="sqb-overline">YOUR ENGINE STARTS HERE</p><h2>Welcome to SilverQueen</h2><p>Sign in to manage your engine, or join the movement and connect with your barangay.</p><?php require __DIR__ . '/user/login_form_partial.php'; ?></div></section></main>  <footer class="site-footer sq-disclosure-footer" aria-label="SilverQueen and Ginto public disclosures">
+    <div class="sq-disclosure-inner">
+      <a class="footer-brand" href="#cover">SilverQueen</a>
+      <p><strong>silverqueen.pro</strong> is the full implementation of <a href="https://github.com/oliverbob/ginto.ai" target="_blank" rel="noopener noreferrer">Ginto AI</a>, the first business example implementing the full scale and power of the project.</p>
+      <p><strong>sq.silverqueen.pro</strong> and <strong>gk.silverqueen.pro</strong> are child projects built around the same projects by GitHub user <strong>oliverbob</strong>.</p>
+      <p>The vision is to help digitize the <strong>42,064 barangays</strong> of the Philippines, while welcoming project ventures around the world that strictly do not involve venture capitalists.</p>
+      <p>The author’s stage name is <strong>Bob Reyes</strong>, also known as <strong>Datu Gyud</strong> in SilverQueen.</p>
+      <p>These projects are run and managed by their current operator, <strong>Ginto Services Corporation</strong> (Company Reg. No. <strong>2026040246055-25</strong>), registered in the Philippines in April 2026 to accommodate the potential of Ginto AI. This does not automatically make the corporation the owner of Ginto AI: Ginto AI is Bob Reyes’s open-source project and predates SilverQueen.</p>
+      <p>All online transactions are reported to the <strong>Bureau of Internal Revenue</strong> for full compliance.</p>
+      <p>For public disclosures, see <a href="https://sq.silverqueen.pro" target="_blank" rel="noopener noreferrer">sq.silverqueen.pro</a> or use these direct links:</p>
+      <nav class="sq-disclosure-links" aria-label="Public disclosures">
+        <a href="https://sq.silverqueen.pro/terms" target="_blank" rel="noopener noreferrer">Terms &amp; User Policy</a><span aria-hidden="true">·</span>
+        <a href="https://sq.silverqueen.pro/privacy" target="_blank" rel="noopener noreferrer">Privacy</a><span aria-hidden="true">·</span>
+        <a href="https://sq.silverqueen.pro/about" target="_blank" rel="noopener noreferrer">About</a>
+      </nav>
+      <img src="https://comchain.silverqueen.pro/assets/img/bir-registration-seal.png" alt="BIR Registration Seal" loading="lazy">
+      <span class="footer-end">Illustrative concept · Philippines</span>
+    </div>
+  </footer>
+  <footer class="st-footer" style="background:rgba(255,255,255,0.03);color:#9CA3AF"><div>© 2026 SilverQueen</div></footer>
+<script>
+(function(){
   if(!('IntersectionObserver' in window)){var a=document.querySelectorAll('[data-st-reveal]');for(var i=0;i<a.length;i++)a[i].classList.add('st-in');return;}
   var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('st-in');io.unobserve(e.target);}});},{threshold:0.12});
   function scan(){document.querySelectorAll('[data-st-reveal]:not(.st-in)').forEach(function(el){io.observe(el);});}
@@ -804,7 +1385,19 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
     if(el){e.preventDefault();el.scrollIntoView({behavior:'smooth',block:'start'});}
   });
 })();
-</script>
+</script><style>
+  html.st-embed{scrollbar-width:none;-ms-overflow-style:none}
+  html.st-embed::-webkit-scrollbar{display:none;width:0;height:0}
+  .st-embed-hint{position:fixed;inset:0;z-index:2147483000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    background:radial-gradient(ellipse at center,rgba(0,0,0,.18) 0%,rgba(0,0,0,.52) 100%);
+    color:#fff;font:600 17px/1.3 -apple-system,system-ui,sans-serif;letter-spacing:.02em;text-align:center;
+    text-shadow:0 1px 8px rgba(0,0,0,.6);pointer-events:none;opacity:0;transition:opacity .5s ease}
+  .st-embed-hint__mouse{width:30px;height:50px;border:2.5px solid rgba(255,255,255,.95);border-radius:18px;position:relative;box-shadow:0 2px 12px rgba(0,0,0,.35)}
+  .st-embed-hint__mouse:after{content:"";position:absolute;left:50%;top:8px;width:5px;height:10px;margin-left:-2.5px;border-radius:3px;background:#fff;animation:st-embed-wheel 1.6s ease-in-out infinite}
+  .st-embed-hint__chev{width:16px;height:16px;border-right:2.5px solid rgba(255,255,255,.9);border-bottom:2.5px solid rgba(255,255,255,.9);transform:rotate(45deg);animation:st-embed-chev 1.6s ease-in-out infinite;margin-top:-8px}
+  @keyframes st-embed-wheel{0%{transform:translateY(0);opacity:1}65%{transform:translateY(15px);opacity:0}100%{transform:translateY(0);opacity:0}}
+  @keyframes st-embed-chev{0%,100%{opacity:.45;margin-top:-8px}50%{opacity:1;margin-top:-2px}}
+</style>
 <script>
 (function(){
   if(!/[?&]embed=1(&|$)/.test(location.search))return;
@@ -851,8 +1444,47 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
   },700);
   setTimeout(hide,10000);
 })();
-</script>
-<script>
+</script><script id="st-price-sync">(function(){
+var q=new URLSearchParams(location.search);
+var cur=q.get('currency'),base=q.get('base_currency');
+if(!cur||!base||cur.toUpperCase()===base.toUpperCase())return;
+var loc=q.get('locale')||document.documentElement.lang||'en';
+function fmt(c){try{return new Intl.NumberFormat(loc,{style:'currency',currency:cur.toUpperCase()}).format(c/100)}catch(e){return (c/100).toFixed(2)+' '+cur.toUpperCase()}}
+var RX=/(?:€|CHF|Fr\.?|EUR|GBP|£|\$|USD)\s?\d[\d.,'’\u00A0]*|\d[\d.,'’\u00A0]*\s?(?:€|CHF|Fr\.?|EUR|GBP|£|\$|USD)/;
+function handleOf(a){var m=(a.getAttribute('href')||'').match(/\/products\/([A-Za-z0-9._-]+)/);return m?m[1]:null}
+var jobs=[],used=new Set();
+document.querySelectorAll('.stcg-price').forEach(function(p){
+  var scope=p.parentElement;if(!scope)return;
+  var a=scope.querySelector('a[href*="/products/"]');var h=a&&handleOf(a);
+  if(h&&RX.test(p.textContent)){jobs.push({n:p,h:h});used.add(p)}
+});
+document.querySelectorAll('a[href*="/products/"]').forEach(function(a){
+  var h=handleOf(a);if(!h)return;
+  var n=a,d=0;
+  while(n.parentElement&&d<6){
+    n=n.parentElement;d++;
+    var w=document.createTreeWalker(n,NodeFilter.SHOW_TEXT),t;
+    while((t=w.nextNode())){
+      if(used.has(t)||!RX.test(t.nodeValue))continue;
+      if(t.parentElement&&t.parentElement.closest('.stcg-price'))continue;
+      jobs.push({n:t,h:h});used.add(t);return;
+    }
+    if(n.hasAttribute('data-element-id'))return;
+  }
+});
+if(!jobs.length)return;
+var prices={};
+Promise.all(Array.from(new Set(jobs.map(function(j){return j.h}))).map(function(h){
+  return fetch('/products/'+h+'.js').then(function(r){return r.ok?r.json():null})
+    .then(function(p){if(p)prices[h]=p.price_min!=null?p.price_min:p.price}).catch(function(){})
+})).then(function(){
+  jobs.forEach(function(j){
+    var c=prices[j.h];if(c==null)return;
+    if(j.n.nodeType===3)j.n.nodeValue=j.n.nodeValue.replace(RX,fmt(c));
+    else j.n.textContent=j.n.textContent.replace(RX,fmt(c));
+  })
+});
+})()</script><script>
 (function(){
   var hs=document.querySelectorAll('.st-header');
   for(var i=0;i<hs.length;i++){(function(h){
@@ -874,5 +1506,12 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
   })(hs[i]);}
 })();
 </script>
-</body>
+<div id="scrollytelling-badge" style="position:fixed;bottom:16px;right:16px;z-index:999999;font-family:'Inter',system-ui,-apple-system,sans-serif;">
+  <a href="https://scrollytelling.ai?ref=made_with_scrollytelling" target="_blank" rel="noopener"
+     style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px 6px 10px;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-radius:20px;color:#fff;text-decoration:none;font-size:11px;font-weight:500;letter-spacing:0.2px;opacity:0.75;transition:opacity 0.2s ease,background 0.2s ease;border:1px solid rgba(255,255,255,0.1);box-shadow:0 2px 8px rgba(0,0,0,0.2);"
+     onmouseover="this.style.opacity='1';this.style.background='rgba(0,0,0,0.85)'"
+     onmouseout="this.style.opacity='0.75';this.style.background='rgba(0,0,0,0.7)'">
+    Made with <img src="/assets/silverqueen/sqb-engine-v2/assets/images/logo-symbol-white.png" alt="" style="width:14px;height:14px;" /> Scrollytelling
+  </a>
+</div><?php if (!empty($loginError)): ?><script>window.addEventListener('load',function(){document.getElementById('auth')?.scrollIntoView({block:'start'});});</script><?php endif; ?></div></div></body>
 </html>
