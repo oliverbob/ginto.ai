@@ -16,7 +16,6 @@ a{color:inherit}button{font:inherit}
 .site-header{height:74px;position:fixed;z-index:20;inset:0 0 auto;display:flex;align-items:center;gap:1.5rem;padding:0 clamp(1rem,4vw,3.5rem);border-bottom:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(5,10,16,.95),rgba(5,10,16,.62));backdrop-filter:blur(16px)}
 .wordmark{display:inline-flex;align-items:center;gap:.65rem;text-decoration:none;font-weight:850;letter-spacing:-.04em;font-size:1rem}
 .wordmark-mark{width:31px;height:31px;display:grid;place-items:center;border-radius:9px;background:var(--gold);color:var(--bg);font:900 .65rem var(--display);box-shadow:0 0 22px rgba(255,200,61,.25)}
-.wordmark-period,.footer-brand span{color:var(--gold)}
 .header-note{margin-right:auto;color:var(--muted);font-size:.72rem;letter-spacing:.1em;text-transform:uppercase}
 .header-login{color:#C8D5DC;text-decoration:none;font-size:.82rem;font-weight:750;padding:.5rem .4rem}.header-login:hover{color:var(--cyan)}
 .header-cta{min-height:42px;display:inline-flex;align-items:center;gap:.7rem;padding:.5rem 1rem;border:1px solid rgba(0,229,255,.4);border-radius:99px;background:rgba(0,229,255,.05);color:var(--cyan);text-decoration:none;font-size:.82rem;font-weight:800}

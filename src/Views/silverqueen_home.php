@@ -30,7 +30,7 @@
 <body>
   <a class="skip-link" href="#cover">Skip to story</a>
   <header class="site-header">
-    <a class="wordmark" href="#cover" aria-label="SilverQueen home"><span class="wordmark-mark" aria-hidden="true">SQ</span><span>SilverQueen<span class="wordmark-period">.</span></span></a>
+    <a class="wordmark" href="#cover" aria-label="SilverQueen home"><span class="wordmark-mark" aria-hidden="true">SQ</span><span>SilverQueen</span></a>
     <div class="header-note">A barangay-first movement</div>
     <a class="header-login" href="/login?form=1">Log in</a>
     <a class="header-cta" href="/register">Join the Movement <span aria-hidden="true">↗</span></a>
@@ -140,7 +140,7 @@
   </main>
   <footer class="site-footer sq-disclosure-footer" aria-label="SilverQueen and Ginto public disclosures">
     <div class="sq-disclosure-inner">
-      <a class="footer-brand" href="#cover">SilverQueen<span>.</span></a>
+      <a class="footer-brand" href="#cover">SilverQueen</a>
       <p><strong>silverqueen.pro</strong> is the full implementation of <a href="https://github.com/oliverbob/ginto.ai" target="_blank" rel="noopener noreferrer">Ginto AI</a>, the first business example implementing the full scale and power of the project.</p>
       <p><strong>sq.silverqueen.pro</strong> and <strong>gk.silverqueen.pro</strong> are child projects built around the same projects by GitHub user <strong>oliverbob</strong>.</p>
       <p>The vision is to help digitize the <strong>42,064 barangays</strong> of the Philippines, while welcoming project ventures around the world that strictly do not involve venture capitalists.</p>
