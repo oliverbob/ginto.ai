@@ -139,3 +139,6 @@ h3{margin:0 0 .65rem;font-size:clamp(1.7rem,2.8vw,2.4rem);font-weight:780}
 
 .sq-disclosure-footer{display:block;padding:2rem clamp(1rem,5vw,4rem);font-size:.8rem;line-height:1.65;color:#A5B7C1}.sq-disclosure-inner{max-width:62rem;margin:0 auto;text-align:center}.sq-disclosure-inner p{margin:.65rem 0}.sq-disclosure-inner a{color:#F0CF68;text-underline-offset:3px}.sq-disclosure-inner .footer-brand{display:inline-block;margin:0 0 .7rem}.sq-disclosure-links{margin:1rem 0}.sq-disclosure-links span{margin:0 .45rem;opacity:.6}.sq-disclosure-inner img{display:block;max-width:100%;max-height:6rem;object-fit:contain;margin:1.2rem auto}.sq-disclosure-inner .footer-end{display:block;margin-top:1rem}
 @media(max-width:760px){.header-login{font-size:.75rem;padding:.45rem .15rem}.sq-disclosure-footer{padding:1.5rem 1rem;font-size:.75rem}}
+
+.chapter-auth{display:block;min-height:100svh;padding:8rem clamp(1rem,5vw,4rem) 6rem;scroll-margin-top:74px}.auth-content{max-width:620px;margin:0 auto}.chapter-auth h2{max-width:none;font-size:clamp(2.2rem,4vw,3.5rem)}
+@media(max-width:760px){.chapter-auth{min-height:100svh;padding:calc(60svh + 2rem) 1rem 4rem;scroll-margin-top:62px}}

@@ -32,7 +32,7 @@
   <header class="site-header">
     <a class="wordmark" href="#cover" aria-label="SilverQueen home"><span class="wordmark-mark" aria-hidden="true">SQ</span><span>SilverQueen</span></a>
     <div class="header-note">A barangay-first movement</div>
-    <a class="header-login" href="/login?form=1">Log in</a>
+    <a class="header-login" href="#auth">Log in</a>
     <a class="header-cta" href="/register">Join the Movement <span aria-hidden="true">↗</span></a>
   </header>
   <main>
@@ -135,6 +135,14 @@
             <p class="cta-note">Social connection. Community commerce. Last-mile delivery.</p>
           </div>
         </section>
+        <section class="chapter chapter-auth" id="auth" data-chapter="auth" aria-labelledby="auth-heading">
+          <div class="auth-content">
+            <p class="eyebrow"><span class="eyebrow-rule"></span> YOUR NEXT CONNECTION STARTS HERE</p>
+            <h2 id="auth-heading">Welcome to <span class="title-cyan">SilverQueen</span></h2>
+            <p class="body-copy">Sign in to continue, or join the movement and connect with your community.</p>
+            <?php require __DIR__ . '/user/login_form_partial.php'; ?>
+          </div>
+        </section>
       </div>
     </div>
   </main>
@@ -157,5 +165,8 @@
       <span class="footer-end">Illustrative concept · Philippines</span>
     </div>
   </footer>
+  <?php if (!empty($loginError)): ?>
+  <script>window.addEventListener('load',function(){document.getElementById('auth')?.scrollIntoView({block:'start'});});</script>
+  <?php endif; ?>
 </body>
 </html>
