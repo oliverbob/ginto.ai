@@ -708,7 +708,6 @@ $escV2 = static fn($value) => htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
       while (cache.size > maxCache && keys.length) {
         var key = keys.shift();
         var img = cache.get(key);
-        if (img) img.src = '';
         cache.delete(key);
         if (current === key) current = -1;
       }
