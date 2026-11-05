@@ -59,8 +59,8 @@ class AuthController
             }
             // The SilverQueen story is the public pre-login experience. Its embedded
             // platform tabs use the same POST /login handler and cross-login flow.
-            View::view('silverqueen_home', [
-                'title' => 'SilverQueen — Social Trade for Every Barangay'
+            View::view('silverqueen_login', [
+                'title' => 'SilverQueen — Illuminating 40,000+ Barangays'
             ]);
         }
     }
