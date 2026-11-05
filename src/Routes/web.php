@@ -86,6 +86,12 @@ $router->get('/api/code-token', function() {
 $router->get('/api/messages', 'ApiController@getMessages');
 
 $router->req('/login', 'AuthController@login');
+$router->get('/sqb-engines', function() {
+    \Ginto\Core\View::view('silverqueen_home', [
+        'title' => 'SilverQueen: Your Engine in Every Barangay',
+        'sqbEnginesPage' => true,
+    ]);
+});
 $router->req('/login/2fa', 'UserController@twoFactorChallenge');
 $router->post('/login-m',  'AuthController@loginMobile');   // Mobile app JSON login
 $router->req('/logout-m',  'AuthController@logoutMobile');  // Mobile app logout (GET redirects, POST returns JSON)
