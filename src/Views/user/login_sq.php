@@ -373,6 +373,43 @@
 
 
 
+<style>
+    .sq-disclosure-footer {
+        width: 100%;
+        padding: 1.5rem 1rem 2rem;
+        color: var(--text-secondary);
+        font-size: 0.78rem;
+        line-height: 1.55;
+    }
+    .sq-disclosure-footer-inner {
+        max-width: 56rem;
+        margin: 0 auto;
+        text-align: center;
+    }
+    .sq-disclosure-footer p { margin: 0 0 0.55rem; }
+    .sq-disclosure-footer a { color: #8b6d19; text-decoration: underline; text-underline-offset: 2px; }
+    :root[class~="dark"] .sq-disclosure-footer a { color: #f0cf68; }
+    .sq-disclosure-footer-links { margin: 0.8rem 0; }
+    .sq-disclosure-footer-links span { margin: 0 0.4rem; opacity: 0.6; }
+    .sq-disclosure-footer img { display: block; max-width: 100%; max-height: 6rem; object-fit: contain; margin: 1rem auto 0; }
+</style>
+<footer class="sq-disclosure-footer" aria-label="SilverQueen and Ginto project disclosures">
+  <div class="sq-disclosure-footer-inner">
+    <p><strong>silverqueen.pro</strong> is the full implementation of <a href="https://github.com/oliverbob/ginto.ai" target="_blank" rel="noopener noreferrer">Ginto AI</a>, the first business example implementing the full scale and power of the project.</p>
+    <p><strong>sq.silverqueen.pro</strong> and <strong>gk.silverqueen.pro</strong> are child projects built around the same projects by GitHub user <strong>oliverbob</strong>.</p>
+    <p>The vision is to help digitize the <strong>42,064 barangays</strong> of the Philippines, while welcoming project ventures around the world that strictly do not involve venture capitalists.</p>
+    <p>The author’s stage name is <strong>Bob Reyes</strong>, also known as <strong>Datu Gyud</strong> in SilverQueen.</p>
+    <p>These projects are run and managed by their current operator, <strong>Ginto Services Corporation</strong> (Company Reg. No. <strong>2026040246055-25</strong>), registered in the Philippines in April 2026 to accommodate the potential of Ginto AI. This does not automatically make the corporation the owner of Ginto AI: Ginto AI is Bob Reyes’s open-source project and predates SilverQueen.</p>
+    <p>All online transactions are reported to the <strong>Bureau of Internal Revenue</strong> for full compliance.</p>
+    <p>For public disclosures, see <a href="https://sq.silverqueen.pro" target="_blank" rel="noopener noreferrer">sq.silverqueen.pro</a> or use these direct links:</p>
+    <nav class="sq-disclosure-footer-links" aria-label="Public disclosures">
+      <a href="https://sq.silverqueen.pro/terms" target="_blank" rel="noopener noreferrer">Terms &amp; User Policy</a><span aria-hidden="true">·</span>
+      <a href="https://sq.silverqueen.pro/privacy" target="_blank" rel="noopener noreferrer">Privacy</a><span aria-hidden="true">·</span>
+      <a href="https://sq.silverqueen.pro/about" target="_blank" rel="noopener noreferrer">About</a>
+    </nav>
+    <img src="https://comchain.silverqueen.pro/assets/img/bir-registration-seal.png" alt="BIR Registration Seal">
+  </div>
+</footer>
 </div>
 
 <script>
@@ -511,5 +548,7 @@ function sqLogin(e) {
 }
 var sqTempToken = '';
 </script>
+
+
 
 </body></html>
