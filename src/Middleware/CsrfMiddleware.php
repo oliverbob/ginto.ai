@@ -40,6 +40,7 @@ class CsrfMiddleware
         '/api/internal/sites-card',       // the feed card's Sites calls: HMAC-signed by the chat server (SitesCardController)
         '/sites/chat',                    // visitors' questions on members' live sites: no session, rate-limited (CustomerChat)
         '/api/internal/api-keys',         // SilverQueen /superadmin API Keys: HMAC-signed, nonce once (ApiKeysRelayController)
+        '/api/sqetch/chat',               // SQetch bearer is validated with Comchain; no session cookie authenticates this call
         // The payments relay for sq.silverqueen.pro. There is no session and
         // no browser here — sq authenticates with an HMAC over the timestamp
         // and the exact body, which SqRelayController checks before it does
