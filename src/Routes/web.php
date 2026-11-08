@@ -1405,6 +1405,8 @@ $router->post('/api/internal/sites-card', 'SitesCardController@handle');
 $router->get('/api/internal/sites-templates', 'SitesCardController@templates');
 // The SilverQueen /superadmin API Keys page reaches this host's keys here (signed; no session).
 $router->post('/api/internal/api-keys', 'ApiKeysRelayController@handle');
+// SQetch chat validates its bearer token against Comchain before provider keys are used.
+$router->post('/api/sqetch/chat', 'SqetchChatController@handle');
 
 // SilverQueen Premium (owner, 2026-10-24). See src/Sites/.
 $router->get('/sites', 'SitesController@directory');

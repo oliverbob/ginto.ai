@@ -23,7 +23,6 @@ class ApiKeysRelayController
 
     public function handle()
     {
-        header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
         $body = (string) file_get_contents('php://input');
 
@@ -34,7 +33,12 @@ class ApiKeysRelayController
             return;
         }
 
-        $in   = json_decode($body, true) ?: [];
+        $in = json_decode($body, true) ?: [];
+        if (($in['action'] ?? '') === 'chat') {
+            $this->streamChat($in['messages'] ?? []);
+            return;
+        }
+        header('Content-Type: application/json; charset=utf-8');
         $keys = new ApiKeys(Database::getInstance());
         $by   = (int) ($in['by'] ?? 0);
 
@@ -53,6 +57,107 @@ class ApiKeysRelayController
             $out = ['ok' => false, 'error' => $e->getMessage()];
         }
         echo json_encode($out + ['ok' => $out['ok'] ?? true]);
+    }
+
+    /** Stream a constrained text-only completion using the centrally managed provider keys. */
+    public function streamChat(array $messages): void
+    {
+        if (!is_array($messages) || $messages === [] || count($messages) > 40) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => ['message' => 'A conversation with up to 40 messages is required.']]);
+            return;
+        }
+        foreach ($messages as $message) {
+            if (!is_array($message) || !in_array(($message['role'] ?? ''), ['system', 'user', 'assistant'], true)
+                || !is_string($message['content'] ?? null) || strlen($message['content']) > 20000) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['error' => ['message' => 'The conversation contains an invalid message.']]);
+                return;
+            }
+        }
+
+        $db = Database::getInstance();
+        $manager = new \App\Core\ProviderKeyManager($db);
+        $attempts = [];
+        foreach (['groq', 'cerebras'] as $provider) {
+            $keyData = $manager->getAvailableKey($provider);
+            $envName = $provider === 'groq' ? 'GROQ_API_KEY' : 'CEREBRAS_API_KEY';
+            $envKey = (string) (\Ginto\Support\Env::get($envName, '') ?? '');
+            if ($keyData) {
+                $attempts[] = [$provider, $keyData['api_key'], (int) $keyData['id']];
+            } elseif ($envKey !== '') {
+                $rows = $manager->getKeysForProvider($provider);
+                $mirroredAndLimited = false;
+                foreach ($rows as $row) {
+                    if (!empty($row['api_key']) && hash_equals((string) $row['api_key'], $envKey)) {
+                        $mirroredAndLimited = true;
+                        break;
+                    }
+                }
+                if (!$mirroredAndLimited) $attempts[] = [$provider, $envKey, 0];
+            }
+        }
+        if ($attempts === []) {
+            http_response_code(503);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['error' => ['message' => 'No active Groq or Cerebras provider key is available.']]);
+            return;
+        }
+
+        while (ob_get_level() > 0) @ob_end_clean();
+        header('Content-Type: text/event-stream; charset=utf-8');
+        header('Cache-Control: no-cache, no-transform');
+        header('X-Accel-Buffering: no');
+        header('Connection: keep-alive');
+        $lastError = '';
+        foreach ($attempts as [$provider, $key, $keyId]) {
+            $model = $provider === 'groq' ? 'openai/gpt-oss-20b' : 'gpt-oss-120b';
+            $url = $provider === 'groq' ? 'https://api.groq.com/openai/v1/chat/completions' : 'https://api.cerebras.ai/v1/chat/completions';
+            $payload = json_encode(['model' => $model, 'messages' => $messages, 'stream' => true, 'max_completion_tokens' => 4096], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            $buffer = '';
+            $started = false;
+            $retry = false;
+            $httpStatus = 0;
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true, CURLOPT_POSTFIELDS => $payload, CURLOPT_CONNECTTIMEOUT => 10, CURLOPT_TIMEOUT => 150,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json', 'Accept: text/event-stream', 'Authorization: Bearer ' . $key],
+                CURLOPT_WRITEFUNCTION => function ($curl, string $chunk) use (&$buffer, &$started, &$retry, &$httpStatus, &$lastError, $manager, $keyId): int {
+                    $httpStatus = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+                    if ($httpStatus >= 400) {
+                        $buffer .= $chunk;
+                        if (strlen($buffer) > 8192) $buffer = substr($buffer, 0, 8192);
+                        $decoded = json_decode($buffer, true);
+                        $lastError = (string) ($decoded['error']['message'] ?? $decoded['message'] ?? 'Provider request failed.');
+                        $retry = in_array($httpStatus, [401, 403, 408, 413, 429], true) || $httpStatus >= 500;
+                        if ($keyId > 0 && in_array($httpStatus, [408, 413, 429], true)) $manager->markKeyRateLimited($keyId, 60);
+                        return strlen($chunk);
+                    }
+                    $started = true;
+                    echo $chunk;
+                    if (ob_get_level() > 0) @ob_flush();
+                    flush();
+                    return strlen($chunk);
+                },
+            ]);
+            curl_exec($ch);
+            $httpStatus = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            $curlError = curl_error($ch);
+            curl_close($ch);
+            if ($httpStatus >= 200 && $httpStatus < 300 && $started) {
+                if ($keyId > 0) $manager->markKeyUsed($keyId);
+                echo "data: [DONE]\n\n";
+                flush();
+                return;
+            }
+            if ($curlError !== '') { $lastError = 'The provider could not be reached.'; $retry = true; }
+            if (!$retry || $started) break;
+        }
+        echo 'data: ' . json_encode(['error' => ['message' => $lastError ?: 'Both configured AI providers are unavailable.']]) . "\n\n";
+        echo "data: [DONE]\n\n";
+        flush();
     }
 
     private function save(ApiKeys $keys, array $in, int $by): array
