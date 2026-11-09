@@ -181,6 +181,26 @@ class ProviderKeyManager
         return null;
     }
 
+    /** @return list<array<string,mixed>> Active, unthrottled keys explicitly granted to a SQetch identity. */
+    public function getAvailableAssignedKeys(string $provider, int $identityId): array
+    {
+        if ($identityId < 1 || !in_array($provider, ['cerebras', 'groq'], true)) return [];
+        $now = date('Y-m-d H:i:s');
+        $rows = $this->db->select('provider_keys', ['[>]sqetch_provider_key_assignments' => ['id' => 'provider_key_id']],
+            ['provider_keys.id', 'provider_keys.provider', 'provider_keys.api_key', 'provider_keys.key_name', 'provider_keys.tier', 'provider_keys.is_default', 'provider_keys.rate_limit_reset_at'], [
+                'sqetch_provider_key_assignments.comchain_identity_id' => $identityId,
+                'provider_keys.provider' => $provider,
+                'provider_keys.user_id' => null,
+                'provider_keys.is_active' => 1,
+                'ORDER' => ['provider_keys.is_default' => 'DESC', 'provider_keys.id' => 'ASC'],
+            ]) ?: [];
+        $out = [];
+        foreach ($rows as $row) {
+            if (($row['rate_limit_reset_at'] ?? null) === null || $row['rate_limit_reset_at'] <= $now) $out[] = $this->formatKeyResult($row);
+        }
+        return $out;
+    }
+
     /**
      * Mark a key as rate-limited.
      * 
